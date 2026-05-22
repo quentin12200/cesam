@@ -40,4 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# SQLite local database
+*.db
+*.db-shm
+*.db-wal
+
 /app/generated/prisma
