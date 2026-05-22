@@ -3,12 +3,16 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+// Prisma CLI ne comprend pas libsql:// — la vraie connexion passe par l'adaptateur dans lib/prisma.ts
+const rawUrl = process.env["DATABASE_URL"] ?? "file:./dev.db";
+const datasourceUrl = rawUrl.startsWith("libsql://") ? "file:./dev.db" : rawUrl;
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: datasourceUrl,
   },
 });
