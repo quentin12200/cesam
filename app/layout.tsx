@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
+import SplashScreen from "@/components/SplashScreen";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -24,6 +25,7 @@ export default function RootLayout({
         <header className="bg-green-700 text-white px-4 py-3 shadow-md sticky top-0 z-30">
           <h1 className="text-lg font-bold tracking-wide">GAEC CESAM — Samuel &amp; Céline</h1>
         </header>
+        <SplashScreen />
         <main className="flex-1 overflow-auto">
           {children}
         </main>
