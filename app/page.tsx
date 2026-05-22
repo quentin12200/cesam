@@ -1,11 +1,27 @@
 import { prisma } from "@/lib/prisma";
-import { differenceInDays } from "date-fns";
+import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getVaccinsManquants } from "@/lib/utils";
 import Link from "next/link";
-import { Beef, Baby, Wifi, AlertTriangle, Syringe, RefreshCw } from "lucide-react";
+import {
+  Beef,
+  Baby,
+  Wifi,
+  AlertTriangle,
+  Syringe,
+  RefreshCw,
+  Tag,
+  Scissors,
+  Activity,
+  CalendarCheck,
+} from "lucide-react";
 
 async function getDashboardData() {
   const now = new Date();
+  const sevenDaysLater = addDays(now, 7);
+  const thirtyDaysLater = addDays(now, 30);
+  const ninetyDaysLater = addDays(now, 90);
+  const twentyOneDaysLater = addDays(now, 21);
+  const sixMonthsAgo = addDays(now, -180);
 
   const [
     vachesActives,
@@ -13,6 +29,12 @@ async function getDashboardData() {
     capteurs,
     vachesAvecSaillies,
     veauxPourVaccins,
+    veauxNonBoucles,
+    evenementsSanitairesUrgents,
+    velagesSemaine,
+    velagesPrevus,
+    vaccinationPreVelage,
+    veauxASevrer,
   ] = await Promise.all([
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: false } }),
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "M" } }),
@@ -37,11 +59,46 @@ async function getDashboardData() {
         vaccinations: { select: { vaccin: true, date: true } },
       },
     }),
+    prisma.animal.count({
+      where: {
+        statut: "ACTIF",
+        boucleFaite: false,
+        velageVeau: { isNot: null },
+      },
+    }),
+    prisma.evenementSanitaire.count({ where: { resolu: false } }),
+    prisma.gestation.count({
+      where: {
+        etat: { in: ["VERT", "ROSE"] },
+        dateVelagePrevue: { gte: now, lte: sevenDaysLater },
+      },
+    }),
+    prisma.gestation.count({
+      where: {
+        etat: { in: ["VERT", "ROSE"] },
+        dateVelagePrevue: { gte: now, lte: thirtyDaysLater },
+      },
+    }),
+    // Gestations dans la fenêtre vaccins pré-vélage (J-21 à J-90)
+    prisma.gestation.count({
+      where: {
+        etat: { in: ["VERT", "ROSE"] },
+        dateVelagePrevue: { gte: twentyOneDaysLater, lte: ninetyDaysLater },
+      },
+    }),
+    // Veaux ≥6 mois encore actifs (à sevrer)
+    prisma.animal.count({
+      where: {
+        statut: "ACTIF",
+        velageVeau: { isNot: null },
+        danais: { lte: sixMonthsAgo },
+      },
+    }),
   ]);
 
-  // Comptage états gestation
   let vachesPleine = 0;
   let aEchographier = 0;
+  let vachesVidesEnRetard = 0;
 
   for (const vache of vachesAvecSaillies) {
     const derniereSaillie = vache.saillies[0]?.date ?? null;
@@ -59,9 +116,9 @@ async function getDashboardData() {
 
     if (etat === "VERT" || etat === "ROSE") vachesPleine++;
     if (etat === "JAUNE") aEchographier++;
+    if (etat === "ROUGE") vachesVidesEnRetard++;
   }
 
-  // Veaux à vacciner
   let veauxAVacciner = 0;
   for (const animal of veauxPourVaccins) {
     const ageJours = differenceInDays(now, animal.danais);
@@ -74,18 +131,6 @@ async function getDashboardData() {
     }
   }
 
-  // Vélages prévus dans 30 jours
-  const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const velagesPrevus = await prisma.gestation.count({
-    where: {
-      etat: { in: ["VERT", "ROSE"] },
-      dateVelagePrevue: {
-        gte: now,
-        lte: thirtyDaysLater,
-      },
-    },
-  });
-
   const pctPleine = vachesActives > 0 ? Math.round((vachesPleine / vachesActives) * 100) : 0;
 
   return {
@@ -97,12 +142,28 @@ async function getDashboardData() {
     aEchographier,
     veauxAVacciner,
     velagesPrevus,
+    velagesSemaine,
+    vachesVidesEnRetard,
+    veauxNonBoucles,
+    veauxASevrer,
+    evenementsSanitairesUrgents,
+    vaccinationPreVelage,
   };
 }
 
 export default async function Dashboard() {
   const data = await getDashboardData();
   const capteursActifs = data.capteurs.filter((c) => c.actif);
+
+  const hasAlertesJour =
+    data.vachesVidesEnRetard > 0 ||
+    data.evenementsSanitairesUrgents > 0 ||
+    data.veauxNonBoucles > 0 ||
+    data.vaccinationPreVelage > 0 ||
+    data.aEchographier > 0 ||
+    data.veauxAVacciner > 0;
+
+  const hasAlertesHebdo = data.velagesSemaine > 0 || data.veauxASevrer > 0;
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
@@ -130,30 +191,155 @@ export default async function Dashboard() {
         </div>
       </div>
 
-      {/* Alertes */}
-      {(data.aEchographier > 0 || data.veauxAVacciner > 0) && (
+      {/* CE QUE JE DOIS FAIRE AUJOURD'HUI */}
+      {hasAlertesJour && (
         <div className="bg-white rounded-xl shadow p-4">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <AlertTriangle size={18} className="text-yellow-500" />
-            À faire aujourd&apos;hui
+            <AlertTriangle size={18} className="text-red-500" />
+            Ce que je dois faire aujourd&apos;hui
           </h3>
           <div className="space-y-2">
+            {data.vachesVidesEnRetard > 0 && (
+              <Link
+                href="/reproduction"
+                className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Activity size={16} className="text-red-600" />
+                  <span className="text-sm font-medium text-red-800">Vaches vides en retard</span>
+                </div>
+                <span className="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {data.vachesVidesEnRetard}
+                </span>
+              </Link>
+            )}
+            {data.evenementsSanitairesUrgents > 0 && (
+              <Link
+                href="/sanitaire"
+                className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Activity size={16} className="text-red-600" />
+                  <span className="text-sm font-medium text-red-800">Interventions sanitaires urgentes</span>
+                </div>
+                <span className="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {data.evenementsSanitairesUrgents}
+                </span>
+              </Link>
+            )}
+            {data.veauxNonBoucles > 0 && (
+              <Link
+                href="/animaux"
+                className={`flex items-center justify-between p-3 rounded-lg border ${
+                  data.veauxNonBoucles >= 15
+                    ? "bg-red-50 border-red-200"
+                    : "bg-orange-50 border-orange-200"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Tag
+                    size={16}
+                    className={data.veauxNonBoucles >= 15 ? "text-red-600" : "text-orange-600"}
+                  />
+                  <span
+                    className={`text-sm font-medium ${
+                      data.veauxNonBoucles >= 15 ? "text-red-800" : "text-orange-800"
+                    }`}
+                  >
+                    Veaux non bouclés
+                  </span>
+                </div>
+                <span
+                  className={`text-white text-xs font-bold px-2 py-1 rounded-full ${
+                    data.veauxNonBoucles >= 15 ? "bg-red-600" : "bg-orange-500"
+                  }`}
+                >
+                  {data.veauxNonBoucles}
+                </span>
+              </Link>
+            )}
+            {data.vaccinationPreVelage > 0 && (
+              <Link
+                href="/sanitaire"
+                className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Syringe size={16} className="text-orange-600" />
+                  <span className="text-sm font-medium text-orange-800">
+                    Vaccins pré-vélage (Crypto / Rotavec)
+                  </span>
+                </div>
+                <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {data.vaccinationPreVelage}
+                </span>
+              </Link>
+            )}
             {data.aEchographier > 0 && (
-              <Link href="/reproduction" className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+              <Link
+                href="/reproduction"
+                className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200"
+              >
                 <div className="flex items-center gap-2">
                   <RefreshCw size={16} className="text-yellow-600" />
                   <span className="text-sm font-medium text-yellow-800">Vaches à échographier</span>
                 </div>
-                <span className="bg-yellow-400 text-black text-xs font-bold px-2 py-1 rounded-full">{data.aEchographier}</span>
+                <span className="bg-yellow-400 text-black text-xs font-bold px-2 py-1 rounded-full">
+                  {data.aEchographier}
+                </span>
               </Link>
             )}
             {data.veauxAVacciner > 0 && (
-              <Link href="/sanitaire" className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+              <Link
+                href="/sanitaire"
+                className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200"
+              >
                 <div className="flex items-center gap-2">
                   <Syringe size={16} className="text-red-600" />
                   <span className="text-sm font-medium text-red-800">Veaux à vacciner</span>
                 </div>
-                <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">{data.veauxAVacciner}</span>
+                <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {data.veauxAVacciner}
+                </span>
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Focus hebdomadaire J+7 */}
+      {hasAlertesHebdo && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <CalendarCheck size={18} className="text-blue-500" />
+            Cette semaine (J+7)
+          </h3>
+          <div className="space-y-2">
+            {data.velagesSemaine > 0 && (
+              <Link
+                href="/velage"
+                className="flex items-center justify-between p-3 bg-pink-50 rounded-lg border border-pink-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Baby size={16} className="text-pink-600" />
+                  <span className="text-sm font-medium text-pink-800">Vélages prévus cette semaine</span>
+                </div>
+                <span className="bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {data.velagesSemaine}
+                </span>
+              </Link>
+            )}
+            {data.veauxASevrer > 0 && (
+              <Link
+                href="/animaux"
+                className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Scissors size={16} className="text-green-600" />
+                  <span className="text-sm font-medium text-green-800">Veaux à sevrer (≥ 6 mois)</span>
+                </div>
+                <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {data.veauxASevrer}
+                </span>
               </Link>
             )}
           </div>
@@ -167,7 +353,9 @@ export default async function Dashboard() {
           <div className="text-center p-3 bg-green-50 rounded-lg">
             <div className="text-2xl font-bold text-green-700">{data.pctPleine}%</div>
             <div className="text-xs text-gray-600 mt-1">Vaches pleines</div>
-            <div className="text-xs text-gray-400">{data.vachesPleine} / {data.vachesActives}</div>
+            <div className="text-xs text-gray-400">
+              {data.vachesPleine} / {data.vachesActives}
+            </div>
           </div>
           <div className="text-center p-3 bg-pink-50 rounded-lg">
             <div className="text-2xl font-bold text-pink-600">{data.velagesPrevus}</div>
@@ -197,25 +385,36 @@ export default async function Dashboard() {
           {data.capteurs.map((capteur) => (
             <div
               key={capteur.id}
-              className={`p-3 rounded-lg border ${capteur.actif ? "bg-green-50 border-green-300" : "bg-gray-50 border-gray-200"}`}
+              className={`p-3 rounded-lg border ${
+                capteur.actif ? "bg-green-50 border-green-300" : "bg-gray-50 border-gray-200"
+              }`}
             >
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-gray-700">Capteur {capteur.numero}</span>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${capteur.actif ? "bg-green-500 text-white" : "bg-gray-400 text-white"}`}>
+                <span
+                  className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                    capteur.actif ? "bg-green-500 text-white" : "bg-gray-400 text-white"
+                  }`}
+                >
                   {capteur.actif ? "ACTIF" : "LIBRE"}
                 </span>
               </div>
               {capteur.actif && capteur.animalNom && (
-                <div className="text-xs text-gray-600 mt-1">{capteur.animalNom} - {capteur.animalNutrav}</div>
+                <div className="text-xs text-gray-600 mt-1">
+                  {capteur.animalNom} - {capteur.animalNutrav}
+                </div>
               )}
               {capteur.actif && capteur.dateAttribution && (
-                <div className="text-xs text-gray-400">Depuis le {new Date(capteur.dateAttribution).toLocaleDateString("fr-FR")}</div>
+                <div className="text-xs text-gray-400">
+                  Depuis le {new Date(capteur.dateAttribution).toLocaleDateString("fr-FR")}
+                </div>
               )}
             </div>
           ))}
         </div>
         <div className="mt-2 text-xs text-gray-500 text-center">
-          {capteursActifs.length} capteur{capteursActifs.length > 1 ? "s" : ""} actif{capteursActifs.length > 1 ? "s" : ""}
+          {capteursActifs.length} capteur{capteursActifs.length > 1 ? "s" : ""} actif
+          {capteursActifs.length > 1 ? "s" : ""}
         </div>
       </div>
     </div>
