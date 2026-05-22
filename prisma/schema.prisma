@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Animal {
+  id            String    @id @default(cuid())
+  copaip        String    @default("FR")
+  nunati        String    @unique
+  nutrav        String    @unique
+  nobovi        String?
+  danais        DateTime
+  sexbov        String    @default("F")
+  statut        String    @default("ACTIF")
+  race          String    @default("BLONDE_AQUITAINE")
+  estGenisse    Boolean   @default(false)
+
+  copami        String?
+  numeip        String?
+  nomeip        String?
+  tramip        String?
+
+  mereId        String?
+  mere          Animal?   @relation("Genealogie", fields: [mereId], references: [id])
+  veaux         Animal[]  @relation("Genealogie")
+
+  taureauId     String?
+  taureau       Taureau?  @relation(fields: [taureauId], references: [id])
+
+  boucleNumero  String?
+  boucleFaite   Boolean   @default(false)
+
+  localisationId String?
+  localisation   Localisation? @relation(fields: [localisationId], references: [id])
+
+  saillies        Saillie[]
+  velagesVache    Velage[]        @relation("VelageVache")
+  velageVeau      Velage?         @relation("VelageVeau")
+  pesees          Pesee[]
+  vaccinations    Vaccination[]
+  evenements      EvenementSanitaire[]
+  parages         Parage[]
+  complementsAlim ComplementAlim[]
+
+  notes         String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Taureau {
+  id       String   @id @default(cuid())
+  copaip   String   @default("FR")
+  nupere   String   @unique
+  nopere   String?
+  traper   String?
+  present  Boolean  @default(true)
+
+  animaux  Animal[]
+  saillies Saillie[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Saillie {
+  id          String   @id @default(cuid())
+  animalId    String
+  animal      Animal   @relation(fields: [animalId], references: [id])
+  date        DateTime
+  type        String
+  estimation  Boolean  @default(false)
+  groupage    Boolean  @default(false)
+  tentative   Int      @default(1)
+  taureauId   String?
+  taureau     Taureau? @relation(fields: [taureauId], references: [id])
+
+  gestation   Gestation?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Gestation {
+  id               String    @id @default(cuid())
+  saillieId        String    @unique
+  saillie          Saillie   @relation(fields: [saillieId], references: [id])
+  etat             String    @default("GRIS")
+  dateEcho         DateTime?
+  joursGestation   Int?
+  dateVelagePrevue DateTime?
+  resultatEcho     String?
+  sousResultat     String?
+
+  velage           Velage?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Velage {
+  id            String    @id @default(cuid())
+  date          DateTime
+  qualificatif  String    @default("NORMAL")
+  sousType      String?
+
+  vacheId       String
+  vache         Animal    @relation("VelageVache", fields: [vacheId], references: [id])
+
+  veauId        String?   @unique
+  veau          Animal?   @relation("VelageVeau", fields: [veauId], references: [id])
+
+  gestationId   String?   @unique
+  gestation     Gestation? @relation(fields: [gestationId], references: [id])
+
+  capteur       Int?
+  pereNom       String?
+  pereNunati    String?
+  jumeaux       Boolean   @default(false)
+
+  notes         String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Vaccination {
+  id         String    @id @default(cuid())
+  animalId   String
+  animal     Animal    @relation(fields: [animalId], references: [id])
+  vaccin     String
+  date       DateTime
+  voie       String?
+  dose       Float?
+  statut     String    @default("FAIT")
+  notes      String?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model EvenementSanitaire {
+  id          String    @id @default(cuid())
+  animalId    String
+  animal      Animal    @relation(fields: [animalId], references: [id])
+  type        String
+  date        DateTime
+  description String?
+  photos      String?
+  resolu      Boolean   @default(false)
+  dateResolu  DateTime?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Pesee {
+  id         String   @id @default(cuid())
+  animalId   String
+  animal     Animal   @relation(fields: [animalId], references: [id])
+  date       DateTime
+  poids      Float
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Parage {
+  id         String   @id @default(cuid())
+  animalId   String
+  animal     Animal   @relation(fields: [animalId], references: [id])
+  date       DateTime
+  pattes     String
+  notes      String?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ComplementAlim {
+  id         String   @id @default(cuid())
+  animalId   String
+  animal     Animal   @relation(fields: [animalId], references: [id])
+  type       String
+  date       DateTime
+  statut     String   @default("PREVU")
+  notes      String?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Localisation {
+  id      String   @id @default(cuid())
+  nom     String   @unique
+  type    String
+  animaux Animal[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CapteurVelage {
+  id              String    @id @default(cuid())
+  numero          Int       @unique
+  animalNutrav    String?
+  animalNom       String?
+  dateAttribution DateTime?
+  actif           Boolean   @default(false)
+
+  updatedAt DateTime @updatedAt
+}
