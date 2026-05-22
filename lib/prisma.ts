@@ -9,8 +9,7 @@ function createPrismaClient() {
     url: DB_URL,
     ...(AUTH_TOKEN ? { authToken: AUTH_TOKEN } : {}),
   });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return new PrismaClient({ adapter } as any);
+  return new PrismaClient({ adapter } as never);
 }
 
 const globalForPrisma = globalThis as unknown as {
