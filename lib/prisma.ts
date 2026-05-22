@@ -5,7 +5,8 @@ const DB_URL = process.env.DATABASE_URL ?? "file:///home/user/cesam/dev.db";
 
 function createPrismaClient() {
   const adapter = new PrismaLibSql({ url: DB_URL });
-  return new PrismaClient({ adapter } as Parameters<typeof PrismaClient>[0]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return new PrismaClient({ adapter } as any);
 }
 
 const globalForPrisma = globalThis as unknown as {
