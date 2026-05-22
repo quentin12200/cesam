@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getVaccinsManquants } from "@/lib/utils";
