@@ -25,7 +25,7 @@ async function getAnimal(nutrav: string) {
       velagesVache: {
         orderBy: { date: "desc" },
         include: {
-          veau: { select: { nutrav: true, nobovi: true, sexbov: true } },
+          veau: { select: { nutrav: true, nobovi: true, sexbov: true, statut: true } },
         },
       },
       velageVeau: {
@@ -88,6 +88,36 @@ export default async function FicheAnimal({ params }: PageProps) {
         </div>
       </div>
 
+      {/* Reproduction (vaches seulement) */}
+      {animal.sexbov === "F" && !animal.estGenisse && animal.saillies.length > 0 && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3">Reproduction</h3>
+          <div className="space-y-2">
+            {animal.saillies.slice(0, 5).map((saillie) => (
+              <div key={saillie.id} className="border border-gray-100 rounded-lg p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{formatDate(saillie.date)}</span>
+                  <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">{saillie.type}</span>
+                </div>
+                {saillie.taureau && (
+                  <div className="text-xs text-gray-500 mt-1">Taureau: {saillie.taureau.nopere ?? saillie.taureau.nupere}</div>
+                )}
+                {saillie.gestation && (
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getBadgeClass(saillie.gestation.etat as "VERT" | "JAUNE" | "ROUGE" | "ROSE" | "GRIS")}`}>
+                      {getEtatLabel(saillie.gestation.etat as "VERT" | "JAUNE" | "ROUGE" | "ROSE" | "GRIS")}
+                    </span>
+                    {saillie.gestation.dateVelagePrevue && (
+                      <span className="text-xs text-gray-500">Vélage prévu: {formatDate(saillie.gestation.dateVelagePrevue)}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Identité */}
       <div className="bg-white rounded-xl shadow p-4">
         <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -107,16 +137,67 @@ export default async function FicheAnimal({ params }: PageProps) {
           <div className="font-medium">{formatAge(animal.danais)}</div>
           <div className="text-gray-500">Sexe</div>
           <div>{animal.sexbov === "F" ? (animal.estGenisse ? "Génisse" : "Vache") : "Mâle"}</div>
-          <div className="text-gray-500">Statut</div>
-          <div>
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${animal.statut === "ACTIF" ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>
-              {animal.statut}
-            </span>
-          </div>
-          <div className="text-gray-500">Race</div>
-          <div className="text-xs">{animal.race.replace("_", " ")}</div>
         </div>
       </div>
+
+      {/* Vélages */}
+      {animal.velagesVache.length > 0 && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Baby size={16} className="text-pink-500" />
+            Historique vélages ({animal.velagesVache.length})
+          </h3>
+          <div className="space-y-2">
+            {animal.velagesVache.map((velage) => (
+              <div key={velage.id} className="border border-gray-100 rounded-lg p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{formatDate(velage.date)}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${velage.qualificatif === "NORMAL" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{velage.qualificatif}</span>
+                </div>
+                {velage.veau && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <Link href={`/troupeau/${velage.veau.nutrav}`} className="text-xs text-green-700 hover:underline font-mono">
+                      {velage.veau.nutrav}
+                    </Link>
+                    <span className="text-xs text-gray-500">
+                      {velage.veau.sexbov === "M" ? "♂ Mâle" : "♀ Femelle"}
+                    </span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${velage.veau.statut === "ACTIF" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      {velage.veau.statut === "ACTIF" ? "Présent" : "Sorti"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Vélage veau */}
+      {animal.velageVeau && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Baby size={16} className="text-pink-500" />
+            Naissance
+          </h3>
+          <div className="text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Date</span>
+              <span>{formatDate(animal.velageVeau.date)}</span>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-gray-500">Mère</span>
+              <Link href={`/troupeau/${animal.velageVeau.vache.nutrav}`} className="text-green-700 hover:underline">
+                {animal.velageVeau.vache.nobovi ?? animal.velageVeau.vache.nutrav}
+              </Link>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-gray-500">Qualificatif</span>
+              <span>{animal.velageVeau.qualificatif}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Généalogie */}
       <div className="bg-white rounded-xl shadow p-4">
@@ -165,87 +246,6 @@ export default async function FicheAnimal({ params }: PageProps) {
           </div>
         )}
       </div>
-
-      {/* Reproduction (vaches seulement) */}
-      {animal.sexbov === "F" && !animal.estGenisse && animal.saillies.length > 0 && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-3">Reproduction</h3>
-          <div className="space-y-2">
-            {animal.saillies.slice(0, 5).map((saillie) => (
-              <div key={saillie.id} className="border border-gray-100 rounded-lg p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{formatDate(saillie.date)}</span>
-                  <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">{saillie.type}</span>
-                </div>
-                {saillie.taureau && (
-                  <div className="text-xs text-gray-500 mt-1">Taureau: {saillie.taureau.nopere ?? saillie.taureau.nupere}</div>
-                )}
-                {saillie.gestation && (
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getBadgeClass(saillie.gestation.etat as "VERT" | "JAUNE" | "ROUGE" | "ROSE" | "GRIS")}`}>
-                      {getEtatLabel(saillie.gestation.etat as "VERT" | "JAUNE" | "ROUGE" | "ROSE" | "GRIS")}
-                    </span>
-                    {saillie.gestation.dateVelagePrevue && (
-                      <span className="text-xs text-gray-500">Vélage prévu: {formatDate(saillie.gestation.dateVelagePrevue)}</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Vélages */}
-      {animal.velagesVache.length > 0 && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Baby size={16} className="text-pink-500" />
-            Historique vélages ({animal.velagesVache.length})
-          </h3>
-          <div className="space-y-2">
-            {animal.velagesVache.map((velage) => (
-              <div key={velage.id} className="border border-gray-100 rounded-lg p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{formatDate(velage.date)}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${velage.qualificatif === "NORMAL" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{velage.qualificatif}</span>
-                </div>
-                {velage.veau && (
-                  <Link href={`/troupeau/${velage.veau.nutrav}`} className="text-xs text-green-700 mt-1 block hover:underline">
-                    Veau: {velage.veau.nobovi ?? velage.veau.nutrav} ({velage.veau.sexbov})
-                  </Link>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Vélage veau */}
-      {animal.velageVeau && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Baby size={16} className="text-pink-500" />
-            Naissance
-          </h3>
-          <div className="text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Date</span>
-              <span>{formatDate(animal.velageVeau.date)}</span>
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-gray-500">Mère</span>
-              <Link href={`/troupeau/${animal.velageVeau.vache.nutrav}`} className="text-green-700 hover:underline">
-                {animal.velageVeau.vache.nobovi ?? animal.velageVeau.vache.nutrav}
-              </Link>
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-gray-500">Qualificatif</span>
-              <span>{animal.velageVeau.qualificatif}</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Pesées */}
       {animal.pesees.length > 0 && (

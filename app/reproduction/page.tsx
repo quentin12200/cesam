@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib/utils";
 import Link from "next/link";
 import { RefreshCw, Plus, CheckCircle, Filter } from "lucide-react";
@@ -41,7 +42,9 @@ export default function ReproductionPage() {
   const [vaches, setVaches] = useState<VacheRepro[]>([]);
   const [taureaux, setTaureaux] = useState<Taureau[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterEtat, setFilterEtat] = useState<FilterEtat>("TOUS");
+  const searchParams = useSearchParams();
+  const initialFiltre = (searchParams.get("filtre") as FilterEtat) ?? "TOUS";
+  const [filterEtat, setFilterEtat] = useState<FilterEtat>(initialFiltre);
   const [showSaillieForm, setShowSaillieForm] = useState(false);
   const [showEchoForm, setShowEchoForm] = useState(false);
   const [selectedVache, setSelectedVache] = useState<VacheRepro | null>(null);

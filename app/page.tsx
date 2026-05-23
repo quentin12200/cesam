@@ -15,6 +15,7 @@ import {
   Scissors,
   Activity,
   CalendarCheck,
+  Search,
 } from "lucide-react";
 
 async function getDashboardData() {
@@ -38,8 +39,8 @@ async function getDashboardData() {
     vaccinationPreVelage,
     veauxASevrer,
   ] = await Promise.all([
-    prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: false } }),
-    prisma.animal.count({ where: { statut: "ACTIF", sexbov: "M" } }),
+    prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", velageVeau: { is: null } } }),
+    prisma.animal.count({ where: { statut: "ACTIF", OR: [{ sexbov: "M" }, { estGenisse: true }] } }),
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
     prisma.animal.findMany({
       where: { statut: "ACTIF", sexbov: "F", estGenisse: false },
@@ -169,6 +170,16 @@ export default async function Dashboard() {
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
+      {/* Recherche rapide */}
+      <form action="/troupeau" method="GET" className="relative mt-2">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          name="q"
+          placeholder="Trouver un animal (N° ou nom)..."
+          className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm shadow focus:outline-none focus:ring-2 focus:ring-green-500"
+        />
+      </form>
       <h2 className="text-xl font-bold text-gray-800 mt-2">Tableau de bord</h2>
 
       {/* Stats principales */}
@@ -188,7 +199,7 @@ export default async function Dashboard() {
           </div>
           <div>
             <div className="text-2xl font-bold text-gray-800">{data.veauxActifs}</div>
-            <div className="text-xs text-gray-500">Veaux actifs</div>
+            <div className="text-xs text-gray-500">Veaux & génisses</div>
           </div>
         </div>
       </div>
@@ -203,7 +214,7 @@ export default async function Dashboard() {
           <div className="space-y-2">
             {data.vachesVidesEnRetard > 0 && (
               <Link
-                href="/reproduction"
+                href="/reproduction?filtre=ROUGE"
                 className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200"
               >
                 <div className="flex items-center gap-2">
