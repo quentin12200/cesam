@@ -47,6 +47,8 @@ model Animal {
 
   notes         String?
 
+  sortie        Sortie?
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -212,4 +214,25 @@ model CapteurVelage {
   actif           Boolean   @default(false)
 
   updatedAt DateTime @updatedAt
+}
+
+model Sortie {
+  id              String    @id @default(cuid())
+  animalId        String    @unique
+  animal          Animal    @relation(fields: [animalId], references: [id])
+  date            DateTime
+  type            String    // MORT | ELEVAGE | BOUCHERIE | ENGRAISSEMENT
+
+  acheteur        String?
+  prixKilo        Float?
+  poids           Float?
+  prixPrevuHT     Float?
+  prixDefinitifHT Float?
+
+  dateDebutEngr   DateTime?
+
+  notes           String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }

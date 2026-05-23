@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Beef, RefreshCw, Shield, Baby } from "lucide-react";
+import { Home, RefreshCw, Shield, Baby, Euro } from "lucide-react";
 import CowIcon from "@/components/CowIcon";
 
 const navItems = [
-  { href: "/", label: "Tableau de bord", icon: Home },
+  { href: "/", label: "Accueil", icon: Home },
   { href: "/troupeau", label: "Troupeau", icon: CowIcon },
   { href: "/reproduction", label: "Repro", icon: RefreshCw },
   { href: "/sanitaire", label: "Sanitaire", icon: Shield },
   { href: "/velage", label: "Vélage", icon: Baby },
+  { href: "/finances", label: "Finances", icon: Euro },
 ];
 
 export default function BottomNav() {
@@ -32,8 +33,8 @@ export default function BottomNav() {
                   : "text-gray-500"
               }`}
             >
-              <Icon size={20} />
-              <span>{label}</span>
+              <Icon size={18} />
+              <span className="text-[10px] leading-tight">{label}</span>
             </Link>
           );
         })}

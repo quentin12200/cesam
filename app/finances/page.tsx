@@ -1,0 +1,288 @@
+export const dynamic = "force-dynamic";
+
+import { prisma } from "@/lib/prisma";
+import Link from "next/link";
+import { ArrowLeft, TrendingUp, Package, Euro, Plus } from "lucide-react";
+import SortieForm from "./SortieForm";
+
+function formatEuro(val: number | null | undefined) {
+  if (val == null) return "—";
+  return val.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+}
+
+function formatPoids(val: number | null | undefined) {
+  if (val == null) return "—";
+  return `${val.toFixed(0)} kg`;
+}
+
+async function getFinancesData(annee: number) {
+  const debut = new Date(`${annee}-01-01`);
+  const fin = new Date(`${annee + 1}-01-01`);
+
+  const sorties = await prisma.sortie.findMany({
+    where: { date: { gte: debut, lt: fin } },
+    include: {
+      animal: {
+        select: { nutrav: true, nobovi: true, sexbov: true, danais: true, velageVeau: { select: { id: true } } },
+      },
+    },
+    orderBy: { date: "desc" },
+  });
+
+  const ventesElevage = sorties.filter((s) => s.type === "ELEVAGE");
+  const ventesBoucherie = sorties.filter((s) => s.type === "BOUCHERIE");
+  const morts = sorties.filter((s) => s.type === "MORT");
+  const engraissements = sorties.filter((s) => s.type === "ENGRAISSEMENT");
+
+  const caVeaux = ventesElevage
+    .filter((s) => s.animal.velageVeau !== null)
+    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+
+  const caVaches = [
+    ...ventesElevage.filter((s) => s.animal.velageVeau === null),
+    ...ventesBoucherie,
+  ].reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+
+  const caTotal = caVeaux + caVaches;
+
+  const veauxVendus = ventesElevage.filter((s) => s.animal.velageVeau !== null);
+  const poidsVeauxTotal = veauxVendus.reduce((sum, s) => sum + (s.poids ?? 0), 0);
+  const poidsMoyenVeau = veauxVendus.length > 0 ? poidsVeauxTotal / veauxVendus.length : null;
+  const prixMoyenVeau =
+    veauxVendus.length > 0
+      ? veauxVendus.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0) /
+        veauxVendus.length
+      : null;
+
+  const vachesBoucherie = ventesBoucherie;
+  const poidsCarcasseTotal = vachesBoucherie.reduce((sum, s) => sum + (s.poids ?? 0), 0);
+  const poidsMoyenCarcasse =
+    vachesBoucherie.length > 0 ? poidsCarcasseTotal / vachesBoucherie.length : null;
+  const prixMoyenVache =
+    vachesBoucherie.length > 0
+      ? vachesBoucherie.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0) /
+        vachesBoucherie.length
+      : null;
+
+  return {
+    sorties,
+    caVeaux,
+    caVaches,
+    caTotal,
+    ventesElevageCount: ventesElevage.length,
+    ventesBoucherieCount: ventesBoucherie.length,
+    mortsCount: morts.length,
+    engraissementsCount: engraissements.length,
+    poidsMoyenVeau,
+    prixMoyenVeau,
+    poidsMoyenCarcasse,
+    prixMoyenVache,
+    veauxVendusCount: veauxVendus.length,
+  };
+}
+
+async function getAnimauxActifs() {
+  return prisma.animal.findMany({
+    where: { statut: "ACTIF" },
+    select: { id: true, nutrav: true, nobovi: true, sexbov: true },
+    orderBy: { nutrav: "asc" },
+  });
+}
+
+interface PageProps {
+  searchParams: Promise<{ annee?: string; nouvelle?: string }>;
+}
+
+const ANNEE_COURANTE = new Date().getFullYear();
+
+export default async function FinancesPage({ searchParams }: PageProps) {
+  const sp = await searchParams;
+  const annee = sp.annee ? parseInt(sp.annee) : ANNEE_COURANTE;
+  const showForm = sp.nouvelle === "1";
+
+  const [data, animaux] = await Promise.all([
+    getFinancesData(annee),
+    showForm ? getAnimauxActifs() : Promise.resolve([]),
+  ]);
+
+  const typeLabel: Record<string, string> = {
+    MORT: "Mort",
+    ELEVAGE: "Vente vif",
+    BOUCHERIE: "Boucherie",
+    ENGRAISSEMENT: "Engraissement",
+  };
+
+  const typeBadge: Record<string, string> = {
+    MORT: "bg-gray-100 text-gray-600",
+    ELEVAGE: "bg-green-100 text-green-700",
+    BOUCHERIE: "bg-orange-100 text-orange-700",
+    ENGRAISSEMENT: "bg-blue-100 text-blue-700",
+  };
+
+  return (
+    <div className="p-4 space-y-4 max-w-2xl mx-auto">
+      <div className="flex items-center gap-3 mt-2">
+        <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-600 hover:bg-gray-50">
+          <ArrowLeft size={18} />
+        </Link>
+        <h2 className="text-xl font-bold text-gray-800 flex-1">Finances & Sorties</h2>
+        {!showForm && (
+          <Link
+            href={`/finances?annee=${annee}&nouvelle=1`}
+            className="flex items-center gap-1.5 bg-green-700 text-white text-sm font-medium px-3 py-2 rounded-lg shadow"
+          >
+            <Plus size={16} />
+            Sortie
+          </Link>
+        )}
+      </div>
+
+      {/* Sélecteur d'année */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {[ANNEE_COURANTE - 1, ANNEE_COURANTE, ANNEE_COURANTE + 1].map((y) => (
+          <Link
+            key={y}
+            href={`/finances?annee=${y}`}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
+              y === annee
+                ? "bg-green-700 text-white shadow"
+                : "bg-white text-gray-600 shadow-sm border border-gray-200"
+            }`}
+          >
+            {y}
+          </Link>
+        ))}
+      </div>
+
+      {/* Formulaire nouvelle sortie */}
+      {showForm && <SortieForm animaux={animaux} annee={annee} />}
+
+      {/* CA Total */}
+      <div className="bg-gradient-to-br from-green-700 to-green-800 rounded-xl shadow p-4 text-white">
+        <div className="flex items-center gap-2 mb-1">
+          <Euro size={18} />
+          <span className="text-sm font-medium opacity-90">Chiffre d&apos;affaires {annee}</span>
+        </div>
+        <div className="text-3xl font-bold">{formatEuro(data.caTotal)}</div>
+        <div className="flex gap-4 mt-3 text-sm opacity-80">
+          <div>
+            <div className="font-semibold text-white">{formatEuro(data.caVeaux)}</div>
+            <div>Veaux</div>
+          </div>
+          <div className="w-px bg-white/30" />
+          <div>
+            <div className="font-semibold text-white">{formatEuro(data.caVaches)}</div>
+            <div>Vaches / boucherie</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats par catégorie */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl shadow p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp size={16} className="text-green-600" />
+            <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Ventes vif</span>
+          </div>
+          <div className="text-2xl font-bold text-gray-800">{data.ventesElevageCount}</div>
+          <div className="text-xs text-gray-500 mt-0.5">animaux</div>
+          {data.poidsMoyenVeau && (
+            <div className="text-xs text-gray-400 mt-1">
+              Poids moy. {formatPoids(data.poidsMoyenVeau)}
+            </div>
+          )}
+          {data.prixMoyenVeau && (
+            <div className="text-xs text-green-600 font-medium mt-0.5">
+              Moy. {formatEuro(data.prixMoyenVeau)}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Package size={16} className="text-orange-600" />
+            <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Boucherie</span>
+          </div>
+          <div className="text-2xl font-bold text-gray-800">{data.ventesBoucherieCount}</div>
+          <div className="text-xs text-gray-500 mt-0.5">vaches</div>
+          {data.poidsMoyenCarcasse && (
+            <div className="text-xs text-gray-400 mt-1">
+              Carcasse moy. {formatPoids(data.poidsMoyenCarcasse)}
+            </div>
+          )}
+          {data.prixMoyenVache && (
+            <div className="text-xs text-orange-600 font-medium mt-0.5">
+              Moy. {formatEuro(data.prixMoyenVache)}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-base">💀</span>
+            <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Morts</span>
+          </div>
+          <div className="text-2xl font-bold text-gray-400">{data.mortsCount}</div>
+          <div className="text-xs text-gray-500 mt-0.5">animaux</div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-base">🐄</span>
+            <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Engraissement</span>
+          </div>
+          <div className="text-2xl font-bold text-blue-600">{data.engraissementsCount}</div>
+          <div className="text-xs text-gray-500 mt-0.5">en cours</div>
+        </div>
+      </div>
+
+      {/* Liste des sorties */}
+      <div className="bg-white rounded-xl shadow p-4">
+        <h3 className="font-semibold text-gray-800 mb-3">
+          Sorties {annee} ({data.sorties.length})
+        </h3>
+        {data.sorties.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">Aucune sortie enregistrée pour {annee}</p>
+        ) : (
+          <div className="space-y-2">
+            {data.sorties.map((sortie) => (
+              <div key={sortie.id} className="border border-gray-100 rounded-lg p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Link
+                      href={`/troupeau/${sortie.animal.nutrav}`}
+                      className="bg-gray-700 text-white text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0"
+                    >
+                      {sortie.animal.nutrav}
+                    </Link>
+                    <span className="text-sm font-medium text-gray-700 truncate">
+                      {sortie.animal.nobovi ?? "—"}
+                    </span>
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${typeBadge[sortie.type] ?? "bg-gray-100 text-gray-600"}`}>
+                    {typeLabel[sortie.type] ?? sortie.type}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                  <span>{new Date(sortie.date).toLocaleDateString("fr-FR")}</span>
+                  <div className="flex items-center gap-3">
+                    {sortie.poids && <span>{formatPoids(sortie.poids)}</span>}
+                    {sortie.prixKilo && <span>{sortie.prixKilo.toFixed(2)} €/kg</span>}
+                    {(sortie.prixDefinitifHT ?? sortie.prixPrevuHT) && (
+                      <span className="font-semibold text-green-700">
+                        {formatEuro(sortie.prixDefinitifHT ?? sortie.prixPrevuHT)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {sortie.acheteur && (
+                  <div className="text-xs text-gray-400 mt-1">Acheteur : {sortie.acheteur}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

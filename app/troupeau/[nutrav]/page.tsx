@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { formatAge, formatDate, getEtatGestation, getBadgeClass, getEtatLabel } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Syringe, Scale, Baby, AlertCircle } from "lucide-react";
+import { ArrowLeft, Syringe, Scale, Baby, AlertCircle, Euro, LogOut } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import EditAnimalDrawer from "./EditAnimalDrawer";
 import CowIcon from "@/components/CowIcon";
@@ -39,6 +39,7 @@ async function getAnimal(nutrav: string) {
         orderBy: { date: "desc" },
         include: { gestation: true, taureau: true },
       },
+      sortie: true,
     },
   });
   return animal;
@@ -329,6 +330,81 @@ export default async function FicheAnimal({ params }: PageProps) {
           </div>
         </div>
       )}
+
+      {/* Sortie */}
+      {animal.sortie ? (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <LogOut size={16} className="text-gray-500" />
+            Sortie
+          </h3>
+          <div className="text-sm space-y-1.5">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Date</span>
+              <span>{formatDate(animal.sortie.date)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Type</span>
+              <span className="font-medium">
+                {animal.sortie.type === "MORT" && "Mort"}
+                {animal.sortie.type === "ELEVAGE" && "Vente vif"}
+                {animal.sortie.type === "BOUCHERIE" && "Boucherie"}
+                {animal.sortie.type === "ENGRAISSEMENT" && "Engraissement"}
+              </span>
+            </div>
+            {animal.sortie.acheteur && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Acheteur</span>
+                <span>{animal.sortie.acheteur}</span>
+              </div>
+            )}
+            {animal.sortie.poids && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Poids</span>
+                <span>{animal.sortie.poids} kg</span>
+              </div>
+            )}
+            {animal.sortie.prixKilo && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Prix / kg</span>
+                <span>{animal.sortie.prixKilo.toFixed(2)} €</span>
+              </div>
+            )}
+            {(animal.sortie.prixDefinitifHT ?? animal.sortie.prixPrevuHT) && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Prix total</span>
+                <span className="font-bold text-green-700">
+                  {(animal.sortie.prixDefinitifHT ?? animal.sortie.prixPrevuHT)!.toLocaleString(
+                    "fr-FR",
+                    { style: "currency", currency: "EUR" }
+                  )}
+                  {!animal.sortie.prixDefinitifHT && (
+                    <span className="text-xs text-gray-400 font-normal ml-1">(estimé)</span>
+                  )}
+                </span>
+              </div>
+            )}
+            {animal.sortie.notes && (
+              <div className="pt-1 text-xs text-gray-500">{animal.sortie.notes}</div>
+            )}
+          </div>
+          <Link
+            href="/finances"
+            className="mt-3 flex items-center gap-1.5 text-xs text-green-700 font-medium hover:underline"
+          >
+            <Euro size={12} />
+            Voir dans Finances
+          </Link>
+        </div>
+      ) : animal.statut === "ACTIF" ? (
+        <Link
+          href="/finances?nouvelle=1"
+          className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+        >
+          <LogOut size={16} />
+          Enregistrer une sortie
+        </Link>
+      ) : null}
     </div>
   );
 }
