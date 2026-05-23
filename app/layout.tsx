@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import SplashScreen from "@/components/SplashScreen";
+import InstallPrompt from "@/app/components/InstallPrompt";
 import Image from "next/image";
 
 const geist = Geist({
@@ -13,9 +14,15 @@ const geist = Geist({
 export const metadata: Metadata = {
   title: "GAEC CESAM",
   description: "Gestion de troupeau - Samuel & Céline",
+  manifest: "/manifest.json",
   icons: {
     icon: "/favicon.svg",
     apple: "/favicon.svg",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "CESAM",
   },
 };
 
@@ -44,6 +51,7 @@ export default function RootLayout({
           {children}
         </main>
         <BottomNav />
+        <InstallPrompt />
       </body>
     </html>
   );
