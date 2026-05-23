@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { formatAge, formatDate, getEtatGestation, getBadgeClass, getEtatLabel } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Cow, Syringe, Scale, Baby, AlertCircle } from "lucide-react";
+import { ArrowLeft, Beef, Syringe, Scale, Baby, AlertCircle } from "lucide-react";
 import { differenceInDays } from "date-fns";
 
 interface PageProps {
@@ -121,7 +121,7 @@ export default async function FicheAnimal({ params }: PageProps) {
       {/* Identité */}
       <div className="bg-white rounded-xl shadow p-4">
         <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Cow size={16} className="text-green-700" />
+          <Beef size={16} className="text-green-700" />
           Identité
         </h3>
         <div className="grid grid-cols-2 gap-2 text-sm">

@@ -5,7 +5,7 @@ import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getVaccinsManquants } from "@/lib/utils";
 import Link from "next/link";
 import {
-  Cow,
+  Beef,
   Baby,
   Wifi,
   AlertTriangle,
@@ -186,7 +186,7 @@ export default async function Dashboard() {
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white rounded-xl shadow p-4 flex items-center gap-3">
           <div className="bg-green-100 rounded-full p-2">
-            <Cow size={24} className="text-green-700" />
+            <Beef size={24} className="text-green-700" />
           </div>
           <div>
             <div className="text-2xl font-bold text-gray-800">{data.vachesActives}</div>
