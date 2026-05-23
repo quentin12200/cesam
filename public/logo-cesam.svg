@@ -1,0 +1,184 @@
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="doorGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8D6E63;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5D4037;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="cowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F5DEB3;stop-opacity:0.8" />
+    </linearGradient>
+    
+    <linearGradient id="magicGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4CAF50;stop-opacity:0.6" />
+      <stop offset="50%" style="stop-color:#81C784;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#A5D6A7;stop-opacity:0.6" />
+    </linearGradient>
+    
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <filter id="shadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dx="0" dy="3" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.4"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Fond avec aura magique -->
+  <circle cx="200" cy="200" r="190" fill="url(#magicGlow)" opacity="0.3"/>
+  <circle cx="200" cy="200" r="185" fill="#FFFFFF"/>
+  
+  <!-- Rayons magiques -->
+  <g opacity="0.4">
+    <line x1="200" y1="200" x2="100" y2="80" stroke="#4CAF50" stroke-width="2" opacity="0.6"/>
+    <line x1="200" y1="200" x2="300" y2="80" stroke="#4CAF50" stroke-width="2" opacity="0.6"/>
+    <line x1="200" y1="200" x2="80" y2="150" stroke="#81C784" stroke-width="1.5" opacity="0.5"/>
+    <line x1="200" y1="200" x2="320" y2="150" stroke="#81C784" stroke-width="1.5" opacity="0.5"/>
+    <line x1="200" y1="200" x2="60" y2="220" stroke="#A5D6A7" stroke-width="1.5" opacity="0.4"/>
+    <line x1="200" y1="200" x2="340" y2="220" stroke="#A5D6A7" stroke-width="1.5" opacity="0.4"/>
+  </g>
+  
+  <!-- Porte GAUCHE -->
+  <g transform="translate(100, 200)" filter="url(#shadow)">
+    <g transform="skewY(-15) rotate(-25) translate(-10, 0)">
+      <rect x="-60" y="-100" width="80" height="200" rx="5" fill="url(#doorGradient)" stroke="#3E2723" stroke-width="3"/>
+      <line x1="-60" y1="-70" x2="20" y2="-70" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <line x1="-60" y1="-40" x2="20" y2="-40" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <line x1="-60" y1="-10" x2="20" y2="-10" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <line x1="-60" y1="20" x2="20" y2="20" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <line x1="-60" y1="50" x2="20" y2="50" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <line x1="-60" y1="80" x2="20" y2="80" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <rect x="-55" y="-85" width="15" height="8" rx="2" fill="#424242"/>
+      <rect x="-55" y="77" width="15" height="8" rx="2" fill="#424242"/>
+      <circle cx="5" cy="5" r="4" fill="#424242"/>
+      <circle cx="5" cy="5" r="2.5" fill="#757575"/>
+    </g>
+  </g>
+  
+  <!-- Porte DROITE -->
+  <g transform="translate(300, 200)" filter="url(#shadow)">
+    <g transform="skewY(15) rotate(25) translate(10, 0)">
+      <rect x="-20" y="-100" width="80" height="200" rx="5" fill="url(#doorGradient)" stroke="#3E2723" stroke-width="3"/>
+      <line x1="-20" y1="-70" x2="60" y2="-70" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <line x1="-20" y1="-40" x2="60" y2="-40" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <line x1="-20" y1="-10" x2="60" y2="-10" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <line x1="-20" y1="20" x2="60" y2="20" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <line x1="-20" y1="50" x2="60" y2="50" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <line x1="-20" y1="80" x2="60" y2="80" stroke="#3E2723" stroke-width="2" opacity="0.5"/>
+      <rect x="40" y="-85" width="15" height="8" rx="2" fill="#424242"/>
+      <rect x="40" y="77" width="15" height="8" rx="2" fill="#424242"/>
+      <circle cx="-5" cy="5" r="4" fill="#424242"/>
+      <circle cx="-5" cy="5" r="2.5" fill="#757575"/>
+    </g>
+  </g>
+  
+  <!-- Particules magiques -->
+  <g filter="url(#glow)">
+    <circle cx="120" cy="120" r="3" fill="#4CAF50" opacity="0.8">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="280" cy="130" r="2.5" fill="#81C784" opacity="0.7">
+      <animate attributeName="opacity" values="0.4;0.9;0.4" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="100" cy="200" r="2" fill="#A5D6A7" opacity="0.6">
+      <animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="300" cy="200" r="2" fill="#4CAF50" opacity="0.6">
+      <animate attributeName="opacity" values="0.3;0.9;0.3" dur="2.8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="130" cy="280" r="2.5" fill="#81C784" opacity="0.7">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="270" cy="270" r="3" fill="#A5D6A7" opacity="0.8">
+      <animate attributeName="opacity" values="0.4;1;0.4" dur="2.6s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  
+  <!-- VRAIE TÊTE DE VACHE -->
+  <g transform="translate(200, 195) scale(1.1)" filter="url(#glow)">
+    <!-- Halo -->
+    <circle cx="0" cy="0" r="70" fill="url(#magicGlow)" opacity="0.4"/>
+    
+    <!-- CRÂNE allongé (forme ovale horizontale) -->
+    <ellipse cx="0" cy="-12" rx="52" ry="32" fill="url(#cowGradient)" stroke="#2E7D32" stroke-width="3"/>
+    
+    <!-- MUSEAU LARGE RECTANGULAIRE - caractéristique VACHE -->
+    <rect x="-32" y="12" width="64" height="35" rx="10" fill="#FFCCBC" stroke="#2E7D32" stroke-width="3"/>
+    
+    <!-- NARINES LARGES espacées -->
+    <ellipse cx="-14" cy="26" rx="7" ry="6" fill="#1B5E20"/>
+    <ellipse cx="14" cy="26" rx="7" ry="6" fill="#1B5E20"/>
+    
+    <!-- Ligne séparatrice museau (caractéristique vache) -->
+    <line x1="0" y1="20" x2="0" y2="35" stroke="#2E7D32" stroke-width="2"/>
+    
+    <!-- Bouche -->
+    <path d="M -20 42 Q 0 46 20 42" stroke="#2E7D32" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    
+    <!-- OREILLES LARGES de vache -->
+    <ellipse cx="-52" cy="-20" rx="16" ry="24" fill="#C8E6C9" stroke="#2E7D32" stroke-width="2.5" transform="rotate(-35 -52 -20)"/>
+    <ellipse cx="-52" cy="-20" rx="10" ry="16" fill="#FFCCBC" opacity="0.6" transform="rotate(-35 -52 -20)"/>
+    
+    <ellipse cx="52" cy="-20" rx="16" ry="24" fill="#C8E6C9" stroke="#2E7D32" stroke-width="2.5" transform="rotate(35 52 -20)"/>
+    <ellipse cx="52" cy="-20" rx="10" ry="16" fill="#FFCCBC" opacity="0.6" transform="rotate(35 52 -20)"/>
+    
+    <!-- CORNES DORÉES magiques -->
+    <path d="M -48 -35 Q -56 -52 -54 -62" stroke="#FFD700" stroke-width="5" fill="none" stroke-linecap="round" filter="url(#glow)"/>
+    <path d="M 48 -35 Q 56 -52 54 -62" stroke="#FFD700" stroke-width="5" fill="none" stroke-linecap="round" filter="url(#glow)"/>
+    <path d="M -48 -35 Q -56 -52 -54 -62" stroke="#FFA726" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M 48 -35 Q 56 -52 54 -62" stroke="#FFA726" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    
+    <!-- YEUX VERTS magiques (plus espacés et plus haut) -->
+    <ellipse cx="-26" cy="-10" rx="10" ry="12" fill="#4CAF50" opacity="0.8"/>
+    <circle cx="-26" cy="-10" r="7.5" fill="#1B5E20"/>
+    <circle cx="-24" cy="-12" r="4" fill="#FFFFFF"/>
+    <circle cx="-23" cy="-11" r="2.5" fill="#81C784" filter="url(#glow)"/>
+    
+    <ellipse cx="26" cy="-10" rx="10" ry="12" fill="#4CAF50" opacity="0.8"/>
+    <circle cx="26" cy="-10" r="7.5" fill="#1B5E20"/>
+    <circle cx="28" cy="-12" r="4" fill="#FFFFFF"/>
+    <circle cx="29" cy="-11" r="2.5" fill="#81C784" filter="url(#glow)"/>
+    
+    <!-- TACHES BLONDE D'AQUITAINE sur front -->
+    <ellipse cx="-20" cy="-24" rx="14" ry="11" fill="#F5DEB3" opacity="0.7"/>
+    <ellipse cx="22" cy="-26" rx="16" ry="12" fill="#F5DEB3" opacity="0.7"/>
+    <ellipse cx="0" cy="-32" rx="12" ry="9" fill="#F5DEB3" opacity="0.6"/>
+    
+    <!-- ÉTOILES DORÉES magiques -->
+    <g fill="#FFD700" filter="url(#glow)">
+      <path d="M -65 -5 l 2.5 7.5 l 7.5 0 l -6 4.5 l 2.5 7.5 l -6.5 -5 l -6.5 5 l 2.5 -7.5 l -6 -4.5 l 7.5 0 z" transform="scale(0.5)"/>
+      <path d="M 65 -5 l 2.5 7.5 l 7.5 0 l -6 4.5 l 2.5 7.5 l -6.5 -5 l -6.5 5 l 2.5 -7.5 l -6 -4.5 l 7.5 0 z" transform="scale(0.45)"/>
+      <path d="M 0 -70 l 2.5 7.5 l 7.5 0 l -6 4.5 l 2.5 7.5 l -6.5 -5 l -6.5 5 l 2.5 -7.5 l -6 -4.5 l 7.5 0 z" transform="scale(0.4)"/>
+    </g>
+  </g>
+  
+  <!-- Smartphone -->
+  <g transform="translate(330, 50)">
+    <rect x="0" y="0" width="35" height="55" rx="5" fill="#2E7D32" stroke="#1B5E20" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="3" y="6" width="29" height="38" fill="#E8F5E9"/>
+    <circle cx="28" cy="6" r="8" fill="#FF5252"/>
+    <text x="28" y="10" font-size="10" font-weight="bold" fill="#FFFFFF" text-anchor="middle">!</text>
+    <circle cx="17" cy="18" r="3" fill="#4CAF50"/>
+    <rect x="12" y="26" width="10" height="3" rx="1.5" fill="#81C784"/>
+    <rect x="10" y="32" width="14" height="3" rx="1.5" fill="#A5D6A7"/>
+  </g>
+  
+  <!-- TEXTE CESAM -->
+  <g transform="translate(200, 360)">
+    <text x="0" y="0" font-family="Arial, sans-serif" font-size="52" font-weight="bold" fill="#2E7D32" text-anchor="middle" filter="url(#glow)">CESAM</text>
+    <text x="0" y="22" font-family="Arial, sans-serif" font-size="14" fill="#66BB6A" text-anchor="middle" font-style="italic">✨ Ouvre les portes du digital ✨</text>
+  </g>
+</svg>
