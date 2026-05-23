@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib/utils";
 import Link from "next/link";
@@ -38,7 +38,7 @@ const filterLabels: Record<FilterEtat, string> = {
   ROSE: "Imminent",
 };
 
-export default function ReproductionPage() {
+function ReproductionContent() {
   const [vaches, setVaches] = useState<VacheRepro[]>([]);
   const [taureaux, setTaureaux] = useState<Taureau[]>([]);
   const [loading, setLoading] = useState(true);
@@ -422,5 +422,13 @@ export default function ReproductionPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ReproductionPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-400">Chargement...</div>}>
+      <ReproductionContent />
+    </Suspense>
   );
 }
