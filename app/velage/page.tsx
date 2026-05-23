@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
-import { Wifi, Baby, WifiOff } from "lucide-react";
+import { Wifi, Baby, WifiOff, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import VelageFormWrapper from "./VelageFormWrapper";
 
 async function getVelageData() {
@@ -54,7 +55,12 @@ export default async function VelagePage() {
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
-      <h2 className="text-xl font-bold text-gray-800 mt-2">Vélage</h2>
+      <div className="flex items-center gap-3 mt-2">
+        <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
+          <ArrowLeft size={18} />
+        </Link>
+        <h2 className="text-xl font-bold text-gray-800">Vélage</h2>
+      </div>
 
       {/* Capteurs */}
       <div className="bg-white rounded-xl shadow p-4">
