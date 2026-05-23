@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getVaccinsManquants, formatDate, formatAge } from "@/lib/utils";
 import { differenceInDays, subDays } from "date-fns";
 import Link from "next/link";
-import { Syringe, AlertTriangle, CheckCircle } from "lucide-react";
+import { Syringe, AlertTriangle, CheckCircle, ArrowLeft } from "lucide-react";
 import VaccinationFormWrapper from "./VaccinationFormWrapper";
 
 async function getSanitaireData() {
@@ -109,7 +109,12 @@ export default async function SanitairePage() {
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
-      <h2 className="text-xl font-bold text-gray-800 mt-2">Sanitaire</h2>
+      <div className="flex items-center gap-3 mt-2">
+        <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
+          <ArrowLeft size={18} />
+        </Link>
+        <h2 className="text-xl font-bold text-gray-800">Sanitaire</h2>
+      </div>
 
       {/* Résumé */}
       <div className="grid grid-cols-3 gap-2">

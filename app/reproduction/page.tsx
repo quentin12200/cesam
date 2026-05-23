@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { RefreshCw, Plus, CheckCircle, Filter } from "lucide-react";
+import { RefreshCw, Plus, CheckCircle, Filter, ArrowLeft } from "lucide-react";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE";
 
@@ -155,7 +155,12 @@ function ReproductionContent() {
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mt-2">
-        <h2 className="text-xl font-bold text-gray-800">Reproduction</h2>
+        <div className="flex items-center gap-3">
+          <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
+            <ArrowLeft size={18} />
+          </Link>
+          <h2 className="text-xl font-bold text-gray-800">Reproduction</h2>
+        </div>
         <button
           onClick={() => { setShowSaillieForm(true); setSelectedVache(null); }}
           className="flex items-center gap-1 bg-green-700 text-white text-sm px-3 py-2 rounded-lg"
