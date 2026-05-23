@@ -6,7 +6,7 @@ import { Home, Beef, RefreshCw, Shield, Baby } from "lucide-react";
 import CowIcon from "@/components/CowIcon";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: Home },
+  { href: "/", label: "Tableau de bord", icon: Home },
   { href: "/troupeau", label: "Troupeau", icon: CowIcon },
   { href: "/reproduction", label: "Repro", icon: RefreshCw },
   { href: "/sanitaire", label: "Sanitaire", icon: Shield },
