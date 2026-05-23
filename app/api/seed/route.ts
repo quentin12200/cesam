@@ -281,7 +281,7 @@ export async function GET(request: NextRequest) {
         data: {
           copaip:     a.copaip,
           nunati:     a.nunati,
-          nutrav:     a.nutrav,
+          nutrav:     a.nutrav.padStart(4, "0"),
           nobovi:     a.nobovi ?? null,
           danais:     d(a.danais),
           sexbov:     a.sexbov,
