@@ -60,7 +60,9 @@ export async function PATCH(
   if ("estGenisse" in body) data.estGenisse = body.estGenisse;
   if ("notes"      in body) data.notes      = body.notes?.trim() || null;
   if ("danais"     in body) data.danais     = new Date(body.danais);
-  if ("boucleFaite"in body) data.boucleFaite= body.boucleFaite;
+  if ("boucleFaite" in body) data.boucleFaite = body.boucleFaite;
+  if ("sevreFait"   in body) data.sevreFait   = body.sevreFait;
+  if ("tarieFaite"  in body) data.tarieFaite  = body.tarieFaite;
 
   const updated = await prisma.animal.update({ where: { nutrav }, data });
   return NextResponse.json({ success: true, animal: updated });

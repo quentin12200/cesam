@@ -2,9 +2,15 @@ import { differenceInMonths, differenceInDays, addMonths, addDays } from "date-f
 
 export function formatAge(danais: Date): string {
   const now = new Date();
-  const mois = differenceInMonths(now, danais);
-  const joursRestants = differenceInDays(now, addMonths(danais, mois));
-  return `${mois} m ${joursRestants} j`;
+  const totalMois = differenceInMonths(now, danais);
+  if (totalMois >= 24) {
+    const ans = Math.floor(totalMois / 12);
+    const moisRestants = totalMois % 12;
+    if (moisRestants === 0) return `${ans} an${ans > 1 ? "s" : ""}`;
+    return `${ans} an${ans > 1 ? "s" : ""} ${moisRestants} m`;
+  }
+  const joursRestants = differenceInDays(now, addMonths(danais, totalMois));
+  return `${totalMois} m ${joursRestants} j`;
 }
 
 export function formatDate(date: Date | null | undefined): string {
@@ -130,8 +136,148 @@ export function getVaccinsManquants(
 
   // MHE: éligible >= 60j (OBLIGATOIRE pour vente)
   if (ageJours >= 60 && !aVaccin("MHE")) {
-    manquants.push({ vaccin: "MHE", raison: "MHE OBLIGATOIRE (>60j)", urgent: true });
+    manquants.push({ vaccin: "MHE", raison: "MHE primo (>60j)", urgent: true });
+  } else if (aVaccin("MHE") && !aVaccin("MHE_RAPPEL")) {
+    const premiere = vaccinations.find((v) => v.vaccin === "MHE");
+    if (premiere) {
+      const joursDepuis = differenceInDays(now, premiere.date);
+      if (joursDepuis >= 21) {
+        manquants.push({ vaccin: "MHE_RAPPEL", raison: "MHE rappel +21j (vente)", urgent: joursDepuis > 35 });
+      }
+    }
   }
 
   return manquants;
 }
+
+export function isMheVendable(vaccinations: { vaccin: string; date: Date }[]): {
+  vendable: boolean;
+  reason: string;
+} {
+  const mhe = vaccinations.find((v) => v.vaccin === "MHE");
+  const mheRappel = vaccinations.find((v) => v.vaccin === "MHE_RAPPEL");
+
+  if (!mhe) return { vendable: false, reason: "MHE primo manquant" };
+  if (!mheRappel) return { vendable: false, reason: "MHE rappel manquant" };
+
+  const joursDepuisRappel = differenceInDays(new Date(), mheRappel.date);
+  if (joursDepuisRappel < 10) {
+    return { vendable: false, reason: `J+${joursDepuisRappel}/10 après rappel MHE` };
+  }
+  return { vendable: true, reason: "MHE complet" };
+}
+
+// Protocol vaccinal — statut visuel par étape
+export type StepStatus = "done" | "due" | "pending" | "not_eligible";
+
+export interface ProtocolStep {
+  vaccin: string;
+  label: string;
+  status: StepStatus;
+  doneDate?: Date;
+  eligibleDate?: Date;
+  isRappel: boolean;
+  isMandatory: boolean;
+  isUrgent: boolean;
+}
+
+export function getVaccinProtocolSteps(
+  danais: Date,
+  vaccinations: { vaccin: string; date: Date }[]
+): ProtocolStep[] {
+  const now = new Date();
+  const ageJours = differenceInDays(now, danais);
+  const steps: ProtocolStep[] = [];
+  const get = (nom: string) => vaccinations.find((v) => v.vaccin === nom);
+
+  // NASALGEN
+  const nasalgen = get("NASALGEN");
+  steps.push({
+    vaccin: "NASALGEN",
+    label: "Nasalgen",
+    status: nasalgen ? "done" : "due",
+    doneDate: nasalgen?.date,
+    isRappel: false,
+    isMandatory: false,
+    isUrgent: !nasalgen && ageJours > 7,
+  });
+
+  // NASALGEN_RAPPEL (90j after primo)
+  if (nasalgen) {
+    const joursDepuis = differenceInDays(now, nasalgen.date);
+    const rappel = get("NASALGEN_RAPPEL");
+    steps.push({
+      vaccin: "NASALGEN_RAPPEL",
+      label: "Nasalgen rappel",
+      status: rappel ? "done" : joursDepuis >= 90 ? "due" : "pending",
+      doneDate: rappel?.date,
+      eligibleDate: joursDepuis < 90 ? addDays(nasalgen.date, 90) : undefined,
+      isRappel: true,
+      isMandatory: false,
+      isUrgent: !rappel && joursDepuis > 105,
+    });
+  }
+
+  // HIPRABOVIS (éligible 30j)
+  const hipra = get("HIPRABOVIS");
+  steps.push({
+    vaccin: "HIPRABOVIS",
+    label: "Hiprabovis",
+    status: hipra ? "done" : ageJours >= 30 ? "due" : "not_eligible",
+    doneDate: hipra?.date,
+    eligibleDate: ageJours < 30 ? addDays(danais, 30) : undefined,
+    isRappel: false,
+    isMandatory: false,
+    isUrgent: !hipra && ageJours > 60,
+  });
+
+  // HIPRABOVIS_RAPPEL (21j after primo)
+  if (hipra) {
+    const joursDepuis = differenceInDays(now, hipra.date);
+    const rappel = get("HIPRABOVIS_RAPPEL");
+    steps.push({
+      vaccin: "HIPRABOVIS_RAPPEL",
+      label: "Hiprabovis rappel",
+      status: rappel ? "done" : joursDepuis >= 21 ? "due" : "pending",
+      doneDate: rappel?.date,
+      eligibleDate: joursDepuis < 21 ? addDays(hipra.date, 21) : undefined,
+      isRappel: true,
+      isMandatory: false,
+      isUrgent: !rappel && joursDepuis > 35,
+    });
+  }
+
+  // MHE primo (éligible 60j — obligatoire vente)
+  const mhe = get("MHE");
+  steps.push({
+    vaccin: "MHE",
+    label: "MHE primo",
+    status: mhe ? "done" : ageJours >= 60 ? "due" : "not_eligible",
+    doneDate: mhe?.date,
+    eligibleDate: ageJours < 60 ? addDays(danais, 60) : undefined,
+    isRappel: false,
+    isMandatory: true,
+    isUrgent: !mhe && ageJours >= 60,
+  });
+
+  // MHE_RAPPEL (21j after primo — obligatoire + J+10 pour vente)
+  if (mhe) {
+    const joursDepuis = differenceInDays(now, mhe.date);
+    const rappel = get("MHE_RAPPEL");
+    steps.push({
+      vaccin: "MHE_RAPPEL",
+      label: "MHE rappel",
+      status: rappel ? "done" : joursDepuis >= 21 ? "due" : "pending",
+      doneDate: rappel?.date,
+      eligibleDate: joursDepuis < 21 ? addDays(mhe.date, 21) : undefined,
+      isRappel: true,
+      isMandatory: true,
+      isUrgent: !rappel && joursDepuis > 35,
+    });
+  }
+
+  return steps;
+}
+
+// unused but exported for convenience
+export { addDays };

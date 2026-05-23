@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Animal" ADD COLUMN "sevreFait" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Animal" ADD COLUMN "tarieFaite" BOOLEAN NOT NULL DEFAULT false;

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { getVaccinsManquants, formatDate, formatAge } from "@/lib/utils";
 import { differenceInDays, subDays } from "date-fns";
