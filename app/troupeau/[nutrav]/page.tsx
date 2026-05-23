@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { formatAge, formatDate, getEtatGestation, getBadgeClass, getEtatLabel } from "@/lib/utils";
+import { formatAge, formatDate, getEtatGestation, getBadgeClass, getEtatLabel, isMheVendable } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Syringe, Scale, Baby, AlertCircle, Euro, LogOut } from "lucide-react";
+import { ArrowLeft, Syringe, Scale, Baby, AlertCircle, Euro, LogOut, ShieldCheck, ShieldX } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import EditAnimalDrawer from "./EditAnimalDrawer";
 import CowIcon from "@/components/CowIcon";
@@ -138,9 +138,9 @@ export default async function FicheAnimal({ params }: PageProps) {
           Identité
         </h3>
         <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="text-gray-500">NUTRAV</div>
-          <div className="font-mono font-medium">{animal.nutrav}</div>
-          <div className="text-gray-500">NUNATI</div>
+          <div className="text-gray-500">N° Travail</div>
+          <div className="font-mono font-bold text-base">{animal.nutrav}</div>
+          <div className="text-gray-500">N° Nat</div>
           <div className="font-mono text-xs">{animal.nunati}</div>
           <div className="text-gray-500">Nom</div>
           <div>{animal.nobovi ?? "-"}</div>
@@ -291,6 +291,28 @@ export default async function FicheAnimal({ params }: PageProps) {
             <Syringe size={16} className="text-purple-600" />
             Vaccinations ({animal.vaccinations.length})
           </h3>
+          {/* MHE vendability badge */}
+          {(() => {
+            const mheStatus = isMheVendable(
+              animal.vaccinations.map((v) => ({ vaccin: v.vaccin, date: v.date }))
+            );
+            return (
+              <div
+                className={`mb-3 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+                  mheStatus.vendable
+                    ? "bg-green-50 text-green-800 border border-green-200"
+                    : "bg-red-50 text-red-800 border border-red-200"
+                }`}
+              >
+                {mheStatus.vendable ? (
+                  <ShieldCheck size={16} className="text-green-600 flex-shrink-0" />
+                ) : (
+                  <ShieldX size={16} className="text-red-600 flex-shrink-0" />
+                )}
+                MHE — {mheStatus.vendable ? "Vendable" : `Non vendable · ${mheStatus.reason}`}
+              </div>
+            );
+          })()}
           <div className="space-y-1">
             {animal.vaccinations.map((vacc) => (
               <div key={vacc.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50">

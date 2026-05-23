@@ -32,6 +32,8 @@ model Animal {
 
   boucleNumero  String?
   boucleFaite   Boolean   @default(false)
+  sevreFait     Boolean   @default(false)
+  tarieFaite    Boolean   @default(false)
 
   localisationId String?
   localisation   Localisation? @relation(fields: [localisationId], references: [id])

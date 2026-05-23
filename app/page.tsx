@@ -2,9 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, addDays } from "date-fns";
-import { getEtatGestation, getVaccinsManquants } from "@/lib/utils";
+import { getEtatGestation, getVaccinsManquants, formatAge, formatDateShort } from "@/lib/utils";
 import Link from "next/link";
 import CowIcon from "@/components/CowIcon";
+import ChecklistSection, {
+  type ChecklistItem,
+  type SubItem,
+} from "@/app/components/ChecklistSection";
 import {
   Baby,
   Wifi,
@@ -16,6 +20,7 @@ import {
   Activity,
   CalendarCheck,
   Search,
+  MilkOff,
 } from "lucide-react";
 
 async function getDashboardData() {
@@ -25,6 +30,7 @@ async function getDashboardData() {
   const ninetyDaysLater = addDays(now, 90);
   const twentyOneDaysLater = addDays(now, 21);
   const sixMonthsAgo = addDays(now, -180);
+  const fiveMonthsAgo = addDays(now, -150);
 
   const [
     vachesActives,
@@ -32,12 +38,18 @@ async function getDashboardData() {
     capteurs,
     vachesAvecSaillies,
     veauxPourVaccins,
-    veauxNonBoucles,
     evenementsSanitairesUrgents,
     velagesSemaine,
     velagesPrevus,
     vaccinationPreVelage,
-    veauxASevrer,
+    // Checklist: veaux à boucler (with details)
+    veauxABouclerList,
+    // Checklist: veaux à sevrer ≥6 mois
+    veauxASevrerList,
+    // Collapsible: presque sevrables (5-6 mois)
+    veauxPresqueSevrables,
+    // Checklist: vaches à tarir (calving in 40-70 days)
+    vachesATarirList,
   ] = await Promise.all([
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", velageVeau: { is: null } } }),
     prisma.animal.count({ where: { statut: "ACTIF", OR: [{ sexbov: "M" }, { estGenisse: true }] } }),
@@ -50,24 +62,12 @@ async function getDashboardData() {
           take: 1,
           include: { gestation: true },
         },
-        velagesVache: {
-          orderBy: { date: "desc" },
-          take: 1,
-        },
+        velagesVache: { orderBy: { date: "desc" }, take: 1 },
       },
     }),
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
-      include: {
-        vaccinations: { select: { vaccin: true, date: true } },
-      },
-    }),
-    prisma.animal.count({
-      where: {
-        statut: "ACTIF",
-        boucleFaite: false,
-        velageVeau: { isNot: null },
-      },
+      include: { vaccinations: { select: { vaccin: true, date: true } } },
     }),
     prisma.evenementSanitaire.count({ where: { resolu: false } }),
     prisma.gestation.count({
@@ -82,20 +82,83 @@ async function getDashboardData() {
         dateVelagePrevue: { gte: now, lte: thirtyDaysLater },
       },
     }),
-    // Gestations dans la fenêtre vaccins pré-vélage (J-21 à J-90)
     prisma.gestation.count({
       where: {
         etat: { in: ["VERT", "ROSE"] },
         dateVelagePrevue: { gte: twentyOneDaysLater, lte: ninetyDaysLater },
       },
     }),
-    // Veaux ≥6 mois encore actifs (à sevrer)
-    prisma.animal.count({
+    // Veaux à boucler avec infos mère
+    prisma.animal.findMany({
       where: {
         statut: "ACTIF",
+        boucleFaite: false,
+        velageVeau: { isNot: null },
+      },
+      select: {
+        nutrav: true,
+        nobovi: true,
+        danais: true,
+        velageVeau: {
+          select: { vache: { select: { nutrav: true, nobovi: true } } },
+        },
+      },
+      orderBy: { danais: "asc" },
+    }),
+    // Veaux à sevrer: ≥6 mois, pas encore sevrés
+    prisma.animal.findMany({
+      where: {
+        statut: "ACTIF",
+        sevreFait: false,
         velageVeau: { isNot: null },
         danais: { lte: sixMonthsAgo },
       },
+      select: {
+        nutrav: true,
+        nobovi: true,
+        danais: true,
+        velageVeau: {
+          select: { vache: { select: { nutrav: true, nobovi: true } } },
+        },
+      },
+      orderBy: { danais: "asc" },
+    }),
+    // Presque sevrables: 5 à 6 mois
+    prisma.animal.findMany({
+      where: {
+        statut: "ACTIF",
+        sevreFait: false,
+        velageVeau: { isNot: null },
+        danais: { gte: sixMonthsAgo, lte: fiveMonthsAgo },
+      },
+      select: {
+        nutrav: true,
+        nobovi: true,
+        danais: true,
+        velageVeau: {
+          select: { vache: { select: { nutrav: true, nobovi: true } } },
+        },
+      },
+      orderBy: { danais: "asc" },
+    }),
+    // Vaches à tarir: vélage prévu dans 40-70 jours, pas encore tarées
+    prisma.gestation.findMany({
+      where: {
+        etat: { in: ["VERT", "ROSE"] },
+        dateVelagePrevue: { gte: addDays(now, 40), lte: addDays(now, 70) },
+        saillie: {
+          animal: { statut: "ACTIF", sexbov: "F", estGenisse: false, tarieFaite: false },
+        },
+      },
+      select: {
+        dateVelagePrevue: true,
+        saillie: {
+          select: {
+            animal: { select: { nutrav: true, nobovi: true, danais: true } },
+          },
+        },
+      },
+      orderBy: { dateVelagePrevue: "asc" },
     }),
   ]);
 
@@ -134,7 +197,65 @@ async function getDashboardData() {
     }
   }
 
-  const pctPleine = vachesActives > 0 ? Math.round((vachesPleine / vachesActives) * 100) : 0;
+  const pctPleine =
+    vachesActives > 0 ? Math.round((vachesPleine / vachesActives) * 100) : 0;
+
+  // Build checklist items
+  const bouclageItems: ChecklistItem[] = veauxABouclerList.map((a) => {
+    const ageJours = differenceInDays(now, a.danais);
+    const mere = a.velageVeau?.vache;
+    return {
+      nutrav: a.nutrav,
+      nom: a.nobovi ?? null,
+      ageLabel: `${ageJours} j`,
+      extra: mere
+        ? `Mère: ${mere.nutrav}${mere.nobovi ? " " + mere.nobovi : ""}`
+        : undefined,
+      isUrgent: ageJours >= 15,
+      apiField: "boucleFaite",
+    };
+  });
+
+  const sevrageItems: ChecklistItem[] = veauxASevrerList.map((a) => {
+    const mere = a.velageVeau?.vache;
+    return {
+      nutrav: a.nutrav,
+      nom: a.nobovi ?? null,
+      ageLabel: formatAge(a.danais),
+      extra: mere
+        ? `Mère: ${mere.nutrav}${mere.nobovi ? " " + mere.nobovi : ""}`
+        : undefined,
+      apiField: "sevreFait",
+    };
+  });
+
+  const presqueSevrables: SubItem[] = veauxPresqueSevrables.map((a) => {
+    const mere = a.velageVeau?.vache;
+    return {
+      nutrav: a.nutrav,
+      nom: a.nobovi ?? null,
+      ageLabel: formatAge(a.danais),
+      extra: mere
+        ? `Mère: ${mere.nutrav}${mere.nobovi ? " " + mere.nobovi : ""}`
+        : undefined,
+    };
+  });
+
+  const tarirItems: ChecklistItem[] = vachesATarirList.map((g) => {
+    const a = g.saillie.animal;
+    const joursRestants = g.dateVelagePrevue
+      ? differenceInDays(g.dateVelagePrevue, now)
+      : null;
+    return {
+      nutrav: a.nutrav,
+      nom: a.nobovi ?? null,
+      ageLabel: formatAge(a.danais),
+      extra: g.dateVelagePrevue
+        ? `Vélage: ${formatDateShort(g.dateVelagePrevue)} (J-${joursRestants})`
+        : undefined,
+      apiField: "tarieFaite",
+    };
+  });
 
   return {
     vachesActives,
@@ -147,10 +268,12 @@ async function getDashboardData() {
     velagesPrevus,
     velagesSemaine,
     vachesVidesEnRetard,
-    veauxNonBoucles,
-    veauxASevrer,
     evenementsSanitairesUrgents,
     vaccinationPreVelage,
+    bouclageItems,
+    sevrageItems,
+    presqueSevrables,
+    tarirItems,
   };
 }
 
@@ -161,12 +284,15 @@ export default async function Dashboard() {
   const hasAlertesJour =
     data.vachesVidesEnRetard > 0 ||
     data.evenementsSanitairesUrgents > 0 ||
-    data.veauxNonBoucles > 0 ||
+    data.bouclageItems.length > 0 ||
     data.vaccinationPreVelage > 0 ||
     data.aEchographier > 0 ||
     data.veauxAVacciner > 0;
 
-  const hasAlertesHebdo = data.velagesSemaine > 0 || data.veauxASevrer > 0;
+  const hasAlertesHebdo =
+    data.velagesSemaine > 0 ||
+    data.sevrageItems.length > 0 ||
+    data.tarirItems.length > 0;
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
@@ -176,7 +302,7 @@ export default async function Dashboard() {
         <input
           type="text"
           name="q"
-          placeholder="Trouver un animal (N° ou nom)..."
+          placeholder="N° animal ou nom..."
           className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm shadow focus:outline-none focus:ring-2 focus:ring-green-500"
         />
       </form>
@@ -240,37 +366,6 @@ export default async function Dashboard() {
                 </span>
               </Link>
             )}
-            {data.veauxNonBoucles > 0 && (
-              <Link
-                href="/animaux"
-                className={`flex items-center justify-between p-3 rounded-lg border ${
-                  data.veauxNonBoucles >= 15
-                    ? "bg-red-50 border-red-200"
-                    : "bg-orange-50 border-orange-200"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Tag
-                    size={16}
-                    className={data.veauxNonBoucles >= 15 ? "text-red-600" : "text-orange-600"}
-                  />
-                  <span
-                    className={`text-sm font-medium ${
-                      data.veauxNonBoucles >= 15 ? "text-red-800" : "text-orange-800"
-                    }`}
-                  >
-                    Veaux non bouclés
-                  </span>
-                </div>
-                <span
-                  className={`text-white text-xs font-bold px-2 py-1 rounded-full ${
-                    data.veauxNonBoucles >= 15 ? "bg-red-600" : "bg-orange-500"
-                  }`}
-                >
-                  {data.veauxNonBoucles}
-                </span>
-              </Link>
-            )}
             {data.vaccinationPreVelage > 0 && (
               <Link
                 href="/sanitaire"
@@ -319,6 +414,15 @@ export default async function Dashboard() {
         </div>
       )}
 
+      {/* CHECKLIST: Veaux à boucler */}
+      <ChecklistSection
+        title="Veaux à boucler"
+        icon={<Tag size={18} />}
+        items={data.bouclageItems}
+        actionLabel="Bouclé"
+        color="orange"
+      />
+
       {/* Focus hebdomadaire J+7 */}
       {hasAlertesHebdo && (
         <div className="bg-white rounded-xl shadow p-4">
@@ -341,23 +445,32 @@ export default async function Dashboard() {
                 </span>
               </Link>
             )}
-            {data.veauxASevrer > 0 && (
-              <Link
-                href="/animaux"
-                className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200"
-              >
-                <div className="flex items-center gap-2">
-                  <Scissors size={16} className="text-green-600" />
-                  <span className="text-sm font-medium text-green-800">Veaux à sevrer (≥ 6 mois)</span>
-                </div>
-                <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                  {data.veauxASevrer}
-                </span>
-              </Link>
-            )}
           </div>
         </div>
       )}
+
+      {/* CHECKLIST: Veaux à sevrer */}
+      <ChecklistSection
+        title="Veaux à sevrer"
+        icon={<Scissors size={18} />}
+        items={data.sevrageItems}
+        actionLabel="Sevré"
+        color="green"
+        subSection={
+          data.presqueSevrables.length > 0
+            ? { title: "Presque sevrables (5–6 mois)", items: data.presqueSevrables }
+            : undefined
+        }
+      />
+
+      {/* CHECKLIST: Vaches à tarir */}
+      <ChecklistSection
+        title="Vaches à tarir"
+        icon={<MilkOff size={18} />}
+        items={data.tarirItems}
+        actionLabel="Tarie"
+        color="blue"
+      />
 
       {/* Stats rapides */}
       <div className="bg-white rounded-xl shadow p-4">

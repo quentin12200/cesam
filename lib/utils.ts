@@ -2,9 +2,15 @@ import { differenceInMonths, differenceInDays, addMonths, addDays } from "date-f
 
 export function formatAge(danais: Date): string {
   const now = new Date();
-  const mois = differenceInMonths(now, danais);
-  const joursRestants = differenceInDays(now, addMonths(danais, mois));
-  return `${mois} m ${joursRestants} j`;
+  const totalMois = differenceInMonths(now, danais);
+  if (totalMois >= 24) {
+    const ans = Math.floor(totalMois / 12);
+    const moisRestants = totalMois % 12;
+    if (moisRestants === 0) return `${ans} an${ans > 1 ? "s" : ""}`;
+    return `${ans} an${ans > 1 ? "s" : ""} ${moisRestants} m`;
+  }
+  const joursRestants = differenceInDays(now, addMonths(danais, totalMois));
+  return `${totalMois} m ${joursRestants} j`;
 }
 
 export function formatDate(date: Date | null | undefined): string {
@@ -130,8 +136,36 @@ export function getVaccinsManquants(
 
   // MHE: éligible >= 60j (OBLIGATOIRE pour vente)
   if (ageJours >= 60 && !aVaccin("MHE")) {
-    manquants.push({ vaccin: "MHE", raison: "MHE OBLIGATOIRE (>60j)", urgent: true });
+    manquants.push({ vaccin: "MHE", raison: "MHE primo (>60j)", urgent: true });
+  } else if (aVaccin("MHE") && !aVaccin("MHE_RAPPEL")) {
+    const premiere = vaccinations.find((v) => v.vaccin === "MHE");
+    if (premiere) {
+      const joursDepuis = differenceInDays(now, premiere.date);
+      if (joursDepuis >= 21) {
+        manquants.push({ vaccin: "MHE_RAPPEL", raison: "MHE rappel +21j (vente)", urgent: joursDepuis > 35 });
+      }
+    }
   }
 
   return manquants;
 }
+
+export function isMheVendable(vaccinations: { vaccin: string; date: Date }[]): {
+  vendable: boolean;
+  reason: string;
+} {
+  const mhe = vaccinations.find((v) => v.vaccin === "MHE");
+  const mheRappel = vaccinations.find((v) => v.vaccin === "MHE_RAPPEL");
+
+  if (!mhe) return { vendable: false, reason: "MHE primo manquant" };
+  if (!mheRappel) return { vendable: false, reason: "MHE rappel manquant" };
+
+  const joursDepuisRappel = differenceInDays(new Date(), mheRappel.date);
+  if (joursDepuisRappel < 10) {
+    return { vendable: false, reason: `J+${joursDepuisRappel}/10 après rappel MHE` };
+  }
+  return { vendable: true, reason: "MHE complet" };
+}
+
+// unused but exported for convenience
+export { addDays };
