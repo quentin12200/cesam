@@ -43,3 +43,26 @@ export async function GET(
 
   return NextResponse.json(animal);
 }
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ nutrav: string }> }
+) {
+  const { nutrav } = await params;
+  const body = await request.json();
+
+  const animal = await prisma.animal.findUnique({ where: { nutrav } });
+  if (!animal) return NextResponse.json({ error: "Animal non trouvé" }, { status: 404 });
+
+  const data: Record<string, unknown> = { updatedAt: new Date() };
+  if ("nobovi"     in body) data.nobovi     = body.nobovi?.trim() || null;
+  if ("statut"     in body) data.statut     = body.statut;
+  if ("estGenisse" in body) data.estGenisse = body.estGenisse;
+  if ("notes"      in body) data.notes      = body.notes?.trim() || null;
+  if ("danais"     in body) data.danais     = new Date(body.danais);
+  if ("boucleFaite"in body) data.boucleFaite= body.boucleFaite;
+
+  const updated = await prisma.animal.update({ where: { nutrav }, data });
+  return NextResponse.json({ success: true, animal: updated });
+}
+
