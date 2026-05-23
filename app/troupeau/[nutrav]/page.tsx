@@ -2,8 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { formatAge, formatDate, getEtatGestation, getBadgeClass, getEtatLabel } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Beef, Syringe, Scale, Baby, AlertCircle } from "lucide-react";
+import { ArrowLeft, Syringe, Scale, Baby, AlertCircle } from "lucide-react";
 import { differenceInDays } from "date-fns";
+import EditAnimalDrawer from "./EditAnimalDrawer";
+import CowIcon from "@/components/CowIcon";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -77,7 +79,7 @@ export default async function FicheAnimal({ params }: PageProps) {
         <Link href="/troupeau" className="p-2 bg-white rounded-lg shadow text-gray-600 hover:bg-gray-50">
           <ArrowLeft size={18} />
         </Link>
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="bg-green-700 text-white text-sm font-bold px-2 py-1 rounded-lg font-mono">{animal.nutrav}</span>
             {etat && (
@@ -86,6 +88,16 @@ export default async function FicheAnimal({ params }: PageProps) {
           </div>
           <h2 className="text-xl font-bold text-gray-800 mt-1">{animal.nobovi ?? "Sans nom"}</h2>
         </div>
+        <EditAnimalDrawer
+          nutrav={animal.nutrav}
+          nobovi={animal.nobovi}
+          danais={animal.danais.toISOString()}
+          statut={animal.statut}
+          estGenisse={animal.estGenisse}
+          sexbov={animal.sexbov}
+          notes={animal.notes}
+          boucleFaite={animal.boucleFaite}
+        />
       </div>
 
       {/* Reproduction (vaches seulement) */}
@@ -121,7 +133,7 @@ export default async function FicheAnimal({ params }: PageProps) {
       {/* Identité */}
       <div className="bg-white rounded-xl shadow p-4">
         <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Beef size={16} className="text-green-700" />
+          <CowIcon size={16} className="text-green-700" />
           Identité
         </h3>
         <div className="grid grid-cols-2 gap-2 text-sm">
