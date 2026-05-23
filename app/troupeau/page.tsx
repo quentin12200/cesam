@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { formatAge } from "@/lib/utils";
+import { getEtatGestation, getBadgeClass, formatAge } from "@/lib/utils";
 import Link from "next/link";
 import { Search, ChevronRight } from "lucide-react";
 
@@ -42,6 +42,22 @@ async function getAnimaux(sexe?: string, statut?: string, q?: string, page = 1) 
         statut: true,
         estGenisse: true,
         race: true,
+        saillies: {
+          orderBy: { date: "desc" as const },
+          take: 1,
+          select: {
+            date: true,
+            gestation: { select: { etat: true, dateVelagePrevue: true } },
+          },
+        },
+        velagesVache: {
+          orderBy: { date: "desc" as const },
+          take: 1,
+          select: {
+            date: true,
+            veau: { select: { nutrav: true, statut: true } },
+          },
+        },
       },
     }),
   ]);
@@ -112,22 +128,41 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             className="block bg-white rounded-xl shadow p-4 flex items-center justify-between hover:shadow-md transition-shadow"
           >
             <div className="flex items-center gap-3">
-              <span className="bg-green-700 text-white text-xs font-bold px-2 py-1 rounded-lg font-mono">{animal.nutrav}</span>
+              <span className="bg-green-700 text-white font-bold px-3 py-1.5 rounded-lg font-mono text-base min-w-[4rem] text-center">
+                {animal.nutrav}
+              </span>
               <div>
                 <div className="font-semibold text-gray-800 text-sm">
                   {animal.nobovi ?? <span className="text-gray-400 italic">Sans nom</span>}
                 </div>
                 <div className="text-xs text-gray-500 mt-0.5">
-                  {formatAge(animal.danais)} &bull; {animal.sexbov === "F" ? (animal.estGenisse ? "Génisse" : "Vache") : "Mâle"}
+                  {formatAge(animal.danais)} • {animal.sexbov === "F" ? (animal.estGenisse ? "Génisse" : "Vache") : "Mâle"}
                 </div>
+                {(() => {
+                  if (animal.sexbov !== "F" || animal.estGenisse) return null;
+                  const etat = getEtatGestation(
+                    animal.saillies[0]?.date ?? null,
+                    animal.saillies[0]?.gestation?.etat ?? null,
+                    animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
+                    animal.velagesVache[0]?.date ?? null
+                  );
+                  const veau = animal.velagesVache[0]?.veau;
+                  return (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getBadgeClass(etat)}`}>
+                        {etat === "VERT" ? "Pleine" : etat === "ROSE" ? "Imminente" : etat === "JAUNE" ? "À écho" : etat === "GRIS" ? "En attente" : "Vide"}
+                      </span>
+                      {veau && veau.statut === "ACTIF" && (
+                        <span className="text-xs text-blue-600 font-mono bg-blue-50 px-1.5 py-0.5 rounded">
+                          🐮 {veau.nutrav}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold px-2 py-1 rounded-full ${animal.statut === "ACTIF" ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>
-                {animal.statut}
-              </span>
-              <ChevronRight size={16} className="text-gray-400" />
-            </div>
+            <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
           </Link>
         ))}
         {animaux.length === 0 && (

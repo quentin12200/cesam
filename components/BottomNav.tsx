@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Beef, RefreshCw, Shield, Baby } from "lucide-react";
+import { Home, Cow, RefreshCw, Shield, Baby } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: Home },
-  { href: "/troupeau", label: "Troupeau", icon: Beef },
+  { href: "/troupeau", label: "Troupeau", icon: Cow },
   { href: "/reproduction", label: "Repro", icon: RefreshCw },
   { href: "/sanitaire", label: "Sanitaire", icon: Shield },
   { href: "/velage", label: "Vélage", icon: Baby },

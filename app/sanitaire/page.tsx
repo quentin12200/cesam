@@ -179,7 +179,6 @@ export default async function SanitairePage() {
           <div className="space-y-2">
             {veauxAVacciner.map((animal) => {
               const estUrgent = animal.vaccinsManquants.some((v) => v.urgent);
-              const asMHEManquant = animal.vaccinsManquants.some((v) => v.vaccin === "MHE");
               return (
                 <div key={animal.id} className={`border rounded-lg p-3 ${estUrgent ? "border-red-200 bg-red-50" : "border-yellow-100 bg-yellow-50"}`}>
                   <div className="flex items-start justify-between">
@@ -187,9 +186,6 @@ export default async function SanitairePage() {
                       <div className="flex items-center gap-2">
                         <Link href={`/troupeau/${animal.nutrav}`} className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{animal.nutrav}</Link>
                         <span className="text-sm font-medium text-gray-800">{animal.nobovi ?? "Sans nom"}</span>
-                        {asMHEManquant && (
-                          <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold">MHE</span>
-                        )}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">{formatAge(animal.danais)}</div>
                       <div className="flex flex-wrap gap-1 mt-2">
