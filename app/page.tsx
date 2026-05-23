@@ -9,6 +9,7 @@ import ChecklistSection, {
   type ChecklistItem,
   type SubItem,
 } from "@/app/components/ChecklistSection";
+import QuickSearch from "@/app/components/QuickSearch";
 import {
   Baby,
   Wifi,
@@ -19,7 +20,6 @@ import {
   Scissors,
   Activity,
   CalendarCheck,
-  Search,
   MilkOff,
 } from "lucide-react";
 
@@ -50,6 +50,12 @@ async function getDashboardData() {
     veauxPresqueSevrables,
     // Checklist: vaches à tarir (calving in 40-70 days)
     vachesATarirList,
+    // Composition
+    nbVaches,
+    nbGenissesBabies,
+    nbGenissesMoyennes,
+    nbGenissesGrandes,
+    nbMales,
   ] = await Promise.all([
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", velageVeau: { is: null } } }),
     prisma.animal.count({ where: { statut: "ACTIF", OR: [{ sexbov: "M" }, { estGenisse: true }] } }),
@@ -160,6 +166,12 @@ async function getDashboardData() {
       },
       orderBy: { dateVelagePrevue: "asc" },
     }),
+    // Composition du troupeau
+    prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: false } }),
+    prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: true, danais: { gte: addDays(now, -365) } } }),
+    prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: true, danais: { gte: addDays(now, -730), lt: addDays(now, -365) } } }),
+    prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: true, danais: { gte: addDays(now, -1095), lt: addDays(now, -730) } } }),
+    prisma.animal.count({ where: { statut: "ACTIF", sexbov: "M" } }),
   ]);
 
   let vachesPleine = 0;
@@ -274,6 +286,11 @@ async function getDashboardData() {
     sevrageItems,
     presqueSevrables,
     tarirItems,
+    nbVaches,
+    nbGenissesBabies,
+    nbGenissesMoyennes,
+    nbGenissesGrandes,
+    nbMales,
   };
 }
 
@@ -297,15 +314,7 @@ export default async function Dashboard() {
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
       {/* Recherche rapide */}
-      <form action="/troupeau" method="GET" className="relative mt-2">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          name="q"
-          placeholder="N° animal ou nom..."
-          className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm shadow focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
-      </form>
+      <QuickSearch />
       <h2 className="text-xl font-bold text-gray-800 mt-2">Tableau de bord</h2>
 
       {/* Stats principales */}
@@ -498,6 +507,34 @@ export default async function Dashboard() {
             <div className="text-xs text-gray-600 mt-1">Vaccins en retard</div>
             <div className="text-xs text-gray-400">Protocoles</div>
           </div>
+        </div>
+      </div>
+
+      {/* Composition du troupeau */}
+      <div className="bg-white rounded-xl shadow p-4">
+        <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <CowIcon size={18} className="text-green-700" />
+          Composition du troupeau
+        </h3>
+        <div className="space-y-1.5">
+          {([
+            { label: "Vaches", count: data.nbVaches, color: "bg-green-100 text-green-700", href: "/troupeau?lot=vaches" },
+            { label: "Génisses < 1 an", count: data.nbGenissesBabies, color: "bg-sky-100 text-sky-700", href: "/troupeau?lot=babies" },
+            { label: "Génisses 1–2 ans", count: data.nbGenissesMoyennes, color: "bg-indigo-100 text-indigo-700", href: "/troupeau?lot=moyennes" },
+            { label: "Génisses 2–3 ans", count: data.nbGenissesGrandes, color: "bg-purple-100 text-purple-700", href: "/troupeau?lot=grandes" },
+            { label: "Mâles", count: data.nbMales, color: "bg-gray-100 text-gray-600", href: "/troupeau?sexe=M" },
+          ] as const).map(({ label, count, color, href }) => (
+            <Link key={label} href={href} className="flex items-center justify-between p-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+              <span className="text-sm text-gray-700">{label}</span>
+              <span className={`text-sm font-bold px-2.5 py-0.5 rounded-full ${color}`}>{count}</span>
+            </Link>
+          ))}
+        </div>
+        <div className="mt-3 pt-2 border-t border-gray-100 flex justify-between text-xs text-gray-500">
+          <span>Total actifs</span>
+          <span className="font-semibold text-gray-700">
+            {data.nbVaches + data.nbGenissesBabies + data.nbGenissesMoyennes + data.nbGenissesGrandes + data.nbMales}
+          </span>
         </div>
       </div>
 

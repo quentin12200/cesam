@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, TrendingUp, Package, Euro, Plus } from "lucide-react";
 import SortieForm from "./SortieForm";
+import AnnulerSortieButton from "./AnnulerSortieButton";
 
 function formatEuro(val: number | null | undefined) {
   if (val == null) return "—";
@@ -23,7 +24,7 @@ async function getFinancesData(annee: number) {
     where: { date: { gte: debut, lt: fin } },
     include: {
       animal: {
-        select: { nutrav: true, nobovi: true, sexbov: true, danais: true, velageVeau: { select: { id: true } } },
+        select: { nutrav: true, nobovi: true, sexbov: true, danais: true, estGenisse: true, velageVeau: { select: { id: true } } },
       },
     },
     orderBy: { date: "desc" },
@@ -64,6 +65,47 @@ async function getFinancesData(annee: number) {
         vachesBoucherie.length
       : null;
 
+  // Monthly CA distribution
+  const MOIS_COURTS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+  const monthlyCA = MOIS_COURTS.map((label, i) => {
+    const monthSorties = sorties.filter((s) => new Date(s.date).getMonth() === i);
+    return {
+      label,
+      ca: monthSorties.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0),
+      count: monthSorties.length,
+    };
+  });
+  const maxMonthlyCA = Math.max(...monthlyCA.map((m) => m.ca), 1);
+
+  // Top buyers
+  const buyerMap = new Map<string, { count: number; total: number }>();
+  for (const s of sorties) {
+    if (s.acheteur) {
+      const existing = buyerMap.get(s.acheteur) ?? { count: 0, total: 0 };
+      buyerMap.set(s.acheteur, {
+        count: existing.count + 1,
+        total: existing.total + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0),
+      });
+    }
+  }
+  const topBuyers = [...buyerMap.entries()]
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 5)
+    .map(([name, stats]) => ({ name, ...stats }));
+
+  // CA by animal category
+  const caVeauxVif = ventesElevage
+    .filter((s) => s.animal.velageVeau !== null)
+    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+  const caGenisses = ventesElevage
+    .filter((s) => s.animal.velageVeau === null && s.animal.estGenisse)
+    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+  const caVachesBoucherie = ventesBoucherie
+    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+  const caVachesElevage = ventesElevage
+    .filter((s) => s.animal.velageVeau === null && !s.animal.estGenisse && s.animal.sexbov === "F")
+    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+
   return {
     sorties,
     caVeaux,
@@ -78,6 +120,13 @@ async function getFinancesData(annee: number) {
     poidsMoyenCarcasse,
     prixMoyenVache,
     veauxVendusCount: veauxVendus.length,
+    monthlyCA,
+    maxMonthlyCA,
+    topBuyers,
+    caVeauxVif,
+    caGenisses,
+    caVachesBoucherie,
+    caVachesElevage,
   };
 }
 
@@ -236,6 +285,47 @@ export default async function FinancesPage({ searchParams }: PageProps) {
         </div>
       </div>
 
+      {/* Répartition mensuelle */}
+      {data.sorties.length > 0 && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3">Répartition mensuelle {annee}</h3>
+          <div className="space-y-2">
+            {data.monthlyCA.filter((m) => m.ca > 0).map((m) => (
+              <div key={m.label} className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 w-8 shrink-0">{m.label}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="bg-green-500 h-2.5 rounded-full"
+                    style={{ width: `${(m.ca / data.maxMonthlyCA) * 100}%` }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-gray-700 w-24 text-right shrink-0">
+                  {formatEuro(m.ca)}
+                </span>
+                <span className="text-xs text-gray-400 w-10 text-right shrink-0">×{m.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top acheteurs */}
+      {data.topBuyers.length > 0 && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3">Top acheteurs {annee}</h3>
+          <div className="space-y-2">
+            {data.topBuyers.map((buyer, i) => (
+              <div key={buyer.name} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50">
+                <span className="text-xs font-bold text-gray-400 w-5 text-center">{i + 1}</span>
+                <span className="flex-1 text-sm text-gray-700 truncate">{buyer.name}</span>
+                <span className="text-xs text-gray-400">{buyer.count} animal{buyer.count > 1 ? "x" : ""}</span>
+                <span className="text-sm font-semibold text-green-700">{formatEuro(buyer.total)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Liste des sorties */}
       <div className="bg-white rounded-xl shadow p-4">
         <h3 className="font-semibold text-gray-800 mb-3">
@@ -278,6 +368,9 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                 {sortie.acheteur && (
                   <div className="text-xs text-gray-400 mt-1">Acheteur : {sortie.acheteur}</div>
                 )}
+                <div className="flex justify-end mt-1">
+                  <AnnulerSortieButton sortieId={sortie.id} nutrav={sortie.animal.nutrav} />
+                </div>
               </div>
             ))}
           </div>
