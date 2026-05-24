@@ -314,6 +314,7 @@ function ReproductionContent() {
                   <th className="px-3 py-2 text-center font-semibold">9 mois</th>
                   <th className="px-3 py-2 text-center font-semibold">Père</th>
                   <th className="px-3 py-2 text-center font-semibold">Délai</th>
+                  <th className="px-2 py-2 text-center font-semibold">%</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -348,6 +349,33 @@ function ReproductionContent() {
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badgeColor}`}>
                           J-{daysLeft}
                         </span>
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        {(() => {
+                          const progress = Math.min(100, Math.max(0, ((DUREE_GESTATION - daysLeft) / DUREE_GESTATION) * 100));
+                          const r = 12;
+                          const circ = 2 * Math.PI * r;
+                          const dash = (progress / 100) * circ;
+                          const color = daysLeft <= 14 ? "#f472b6" : daysLeft <= 30 ? "#fb923c" : "#22c55e";
+                          return (
+                            <svg width="32" height="32" viewBox="0 0 32 32" className="inline-block">
+                              <circle cx="16" cy="16" r={r} fill="none" stroke="#e5e7eb" strokeWidth="4" />
+                              <circle
+                                cx="16" cy="16" r={r}
+                                fill="none"
+                                stroke={color}
+                                strokeWidth="4"
+                                strokeDasharray={`${dash} ${circ}`}
+                                strokeDashoffset={circ / 4}
+                                strokeLinecap="round"
+                                style={{ transform: "rotate(-90deg)", transformOrigin: "16px 16px" }}
+                              />
+                              <text x="16" y="20" textAnchor="middle" fontSize="7" fontWeight="bold" fill={color}>
+                                {Math.round(progress)}%
+                              </text>
+                            </svg>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );
