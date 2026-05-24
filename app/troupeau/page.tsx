@@ -2,8 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getEtatGestation, getBadgeClass, formatAge } from "@/lib/utils";
 import Link from "next/link";
-import { Search, ChevronRight, ArrowLeft } from "lucide-react";
+import { Search, ChevronRight, ArrowLeft, Plus } from "lucide-react";
 import { addDays } from "date-fns";
+import NouvelAnimalForm from "./NouvelAnimalForm";
 
 interface PageProps {
   searchParams: Promise<{
@@ -12,6 +13,7 @@ interface PageProps {
     q?: string;
     page?: string;
     lot?: string;
+    nouveau?: string;
   }>;
 }
 
@@ -104,6 +106,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const q = params.q;
   const page = parseInt(params.page ?? "1", 10);
   const lot = params.lot;
+  const showForm = params.nouveau === "1";
 
   const { animaux, total, pages } = await getAnimaux(sexe, statut, q, page, lot);
 
@@ -132,8 +135,20 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
           <ArrowLeft size={18} />
         </Link>
-        <h2 className="text-xl font-bold text-gray-800">Troupeau</h2>
+        <h2 className="text-xl font-bold text-gray-800 flex-1">Troupeau</h2>
+        {!showForm && (
+          <Link
+            href="/troupeau?nouveau=1"
+            className="flex items-center gap-1.5 bg-green-700 text-white text-sm font-medium px-3 py-2 rounded-lg shadow"
+          >
+            <Plus size={16} />
+            Ajouter
+          </Link>
+        )}
       </div>
+
+      {/* Formulaire nouvel animal */}
+      {showForm && <NouvelAnimalForm />}
 
       {/* Recherche */}
       <form method="GET" action="/troupeau" className="relative">
