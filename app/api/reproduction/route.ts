@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -14,7 +16,7 @@ export async function GET() {
       nobovi: true,
       danais: true,
       saillies: {
-        orderBy: { date: "desc" },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         take: 1,
         select: {
           id: true,

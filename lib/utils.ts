@@ -57,10 +57,10 @@ export function getEtatGestation(
   }
 
   // Saillie enregistrée — calcul par délai
+  // ROUGE ne vient jamais du délai seul : uniquement d'un écho VIDE ou d'un marquage manuel
   const joursDepuisSaillie = differenceInDays(now, derniereSaillie);
   if (joursDepuisSaillie < 35) return "GRIS";
-  if (joursDepuisSaillie <= 45) return "JAUNE";
-  return "ROUGE";
+  return "JAUNE";
 }
 
 export function getBadgeClass(etat: EtatGestation): string {
