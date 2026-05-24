@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { RefreshCw, Plus, CheckCircle, ArrowLeft, CalendarDays } from "lucide-react";
+import { RefreshCw, Plus, CheckCircle, ArrowLeft, CalendarDays, Settings } from "lucide-react";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE";
 
@@ -210,12 +210,17 @@ function ReproductionContent() {
           </Link>
           <h2 className="text-xl font-bold text-gray-800">Reproduction</h2>
         </div>
-        <button
-          onClick={() => { setShowSaillieForm(true); setSelectedVache(null); }}
-          className="flex items-center gap-1 bg-green-700 text-white text-sm px-3 py-2 rounded-lg"
-        >
-          <Plus size={16} /> Saillie
-        </button>
+        <div className="flex items-center gap-2">
+          <Link href="/taureaux" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" title="Gérer les taureaux">
+            <Settings size={18} />
+          </Link>
+          <button
+            onClick={() => { setShowSaillieForm(true); setSelectedVache(null); }}
+            className="flex items-center gap-1 bg-green-700 text-white text-sm px-3 py-2 rounded-lg"
+          >
+            <Plus size={16} /> Saillie
+          </button>
+        </div>
       </div>
 
       {message && (
