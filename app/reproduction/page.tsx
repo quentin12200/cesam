@@ -195,6 +195,7 @@ function ReproductionContent() {
       }
       setMessage("Saillie enregistrée !");
       setShowSaillieForm(false);
+      setFilterEtat("TOUS");
       await fetchData();
     } catch (err) {
       setSaillieError("Erreur réseau : " + String(err));
