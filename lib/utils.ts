@@ -34,24 +34,20 @@ export function getEtatGestation(
 ): EtatGestation {
   const now = new Date();
 
-  // Confirmée pleine
-  if (gestationEtat === "VERT") return "VERT";
+  // Vide explicitement confirmé par écho ou annulation manuelle — priorité absolue
+  if (gestationEtat === "ROUGE") return "ROUGE";
 
-  // Vélage prévu dans le mois en cours
-  if (dateVelagePrevue) {
-    const diffJours = differenceInDays(dateVelagePrevue, now);
-    if (diffJours >= 0 && diffJours <= 30) return "ROSE";
-    if (gestationEtat === "VERT") return "VERT";
+  // Pleine confirmée par écho
+  if (gestationEtat === "VERT") {
+    // Vélage imminent (< 30 j)
+    if (dateVelagePrevue) {
+      const diffJours = differenceInDays(dateVelagePrevue, now);
+      if (diffJours >= 0 && diffJours <= 30) return "ROSE";
+    }
+    return "VERT";
   }
 
-  // Saillie récente
-  if (derniereSaillie) {
-    const joursDepuisSaillie = differenceInDays(now, derniereSaillie);
-    if (joursDepuisSaillie < 35) return "GRIS";
-    if (joursDepuisSaillie >= 35 && joursDepuisSaillie <= 45) return "JAUNE";
-  }
-
-  // Vide ou > 60j post-vélage sans saillie
+  // Pas de saillie enregistrée
   if (!derniereSaillie) {
     if (dernierVelage) {
       const joursDepuisVelage = differenceInDays(now, dernierVelage);
@@ -60,13 +56,11 @@ export function getEtatGestation(
     return "ROUGE";
   }
 
-  // Plus de 45 jours sans echo confirmation
-  if (derniereSaillie) {
-    const joursDepuisSaillie = differenceInDays(now, derniereSaillie);
-    if (joursDepuisSaillie > 45 && gestationEtat !== "VERT") return "ROUGE";
-  }
-
-  return "GRIS";
+  // Saillie enregistrée — calcul par délai
+  const joursDepuisSaillie = differenceInDays(now, derniereSaillie);
+  if (joursDepuisSaillie < 35) return "GRIS";
+  if (joursDepuisSaillie <= 45) return "JAUNE";
+  return "ROUGE";
 }
 
 export function getBadgeClass(etat: EtatGestation): string {
