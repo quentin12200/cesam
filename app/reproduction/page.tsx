@@ -32,12 +32,40 @@ type FilterEtat = "TOUS" | EtatGestation;
 
 const filterLabels: Record<FilterEtat, string> = {
   TOUS: "Tous",
-  GRIS: "En attente",
+  GRIS: "Saillie récente",
   JAUNE: "À écho",
   VERT: "Pleine",
   ROUGE: "Vide",
   ROSE: "Imminent",
 };
+
+const LEGENDE = [
+  {
+    couleur: "bg-gray-400",
+    label: "Saillie récente",
+    detail: "Saillie effectuée il y a moins de 35 jours — trop tôt pour l'écho",
+  },
+  {
+    couleur: "bg-yellow-400",
+    label: "À échographier",
+    detail: "Entre 35 et 45 jours après la saillie — moment idéal pour confirmer",
+  },
+  {
+    couleur: "bg-green-500",
+    label: "Pleine confirmée",
+    detail: "Gestation confirmée par écho — date de vélage calculée",
+  },
+  {
+    couleur: "bg-pink-400",
+    label: "Vélage imminent",
+    detail: "Vélage prévu dans moins de 30 jours — surveiller de près",
+  },
+  {
+    couleur: "bg-red-500",
+    label: "Vide",
+    detail: "Non gestante — prête pour une nouvelle saillie",
+  },
+];
 
 const DUREE_GESTATION = 285; // jours — Blonde Aquitaine
 
@@ -315,6 +343,24 @@ function ReproductionContent() {
           );
         })}
       </div>
+
+      {/* Légende des couleurs */}
+      <details className="bg-white rounded-xl shadow">
+        <summary className="px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer select-none flex items-center gap-2">
+          <span>🎨</span> Comprendre les couleurs
+        </summary>
+        <div className="px-4 pb-4 space-y-2 border-t border-gray-100 pt-3">
+          {LEGENDE.map((l) => (
+            <div key={l.label} className="flex items-start gap-3">
+              <span className={`mt-0.5 w-3 h-3 rounded-full shrink-0 ${l.couleur}`} />
+              <div>
+                <span className="text-sm font-semibold text-gray-800">{l.label}</span>
+                <span className="text-xs text-gray-500 ml-2">{l.detail}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
 
       {/* Liste vaches */}
       {loading ? (

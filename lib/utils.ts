@@ -86,7 +86,7 @@ export function getEtatLabel(etat: EtatGestation): string {
     case "JAUNE": return "À échographier";
     case "ROUGE": return "Vide";
     case "ROSE": return "Vélage imminent";
-    case "GRIS": return "En attente";
+    case "GRIS": return "Saillie récente";
     default: return "Inconnu";
   }
 }
