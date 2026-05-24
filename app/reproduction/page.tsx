@@ -296,68 +296,64 @@ function ReproductionContent() {
         </div>
       )}
 
-      {/* Calendrier de gestation — barres de progression */}
+      {/* Calendrier de gestation — tableau */}
       {gestationsActives.length > 0 && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
             <CalendarDays size={18} className="text-green-700" />
-            Calendrier de gestation
-            <span className="text-xs font-normal text-gray-400 ml-auto">
+            <span className="font-semibold text-gray-800">Calendrier de gestation</span>
+            <span className="text-xs text-gray-400 ml-auto">
               {gestationsActives.length} vache{gestationsActives.length > 1 ? "s" : ""}
             </span>
-          </h3>
-          <div className="space-y-5">
-            {gestationsActives.map((v) => {
-              const calving = new Date(v.dateVelagePrevue!);
-              const conception = addDays(calving, -DUREE_GESTATION);
-              const elapsed = Math.max(0, differenceInDays(now, conception));
-              const progress = Math.min(100, (elapsed / DUREE_GESTATION) * 100);
-              const daysLeft = differenceInDays(calving, now);
-              const urgency = daysLeft <= 15 ? "pink" : daysLeft <= 45 ? "orange" : "green";
-              const barColor = urgency === "pink" ? "bg-pink-400" : urgency === "orange" ? "bg-orange-400" : "bg-green-500";
-              const badgeColor = urgency === "pink"
-                ? "bg-pink-100 text-pink-700"
-                : urgency === "orange"
-                ? "bg-orange-100 text-orange-700"
-                : "bg-green-100 text-green-700";
-
-              return (
-                <div key={v.id}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-mono font-bold text-green-700 text-xs bg-green-50 px-1.5 py-0.5 rounded shrink-0">
-                        {v.nutrav}
-                      </span>
-                      <span className="text-sm text-gray-700 font-medium truncate">{v.nobovi ?? "Sans nom"}</span>
-                      {v.taureauNom && (
-                        <span className="text-xs text-gray-400 shrink-0">· {v.taureauNom}</span>
-                      )}
-                    </div>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${badgeColor}`}>
-                      J-{daysLeft}
-                    </span>
-                  </div>
-                  {/* Barre de progression */}
-                  <div className="relative h-4 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${barColor} transition-all duration-500`}
-                      style={{ width: `${progress}%` }}
-                    />
-                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white mix-blend-difference">
-                      {Math.round(progress)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-[10px] mt-0.5">
-                    <span className="text-gray-400">
-                      {conception.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-                    </span>
-                    <span className="text-gray-500 font-medium">
-                      Vélage : {calving.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                  <th className="px-3 py-2 text-left font-semibold">Vache</th>
+                  <th className="px-3 py-2 text-center font-semibold">9 mois</th>
+                  <th className="px-3 py-2 text-center font-semibold">Père</th>
+                  <th className="px-3 py-2 text-center font-semibold">Délai</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {gestationsActives.map((v) => {
+                  const calving = new Date(v.dateVelagePrevue!);
+                  const daysLeft = differenceInDays(calving, now);
+                  const rowBg = daysLeft <= 14 ? "bg-pink-50" : daysLeft <= 30 ? "bg-yellow-50" : "";
+                  const badgeColor = daysLeft <= 14
+                    ? "bg-pink-100 text-pink-700"
+                    : daysLeft <= 30
+                    ? "bg-orange-100 text-orange-700"
+                    : "bg-green-100 text-green-700";
+                  return (
+                    <tr key={v.id} className={rowBg}>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-green-700 text-xs bg-green-50 px-1.5 py-0.5 rounded">
+                            {v.nutrav}
+                          </span>
+                          <span className="text-gray-700 font-medium truncate max-w-[80px]">
+                            {v.nobovi ?? "Sans nom"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-center font-medium text-gray-800">
+                        {calving.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+                      </td>
+                      <td className="px-3 py-2 text-center text-gray-600 text-xs">
+                        {v.taureauNom ?? "IA"}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badgeColor}`}>
+                          J-{daysLeft}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
