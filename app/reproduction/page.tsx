@@ -63,6 +63,7 @@ function ReproductionContent() {
   const [selectedVache, setSelectedVache] = useState<VacheRepro | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [saillieError, setSaillieError] = useState<string | null>(null);
   const [confirmVideId, setConfirmVideId] = useState<string | null>(null);
 
   // Saillie form
@@ -110,6 +111,7 @@ function ReproductionContent() {
     setIaNupere("");
     setIaNopere("");
     setIaTraper("");
+    setSaillieError(null);
     setShowSaillieForm(true);
   }
 
@@ -186,12 +188,16 @@ function ReproductionContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ animalId: saillieAnimalId, date: saillieDate, type: saillieType, taureauId }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Erreur serveur" }));
+        setSaillieError(data.error ?? "Erreur lors de l'enregistrement");
+        return;
+      }
       setMessage("Saillie enregistrée !");
       setShowSaillieForm(false);
       await fetchData();
     } catch (err) {
-      setMessage("Erreur: " + String(err));
+      setSaillieError("Erreur réseau : " + String(err));
     } finally {
       setSaving(false);
     }
@@ -657,6 +663,12 @@ function ReproductionContent() {
                     </div>
                     <p className="text-xs text-gray-400">Tous les champs sont optionnels</p>
                   </div>
+                </div>
+              )}
+
+              {saillieError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
+                  {saillieError}
                 </div>
               )}
 
