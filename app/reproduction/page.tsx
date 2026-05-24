@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { RefreshCw, Plus, CheckCircle, ArrowLeft, CalendarDays, Settings } from "lucide-react";
+import { RefreshCw, Plus, CheckCircle, ArrowLeft, CalendarDays, Settings, Printer } from "lucide-react";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE";
 
@@ -274,6 +274,9 @@ function ReproductionContent() {
           <h2 className="text-xl font-bold text-gray-800">Reproduction</h2>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/reproduction/impression" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" title="Tableau imprimable">
+            <Printer size={18} />
+          </Link>
           <Link href="/taureaux" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" title="Gérer les taureaux">
             <Settings size={18} />
           </Link>
