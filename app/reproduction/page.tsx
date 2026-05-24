@@ -65,11 +65,12 @@ function ReproductionContent() {
   const [saillieGroupage, setSaillieGroupage] = useState(false);
   const [saillieTaureauId, setSaillieTaureauId] = useState("");
 
-  // Echo form state — on utilise la date de vélage prévue directement
+  // Echo form state — jours estimés par l'inséminateur à l'écho
   const [echoSaillieId, setEchoSaillieId] = useState("");
   const [echoDate, setEchoDate] = useState(new Date().toISOString().split("T")[0]);
   const [echoResultat, setEchoResultat] = useState("PLEINE");
-  const [echoDateVelage, setEchoDateVelage] = useState("");
+  const [echoJours, setEchoJours] = useState(45); // jours de gestation constatés à l'écho
+  const [echoUnite, setEchoUnite] = useState<"jours" | "mois">("jours");
 
   useEffect(() => {
     fetchData();
@@ -95,13 +96,9 @@ function ReproductionContent() {
     setSelectedVache(vache);
     setEchoSaillieId(vache.saillieId!);
     setEchoResultat("PLEINE");
-    // Pré-calculer la date de vélage depuis la date de saillie + 285 j
-    if (vache.derniereSaillie) {
-      const velagePrevue = addDays(new Date(vache.derniereSaillie), DUREE_GESTATION);
-      setEchoDateVelage(velagePrevue.toISOString().split("T")[0]);
-    } else {
-      setEchoDateVelage(addDays(new Date(), 240).toISOString().split("T")[0]);
-    }
+    setEchoDate(new Date().toISOString().split("T")[0]);
+    setEchoJours(45); // valeur typique pour une première écho
+    setEchoUnite("jours");
     setShowEchoForm(true);
   }
 
@@ -170,6 +167,7 @@ function ReproductionContent() {
     e.preventDefault();
     setSaving(true);
     try {
+      const joursGestationFinal = echoUnite === "mois" ? Math.round(echoJours * 30.5) : echoJours;
       const res = await fetch("/api/echographies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,7 +175,7 @@ function ReproductionContent() {
           saillieId: echoSaillieId,
           date: echoDate,
           resultat: echoResultat,
-          dateVelagePrevue: echoResultat === "PLEINE" ? echoDateVelage : undefined,
+          joursGestation: echoResultat === "PLEINE" ? joursGestationFinal : undefined,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -191,14 +189,16 @@ function ReproductionContent() {
     }
   }
 
-  // Jours restants avant vélage (pour affichage dans le formulaire)
-  const joursAvantVelage = echoDateVelage
-    ? differenceInDays(new Date(echoDateVelage), new Date(echoDate))
+  // Calculs temps réel du formulaire écho
+  const echoJoursEffectifs = echoUnite === "mois" ? Math.round(echoJours * 30.5) : echoJours;
+  const echoDateConception = echoResultat === "PLEINE" && echoJoursEffectifs > 0
+    ? addDays(new Date(echoDate), -echoJoursEffectifs)
     : null;
-
-  // Jours de gestation à la date de l'écho (info vétérinaire)
-  const joursGestationEcho = selectedVache?.derniereSaillie
-    ? differenceInDays(new Date(echoDate), new Date(selectedVache.derniereSaillie))
+  const echoDateVelagePrevue = echoResultat === "PLEINE" && echoJoursEffectifs > 0
+    ? addDays(new Date(echoDate), DUREE_GESTATION - echoJoursEffectifs)
+    : null;
+  const joursAvantVelage = echoDateVelagePrevue
+    ? differenceInDays(echoDateVelagePrevue, new Date(echoDate))
     : null;
 
   return (
@@ -469,11 +469,14 @@ function ReproductionContent() {
                   required
                   className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
                 />
-                {joursGestationEcho !== null && joursGestationEcho > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Soit ~{joursGestationEcho} jours depuis la saillie du {formatDate(new Date(selectedVache!.derniereSaillie!))}
-                  </p>
-                )}
+                {selectedVache?.derniereSaillie && (() => {
+                  const j = differenceInDays(new Date(echoDate), new Date(selectedVache.derniereSaillie));
+                  return j > 0 ? (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Saillie enregistrée le {formatDate(new Date(selectedVache.derniereSaillie))} · {j} j avant l&apos;écho
+                    </p>
+                  ) : null;
+                })()}
               </div>
 
               <div>
@@ -497,28 +500,73 @@ function ReproductionContent() {
               </div>
 
               {echoResultat === "PLEINE" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date de vélage prévue</label>
-                  <input
-                    type="date"
-                    value={echoDateVelage}
-                    onChange={(e) => setEchoDateVelage(e.target.value)}
-                    required
-                    className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
-                  />
-                  {joursAvantVelage !== null && (
-                    <div className={`mt-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                      joursAvantVelage <= 30 ? "bg-pink-50 text-pink-700" :
-                      joursAvantVelage <= 60 ? "bg-orange-50 text-orange-700" :
-                      "bg-green-50 text-green-700"
-                    }`}>
-                      📅 Vélage dans <strong>{joursAvantVelage} jours</strong>
-                      {" · "}{new Date(echoDateVelage).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                <div className="space-y-3">
+                  {/* Jours de gestation estimés par l'inséminateur */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Gestation estimée par l&apos;inséminateur
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        value={echoJours}
+                        onChange={(e) => setEchoJours(Math.max(1, parseInt(e.target.value) || 1))}
+                        min={1}
+                        max={echoUnite === "mois" ? 9 : 284}
+                        required
+                        className="flex-1 border border-gray-200 rounded-lg p-2.5 text-sm text-center font-bold text-lg"
+                      />
+                      <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setEchoUnite("jours")}
+                          className={`px-3 py-2 text-sm font-medium transition-colors ${echoUnite === "jours" ? "bg-green-700 text-white" : "text-gray-600 hover:bg-gray-50"}`}
+                        >
+                          jours
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEchoUnite("mois")}
+                          className={`px-3 py-2 text-sm font-medium transition-colors ${echoUnite === "mois" ? "bg-green-700 text-white" : "text-gray-600 hover:bg-gray-50"}`}
+                        >
+                          mois
+                        </button>
+                      </div>
+                    </div>
+                    {echoUnite === "mois" && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        ≈ {echoJoursEffectifs} jours
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Résultat calculé */}
+                  {echoDateConception && echoDateVelagePrevue && (
+                    <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Début de gestation estimé</span>
+                        <span className="font-semibold text-gray-800">
+                          {echoDateConception.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                        </span>
+                      </div>
+                      <div className="h-px bg-gray-200" />
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Vélage prévu</span>
+                        <span className="font-bold text-green-700">
+                          {echoDateVelagePrevue.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                        </span>
+                      </div>
+                      {joursAvantVelage !== null && (
+                        <div className={`text-center text-xs font-semibold py-1 px-2 rounded-lg ${
+                          joursAvantVelage <= 30 ? "bg-pink-100 text-pink-700" :
+                          joursAvantVelage <= 60 ? "bg-orange-100 text-orange-700" :
+                          "bg-green-100 text-green-700"
+                        }`}>
+                          dans {joursAvantVelage} jours
+                        </div>
+                      )}
                     </div>
                   )}
-                  <p className="text-xs text-gray-400 mt-1.5">
-                    Pré-rempli depuis la saillie + {DUREE_GESTATION} jours. Ajustez si le vétérinaire donne une date différente.
-                  </p>
                 </div>
               )}
 
