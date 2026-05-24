@@ -26,6 +26,8 @@ interface Taureau {
   id: string;
   nupere: string;
   nopere: string | null;
+  present: boolean;
+  traper: string | null;
 }
 
 type FilterEtat = "TOUS" | EtatGestation;
@@ -40,38 +42,14 @@ const filterLabels: Record<FilterEtat, string> = {
 };
 
 const LEGENDE = [
-  {
-    couleur: "bg-gray-400",
-    label: "Saillie récente",
-    detail: "Saillie effectuée il y a moins de 35 jours — trop tôt pour l'écho",
-  },
-  {
-    couleur: "bg-yellow-400",
-    label: "À échographier",
-    detail: "Entre 35 et 45 jours après la saillie — moment idéal pour confirmer",
-  },
-  {
-    couleur: "bg-green-500",
-    label: "Pleine confirmée",
-    detail: "Gestation confirmée par écho — date de vélage calculée",
-  },
-  {
-    couleur: "bg-pink-400",
-    label: "Vélage imminent",
-    detail: "Vélage prévu dans moins de 30 jours — surveiller de près",
-  },
-  {
-    couleur: "bg-red-500",
-    label: "Vide",
-    detail: "Non gestante — prête pour une nouvelle saillie",
-  },
+  { couleur: "bg-gray-400", label: "Saillie récente", detail: "Saillie effectuée il y a moins de 35 jours — trop tôt pour l'écho" },
+  { couleur: "bg-yellow-400", label: "À échographier", detail: "Entre 35 et 45 jours après la saillie — moment idéal pour confirmer" },
+  { couleur: "bg-green-500", label: "Pleine confirmée", detail: "Gestation confirmée par écho — date de vélage calculée" },
+  { couleur: "bg-pink-400", label: "Vélage imminent", detail: "Vélage prévu dans moins de 30 jours — surveiller de près" },
+  { couleur: "bg-red-500", label: "Vide", detail: "Non gestante — prête pour une nouvelle saillie" },
 ];
 
-const DUREE_GESTATION = 285; // jours — Blonde Aquitaine
-
-function moisLabel(date: Date) {
-  return date.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
-}
+const DUREE_GESTATION = 285;
 
 function ReproductionContent() {
   const [vaches, setVaches] = useState<VacheRepro[]>([]);
@@ -87,23 +65,25 @@ function ReproductionContent() {
   const [message, setMessage] = useState<string | null>(null);
   const [confirmVideId, setConfirmVideId] = useState<string | null>(null);
 
-  // Saillie form state
+  // Saillie form
   const [saillieAnimalId, setSaillieAnimalId] = useState("");
   const [saillieDate, setSaillieDate] = useState(new Date().toISOString().split("T")[0]);
-  const [saillieType, setSaillieType] = useState("IA");
-  const [saillieGroupage, setSaillieGroupage] = useState(false);
+  const [saillieType, setSaillieType] = useState<"NATURELLE" | "IA">("NATURELLE");
   const [saillieTaureauId, setSaillieTaureauId] = useState("");
+  // IA bull state
+  const [iaSelectedId, setIaSelectedId] = useState("");
+  const [iaNupere, setIaNupere] = useState("");
+  const [iaNopere, setIaNopere] = useState("");
+  const [iaTraper, setIaTraper] = useState("");
 
-  // Echo form state — jours estimés par l'inséminateur à l'écho
+  // Echo form
   const [echoSaillieId, setEchoSaillieId] = useState("");
   const [echoDate, setEchoDate] = useState(new Date().toISOString().split("T")[0]);
   const [echoResultat, setEchoResultat] = useState("PLEINE");
-  const [echoJours, setEchoJours] = useState(45); // jours de gestation constatés à l'écho
+  const [echoJours, setEchoJours] = useState(45);
   const [echoUnite, setEchoUnite] = useState<"jours" | "mois">("jours");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   async function fetchData() {
     setLoading(true);
@@ -121,12 +101,24 @@ function ReproductionContent() {
     }
   }
 
+  function openSaillieForm(vache?: VacheRepro) {
+    setSaillieAnimalId(vache?.id ?? "");
+    setSaillieDate(new Date().toISOString().split("T")[0]);
+    setSaillieType("NATURELLE");
+    setSaillieTaureauId("");
+    setIaSelectedId("");
+    setIaNupere("");
+    setIaNopere("");
+    setIaTraper("");
+    setShowSaillieForm(true);
+  }
+
   function openEchoForm(vache: VacheRepro) {
     setSelectedVache(vache);
     setEchoSaillieId(vache.saillieId!);
     setEchoResultat("PLEINE");
     setEchoDate(new Date().toISOString().split("T")[0]);
-    setEchoJours(45); // valeur typique pour une première écho
+    setEchoJours(45);
     setEchoUnite("jours");
     setShowEchoForm(true);
   }
@@ -148,38 +140,51 @@ function ReproductionContent() {
   const counts: Record<EtatGestation, number> = { GRIS: 0, JAUNE: 0, VERT: 0, ROUGE: 0, ROSE: 0 };
   vachesAvecEtat.forEach((v) => counts[v.etat]++);
 
-  // Calendrier: vaches VERT/ROSE avec date de vélage prévue, triées par date
-  const velagesPrevus = vachesAvecEtat
+  const gestationsActives = vachesAvecEtat
     .filter((v) => (v.etat === "VERT" || v.etat === "ROSE") && v.dateVelagePrevue)
     .sort((a, b) => new Date(a.dateVelagePrevue!).getTime() - new Date(b.dateVelagePrevue!).getTime());
 
-  // Grouper par mois
-  const velagesParMois: { moisLabel: string; vaches: typeof velagesPrevus }[] = [];
-  for (const v of velagesPrevus) {
-    const d = new Date(v.dateVelagePrevue!);
-    const label = moisLabel(d);
-    const last = velagesParMois[velagesParMois.length - 1];
-    if (last && last.moisLabel === label) {
-      last.vaches.push(v);
-    } else {
-      velagesParMois.push({ moisLabel: label, vaches: [v] });
-    }
-  }
+  const farmBulls = taureaux.filter((t) => t.present);
+  const iaBulls = taureaux.filter((t) => !t.present);
+
+  const now = new Date();
 
   async function handleSaillieSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
+      let taureauId: string | undefined = undefined;
+
+      if (saillieType === "NATURELLE") {
+        taureauId = saillieTaureauId || undefined;
+      } else {
+        if (iaSelectedId) {
+          taureauId = iaSelectedId;
+        } else if (iaNupere.trim()) {
+          const res = await fetch("/api/taureaux", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nupere: iaNupere.trim(),
+              nopere: iaNopere.trim() || null,
+              traper: iaTraper.trim() || null,
+              present: false,
+            }),
+          });
+          if (res.status === 409) {
+            const existing = taureaux.find((t) => t.nupere === iaNupere.trim());
+            taureauId = existing?.id;
+          } else if (res.ok) {
+            const t = await res.json();
+            taureauId = t.id;
+          }
+        }
+      }
+
       const res = await fetch("/api/saillies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          animalId: saillieAnimalId,
-          date: saillieDate,
-          type: saillieType,
-          groupage: saillieGroupage,
-          taureauId: saillieTaureauId || undefined,
-        }),
+        body: JSON.stringify({ animalId: saillieAnimalId, date: saillieDate, type: saillieType, taureauId }),
       });
       if (!res.ok) throw new Error(await res.text());
       setMessage("Saillie enregistrée !");
@@ -242,20 +247,18 @@ function ReproductionContent() {
     }
   }
 
-  // Calculs temps réel du formulaire écho
+  // Echo real-time calculations
   const echoJoursEffectifs = echoUnite === "mois" ? Math.round(echoJours * 30.5) : echoJours;
   const echoDateConception = echoResultat === "PLEINE" && echoJoursEffectifs > 0
-    ? addDays(new Date(echoDate), -echoJoursEffectifs)
-    : null;
+    ? addDays(new Date(echoDate), -echoJoursEffectifs) : null;
   const echoDateVelagePrevue = echoResultat === "PLEINE" && echoJoursEffectifs > 0
-    ? addDays(new Date(echoDate), DUREE_GESTATION - echoJoursEffectifs)
-    : null;
+    ? addDays(new Date(echoDate), DUREE_GESTATION - echoJoursEffectifs) : null;
   const joursAvantVelage = echoDateVelagePrevue
-    ? differenceInDays(echoDateVelagePrevue, new Date(echoDate))
-    : null;
+    ? differenceInDays(echoDateVelagePrevue, new Date(echoDate)) : null;
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-3">
           <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
@@ -268,7 +271,7 @@ function ReproductionContent() {
             <Settings size={18} />
           </Link>
           <button
-            onClick={() => { setShowSaillieForm(true); setSelectedVache(null); }}
+            onClick={() => openSaillieForm()}
             className="flex items-center gap-1 bg-green-700 text-white text-sm px-3 py-2 rounded-lg"
           >
             <Plus size={16} /> Saillie
@@ -283,39 +286,68 @@ function ReproductionContent() {
         </div>
       )}
 
-      {/* Calendrier vélages prévus */}
-      {velagesParMois.length > 0 && (
+      {/* Calendrier de gestation — barres de progression */}
+      {gestationsActives.length > 0 && (
         <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <CalendarDays size={18} className="text-green-700" />
-            Vélages prévus ({velagesPrevus.length})
+            Calendrier de gestation
+            <span className="text-xs font-normal text-gray-400 ml-auto">
+              {gestationsActives.length} vache{gestationsActives.length > 1 ? "s" : ""}
+            </span>
           </h3>
-          <div className="space-y-3">
-            {velagesParMois.map(({ moisLabel: label, vaches: mv }) => (
-              <div key={label}>
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                  {label} · {mv.length} vache{mv.length > 1 ? "s" : ""}
+          <div className="space-y-5">
+            {gestationsActives.map((v) => {
+              const calving = new Date(v.dateVelagePrevue!);
+              const conception = addDays(calving, -DUREE_GESTATION);
+              const elapsed = Math.max(0, differenceInDays(now, conception));
+              const progress = Math.min(100, (elapsed / DUREE_GESTATION) * 100);
+              const daysLeft = differenceInDays(calving, now);
+              const urgency = daysLeft <= 15 ? "pink" : daysLeft <= 45 ? "orange" : "green";
+              const barColor = urgency === "pink" ? "bg-pink-400" : urgency === "orange" ? "bg-orange-400" : "bg-green-500";
+              const badgeColor = urgency === "pink"
+                ? "bg-pink-100 text-pink-700"
+                : urgency === "orange"
+                ? "bg-orange-100 text-orange-700"
+                : "bg-green-100 text-green-700";
+
+              return (
+                <div key={v.id}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono font-bold text-green-700 text-xs bg-green-50 px-1.5 py-0.5 rounded shrink-0">
+                        {v.nutrav}
+                      </span>
+                      <span className="text-sm text-gray-700 font-medium truncate">{v.nobovi ?? "Sans nom"}</span>
+                      {v.taureauNom && (
+                        <span className="text-xs text-gray-400 shrink-0">· {v.taureauNom}</span>
+                      )}
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${badgeColor}`}>
+                      J-{daysLeft}
+                    </span>
+                  </div>
+                  {/* Barre de progression */}
+                  <div className="relative h-4 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${barColor} transition-all duration-500`}
+                      style={{ width: `${progress}%` }}
+                    />
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white mix-blend-difference">
+                      {Math.round(progress)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[10px] mt-0.5">
+                    <span className="text-gray-400">
+                      {conception.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                    </span>
+                    <span className="text-gray-500 font-medium">
+                      Vélage : {calving.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                    </span>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  {mv.map((v) => {
-                    const jours = differenceInDays(new Date(v.dateVelagePrevue!), new Date());
-                    const urgence = jours <= 7 ? "bg-pink-100 text-pink-700" : jours <= 21 ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700";
-                    return (
-                      <div key={v.id} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-gray-50">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-green-700 text-xs bg-green-50 px-1.5 py-0.5 rounded">{v.nutrav}</span>
-                          <span className="text-sm text-gray-700">{v.nobovi ?? "Sans nom"}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">{formatDate(new Date(v.dateVelagePrevue!))}</span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${urgence}`}>J-{jours}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -325,7 +357,8 @@ function ReproductionContent() {
         {(["TOUS", "ROUGE", "JAUNE", "VERT", "ROSE", "GRIS"] as FilterEtat[]).map((etat) => {
           const count = etat === "TOUS" ? vachesAvecEtat.length : counts[etat];
           const isActive = filterEtat === etat;
-          const badgeColor = etat === "TOUS" ? (isActive ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-600")
+          const badgeColor =
+            etat === "TOUS" ? (isActive ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-600")
             : etat === "ROUGE" ? (isActive ? "bg-red-500 text-white" : "bg-red-100 text-red-600")
             : etat === "JAUNE" ? (isActive ? "bg-yellow-400 text-black" : "bg-yellow-50 text-yellow-700")
             : etat === "VERT" ? (isActive ? "bg-green-500 text-white" : "bg-green-100 text-green-700")
@@ -344,7 +377,7 @@ function ReproductionContent() {
         })}
       </div>
 
-      {/* Légende des couleurs */}
+      {/* Légende */}
       <details className="bg-white rounded-xl shadow">
         <summary className="px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer select-none flex items-center gap-2">
           <span>🎨</span> Comprendre les couleurs
@@ -400,16 +433,12 @@ function ReproductionContent() {
                       </button>
                     )}
                     <button
-                      onClick={() => {
-                        setSaillieAnimalId(vache.id);
-                        setShowSaillieForm(true);
-                      }}
+                      onClick={() => openSaillieForm(vache)}
                       className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg flex items-center gap-1"
                     >
                       <RefreshCw size={12} /> Saillie
                     </button>
                   </div>
-                  {/* Annuler / Marquer vide */}
                   {vache.saillieId && vache.etat !== "ROUGE" && (
                     confirmVideId === vache.id ? (
                       <div className="flex items-center gap-1 mt-0.5">
@@ -449,15 +478,17 @@ function ReproductionContent() {
         </div>
       )}
 
-      {/* Modal Saillie */}
+      {/* ── Modal Saillie ── */}
       {showSaillieForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
           <div className="bg-white rounded-t-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">Enregistrer une saillie</h3>
-              <button onClick={() => setShowSaillieForm(false)} className="text-gray-400 text-2xl">×</button>
+              <button onClick={() => setShowSaillieForm(false)} className="text-gray-400 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={handleSaillieSubmit} className="space-y-4">
+
+              {/* Vache */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Vache</label>
                 <select
@@ -468,10 +499,12 @@ function ReproductionContent() {
                 >
                   <option value="">Sélectionner une vache...</option>
                   {vaches.map((v) => (
-                    <option key={v.id} value={v.id}>{v.nutrav} - {v.nobovi ?? "Sans nom"}</option>
+                    <option key={v.id} value={v.id}>{v.nutrav} – {v.nobovi ?? "Sans nom"}</option>
                   ))}
                 </select>
               </div>
+
+              {/* Date */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                 <input
@@ -482,45 +515,155 @@ function ReproductionContent() {
                   className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
                 />
               </div>
+
+              {/* Type toggle */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <select
-                  value={saillieType}
-                  onChange={(e) => setSaillieType(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
-                >
-                  <option value="IA">IA (Insémination artificielle)</option>
-                  <option value="NATURELLE">Saillie naturelle</option>
-                  <option value="TRANSFERT">Transfert embryonnaire</option>
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Type de saillie</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSaillieType("NATURELLE")}
+                    className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${
+                      saillieType === "NATURELLE"
+                        ? "bg-green-700 text-white border-green-700 shadow-md"
+                        : "border-gray-200 text-gray-600 hover:border-green-300"
+                    }`}
+                  >
+                    🐄 Naturelle
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSaillieType("IA")}
+                    className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${
+                      saillieType === "IA"
+                        ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                        : "border-gray-200 text-gray-600 hover:border-blue-300"
+                    }`}
+                  >
+                    💉 Insémination
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Taureau (optionnel)</label>
-                <select
-                  value={saillieTaureauId}
-                  onChange={(e) => setSaillieTaureauId(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
-                >
-                  <option value="">Aucun / Inconnu</option>
-                  {taureaux.map((t) => (
-                    <option key={t.id} value={t.id}>{t.nopere ?? t.nupere}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="groupage"
-                  checked={saillieGroupage}
-                  onChange={(e) => setSaillieGroupage(e.target.checked)}
-                  className="rounded"
-                />
-                <label htmlFor="groupage" className="text-sm text-gray-700">Groupage (IA de groupe)</label>
-              </div>
+
+              {/* NATURELLE — sélection taureau de la ferme */}
+              {saillieType === "NATURELLE" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Taureau de la ferme</label>
+                  {farmBulls.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {farmBulls.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setSaillieTaureauId(saillieTaureauId === t.id ? "" : t.id)}
+                          className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all ${
+                            saillieTaureauId === t.id
+                              ? "bg-green-700 text-white border-green-700 shadow-md"
+                              : "border-gray-200 hover:border-green-400 text-gray-700 bg-white"
+                          }`}
+                        >
+                          <span className="text-2xl mb-1">🐂</span>
+                          <span className="font-bold text-sm leading-tight text-center">{t.nopere ?? t.nupere}</span>
+                          <span className={`text-[11px] font-mono mt-0.5 ${saillieTaureauId === t.id ? "text-green-100" : "text-gray-400"}`}>
+                            {t.nupere}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic bg-gray-50 rounded-lg px-3 py-2">
+                      Aucun taureau enregistré —{" "}
+                      <Link href="/taureaux" className="text-green-700 underline font-medium">gérer les taureaux</Link>
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1.5">Optionnel — laisser vide si non précisé</p>
+                </div>
+              )}
+
+              {/* IA — insémination artificielle */}
+              {saillieType === "IA" && (
+                <div className="space-y-3">
+                  {/* Taureaux IA déjà utilisés */}
+                  {iaBulls.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Taureau IA déjà utilisé</label>
+                      <div className="flex flex-wrap gap-2">
+                        {iaBulls.map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => {
+                              if (iaSelectedId === t.id) {
+                                setIaSelectedId("");
+                              } else {
+                                setIaSelectedId(t.id);
+                                setIaNupere("");
+                                setIaNopere("");
+                                setIaTraper("");
+                              }
+                            }}
+                            className={`text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${
+                              iaSelectedId === t.id
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "border-gray-200 text-gray-600 hover:border-blue-300 bg-white"
+                            }`}
+                          >
+                            {t.nopere ?? t.nupere}
+                            {t.traper && <span className="ml-1 opacity-70">· {t.traper}</span>}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 my-3">
+                        <div className="h-px bg-gray-200 flex-1" />
+                        <span className="text-xs text-gray-400">ou saisir un nouveau</span>
+                        <div className="h-px bg-gray-200 flex-1" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Saisie nouveau taureau IA */}
+                  <div className={`space-y-2 transition-opacity ${iaSelectedId ? "opacity-30 pointer-events-none" : ""}`}>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Référence / Numéro paillette</label>
+                      <input
+                        type="text"
+                        value={iaNupere}
+                        onChange={(e) => { setIaNupere(e.target.value); setIaSelectedId(""); }}
+                        placeholder="ex : FR2312345678"
+                        className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Nom du taureau</label>
+                        <input
+                          type="text"
+                          value={iaNopere}
+                          onChange={(e) => { setIaNopere(e.target.value); setIaSelectedId(""); }}
+                          placeholder="ex : Kaarl Piroux"
+                          className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Race / Origine</label>
+                        <input
+                          type="text"
+                          value={iaTraper}
+                          onChange={(e) => { setIaTraper(e.target.value); setIaSelectedId(""); }}
+                          placeholder="ex : BA, Limousin"
+                          className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400">Tous les champs sont optionnels</p>
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full bg-green-700 text-white py-3 rounded-xl font-medium disabled:opacity-50"
+                className="w-full bg-green-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50"
               >
                 {saving ? "Enregistrement..." : "Enregistrer la saillie"}
               </button>
@@ -529,16 +672,20 @@ function ReproductionContent() {
         </div>
       )}
 
-      {/* Modal Échographie */}
+      {/* ── Modal Échographie ── */}
       {showEchoForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
           <div className="bg-white rounded-t-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">
                 Résultat échographie
-                {selectedVache && <span className="text-sm font-normal text-gray-500 ml-2">— {selectedVache.nutrav} {selectedVache.nobovi ?? ""}</span>}
+                {selectedVache && (
+                  <span className="text-sm font-normal text-gray-500 ml-2">
+                    — {selectedVache.nutrav} {selectedVache.nobovi ?? ""}
+                  </span>
+                )}
               </h3>
-              <button onClick={() => setShowEchoForm(false)} className="text-gray-400 text-2xl">×</button>
+              <button onClick={() => setShowEchoForm(false)} className="text-gray-400 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={handleEchoSubmit} className="space-y-4">
               {!selectedVache && (
@@ -555,11 +702,13 @@ function ReproductionContent() {
                     className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
                   >
                     <option value="">Sélectionner une vache...</option>
-                    {vachesAvecEtat.filter(v => v.saillieId && (v.etat === "JAUNE" || v.etat === "GRIS")).map((v) => (
-                      <option key={v.saillieId} value={v.saillieId!}>
-                        {v.nutrav} - {v.nobovi ?? "Sans nom"} (saillie {formatDate(new Date(v.derniereSaillie!))})
-                      </option>
-                    ))}
+                    {vachesAvecEtat
+                      .filter((v) => v.saillieId && (v.etat === "JAUNE" || v.etat === "GRIS"))
+                      .map((v) => (
+                        <option key={v.saillieId} value={v.saillieId!}>
+                          {v.nutrav} – {v.nobovi ?? "Sans nom"} (saillie {formatDate(new Date(v.derniereSaillie!))})
+                        </option>
+                      ))}
                   </select>
                 </div>
               )}
@@ -577,7 +726,7 @@ function ReproductionContent() {
                   const j = differenceInDays(new Date(echoDate), new Date(selectedVache.derniereSaillie));
                   return j > 0 ? (
                     <p className="text-xs text-gray-400 mt-1">
-                      Saillie enregistrée le {formatDate(new Date(selectedVache.derniereSaillie))} · {j} j avant l&apos;écho
+                      Saillie le {formatDate(new Date(selectedVache.derniereSaillie))} · {j} j avant l&apos;écho
                     </p>
                   ) : null;
                 })()}
@@ -589,14 +738,18 @@ function ReproductionContent() {
                   <button
                     type="button"
                     onClick={() => setEchoResultat("PLEINE")}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-colors ${echoResultat === "PLEINE" ? "bg-green-500 text-white border-green-500" : "border-gray-200 text-gray-700"}`}
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-colors ${
+                      echoResultat === "PLEINE" ? "bg-green-500 text-white border-green-500" : "border-gray-200 text-gray-700"
+                    }`}
                   >
                     ✓ Pleine
                   </button>
                   <button
                     type="button"
                     onClick={() => setEchoResultat("VIDE")}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-colors ${echoResultat === "VIDE" ? "bg-red-500 text-white border-red-500" : "border-gray-200 text-gray-700"}`}
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-colors ${
+                      echoResultat === "VIDE" ? "bg-red-500 text-white border-red-500" : "border-gray-200 text-gray-700"
+                    }`}
                   >
                     ✗ Vide
                   </button>
@@ -605,7 +758,6 @@ function ReproductionContent() {
 
               {echoResultat === "PLEINE" && (
                 <div className="space-y-3">
-                  {/* Jours de gestation estimés par l'inséminateur */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Gestation estimée par l&apos;inséminateur
@@ -624,27 +776,28 @@ function ReproductionContent() {
                         <button
                           type="button"
                           onClick={() => setEchoUnite("jours")}
-                          className={`px-3 py-2 text-sm font-medium transition-colors ${echoUnite === "jours" ? "bg-green-700 text-white" : "text-gray-600 hover:bg-gray-50"}`}
+                          className={`px-3 py-2 text-sm font-medium transition-colors ${
+                            echoUnite === "jours" ? "bg-green-700 text-white" : "text-gray-600 hover:bg-gray-50"
+                          }`}
                         >
                           jours
                         </button>
                         <button
                           type="button"
                           onClick={() => setEchoUnite("mois")}
-                          className={`px-3 py-2 text-sm font-medium transition-colors ${echoUnite === "mois" ? "bg-green-700 text-white" : "text-gray-600 hover:bg-gray-50"}`}
+                          className={`px-3 py-2 text-sm font-medium transition-colors ${
+                            echoUnite === "mois" ? "bg-green-700 text-white" : "text-gray-600 hover:bg-gray-50"
+                          }`}
                         >
                           mois
                         </button>
                       </div>
                     </div>
                     {echoUnite === "mois" && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        ≈ {echoJoursEffectifs} jours
-                      </p>
+                      <p className="text-xs text-gray-400 mt-1">≈ {echoJoursEffectifs} jours</p>
                     )}
                   </div>
 
-                  {/* Résultat calculé */}
                   {echoDateConception && echoDateVelagePrevue && (
                     <div className="bg-gray-50 rounded-xl p-3 space-y-2">
                       <div className="flex items-center justify-between text-sm">
@@ -662,9 +815,9 @@ function ReproductionContent() {
                       </div>
                       {joursAvantVelage !== null && (
                         <div className={`text-center text-xs font-semibold py-1 px-2 rounded-lg ${
-                          joursAvantVelage <= 30 ? "bg-pink-100 text-pink-700" :
-                          joursAvantVelage <= 60 ? "bg-orange-100 text-orange-700" :
-                          "bg-green-100 text-green-700"
+                          joursAvantVelage <= 30 ? "bg-pink-100 text-pink-700"
+                          : joursAvantVelage <= 60 ? "bg-orange-100 text-orange-700"
+                          : "bg-green-100 text-green-700"
                         }`}>
                           dans {joursAvantVelage} jours
                         </div>
@@ -677,7 +830,7 @@ function ReproductionContent() {
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium disabled:opacity-50"
+                className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50"
               >
                 {saving ? "Enregistrement..." : "Enregistrer résultat"}
               </button>

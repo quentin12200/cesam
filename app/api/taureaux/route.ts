@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const taureaux = await prisma.taureau.findMany({
-    select: { id: true, nupere: true, nopere: true, present: true },
+    select: { id: true, nupere: true, nopere: true, present: true, traper: true },
     orderBy: { nopere: "asc" },
   });
 
@@ -13,7 +13,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { nupere, nopere } = body;
+    const { nupere, nopere, traper, present } = body;
 
     if (!nupere?.trim()) {
       return NextResponse.json({ error: "Le numéro du taureau est requis" }, { status: 400 });
@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
       data: {
         nupere: nupere.trim(),
         nopere: nopere?.trim() || null,
+        traper: traper?.trim() || null,
+        present: present !== false,
         updatedAt: new Date(),
       },
     });
