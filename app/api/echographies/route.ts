@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { addDays } from "date-fns";
+import { addDays, differenceInDays } from "date-fns";
+
+const DUREE_GESTATION = 285; // jours — Blonde Aquitaine
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { saillieId, date, resultat, joursGestation } = body;
+    const { saillieId, date, resultat, dateVelagePrevue: dateVelagePrevueStr, joursGestation } = body;
 
     if (!saillieId || !date || !resultat) {
       return NextResponse.json({ error: "saillieId, date et resultat sont requis" }, { status: 400 });
@@ -23,10 +25,22 @@ export async function POST(request: NextRequest) {
     const nouvelEtat = resultat === "PLEINE" ? "VERT" : "ROUGE";
 
     let dateVelagePrevue: Date | undefined;
-    if (resultat === "PLEINE" && joursGestation) {
-      // Calculer la date de vélage prévue à partir de la date de saillie et des jours de gestation
-      const jourRestants = 280 - joursGestation;
-      dateVelagePrevue = addDays(new Date(date), jourRestants);
+    let joursGestationFinal: number | undefined;
+
+    if (resultat === "PLEINE") {
+      if (dateVelagePrevueStr) {
+        // Date fournie directement par le formulaire (mode précis)
+        dateVelagePrevue = new Date(dateVelagePrevueStr);
+        joursGestationFinal = DUREE_GESTATION - differenceInDays(dateVelagePrevue, new Date(date));
+      } else if (joursGestation) {
+        // Compatibilité ascendante
+        dateVelagePrevue = addDays(new Date(date), DUREE_GESTATION - joursGestation);
+        joursGestationFinal = joursGestation;
+      } else {
+        // Fallback: calculer depuis la date de saillie
+        dateVelagePrevue = addDays(new Date(saillie.date), DUREE_GESTATION);
+        joursGestationFinal = differenceInDays(new Date(date), new Date(saillie.date));
+      }
     }
 
     if (saillie.gestation) {
@@ -36,7 +50,7 @@ export async function POST(request: NextRequest) {
           etat: nouvelEtat,
           dateEcho: new Date(date),
           resultatEcho: resultat,
-          joursGestation: joursGestation ?? null,
+          joursGestation: joursGestationFinal ?? null,
           dateVelagePrevue: dateVelagePrevue ?? null,
           updatedAt: new Date(),
         },
@@ -49,7 +63,7 @@ export async function POST(request: NextRequest) {
           etat: nouvelEtat,
           dateEcho: new Date(date),
           resultatEcho: resultat,
-          joursGestation: joursGestation ?? null,
+          joursGestation: joursGestationFinal ?? null,
           dateVelagePrevue: dateVelagePrevue ?? null,
           updatedAt: new Date(),
         },
