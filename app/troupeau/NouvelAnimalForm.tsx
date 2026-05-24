@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { X } from "lucide-react";
 
 const CATEGORIES = [
@@ -49,9 +50,9 @@ export default function NouvelAnimalForm() {
     <div className="bg-white rounded-xl shadow p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-gray-800">Nouvel animal</h3>
-        <a href="/troupeau" className="text-gray-400 hover:text-gray-600">
+        <Link href="/troupeau" className="text-gray-400 hover:text-gray-600">
           <X size={18} />
-        </a>
+        </Link>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
