@@ -50,3 +50,64 @@ export async function GET(request: NextRequest) {
     pages: Math.ceil(total / limit),
   });
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { nutrav, nunati, nobovi, danais, categorie, mereNutrav } = body;
+
+    if (!nutrav?.trim() || !nunati?.trim() || !danais || !categorie) {
+      return NextResponse.json(
+        { error: "Champs manquants: nutrav, nunati, danais, categorie requis" },
+        { status: 400 }
+      );
+    }
+
+    // Vérifier unicité
+    const [existNutrav, existNunati] = await Promise.all([
+      prisma.animal.findUnique({ where: { nutrav: nutrav.trim() } }),
+      prisma.animal.findUnique({ where: { nunati: nunati.trim() } }),
+    ]);
+    if (existNutrav) {
+      return NextResponse.json({ error: "Ce N° Travail existe déjà" }, { status: 409 });
+    }
+    if (existNunati) {
+      return NextResponse.json({ error: "Ce N° National existe déjà" }, { status: 409 });
+    }
+
+    // Résoudre la mère
+    let mereId: string | null = null;
+    if (mereNutrav?.trim()) {
+      const mere = await prisma.animal.findUnique({
+        where: { nutrav: mereNutrav.trim() },
+        select: { id: true },
+      });
+      if (!mere) {
+        return NextResponse.json({ error: `Mère introuvable : ${mereNutrav}` }, { status: 404 });
+      }
+      mereId = mere.id;
+    }
+
+    const sexbov = categorie === "male" ? "M" : "F";
+    const estGenisse = categorie === "genisse";
+
+    const animal = await prisma.animal.create({
+      data: {
+        nutrav: nutrav.trim(),
+        nunati: nunati.trim(),
+        nobovi: nobovi?.trim() || null,
+        danais: new Date(danais),
+        sexbov,
+        estGenisse,
+        mereId,
+        updatedAt: new Date(),
+      },
+    });
+
+    return NextResponse.json({ nutrav: animal.nutrav }, { status: 201 });
+  } catch (err) {
+    console.error("POST /api/animaux error:", err);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
