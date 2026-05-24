@@ -90,8 +90,8 @@ function ReproductionContent() {
     setLoading(true);
     try {
       const [repro, taureauData] = await Promise.all([
-        fetch("/api/reproduction").then((r) => r.json()),
-        fetch("/api/taureaux").then((r) => r.json()),
+        fetch("/api/reproduction", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/taureaux", { cache: "no-store" }).then((r) => r.json()),
       ]);
       setVaches(repro.vaches ?? []);
       setTaureaux(taureauData.taureaux ?? []);
