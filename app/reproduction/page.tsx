@@ -57,6 +57,7 @@ function ReproductionContent() {
   const [selectedVache, setSelectedVache] = useState<VacheRepro | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [confirmVideId, setConfirmVideId] = useState<string | null>(null);
 
   // Saillie form state
   const [saillieAnimalId, setSaillieAnimalId] = useState("");
@@ -181,6 +182,30 @@ function ReproductionContent() {
       if (!res.ok) throw new Error(await res.text());
       setMessage("Échographie enregistrée !");
       setShowEchoForm(false);
+      await fetchData();
+    } catch (err) {
+      setMessage("Erreur: " + String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function marquerVide(vache: VacheRepro) {
+    if (!vache.saillieId) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/echographies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          saillieId: vache.saillieId,
+          date: new Date().toISOString().split("T")[0],
+          resultat: "VIDE",
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setMessage(`${vache.nutrav} marquée vide`);
+      setConfirmVideId(null);
       await fetchData();
     } catch (err) {
       setMessage("Erreur: " + String(err));
@@ -315,11 +340,11 @@ function ReproductionContent() {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex flex-col items-end gap-1.5">
                   <span className={`text-xs font-bold px-2 py-1 rounded-full ${getBadgeClass(vache.etat)}`}>
                     {getEtatLabel(vache.etat)}
                   </span>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap justify-end">
                     {(vache.etat === "JAUNE" || vache.etat === "GRIS") && vache.saillieId && (
                       <button
                         onClick={() => openEchoForm(vache)}
@@ -338,6 +363,34 @@ function ReproductionContent() {
                       <RefreshCw size={12} /> Saillie
                     </button>
                   </div>
+                  {/* Annuler / Marquer vide */}
+                  {vache.saillieId && vache.etat !== "ROUGE" && (
+                    confirmVideId === vache.id ? (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-xs text-gray-500">Non pleine ?</span>
+                        <button
+                          onClick={() => marquerVide(vache)}
+                          disabled={saving}
+                          className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg font-semibold"
+                        >
+                          Oui
+                        </button>
+                        <button
+                          onClick={() => setConfirmVideId(null)}
+                          className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-lg"
+                        >
+                          Non
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmVideId(vache.id)}
+                        className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-0.5"
+                      >
+                        ✗ Marquer vide
+                      </button>
+                    )
+                  )}
                 </div>
               </div>
             </div>
