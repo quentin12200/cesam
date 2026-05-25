@@ -685,7 +685,7 @@ export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, 
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Voie d'administration</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Voie d&apos;administration</label>
                 <select
                   value={batchVoie}
                   onChange={(e) => setBatchVoie(e.target.value)}
