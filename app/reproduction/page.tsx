@@ -127,7 +127,10 @@ function ReproductionContent() {
     setEchoSaillieId(vache.saillieId!);
     setEchoResultat("PLEINE");
     setEchoDate(new Date().toISOString().split("T")[0]);
-    setEchoJours(45);
+    const joursSaillie = vache.derniereSaillie
+      ? differenceInDays(new Date(), new Date(vache.derniereSaillie))
+      : 45;
+    setEchoJours(Math.max(1, joursSaillie));
     setEchoUnite("jours");
     setShowEchoForm(true);
   }
@@ -926,7 +929,7 @@ function ReproductionContent() {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Gestation estimée par l&apos;inséminateur
+                      Jours de gestation à la date de l&apos;écho
                     </label>
                     <div className="flex gap-2">
                       <input
