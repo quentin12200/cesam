@@ -36,10 +36,15 @@ import SevrageButton from "./SevrageButton";
 import QuickActionsBar from "./QuickActionsBar";
 import CategorieButton from "./CategorieButton";
 import EchoButton from "./EchoButton";
+import GroupeButton from "./GroupeButton";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
   searchParams: Promise<{ onglet?: string }>;
+}
+
+async function getGroupes() {
+  return prisma.groupe.findMany({ orderBy: { nom: "asc" } });
 }
 
 async function getAnimal(nutrav: string) {
@@ -79,7 +84,7 @@ async function getAnimal(nutrav: string) {
 export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const { nutrav } = await params;
   const { onglet = "identite" } = await searchParams;
-  const animal = await getAnimal(nutrav);
+  const [animal, groupes] = await Promise.all([getAnimal(nutrav), getGroupes()]);
 
   if (!animal) notFound();
 
@@ -258,6 +263,12 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     danais={animal.danais.toISOString()}
                     estGenisse={animal.estGenisse}
                     categorie={animal.categorie}
+                  />
+                  <GroupeButton
+                    nutrav={animal.nutrav}
+                    groupeId={animal.groupeId}
+                    groupeNom={animal.groupe?.nom ?? null}
+                    groupes={groupes}
                   />
                   {animal.sexbov === "F" && (
                     <EchoButton nutrav={animal.nutrav} aEchographier={animal.aEchographier} />
