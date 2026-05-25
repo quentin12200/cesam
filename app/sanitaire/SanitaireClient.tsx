@@ -683,6 +683,15 @@ export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, 
                   onChange={(e) => setBatchDate(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
                 />
+                {batchDate && (() => {
+                  const daysAgo = Math.floor((Date.now() - new Date(batchDate).getTime()) / 86400000);
+                  if (daysAgo > 30) return (
+                    <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                      ⚠️ Date ancienne ({daysAgo} jours) — les animaux disparaîtront bien de la liste après enregistrement.
+                    </p>
+                  );
+                  return null;
+                })()}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Voie d&apos;administration</label>
