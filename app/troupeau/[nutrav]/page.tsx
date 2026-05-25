@@ -29,6 +29,7 @@ import { differenceInDays } from "date-fns";
 import EditAnimalDrawer from "./EditAnimalDrawer";
 import CowIcon from "@/components/CowIcon";
 import PeseeInlineForm from "./PeseeInlineForm";
+import SevrageButton from "./SevrageButton";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -100,6 +101,15 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     if (jours <= 0) return { ...pesee, gmq: null };
     return { ...pesee, gmq: Math.round(((pesee.poids - prev.poids) / jours) * 1000) };
   });
+
+  // IVV — velagesVache est en DESC, ivv[i] = diff entre velages[i] et velages[i+1]
+  const ivvList = animal.velagesVache.slice(0, -1).map((v, i) => ({
+    velageId: v.id,
+    ivv: differenceInDays(v.date, animal.velagesVache[i + 1].date),
+  }));
+  const ivvMoyen = ivvList.length > 0
+    ? Math.round(ivvList.reduce((s, x) => s + x.ivv, 0) / ivvList.length)
+    : null;
 
   const protocolSteps = getVaccinProtocolSteps(animal.danais, animal.vaccinations);
   const mheStatus = isMheVendable(animal.vaccinations);
@@ -203,6 +213,13 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   <>
                     <div className="text-gray-500">Boucle</div>
                     <div className="text-orange-600 font-medium text-xs">⚠ Non bouclé</div>
+                  </>
+                )}
+                {/* Sevrage — visible pour les veaux/génisses jeunes */}
+                {(animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150 && (
+                  <>
+                    <div className="text-gray-500">Sevrage</div>
+                    <div><SevrageButton nutrav={animal.nutrav} sevreFait={animal.sevreFait} /></div>
                   </>
                 )}
               </div>
@@ -636,58 +653,83 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               </div>
             )}
 
-            {/* Historique vélages */}
+            {/* Historique vélages + IVV */}
             {animal.velagesVache.length > 0 && (
               <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <Baby size={16} className="text-pink-500" />
-                  Historique vélages ({animal.velagesVache.length})
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                    <Baby size={16} className="text-pink-500" />
+                    Historique vélages ({animal.velagesVache.length})
+                  </h3>
+                  {ivvMoyen && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-gray-400">IVV moy.</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        ivvMoyen <= 365 ? "bg-green-100 text-green-700"
+                        : ivvMoyen <= 400 ? "bg-orange-100 text-orange-700"
+                        : "bg-red-100 text-red-700"
+                      }`}>
+                        {ivvMoyen} j {ivvMoyen <= 365 ? "✓" : ivvMoyen <= 400 ? "⚠" : "✗"}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-2">
-                  {animal.velagesVache.map((velage) => (
-                    <div key={velage.id} className="border border-gray-100 rounded-lg p-3 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{formatDate(velage.date)}</span>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            velage.qualificatif === "NORMAL"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
-                          {velage.qualificatif}
-                        </span>
-                      </div>
-                      {velage.veau && (
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <Link
-                            href={`/troupeau/${velage.veau.nutrav}`}
-                            className="font-mono font-bold text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded hover:underline"
-                          >
-                            {velage.veau.nutrav}
-                          </Link>
-                          {velage.veau.nobovi && (
-                            <span className="text-xs text-gray-700">{velage.veau.nobovi}</span>
-                          )}
-                          <span className="text-xs text-gray-400">
-                            {velage.veau.sexbov === "M" ? "♂ Mâle" : "♀ Femelle"}
-                          </span>
-                          <span
-                            className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  {animal.velagesVache.map((velage, i) => {
+                    const older = animal.velagesVache[i + 1];
+                    const ivv = older ? differenceInDays(velage.date, older.date) : null;
+                    return (
+                      <div key={velage.id} className="border border-gray-100 rounded-lg p-3 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{formatDate(velage.date)}</span>
+                          <div className="flex items-center gap-1.5">
+                            {ivv && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                ivv <= 365 ? "bg-green-50 text-green-700"
+                                : ivv <= 400 ? "bg-orange-50 text-orange-600"
+                                : "bg-red-50 text-red-600"
+                              }`}>
+                                IVV {ivv}j
+                              </span>
+                            )}
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              velage.qualificatif === "NORMAL"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-yellow-100 text-yellow-700"
+                            }`}>
+                              {velage.qualificatif}
+                            </span>
+                          </div>
+                        </div>
+                        {velage.veau && (
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <Link
+                              href={`/troupeau/${velage.veau.nutrav}`}
+                              className="font-mono font-bold text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded hover:underline"
+                            >
+                              {velage.veau.nutrav}
+                            </Link>
+                            {velage.veau.nobovi && (
+                              <span className="text-xs text-gray-700">{velage.veau.nobovi}</span>
+                            )}
+                            <span className="text-xs text-gray-400">
+                              {velage.veau.sexbov === "M" ? "♂ Mâle" : "♀ Femelle"}
+                            </span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
                               velage.veau.statut === "ACTIF"
                                 ? "bg-green-100 text-green-700"
                                 : "bg-gray-100 text-gray-500"
-                            }`}
-                          >
-                            {velage.veau.statut === "ACTIF" ? "Présent" : "Sorti"}
-                          </span>
-                        </div>
-                      )}
-                      {velage.pereNom && (
-                        <div className="text-xs text-gray-500 mt-1">Père: {velage.pereNom}</div>
-                      )}
-                    </div>
-                  ))}
+                            }`}>
+                              {velage.veau.statut === "ACTIF" ? "Présent" : "Sorti"}
+                            </span>
+                          </div>
+                        )}
+                        {velage.pereNom && (
+                          <div className="text-xs text-gray-500 mt-1">Père: {velage.pereNom}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
