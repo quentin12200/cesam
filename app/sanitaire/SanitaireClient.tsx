@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import {
   CheckSquare, Square, Syringe, Pill, AlertTriangle,
   CheckCircle, CheckCircle2, X, List, LayoutGrid, RefreshCw,
+  AlertCircle, Clock, ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
+import { differenceInDays } from "date-fns";
+import { getVaccinProtocolSteps } from "@/lib/utils";
 import VaccinationFormWrapper from "./VaccinationFormWrapper";
 import VaccineQuickButton from "./VaccineQuickButton";
 
@@ -46,11 +49,66 @@ export interface RecentItem {
   dateLabel: string;
 }
 
+export interface VeauProtocolItem {
+  id: string;
+  nutrav: string;
+  nobovi: string | null;
+  danais: string;
+  sexbov: string;
+  ageLabel: string;
+  vaccinations: { id: string; vaccin: string; date: string }[];
+}
+
+export interface VacheVaccinsItem {
+  id: string;
+  nutrav: string;
+  nobovi: string | null;
+  joursAvantVelage: number;
+  dateVelage: string;
+  etatGestation: string;
+  hasCrypto: boolean;
+  hasRotavec: boolean;
+  hasBolus: boolean;
+}
+
 interface Props {
   veauxAVacciner: VeauItem[];
+  tousVeaux: VeauProtocolItem[];
   cryptoRotavec: CryptoItem[];
   bolus: BolusItem[];
+  toutesVaches: VacheVaccinsItem[];
   vaccinationsRecentes: RecentItem[];
+}
+
+// ── Statut vaccinal global pour un veau ───────────────────────────────────────
+function getStatutVaccinal(veau: VeauProtocolItem): "complet" | "en_cours" | "a_faire" {
+  const steps = getVaccinProtocolSteps(
+    new Date(veau.danais),
+    veau.vaccinations.map((v) => ({ vaccin: v.vaccin, date: new Date(v.date) }))
+  );
+  const done = steps.filter((s) => s.status === "done").length;
+  const due = steps.filter((s) => s.status === "due").length;
+  if (due === 0 && done > 0) return "complet";
+  if (done > 0) return "en_cours";
+  return "a_faire";
+}
+
+function StatutBadge({ statut }: { statut: "complet" | "en_cours" | "a_faire" }) {
+  if (statut === "complet") return (
+    <span className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full bg-green-100 text-green-800">
+      <ShieldCheck size={12} /> Complet
+    </span>
+  );
+  if (statut === "en_cours") return (
+    <span className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full bg-orange-100 text-orange-800">
+      <Clock size={12} /> En cours
+    </span>
+  );
+  return (
+    <span className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full bg-red-100 text-red-800">
+      <AlertCircle size={12} /> À faire
+    </span>
+  );
 }
 
 // ── Key format: "nutrav::vaccin" ──────────────────────────────────────────────
@@ -259,9 +317,191 @@ function RecentSection({ items, onRefresh }: { items: RecentItem[]; onRefresh: (
   );
 }
 
+// ── Onglet Vaccins Veaux ──────────────────────────────────────────────────────
+function VaccinsVeauxTab({ tousVeaux, onRefresh }: { tousVeaux: VeauProtocolItem[]; onRefresh: () => void }) {
+  const [filtre, setFiltre] = useState<"tous" | "a_faire" | "en_cours" | "complet">("tous");
+
+  const veauxAvecStatut = tousVeaux.map((v) => ({
+    ...v,
+    statut: getStatutVaccinal(v),
+  }));
+
+  const filtered = filtre === "tous" ? veauxAvecStatut : veauxAvecStatut.filter((v) => v.statut === filtre);
+  const counts = {
+    a_faire: veauxAvecStatut.filter((v) => v.statut === "a_faire").length,
+    en_cours: veauxAvecStatut.filter((v) => v.statut === "en_cours").length,
+    complet: veauxAvecStatut.filter((v) => v.statut === "complet").length,
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filtres visuels */}
+      <div className="flex gap-2 flex-wrap">
+        {([
+          { value: "tous", label: "Tous", count: tousVeaux.length, cls: "bg-gray-100 text-gray-700 border-gray-200" },
+          { value: "a_faire", label: "🔴 À faire", count: counts.a_faire, cls: "bg-red-50 text-red-700 border-red-200" },
+          { value: "en_cours", label: "🟠 En cours", count: counts.en_cours, cls: "bg-orange-50 text-orange-700 border-orange-200" },
+          { value: "complet", label: "🟢 Complet", count: counts.complet, cls: "bg-green-50 text-green-700 border-green-200" },
+        ] as const).map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setFiltre(opt.value)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+              filtre === opt.value ? "ring-2 ring-offset-1 ring-gray-400 " + opt.cls : opt.cls
+            }`}
+          >
+            {opt.label} ({opt.count})
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="text-center text-gray-400 py-8">
+          <CheckCircle2 size={28} className="mx-auto mb-2 text-green-500" />
+          <div className="text-sm">Aucun animal dans cette catégorie</div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {filtered.map((veau) => {
+          const steps = getVaccinProtocolSteps(
+            new Date(veau.danais),
+            veau.vaccinations.map((v) => ({ vaccin: v.vaccin, date: new Date(v.date) }))
+          );
+          const urgentSteps = steps.filter((s) => s.status === "due" && s.isUrgent);
+          const dueSteps = steps.filter((s) => s.status === "due");
+
+          return (
+            <div
+              key={veau.id}
+              className={`bg-white rounded-xl shadow p-4 border-l-4 ${
+                veau.statut === "complet" ? "border-green-400"
+                : veau.statut === "en_cours" ? "border-orange-400"
+                : urgentSteps.length > 0 ? "border-red-500" : "border-red-300"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link href={`/troupeau/${veau.nutrav}`} className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded font-bold hover:bg-green-100 transition-colors">
+                      {veau.nutrav}
+                    </Link>
+                    <span className="text-sm font-semibold text-gray-800">{veau.nobovi ?? "Sans nom"}</span>
+                    <span className="text-xs text-gray-400">{veau.ageLabel}</span>
+                    <span className="text-xs text-gray-400">{veau.sexbov === "M" ? "♂" : "♀"}</span>
+                  </div>
+
+                  {/* Étapes du protocole */}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {steps.map((step) => (
+                      <span
+                        key={step.vaccin}
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                          step.status === "done"
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : step.status === "due"
+                            ? step.isUrgent
+                              ? "bg-red-100 text-red-700 border-red-300 animate-pulse"
+                              : "bg-orange-50 text-orange-700 border-orange-200"
+                            : step.status === "pending"
+                            ? "bg-gray-50 text-gray-400 border-gray-200"
+                            : "bg-gray-50 text-gray-300 border-gray-100"
+                        }`}
+                        title={step.status === "done" ? "Fait" : step.status === "due" ? "À faire" : step.status === "pending" ? "En attente" : "Non éligible"}
+                      >
+                        {step.status === "done" ? "✓" : step.status === "due" ? (step.isUrgent ? "⚠" : "→") : step.status === "pending" ? "⏳" : "○"} {step.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <StatutBadge statut={veau.statut} />
+                  {dueSteps.slice(0, 1).map((s) => (
+                    <VaccineQuickButton key={s.vaccin} nutrav={veau.nutrav} vaccin={s.vaccin} label={`+ ${s.label}`} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Onglet Vaccins Vaches ─────────────────────────────────────────────────────
+function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVaccinsItem[]; onRefresh: () => void }) {
+  if (toutesVaches.length === 0) {
+    return (
+      <div className="text-center text-gray-400 py-8">
+        <CheckCircle2 size={28} className="mx-auto mb-2 text-green-500" />
+        <div className="text-sm">Aucune vache gestante avec vaccins à prévoir</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-gray-500">Vaches gestantes · vaccins pré-vélage (Crypto/Rotavec/Bolus)</p>
+      {toutesVaches.map((vache) => {
+        const allOk = vache.hasCrypto && vache.hasRotavec && vache.hasBolus;
+        const noneOk = !vache.hasCrypto && !vache.hasRotavec && !vache.hasBolus;
+        const statut: "complet" | "en_cours" | "a_faire" = allOk ? "complet" : noneOk ? "a_faire" : "en_cours";
+
+        return (
+          <div
+            key={vache.id}
+            className={`bg-white rounded-xl shadow p-4 border-l-4 ${
+              statut === "complet" ? "border-green-400"
+              : statut === "en_cours" ? "border-orange-400"
+              : "border-red-400"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link href={`/troupeau/${vache.nutrav}`} className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded font-bold">
+                    {vache.nutrav}
+                  </Link>
+                  <span className="text-sm font-semibold text-gray-800">{vache.nobovi ?? "Sans nom"}</span>
+                  <span className="text-xs text-gray-400">
+                    {vache.joursAvantVelage > 0 ? `J-${vache.joursAvantVelage}` : "Terme dépassé"}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[
+                    { key: "hasCrypto", label: "Crypto", has: vache.hasCrypto },
+                    { key: "hasRotavec", label: "Rotavec", has: vache.hasRotavec },
+                    { key: "hasBolus", label: "Bolus", has: vache.hasBolus },
+                  ].map((item) => (
+                    <span
+                      key={item.key}
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                        item.has
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : vache.joursAvantVelage <= 45
+                          ? "bg-red-100 text-red-700 border-red-300"
+                          : "bg-gray-50 text-gray-500 border-gray-200"
+                      }`}
+                    >
+                      {item.has ? "✓" : "○"} {item.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <StatutBadge statut={statut} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, vaccinationsRecentes }: Props) {
+export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes }: Props) {
   const router = useRouter();
+  const [onglet, setOnglet] = useState<"urgent" | "veaux" | "vaches">("urgent");
   const [viewMode, setViewMode] = useState<"animal" | "traitement">("animal");
   const [sessionMode, setSessionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -369,6 +609,47 @@ export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, 
 
   return (
     <>
+      {/* Onglets principaux */}
+      <div className="flex bg-white rounded-xl shadow overflow-hidden">
+        {([
+          { id: "urgent", label: "🚨 Urgent", count: urgents.length + cryptoRotavec.length + bolus.length },
+          { id: "veaux", label: "🐄 Vaccins veaux", count: tousVeaux.length },
+          { id: "vaches", label: "🐮 Vaches", count: toutesVaches.length },
+        ] as const).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setOnglet(tab.id)}
+            className={`flex-1 py-3 text-xs font-semibold border-b-2 transition-colors ${
+              onglet === tab.id
+                ? "border-green-600 text-green-700 bg-green-50"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab.label}
+            {tab.count > 0 && (
+              <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                tab.id === "urgent" && (urgents.length > 0 || cryptoRotavec.length > 0 || bolus.length > 0)
+                  ? "bg-red-100 text-red-700"
+                  : "bg-gray-100 text-gray-500"
+              }`}>
+                {tab.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Contenu des onglets Vaccins */}
+      {onglet === "veaux" && (
+        <VaccinsVeauxTab tousVeaux={tousVeaux} onRefresh={() => router.refresh()} />
+      )}
+      {onglet === "vaches" && (
+        <VaccinsVachesTab toutesVaches={toutesVaches} onRefresh={() => router.refresh()} />
+      )}
+
+      {/* Onglet Urgent — contenu existant */}
+      {onglet === "urgent" && (
+      <>
       {/* Stats bar */}
       <div className="grid grid-cols-4 gap-2">
         <div className="bg-white rounded-xl shadow p-3 text-center">
@@ -695,9 +976,13 @@ export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, 
         </>
       )}
 
-      {/* Vaccinations récentes */}
+      {/* Vaccinations récentes — visible sur tous les onglets */}
       {vaccinationsRecentes.length > 0 && (
         <RecentSection items={vaccinationsRecentes} onRefresh={() => router.refresh()} />
+      )}
+
+      {/* Fin onglet urgent */}
+      </>
       )}
 
       {/* ── Floating selection bar ────────────────────────────────────────────── */}
