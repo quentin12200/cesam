@@ -187,7 +187,7 @@ export default function GlobalScanner() {
                   value={animalSearch}
                   onChange={(e) => searchAnimals(e.target.value)}
                   onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  className="w-full border rounded-lg px-3 py-2 text-sm text-gray-800"
                   placeholder="N° nutrav ou nom"
                 />
                 {showDropdown && animalResults.length > 0 && (
@@ -197,7 +197,7 @@ export default function GlobalScanner() {
                         key={a.id}
                         type="button"
                         onMouseDown={() => selectAnimal(a)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                        className="w-full text-left px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
                       >
                         {a.nutrav}{a.nom ? ` — ${a.nom}` : ""}
                       </button>
@@ -209,7 +209,7 @@ export default function GlobalScanner() {
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Médicament *</label>
                 <input value={medicamentNom} onChange={(e) => setMedicamentNom(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Nom du médicament" />
+                  className="w-full border rounded-lg px-3 py-2 text-sm text-gray-800" placeholder="Nom du médicament" />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -217,9 +217,9 @@ export default function GlobalScanner() {
                   <label className="text-xs text-gray-500 block mb-1">Dose</label>
                   <div className="flex gap-1">
                     <input value={dose} onChange={(e) => setDose(e.target.value)} type="number" step="0.1"
-                      className="w-full border rounded-lg px-2 py-2 text-sm" placeholder="0" />
+                      className="w-full border rounded-lg px-2 py-2 text-sm text-gray-800" placeholder="0" />
                     <select value={uniteDosage} onChange={(e) => setUniteDosage(e.target.value)}
-                      className="border rounded-lg px-1 py-2 text-sm bg-white">
+                      className="border rounded-lg px-1 py-2 text-sm bg-white text-gray-800">
                       <option>ml</option><option>mg</option><option>UI</option><option>cp</option>
                     </select>
                   </div>
@@ -227,7 +227,7 @@ export default function GlobalScanner() {
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Voie</label>
                   <input value={voie} onChange={(e) => setVoie(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="IV, SC..." />
+                    className="w-full border rounded-lg px-3 py-2 text-sm text-gray-800" placeholder="IV, SC..." />
                 </div>
               </div>
 
@@ -235,25 +235,25 @@ export default function GlobalScanner() {
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Début</label>
                   <input type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                    className="w-full border rounded-lg px-3 py-2 text-sm text-gray-800" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Durée (jours)</label>
                   <input type="number" value={dureeJours} onChange={(e) => setDureeJours(e.target.value)} min="1"
-                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                    className="w-full border rounded-lg px-3 py-2 text-sm text-gray-800" />
                 </div>
               </div>
 
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Vétérinaire</label>
                 <input value={veterinaire} onChange={(e) => setVeterinaire(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Nom du vétérinaire" />
+                  className="w-full border rounded-lg px-3 py-2 text-sm text-gray-800" placeholder="Nom du vétérinaire" />
               </div>
 
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Motif</label>
                 <input value={motif} onChange={(e) => setMotif(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Motif du traitement" />
+                  className="w-full border rounded-lg px-3 py-2 text-sm text-gray-800" placeholder="Motif du traitement" />
               </div>
 
               <div className="flex gap-2 pt-1">
