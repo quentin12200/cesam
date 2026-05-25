@@ -271,7 +271,12 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     groupes={groupes}
                   />
                   {animal.sexbov === "F" && (
-                    <EchoButton nutrav={animal.nutrav} aEchographier={animal.aEchographier} />
+                    <EchoButton
+                      nutrav={animal.nutrav}
+                      aEchographier={animal.aEchographier}
+                      saillieId={animal.saillies[0]?.id ?? null}
+                      saillieDate={animal.saillies[0]?.date.toISOString() ?? null}
+                    />
                   )}
                 </div>
               )}
