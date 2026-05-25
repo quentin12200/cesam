@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, Pill } from "lucide-react";
+import { ArrowLeft, Pill, Printer } from "lucide-react";
 import { addDays, differenceInDays } from "date-fns";
 import PharmacieClient, { type TraitementItem, type MedicamentItem } from "./PharmacieClient";
 
@@ -79,10 +79,17 @@ export default async function PharmaciePage() {
         <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
           <ArrowLeft size={18} />
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           <Pill size={20} className="text-blue-600" />
           <h2 className="text-xl font-bold text-gray-800">Pharmacie</h2>
         </div>
+        <Link
+          href="/pharmacie/impression"
+          className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
+          title="Imprimer les traitements en cours"
+        >
+          <Printer size={18} />
+        </Link>
       </div>
 
       <PharmacieClient traitements={traitementsItems} medicaments={medicamentItems} />

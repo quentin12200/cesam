@@ -29,6 +29,7 @@ import {
   CheckCircle2,
   Circle,
   Clock,
+  Printer,
 } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import EditAnimalDrawer from "./EditAnimalDrawer";
@@ -190,6 +191,13 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             notes={animal.notes ?? null}
             boucleFaite={animal.boucleFaite}
           />
+          <Link
+            href={`/troupeau/${animal.nutrav}/impression`}
+            className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
+            title="Imprimer la fiche"
+          >
+            <Printer size={18} />
+          </Link>
         </div>
       </div>
 
