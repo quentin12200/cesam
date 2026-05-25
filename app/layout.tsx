@@ -4,6 +4,7 @@ import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import SplashScreen from "@/components/SplashScreen";
 import InstallPrompt from "@/app/components/InstallPrompt";
+import NotificationBell from "@/app/components/NotificationBell";
 import Image from "next/image";
 
 const geist = Geist({
@@ -35,15 +36,18 @@ export default function RootLayout({
     <html lang="fr" className={`${geist.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-gray-100 pb-16">
         <header className="bg-green-700 text-white px-4 py-3 shadow-md sticky top-0 z-30">
-          <div className="flex items-center gap-2.5">
-            <Image
-              src="/logo-cesam.svg"
-              alt="CESAM"
-              width={32}
-              height={32}
-              className="rounded-lg"
-            />
-            <h1 className="text-lg font-bold tracking-wide">GAEC CESAM — Samuel &amp; Céline</h1>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2.5">
+              <Image
+                src="/logo-cesam.svg"
+                alt="CESAM"
+                width={32}
+                height={32}
+                className="rounded-lg"
+              />
+              <h1 className="text-lg font-bold tracking-wide">GAEC CESAM — Samuel &amp; Céline</h1>
+            </div>
+            <NotificationBell />
           </div>
         </header>
         <SplashScreen />

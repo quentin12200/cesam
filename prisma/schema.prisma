@@ -250,3 +250,15 @@ model Chaleur {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model PushSubscription {
+  id          String    @id @default(cuid())
+  endpoint    String    @unique
+  p256dh      String
+  auth        String
+  device      String?
+  lastNotifAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
