@@ -1,41 +1,99 @@
 const { createClient } = require("@libsql/client");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
-const client = createClient({
-  url: "libsql://cesam-quentin12200.aws-eu-west-1.turso.io",
-  authToken: process.env.TURSO_AUTH_TOKEN,
-});
+const url = process.env.DATABASE_URL ?? "libsql://cesam-quentin12200.aws-eu-west-1.turso.io";
+const authToken = process.env.TURSO_AUTH_TOKEN;
 
-async function main() {
-  const migrationPath = path.join(
-    process.cwd(),
-    "prisma/migrations/20260522082327_init/migration.sql"
-  );
-  const sql = fs.readFileSync(migrationPath, "utf-8");
+const client = createClient({ url, ...(authToken ? { authToken } : {}) });
 
-  // Split on semicolons to execute statement by statement
-  const statements = sql
+async function execSql(sql) {
+  const stmts = sql
+    .replace(/--[^\n]*/g, "")
     .split(";")
     .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+    .filter(Boolean);
 
-  console.log(`📦 Application de ${statements.length} statements SQL sur Turso...`);
-
-  for (const stmt of statements) {
+  for (const stmt of stmts) {
     try {
       await client.execute(stmt);
     } catch (e) {
-      if (e.message.includes("already exists")) {
-        console.log(`⚠️  Table déjà existante, ignorée`);
-      } else {
-        console.error(`❌ Erreur: ${e.message}`);
-        console.error(`   Statement: ${stmt.substring(0, 80)}...`);
+      const msg = String(e.message ?? e);
+      if (
+        msg.includes("already exists") ||
+        msg.includes("duplicate column") ||
+        msg.includes("no such column: _prisma_migrations")
+      ) {
+        continue;
       }
+      throw new Error(`Statement failed: ${msg}\n  SQL: ${stmt.slice(0, 120)}`);
     }
   }
-  console.log("✅ Migrations appliquées");
+}
+
+async function main() {
+  // Ensure migration tracking table exists
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
+      "id"                  TEXT PRIMARY KEY,
+      "checksum"            TEXT NOT NULL,
+      "finished_at"         DATETIME,
+      "migration_name"      TEXT UNIQUE NOT NULL,
+      "logs"                TEXT,
+      "rolled_back_at"      DATETIME,
+      "started_at"          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "applied_steps_count" INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  const migrationsDir = path.join(process.cwd(), "prisma/migrations");
+  const migrations = fs
+    .readdirSync(migrationsDir)
+    .filter((e) => {
+      const p = path.join(migrationsDir, e);
+      return (
+        fs.statSync(p).isDirectory() &&
+        fs.existsSync(path.join(p, "migration.sql"))
+      );
+    })
+    .sort();
+
+  console.log(`Found ${migrations.length} migration(s).`);
+
+  for (const name of migrations) {
+    const row = await client.execute({
+      sql: "SELECT id FROM _prisma_migrations WHERE migration_name = ? AND finished_at IS NOT NULL",
+      args: [name],
+    });
+
+    if (row.rows.length > 0) {
+      console.log(`  ✓ ${name}`);
+      continue;
+    }
+
+    const sqlFile = path.join(migrationsDir, name, "migration.sql");
+    const sql = fs.readFileSync(sqlFile, "utf-8");
+    const checksum = crypto.createHash("sha256").update(sql).digest("hex");
+
+    console.log(`  → Applying ${name}...`);
+    await execSql(sql);
+
+    await client.execute({
+      sql: `INSERT OR REPLACE INTO "_prisma_migrations"
+              (id, checksum, migration_name, finished_at, applied_steps_count)
+            VALUES (?, ?, ?, datetime('now'), 1)`,
+      args: [crypto.randomUUID(), checksum, name],
+    });
+
+    console.log(`  ✓ ${name} applied`);
+  }
+
+  console.log("All migrations up to date.");
   client.close();
 }
 
-main().catch(console.error);
+main().catch((e) => {
+  console.error("Migration failed:", e);
+  process.exit(1);
+});
