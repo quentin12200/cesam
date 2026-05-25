@@ -42,6 +42,7 @@ async function getDashboardData() {
     velagesSemaine,
     velagesPrevus,
     vaccinationPreVelage,
+    bolusPreVelage,
     // Checklist: veaux à boucler (with details)
     veauxABouclerList,
     // Checklist: veaux à sevrer ≥6 mois
@@ -96,6 +97,13 @@ async function getDashboardData() {
       where: {
         etat: { in: ["VERT", "ROSE"] },
         dateVelagePrevue: { gte: twentyOneDaysLater, lte: ninetyDaysLater },
+      },
+    }),
+    // Bolus / Métrabol pré-vélage (J-21 à J-45)
+    prisma.gestation.count({
+      where: {
+        etat: { in: ["VERT", "ROSE"] },
+        dateVelagePrevue: { gte: twentyOneDaysLater, lte: addDays(now, 45) },
       },
     }),
     // Veaux à boucler avec infos mère
@@ -313,6 +321,7 @@ async function getDashboardData() {
     vachesVidesEnRetard,
     evenementsSanitairesUrgents,
     vaccinationPreVelage,
+    bolusPreVelage,
     bouclageItems,
     sevrageItems,
     presqueSevrables,
@@ -342,6 +351,7 @@ export default async function Dashboard() {
     data.evenementsSanitairesUrgents > 0 ||
     data.bouclageItems.length > 0 ||
     data.vaccinationPreVelage > 0 ||
+    data.bolusPreVelage > 0 ||
     data.aEchographier > 0 ||
     data.veauxAVacciner > 0 ||
     vachesACapteurSansCapteur.length > 0;
@@ -429,6 +439,22 @@ export default async function Dashboard() {
                 </div>
                 <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                   {data.vaccinationPreVelage}
+                </span>
+              </Link>
+            )}
+            {data.bolusPreVelage > 0 && (
+              <Link
+                href="/sanitaire"
+                className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Syringe size={16} className="text-amber-600" />
+                  <span className="text-sm font-medium text-amber-800">
+                    Bolus / Métrabol pré-vélage (J-45 à J-21)
+                  </span>
+                </div>
+                <span className="bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {data.bolusPreVelage}
                 </span>
               </Link>
             )}
