@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
       ],
     },
     select: {
+      id: true,
       nutrav: true,
       nobovi: true,
       danais: true,
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
       a.sexbov === "F" ? (a.estGenisse ? "Génisse" : "Vache") : "Mâle";
 
     return {
+      id: a.id,
       nutrav: a.nutrav,
       nom: a.nobovi,
       ageLabel,

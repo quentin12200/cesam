@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 60;
+
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
 interface OrdonnanceResult {
@@ -58,8 +60,8 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-4o",
-      max_tokens: 1000,
+      model: "gpt-4o-mini",
+      max_tokens: 800,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest) {
           content: [
             {
               type: "image_url",
-              image_url: { url: imageUrl, detail: "high" },
+              image_url: { url: imageUrl, detail: "auto" },
             },
             {
               type: "text",
@@ -80,9 +82,14 @@ export async function POST(req: NextRequest) {
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    console.error("OpenAI API error:", err);
-    return NextResponse.json({ error: "Erreur OpenAI", detail: err }, { status: 502 });
+    const errText = await response.text();
+    console.error("OpenAI API error:", response.status, errText);
+    let errMsg = `Erreur OpenAI (${response.status})`;
+    try {
+      const errJson = JSON.parse(errText);
+      if (errJson.error?.message) errMsg = errJson.error.message;
+    } catch { /* keep default */ }
+    return NextResponse.json({ error: errMsg }, { status: 502 });
   }
 
   const data = await response.json();
