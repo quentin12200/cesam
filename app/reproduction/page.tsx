@@ -20,6 +20,7 @@ interface VacheRepro {
   dernierVelage: string | null;
   saillieId: string | null;
   taureauNom: string | null;
+  derniereChaleur: string | null;
 }
 
 interface Taureau {
@@ -65,6 +66,12 @@ function ReproductionContent() {
   const [message, setMessage] = useState<string | null>(null);
   const [saillieError, setSaillieError] = useState<string | null>(null);
   const [confirmVideId, setConfirmVideId] = useState<string | null>(null);
+
+  // Chaleur form
+  const [showChaleurForm, setShowChaleurForm] = useState(false);
+  const [chaleurAnimalId, setChaleurAnimalId] = useState("");
+  const [chaleurDate, setChaleurDate] = useState(new Date().toISOString().split("T")[0]);
+  const [chaleurNotes, setChaleurNotes] = useState("");
 
   // Saillie form
   const [saillieAnimalId, setSaillieAnimalId] = useState("");
@@ -246,6 +253,33 @@ function ReproductionContent() {
       if (!res.ok) throw new Error(await res.text());
       setMessage(`${vache.nutrav} marquée vide`);
       setConfirmVideId(null);
+      await fetchData();
+    } catch (err) {
+      setMessage("Erreur: " + String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openChaleurForm(vache?: VacheRepro) {
+    setChaleurAnimalId(vache?.id ?? "");
+    setChaleurDate(new Date().toISOString().split("T")[0]);
+    setChaleurNotes("");
+    setShowChaleurForm(true);
+  }
+
+  async function handleChaleurSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch("/api/chaleurs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animalId: chaleurAnimalId, date: chaleurDate, notes: chaleurNotes.trim() || null }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setMessage("Chaleur enregistrée !");
+      setShowChaleurForm(false);
       await fetchData();
     } catch (err) {
       setMessage("Erreur: " + String(err));
@@ -445,6 +479,12 @@ function ReproductionContent() {
                       {vache.derniereSaillie ? `Saillie: ${formatDate(new Date(vache.derniereSaillie))}` : "Pas de saillie"}
                     </div>
                     {vache.taureauNom && <div className="text-xs text-gray-400">Taureau: {vache.taureauNom}</div>}
+                    {vache.derniereChaleur && (
+                      <div className="text-xs text-pink-500 mt-0.5">
+                        Chaleur: {formatDate(new Date(vache.derniereChaleur))}
+                        {" · J+"}{differenceInDays(now, new Date(vache.derniereChaleur))}
+                      </div>
+                    )}
                     {vache.dateVelagePrevue && (vache.etat === "VERT" || vache.etat === "ROSE") && (
                       <div className="text-xs text-green-700 font-medium mt-0.5">
                         Vélage prévu: {formatDate(new Date(vache.dateVelagePrevue))}
@@ -457,6 +497,24 @@ function ReproductionContent() {
                   <span className={`text-xs font-bold px-2 py-1 rounded-full ${getBadgeClass(vache.etat)}`}>
                     {getEtatLabel(vache.etat)}
                   </span>
+                  {(() => {
+                    const joursDepuisChaleur = vache.derniereChaleur
+                      ? differenceInDays(now, new Date(vache.derniereChaleur)) : null;
+                    return (
+                      <>
+                        {joursDepuisChaleur !== null && joursDepuisChaleur <= 3 && (
+                          <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">
+                            🌡️ En chaleur (J+{joursDepuisChaleur})
+                          </span>
+                        )}
+                        {joursDepuisChaleur !== null && joursDepuisChaleur >= 18 && joursDepuisChaleur <= 24 && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold animate-pulse">
+                            ⚡ Retour J+21 ?
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                   <div className="flex gap-1 flex-wrap justify-end">
                     {(vache.etat === "JAUNE" || vache.etat === "GRIS") && vache.saillieId && (
                       <button
@@ -464,6 +522,14 @@ function ReproductionContent() {
                         className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg flex items-center gap-1"
                       >
                         <CheckCircle size={12} /> Écho
+                      </button>
+                    )}
+                    {vache.etat === "ROUGE" && (
+                      <button
+                        onClick={() => openChaleurForm(vache)}
+                        className="text-xs bg-pink-100 text-pink-700 px-2 py-1 rounded-lg flex items-center gap-1"
+                      >
+                        🌡️ Chaleur
                       </button>
                     )}
                     <button
@@ -509,6 +575,66 @@ function ReproductionContent() {
               Aucune vache dans cette catégorie
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Modal Chaleur ── */}
+      {showChaleurForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
+          <div className="bg-white rounded-t-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800">🌡️ Observer une chaleur</h3>
+              <button onClick={() => setShowChaleurForm(false)} className="text-gray-400 text-2xl leading-none">×</button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Enregistrez l&apos;observation de signes de chaleur. Un rappel J+21 apparaîtra automatiquement.
+            </p>
+            <form onSubmit={handleChaleurSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vache</label>
+                <select
+                  value={chaleurAnimalId}
+                  onChange={(e) => setChaleurAnimalId(e.target.value)}
+                  required
+                  className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+                >
+                  <option value="">Sélectionner une vache...</option>
+                  {vachesAvecEtat
+                    .filter((v) => v.etat === "ROUGE" || !v.saillieId)
+                    .map((v) => (
+                      <option key={v.id} value={v.id}>{v.nutrav} – {v.nobovi ?? "Sans nom"}</option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;observation</label>
+                <input
+                  type="date"
+                  value={chaleurDate}
+                  onChange={(e) => setChaleurDate(e.target.value)}
+                  required
+                  className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes <span className="text-gray-400 font-normal">(optionnel)</span></label>
+                <input
+                  type="text"
+                  value={chaleurNotes}
+                  onChange={(e) => setChaleurNotes(e.target.value)}
+                  placeholder="ex : chaleur forte, montée, mucus..."
+                  className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full bg-pink-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50"
+              >
+                {saving ? "Enregistrement..." : "Enregistrer la chaleur"}
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
