@@ -158,8 +158,8 @@ export default function GlobalScanner() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
+          <div className="bg-white text-gray-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white text-gray-800">
               <span className="font-semibold text-gray-800 flex items-center gap-2">
                 <ScanLine size={16} className="text-blue-500" />
                 Ordonnance scannée
