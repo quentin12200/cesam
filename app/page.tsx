@@ -50,6 +50,10 @@ async function getDashboardData() {
     veauxPresqueSevrables,
     // Checklist: vaches à tarir (calving in 40-70 days)
     vachesATarirList,
+    // Génisses primipares à rapatrier (calving in 30-90 days, jamais vêlé)
+    genissesArapatrier,
+    // Vaches avec vélage dans les 23 prochains jours (à poser capteur)
+    vachesACapteur,
     // Composition
     nbVaches,
     nbGenissesBabies,
@@ -163,6 +167,33 @@ async function getDashboardData() {
             animal: { select: { nutrav: true, nobovi: true, danais: true } },
           },
         },
+      },
+      orderBy: { dateVelagePrevue: "asc" },
+    }),
+    // Génisses primipares à rapatrier (calving en 30-90j, aucun vélage antérieur)
+    prisma.gestation.findMany({
+      where: {
+        etat: { in: ["VERT", "ROSE"] },
+        dateVelagePrevue: { gte: addDays(now, 30), lte: ninetyDaysLater },
+        saillie: {
+          animal: { statut: "ACTIF", velagesVache: { none: {} } },
+        },
+      },
+      select: {
+        dateVelagePrevue: true,
+        saillie: { select: { animal: { select: { nutrav: true, nobovi: true } } } },
+      },
+      orderBy: { dateVelagePrevue: "asc" },
+    }),
+    // Vaches avec vélage dans les 23 prochains jours (pose capteur)
+    prisma.gestation.findMany({
+      where: {
+        etat: { in: ["VERT", "ROSE"] },
+        dateVelagePrevue: { gte: now, lte: addDays(now, 23) },
+      },
+      select: {
+        dateVelagePrevue: true,
+        saillie: { select: { animal: { select: { nutrav: true, nobovi: true } } } },
       },
       orderBy: { dateVelagePrevue: "asc" },
     }),
@@ -286,6 +317,8 @@ async function getDashboardData() {
     sevrageItems,
     presqueSevrables,
     tarirItems,
+    genissesArapatrier,
+    vachesACapteur,
     nbVaches,
     nbGenissesBabies,
     nbGenissesMoyennes,
@@ -297,6 +330,12 @@ async function getDashboardData() {
 export default async function Dashboard() {
   const data = await getDashboardData();
   const capteursActifs = data.capteurs.filter((c) => c.actif);
+  const capteursActifsNutravs = new Set(capteursActifs.map((c) => c.animalNutrav).filter(Boolean));
+
+  // Cows within 23 days calving WITHOUT a sensor already assigned
+  const vachesACapteurSansCapteur = data.vachesACapteur.filter(
+    (g) => !capteursActifsNutravs.has(g.saillie.animal.nutrav)
+  );
 
   const hasAlertesJour =
     data.vachesVidesEnRetard > 0 ||
@@ -304,12 +343,14 @@ export default async function Dashboard() {
     data.bouclageItems.length > 0 ||
     data.vaccinationPreVelage > 0 ||
     data.aEchographier > 0 ||
-    data.veauxAVacciner > 0;
+    data.veauxAVacciner > 0 ||
+    vachesACapteurSansCapteur.length > 0;
 
   const hasAlertesHebdo =
     data.velagesSemaine > 0 ||
     data.sevrageItems.length > 0 ||
-    data.tarirItems.length > 0;
+    data.tarirItems.length > 0 ||
+    data.genissesArapatrier.length > 0;
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
@@ -419,6 +460,27 @@ export default async function Dashboard() {
                 </span>
               </Link>
             )}
+            {vachesACapteurSansCapteur.length > 0 && (
+              <Link
+                href="/velage"
+                className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Wifi size={16} className="text-orange-600" />
+                  <div>
+                    <div className="text-sm font-medium text-orange-800">Poser capteur vélage</div>
+                    <div className="text-xs text-orange-600 mt-0.5">
+                      {vachesACapteurSansCapteur.map((g) =>
+                        g.saillie.animal.nobovi ?? g.saillie.animal.nutrav
+                      ).join(", ")}
+                    </div>
+                  </div>
+                </div>
+                <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {vachesACapteurSansCapteur.length}
+                </span>
+              </Link>
+            )}
           </div>
         </div>
       )}
@@ -453,6 +515,38 @@ export default async function Dashboard() {
                   {data.velagesSemaine}
                 </span>
               </Link>
+            )}
+            {data.genissesArapatrier.length > 0 && (
+              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={16} className="text-amber-600" />
+                    <span className="text-sm font-medium text-amber-800">Génisses à rapatrier à la ferme</span>
+                  </div>
+                  <span className="bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {data.genissesArapatrier.length}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {data.genissesArapatrier.map((g, i) => {
+                    const jours = g.dateVelagePrevue
+                      ? differenceInDays(g.dateVelagePrevue, new Date())
+                      : null;
+                    return (
+                      <div key={i} className="flex items-center justify-between text-xs text-amber-700">
+                        <Link href={`/troupeau/${g.saillie.animal.nutrav}`} className="font-mono bg-white border border-amber-200 px-1.5 py-0.5 rounded">
+                          {g.saillie.animal.nutrav}
+                        </Link>
+                        <span>{g.saillie.animal.nobovi ?? "1er vélage"}</span>
+                        {jours !== null && (
+                          <span className="font-semibold">J-{jours}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-amber-600 mt-2 italic">⚠️ Primipare — surveillance renforcée requise</p>
+              </div>
             )}
           </div>
         </div>
