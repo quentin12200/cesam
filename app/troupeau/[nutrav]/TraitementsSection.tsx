@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Pill, Plus, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Pill, Plus, Clock, CheckCircle2, AlertTriangle, ScanLine, Loader2 } from "lucide-react";
 import { addDays } from "date-fns";
 import { formatDate } from "@/lib/utils";
 import TraitementForm from "./TraitementForm";
@@ -20,6 +20,17 @@ interface TraitementRow {
   delaiAttenteViandeJ: number | null;
 }
 
+interface ScanResult {
+  medicamentNom: string | null;
+  voie: string | null;
+  dose: number | null;
+  uniteDosage: string | null;
+  dureeJours: number | null;
+  dateDebut: string | null;
+  veterinaire: string | null;
+  motif: string | null;
+}
+
 interface Props {
   animalId: string;
   traitements: TraitementRow[];
@@ -27,8 +38,36 @@ interface Props {
 
 export default function TraitementsSection({ animalId, traitements }: Props) {
   const [showForm, setShowForm] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [pendingScan, setPendingScan] = useState<ScanResult | undefined>();
+  const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const now = new Date();
+
+  async function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setScanning(true);
+    try {
+      const base64 = await fileToBase64(file);
+      const mimeType = file.type || "image/jpeg";
+      const res = await fetch("/api/scan-ordonnance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64, mimeType }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Erreur serveur");
+      }
+      const result: ScanResult = await res.json();
+      setPendingScan(result);
+      setShowForm(true);
+    } finally {
+      setScanning(false);
+    }
+  }
 
   async function terminer(id: string) {
     await fetch(`/api/traitements/${id}`, {
@@ -49,13 +88,26 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
             <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{traitements.length}</span>
           )}
         </h3>
-        <button onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
-          <Plus size={13} /> Nouveau
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={scanning}
+            className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
+            title="Scanner une ordonnance (photo ou PDF)"
+          >
+            {scanning ? <Loader2 size={13} className="animate-spin" /> : <ScanLine size={13} />}
+            {scanning ? "Scan..." : "Scanner"}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFilePick} />
+          <button onClick={() => { setShowForm((v) => !v); setPendingScan(undefined); }}
+            className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
+            <Plus size={13} /> Nouveau
+          </button>
+        </div>
       </div>
 
-      {showForm && <TraitementForm animalId={animalId} onClose={() => setShowForm(false)} />}
+      {showForm && <TraitementForm animalId={animalId} onClose={() => { setShowForm(false); setPendingScan(undefined); }} initialScan={pendingScan} />}
 
       {traitements.length === 0 && !showForm ? (
         <div className="text-center py-6 text-gray-400 text-sm">Aucun traitement enregistré</div>
@@ -115,4 +167,16 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
       )}
     </div>
   );
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
