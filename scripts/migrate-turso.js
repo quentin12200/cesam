@@ -94,6 +94,12 @@ async function main() {
 }
 
 main().catch((e) => {
+  const msg = String(e.message ?? e);
+  // Non-fatal when DB is unreachable (local dev, preview envs without DB access)
+  if (msg.includes("403") || msg.includes("allowlist") || msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
+    console.warn("Migration skipped: DB unreachable in this environment.");
+    process.exit(0);
+  }
   console.error("Migration failed:", e);
   process.exit(1);
 });

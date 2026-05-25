@@ -281,3 +281,20 @@ model PushSubscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model ProtocoleVaccin {
+  id                 String   @id @default(cuid())
+  nom                String   @unique
+  label              String
+  ordre              Int      @default(0)
+  ageMinJours        Int      @default(0)
+  urgenceJours       Int?
+  estRappel          Boolean  @default(false)
+  primoNom           String?
+  delaiRappelJours   Int?
+  urgenceRappelJours Int?
+  obligatoireVente   Boolean  @default(false)
+  actif              Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
