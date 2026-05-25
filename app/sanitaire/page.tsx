@@ -65,10 +65,10 @@ async function getSanitaireData() {
       const jours = differenceInDays(new Date(gestation.dateVelagePrevue), now);
       if (jours < 21 || jours > 90) return null;
       const hasCrypto = vache.vaccinations.some(
-        (v) => v.vaccin === "CRYPTO" && differenceInDays(now, v.date) < 120
+        (v) => v.vaccin === "CRYPTO" && differenceInDays(now, v.date) < 300
       );
       const hasRotavec = vache.vaccinations.some(
-        (v) => v.vaccin === "ROTAVEC" && differenceInDays(now, v.date) < 120
+        (v) => v.vaccin === "ROTAVEC" && differenceInDays(now, v.date) < 300
       );
       if (hasCrypto && hasRotavec) return null;
       return {
@@ -92,7 +92,7 @@ async function getSanitaireData() {
       const jours = differenceInDays(new Date(gestation.dateVelagePrevue), now);
       if (jours < 21 || jours > 45) return null;
       const hasBolus = vache.vaccinations.some(
-        (v) => (v.vaccin === "BOLUS" || v.vaccin === "METRABOL") && differenceInDays(now, v.date) < 120
+        (v) => (v.vaccin === "BOLUS" || v.vaccin === "METRABOL") && differenceInDays(now, v.date) < 300
       );
       if (hasBolus) return null;
       return {

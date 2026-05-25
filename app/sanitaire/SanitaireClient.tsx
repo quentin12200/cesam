@@ -152,6 +152,58 @@ function Section({
   );
 }
 
+// ── Recent row with delete ────────────────────────────────────────────────────
+function RecentRow({ vacc, onDeleted }: { vacc: RecentItem; onDeleted: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function handleDelete() {
+    setLoading(true);
+    try {
+      await fetch(`/api/vaccinations/${vacc.id}`, { method: "DELETE" });
+      onDeleted();
+    } finally {
+      setLoading(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 gap-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{vacc.nutrav}</span>
+        <span className="text-gray-700 truncate">{vacc.nobovi ?? "Sans nom"}</span>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-xs font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{vacc.vaccin}</span>
+        <span className="text-xs text-gray-400">{vacc.dateLabel}</span>
+        {confirming ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleDelete}
+              disabled={loading}
+              className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg font-medium disabled:opacity-50"
+            >
+              {loading ? "…" : "Confirmer"}
+            </button>
+            <button onClick={() => setConfirming(false)} className="text-xs text-gray-400 hover:text-gray-600 px-1">
+              Annuler
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirming(true)}
+            className="text-gray-300 hover:text-red-400 transition-colors p-0.5 rounded"
+            title="Annuler cette vaccination"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, vaccinationsRecentes }: Props) {
   const router = useRouter();
@@ -591,22 +643,14 @@ export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, 
       {/* Vaccinations récentes */}
       {vaccinationsRecentes.length > 0 && (
         <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <h3 className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
             <CheckCircle size={16} className="text-green-600" />
             Vaccinations récentes (7 derniers jours)
           </h3>
+          <p className="text-xs text-gray-400 mb-3">Appuyer sur ✕ pour annuler une erreur de saisie</p>
           <div className="space-y-1">
             {vaccinationsRecentes.map((vacc) => (
-              <div key={vacc.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{vacc.nutrav}</span>
-                  <span className="text-gray-700">{vacc.nobovi ?? "Sans nom"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{vacc.vaccin}</span>
-                  <span className="text-xs text-gray-400">{vacc.dateLabel}</span>
-                </div>
-              </div>
+              <RecentRow key={vacc.id} vacc={vacc} onDeleted={() => router.refresh()} />
             ))}
           </div>
         </div>
@@ -683,6 +727,15 @@ export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, 
                   onChange={(e) => setBatchDate(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
                 />
+                {batchDate && (() => {
+                  const daysAgo = Math.floor((Date.now() - new Date(batchDate).getTime()) / 86400000);
+                  if (daysAgo > 30) return (
+                    <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                      ⚠️ Date ancienne ({daysAgo} jours) — les animaux disparaîtront bien de la liste après enregistrement.
+                    </p>
+                  );
+                  return null;
+                })()}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Voie d&apos;administration</label>
