@@ -5,6 +5,7 @@ import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getVaccinsManquants, formatAge, formatDateShort } from "@/lib/utils";
 import Link from "next/link";
 import CowIcon from "@/components/CowIcon";
+import Collapsible from "@/app/components/Collapsible";
 import ChecklistSection, {
   type ChecklistItem,
   type SubItem,
@@ -602,8 +603,7 @@ export default async function Dashboard() {
       />
 
       {/* Stats rapides */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">Stats rapides</h3>
+      <Collapsible title="Stats rapides" defaultOpen={true}>
         <div className="grid grid-cols-2 gap-3">
           <div className="text-center p-3 bg-green-50 rounded-lg">
             <div className="text-2xl font-bold text-green-700">{data.pctPleine}%</div>
@@ -628,14 +628,19 @@ export default async function Dashboard() {
             <div className="text-xs text-gray-400">Protocoles</div>
           </div>
         </div>
-      </div>
+      </Collapsible>
 
       {/* Composition du troupeau */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <CowIcon size={18} className="text-green-700" />
-          Composition du troupeau
-        </h3>
+      <Collapsible
+        title={
+          <span className="flex items-center gap-2">
+            <CowIcon size={14} className="text-green-700" />
+            Composition du troupeau
+          </span>
+        }
+        count={data.nbVaches + data.nbGenissesBabies + data.nbGenissesMoyennes + data.nbGenissesGrandes + data.nbMales}
+        defaultOpen={true}
+      >
         <div className="space-y-1.5">
           {([
             { label: "Vaches", count: data.nbVaches, color: "bg-green-100 text-green-700", href: "/troupeau?lot=vaches" },
@@ -650,20 +655,20 @@ export default async function Dashboard() {
             </Link>
           ))}
         </div>
-        <div className="mt-3 pt-2 border-t border-gray-100 flex justify-between text-xs text-gray-500">
-          <span>Total actifs</span>
-          <span className="font-semibold text-gray-700">
-            {data.nbVaches + data.nbGenissesBabies + data.nbGenissesMoyennes + data.nbGenissesGrandes + data.nbMales}
-          </span>
-        </div>
-      </div>
+      </Collapsible>
 
       {/* Capteurs */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Wifi size={18} className="text-green-700" />
-          Capteurs vélage
-        </h3>
+      <Collapsible
+        title={
+          <span className="flex items-center gap-2">
+            <Wifi size={14} className="text-green-700" />
+            Capteurs vélage
+          </span>
+        }
+        badge={`${capteursActifs.length} actif${capteursActifs.length > 1 ? "s" : ""}`}
+        badgeColor={capteursActifs.length > 0 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}
+        defaultOpen={false}
+      >
         <div className="grid grid-cols-2 gap-2">
           {data.capteurs.map((capteur) => (
             <div
@@ -695,11 +700,7 @@ export default async function Dashboard() {
             </div>
           ))}
         </div>
-        <div className="mt-2 text-xs text-gray-500 text-center">
-          {capteursActifs.length} capteur{capteursActifs.length > 1 ? "s" : ""} actif
-          {capteursActifs.length > 1 ? "s" : ""}
-        </div>
-      </div>
+      </Collapsible>
     </div>
   );
 }

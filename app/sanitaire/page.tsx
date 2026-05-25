@@ -10,6 +10,7 @@ import SanitaireClient, {
   type CryptoItem,
   type BolusItem,
   type RecentItem,
+  type VeauProtocolItem,
 } from "./SanitaireClient";
 
 async function getSanitaireData() {
@@ -18,7 +19,7 @@ async function getSanitaireData() {
   const [animaux, vaccinationsRecentes, vachesAvecGestation] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
-      include: { vaccinations: { select: { vaccin: true, date: true } } },
+      include: { vaccinations: { select: { id: true, vaccin: true, date: true } } },
       orderBy: { danais: "asc" },
     }),
     prisma.vaccination.findMany({
@@ -36,7 +37,7 @@ async function getSanitaireData() {
     }),
   ]);
 
-  // Veaux à vacciner (< 2 ans)
+  // Veaux à vacciner urgents (< 2 ans avec protocole incomplet)
   const veauxAVacciner: VeauItem[] = animaux
     .filter((a) => differenceInDays(now, a.danais) <= 365 * 2)
     .map((animal) => ({
@@ -55,6 +56,24 @@ async function getSanitaireData() {
       const ub = b.vaccinsManquants.some((v) => v.urgent);
       return ua === ub ? 0 : ua ? -1 : 1;
     });
+
+  // Tous les veaux/génisses/mâles < 2 ans pour vue protocole complète
+  const tousVeaux: VeauProtocolItem[] = animaux
+    .filter((a) => differenceInDays(now, a.danais) <= 365 * 2)
+    .map((animal) => ({
+      id: animal.id,
+      nutrav: animal.nutrav,
+      nobovi: animal.nobovi,
+      danais: animal.danais.toISOString(),
+      sexbov: animal.sexbov,
+      ageLabel: formatAge(animal.danais),
+      vaccinations: animal.vaccinations.map((v) => ({
+        id: v.id,
+        vaccin: v.vaccin,
+        date: v.date.toISOString(),
+      })),
+    }))
+    .sort((a, b) => a.nutrav.localeCompare(b.nutrav));
 
   // Crypto/Rotavec pré-vélage (fenêtre J-21 à J-90)
   const cryptoRotavec: CryptoItem[] = vachesAvecGestation
@@ -105,9 +124,32 @@ async function getSanitaireData() {
     })
     .filter(Boolean) as BolusItem[];
 
-  // Sort by calving date
   cryptoRotavec.sort((a, b) => a.joursAvantVelage - b.joursAvantVelage);
   bolus.sort((a, b) => a.joursAvantVelage - b.joursAvantVelage);
+
+  // Vaches avec statut vaccin pré-vélage (pour l'onglet Vaccins Vaches)
+  const toutesVaches = vachesAvecGestation
+    .filter((v) => v.saillies[0]?.gestation?.dateVelagePrevue)
+    .map((vache) => {
+      const gestation = vache.saillies[0]!.gestation!;
+      const jours = differenceInDays(new Date(gestation.dateVelagePrevue!), now);
+      const hasCrypto = vache.vaccinations.some((v) => v.vaccin === "CRYPTO" && differenceInDays(now, v.date) < 300);
+      const hasRotavec = vache.vaccinations.some((v) => v.vaccin === "ROTAVEC" && differenceInDays(now, v.date) < 300);
+      const hasBolus = vache.vaccinations.some((v) => (v.vaccin === "BOLUS" || v.vaccin === "METRABOL") && differenceInDays(now, v.date) < 300);
+      return {
+        id: vache.id,
+        nutrav: vache.nutrav,
+        nobovi: vache.nobovi,
+        joursAvantVelage: jours,
+        dateVelage: gestation.dateVelagePrevue!.toISOString(),
+        etatGestation: gestation.etat,
+        hasCrypto,
+        hasRotavec,
+        hasBolus,
+      };
+    })
+    .filter((v) => ["VERT", "ROSE"].includes(v.etatGestation))
+    .sort((a, b) => a.joursAvantVelage - b.joursAvantVelage);
 
   const recentes: RecentItem[] = vaccinationsRecentes.map((v) => ({
     id: v.id,
@@ -117,14 +159,14 @@ async function getSanitaireData() {
     dateLabel: formatDate(v.date),
   }));
 
-  return { veauxAVacciner, cryptoRotavec, bolus, recentes };
+  return { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes };
 }
 
 export default async function SanitairePage() {
-  const { veauxAVacciner, cryptoRotavec, bolus, recentes } = await getSanitaireData();
+  const { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes } = await getSanitaireData();
 
   return (
-    <div className="p-4 space-y-4 max-w-2xl mx-auto">
+    <div className="p-4 space-y-4 max-w-2xl mx-auto pb-24">
       <div className="flex items-center gap-3 mt-2">
         <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
           <ArrowLeft size={18} />
@@ -134,8 +176,10 @@ export default async function SanitairePage() {
 
       <SanitaireClient
         veauxAVacciner={veauxAVacciner}
+        tousVeaux={tousVeaux}
         cryptoRotavec={cryptoRotavec}
         bolus={bolus}
+        toutesVaches={toutesVaches}
         vaccinationsRecentes={recentes}
       />
     </div>

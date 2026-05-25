@@ -106,6 +106,26 @@ async function getFinancesData(annee: number) {
     .filter((s) => s.animal.velageVeau === null && !s.animal.estGenisse && s.animal.sexbov === "F")
     .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
 
+  // Statistiques mortalité — toutes années confondues pour le taux de troupeau
+  const allTimeTotal = await prisma.animal.count();
+  const allTimeMorts = await prisma.sortie.count({ where: { type: "MORT" } });
+  const tauxMortalite = allTimeTotal > 0 ? (allTimeMorts / allTimeTotal) * 100 : 0;
+
+  // Répartition par cause pour l'année sélectionnée
+  const mortsAvecCause = morts.filter((s) => s.causeMortalite);
+  const causeMap = new Map<string, number>();
+  for (const m of mortsAvecCause) {
+    const cause = m.causeMortalite!;
+    causeMap.set(cause, (causeMap.get(cause) ?? 0) + 1);
+  }
+  const statsParCause = [...causeMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([cause, count]) => ({
+      cause,
+      count,
+      pct: mortsAvecCause.length > 0 ? Math.round((count / mortsAvecCause.length) * 100) : 0,
+    }));
+
   return {
     sorties,
     caVeaux,
@@ -127,6 +147,10 @@ async function getFinancesData(annee: number) {
     caGenisses,
     caVachesBoucherie,
     caVachesElevage,
+    tauxMortalite,
+    allTimeMorts,
+    statsParCause,
+    mortsAnneeSansProbleme: morts.length - mortsAvecCause.length,
   };
 }
 
@@ -326,6 +350,53 @@ export default async function FinancesPage({ searchParams }: PageProps) {
         </div>
       )}
 
+      {/* Statistiques mortalité */}
+      {(data.mortsCount > 0 || data.allTimeMorts > 0) && (
+        <div className="bg-white rounded-xl shadow p-4 border-l-4 border-gray-400">
+          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <span>💀</span>
+            Mortalité — statistiques
+          </h3>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-gray-700">{data.mortsCount}</div>
+              <div className="text-xs text-gray-500 mt-0.5">Morts en {annee}</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-gray-700">{data.tauxMortalite.toFixed(1)} %</div>
+              <div className="text-xs text-gray-500 mt-0.5">Taux cumulé</div>
+            </div>
+          </div>
+
+          {data.statsParCause.length > 0 && (
+            <>
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                Répartition par cause ({annee})
+              </h4>
+              <div className="space-y-2">
+                {data.statsParCause.map((s) => (
+                  <div key={s.cause} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 w-32 shrink-0 truncate">{s.cause}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                      <div className="bg-gray-500 h-2 rounded-full" style={{ width: `${s.pct}%` }} />
+                    </div>
+                    <span className="text-xs font-semibold text-gray-700 w-12 text-right shrink-0">
+                      {s.pct} %
+                    </span>
+                    <span className="text-xs text-gray-400 shrink-0">×{s.count}</span>
+                  </div>
+                ))}
+              </div>
+              {data.mortsAnneeSansProbleme > 0 && (
+                <p className="text-xs text-gray-400 mt-2">
+                  + {data.mortsAnneeSansProbleme} mort{data.mortsAnneeSansProbleme > 1 ? "s" : ""} sans cause renseignée
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Liste des sorties */}
       <div className="bg-white rounded-xl shadow p-4">
         <h3 className="font-semibold text-gray-800 mb-3">
@@ -349,9 +420,16 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                       {sortie.animal.nobovi ?? "—"}
                     </span>
                   </div>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${typeBadge[sortie.type] ?? "bg-gray-100 text-gray-600"}`}>
-                    {typeLabel[sortie.type] ?? sortie.type}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${typeBadge[sortie.type] ?? "bg-gray-100 text-gray-600"}`}>
+                      {typeLabel[sortie.type] ?? sortie.type}
+                    </span>
+                    {sortie.type === "MORT" && sortie.causeMortalite && (
+                      <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+                        {sortie.causeMortalite}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
                   <span>{new Date(sortie.date).toLocaleDateString("fr-FR")}</span>
