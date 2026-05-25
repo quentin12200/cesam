@@ -18,6 +18,14 @@ model Animal {
   race          String    @default("BLONDE_AQUITAINE")
   estGenisse    Boolean   @default(false)
 
+  // Catégorie métier manuelle (VEAU_M|VEAU_F|VELLE|PRESELECTION_GENISSE|GENISSE_VALIDEE|PETITE_GENISSE|MOYENNE_GENISSE|GRANDE_GENISSE|TAUREAU|VACHE)
+  categorie     String?
+
+  groupeId      String?
+  groupe        Groupe?   @relation(fields: [groupeId], references: [id])
+
+  aEchographier Boolean   @default(false)
+
   copami        String?
   numeip        String?
   nomeip        String?
@@ -54,6 +62,15 @@ model Animal {
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+model Groupe {
+  id        String   @id @default(cuid())
+  nom       String   @unique
+  couleur   String?
+  animaux   Animal[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Taureau {
@@ -233,6 +250,8 @@ model Sortie {
   prixDefinitifHT Float?
 
   dateDebutEngr   DateTime?
+
+  causeMortalite  String?
 
   notes           String?
 

@@ -24,6 +24,8 @@ interface VacheRepro {
   saillieId: string | null;
   taureauNom: string | null;
   derniereChaleur: string | null;
+  aEchographier: boolean;
+  estGenisse: boolean;
 }
 
 interface Taureau {
@@ -552,7 +554,15 @@ function ReproductionContent() {
                       <span className="bg-green-700 text-white text-xs font-bold px-2 py-1 rounded-lg font-mono">{vache.nutrav}</span>
                     </Link>
                     <div>
-                      <div className="font-semibold text-gray-800 text-sm">{vache.nobovi ?? "Sans nom"}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-gray-800 text-sm">{vache.nobovi ?? "Sans nom"}</span>
+                        {vache.estGenisse && (
+                          <span className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-medium">Génisse</span>
+                        )}
+                        {vache.aEchographier && (
+                          <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium animate-pulse">📡 À écho</span>
+                        )}
+                      </div>
                       <div className="text-xs text-gray-500 mt-0.5">
                         {vache.derniereSaillie ? `Saillie : ${formatDate(new Date(vache.derniereSaillie))}` : "Pas de saillie"}
                       </div>

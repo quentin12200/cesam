@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       prixDefinitifHT,
       dateDebutEngr,
       notes,
+      causeMortalite,
     } = body;
 
     if (!animalId || !date || !type) {
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
         prixDefinitifHT: prixDefinitifHT ? parseFloat(prixDefinitifHT) : null,
         dateDebutEngr: dateDebutEngr ? new Date(dateDebutEngr) : null,
         notes: notes ?? null,
+        causeMortalite: type === "MORT" ? (causeMortalite ?? null) : null,
         updatedAt: new Date(),
       },
     });
