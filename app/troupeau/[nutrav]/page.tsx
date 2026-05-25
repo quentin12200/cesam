@@ -8,6 +8,9 @@ import {
   getEtatLabel,
   isMheVendable,
   getVaccinProtocolSteps,
+  getCategorieLabel,
+  getCategorieColor,
+  getCategorie,
 } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -31,6 +34,8 @@ import CowIcon from "@/components/CowIcon";
 import PeseeInlineForm from "./PeseeInlineForm";
 import SevrageButton from "./SevrageButton";
 import QuickActionsBar from "./QuickActionsBar";
+import CategorieButton from "./CategorieButton";
+import EchoButton from "./EchoButton";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -43,6 +48,7 @@ async function getAnimal(nutrav: string) {
     include: {
       mere: { select: { id: true, nutrav: true, nobovi: true } },
       taureau: { select: { id: true, nupere: true, nopere: true, traper: true, present: true } },
+      groupe: { select: { id: true, nom: true, couleur: true } },
       veaux: {
         select: { id: true, nutrav: true, nobovi: true, danais: true, sexbov: true, statut: true },
         orderBy: { danais: "desc" },
@@ -158,7 +164,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             statut={animal.statut}
             estGenisse={animal.estGenisse}
             sexbov={animal.sexbov}
-            notes={animal.notes}
+            notes={animal.notes ?? null}
             boucleFaite={animal.boucleFaite}
           />
         </div>
@@ -211,11 +217,12 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 <div>{formatDate(animal.danais)}</div>
                 <div className="text-gray-500">Âge</div>
                 <div className="font-semibold">{formatAge(animal.danais)}</div>
-                <div className="text-gray-500">Sexe / Catégorie</div>
-                <div>
-                  {animal.sexbov === "F"
-                    ? animal.estGenisse ? "♀ Génisse" : "♀ Vache"
-                    : "♂ Mâle"}
+                <div className="text-gray-500">Catégorie</div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getCategorieColor(getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie))}`}>
+                    {animal.sexbov === "F" ? "♀" : "♂"} {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
+                  </span>
+                  {!animal.categorie && <span className="text-xs text-gray-400 italic">auto</span>}
                 </div>
                 {!animal.boucleFaite && (
                   <>
@@ -230,10 +237,31 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     <div><SevrageButton nutrav={animal.nutrav} sevreFait={animal.sevreFait} /></div>
                   </>
                 )}
+                {animal.groupe && (
+                  <>
+                    <div className="text-gray-500">Groupe</div>
+                    <div className="text-sm text-gray-800 font-medium">{animal.groupe.nom}</div>
+                  </>
+                )}
               </div>
               {animal.notes && (
                 <div className="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-600 italic">
                   {animal.notes}
+                </div>
+              )}
+              {/* Actions rapides catégorie / écho */}
+              {animal.statut === "ACTIF" && (
+                <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-2">
+                  <CategorieButton
+                    nutrav={animal.nutrav}
+                    sexbov={animal.sexbov}
+                    danais={animal.danais.toISOString()}
+                    estGenisse={animal.estGenisse}
+                    categorie={animal.categorie}
+                  />
+                  {animal.sexbov === "F" && (
+                    <EchoButton nutrav={animal.nutrav} aEchographier={animal.aEchographier} />
+                  )}
                 </div>
               )}
             </div>

@@ -2,19 +2,29 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { addDays } from "date-fns";
 
 export async function GET() {
+  const now = new Date();
+  // Génisses ≥ 20 mois entrent en reproduction
+  const dateMax20Mois = addDays(now, -(20 * 30.44));
+
   const vaches = await prisma.animal.findMany({
     where: {
       statut: "ACTIF",
       sexbov: "F",
-      estGenisse: false,
+      OR: [
+        { estGenisse: false },
+        { estGenisse: true, danais: { lte: dateMax20Mois } },
+      ],
     },
     select: {
       id: true,
       nutrav: true,
       nobovi: true,
       danais: true,
+      estGenisse: true,
+      aEchographier: true,
       saillies: {
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         take: 1,
@@ -58,6 +68,8 @@ export async function GET() {
     saillieId: v.saillies[0]?.id ?? null,
     taureauNom: v.saillies[0]?.taureau?.nopere ?? v.saillies[0]?.taureau?.nupere ?? null,
     derniereChaleur: v.chaleurs[0]?.date?.toISOString() ?? null,
+    aEchographier: v.aEchographier,
+    estGenisse: v.estGenisse,
   }));
 
   return NextResponse.json({ vaches: result });

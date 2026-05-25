@@ -55,14 +55,17 @@ export async function PATCH(
   if (!animal) return NextResponse.json({ error: "Animal non trouvé" }, { status: 404 });
 
   const data: Record<string, unknown> = { updatedAt: new Date() };
-  if ("nobovi"     in body) data.nobovi     = body.nobovi?.trim() || null;
-  if ("statut"     in body) data.statut     = body.statut;
-  if ("estGenisse" in body) data.estGenisse = body.estGenisse;
-  if ("notes"      in body) data.notes      = body.notes?.trim() || null;
-  if ("danais"     in body) data.danais     = new Date(body.danais);
-  if ("boucleFaite" in body) data.boucleFaite = body.boucleFaite;
-  if ("sevreFait"   in body) data.sevreFait   = body.sevreFait;
-  if ("tarieFaite"  in body) data.tarieFaite  = body.tarieFaite;
+  if ("nobovi"       in body) data.nobovi       = body.nobovi?.trim() || null;
+  if ("statut"       in body) data.statut       = body.statut;
+  if ("estGenisse"   in body) data.estGenisse   = body.estGenisse;
+  if ("notes"        in body) data.notes        = body.notes?.trim() || null;
+  if ("danais"       in body) data.danais       = new Date(body.danais);
+  if ("boucleFaite"  in body) data.boucleFaite  = body.boucleFaite;
+  if ("sevreFait"    in body) data.sevreFait    = body.sevreFait;
+  if ("tarieFaite"   in body) data.tarieFaite   = body.tarieFaite;
+  if ("categorie"    in body) data.categorie    = body.categorie ?? null;
+  if ("groupeId"     in body) data.groupeId     = body.groupeId ?? null;
+  if ("aEchographier" in body) data.aEchographier = Boolean(body.aEchographier);
 
   const updated = await prisma.animal.update({ where: { nutrav }, data });
   return NextResponse.json({ success: true, animal: updated });
