@@ -39,6 +39,7 @@ import QuickActionsBar from "./QuickActionsBar";
 import CategorieButton from "./CategorieButton";
 import EchoButton from "./EchoButton";
 import GroupeButton from "./GroupeButton";
+import TraitementsSection from "./TraitementsSection";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -72,6 +73,11 @@ async function getAnimal(nutrav: string) {
       },
       vaccinations: { orderBy: { date: "asc" } },
       evenements: { orderBy: { date: "desc" } },
+      traitements: {
+        orderBy: { dateDebut: "desc" },
+        take: 10,
+        include: { medicament: { select: { delaiAttenteViandeJ: true } } },
+      },
       pesees: { orderBy: { date: "asc" } },
       velagesVache: {
         orderBy: { date: "desc" },
@@ -583,6 +589,23 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 <PeseeInlineForm nutrav={animal.nutrav} />
               </div>
             </div>
+
+            {/* Traitements */}
+            <TraitementsSection
+              animalId={animal.id}
+              traitements={animal.traitements.map((t) => ({
+                id: t.id,
+                medicamentNom: t.medicamentNom,
+                dateDebut: t.dateDebut.toISOString(),
+                dureeJours: t.dureeJours,
+                voie: t.voie,
+                dose: t.dose,
+                uniteDosage: t.uniteDosage,
+                motif: t.motif,
+                statut: t.statut,
+                delaiAttenteViandeJ: t.medicament?.delaiAttenteViandeJ ?? null,
+              }))}
+            />
 
             {/* Événements sanitaires */}
             {animal.evenements.length > 0 && (
