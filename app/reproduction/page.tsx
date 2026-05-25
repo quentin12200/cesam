@@ -800,6 +800,21 @@ function ReproductionContent() {
                   </div>
                 </div>
               )}
+              {groupageType === "IA" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dose / Taureau IA <span className="text-gray-400 font-normal">(optionnel)</span></label>
+                  <select
+                    value={groupageTaureauId}
+                    onChange={(e) => setGroupageTaureauId(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl p-3 text-sm bg-white"
+                  >
+                    <option value="">— Non précisé —</option>
+                    {taureaux.map((t) => (
+                      <option key={t.id} value={t.id}>{t.nopere ?? t.nupere}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Vaches sélectionnées <span className="text-green-700 font-bold">({groupageIds.length})</span>
