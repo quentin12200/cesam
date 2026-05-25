@@ -204,6 +204,61 @@ function RecentRow({ vacc, onDeleted }: { vacc: RecentItem; onDeleted: () => voi
   );
 }
 
+// ── Recent section with bulk delete ──────────────────────────────────────────
+function RecentSection({ items, onRefresh }: { items: RecentItem[]; onRefresh: () => void }) {
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [loadingAll, setLoadingAll] = useState(false);
+
+  async function handleDeleteAll() {
+    setLoadingAll(true);
+    try {
+      await Promise.all(items.map((v) => fetch(`/api/vaccinations/${v.id}`, { method: "DELETE" })));
+      onRefresh();
+    } finally {
+      setLoadingAll(false);
+      setConfirmAll(false);
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow p-4">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+          <CheckCircle size={16} className="text-green-600" />
+          Vaccinations récentes (7 derniers jours)
+        </h3>
+        {confirmAll ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDeleteAll}
+              disabled={loadingAll}
+              className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50"
+            >
+              {loadingAll ? "…" : `Supprimer les ${items.length}`}
+            </button>
+            <button onClick={() => setConfirmAll(false)} className="text-xs text-gray-400 hover:text-gray-600">
+              Annuler
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmAll(true)}
+            className="text-xs text-red-400 hover:text-red-600 font-medium border border-red-200 px-2.5 py-1 rounded-lg hover:bg-red-50 transition-colors"
+          >
+            Tout supprimer
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-gray-400 mb-3">Appuyer sur ✕ pour annuler une erreur de saisie</p>
+      <div className="space-y-1">
+        {items.map((vacc) => (
+          <RecentRow key={vacc.id} vacc={vacc} onDeleted={onRefresh} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, vaccinationsRecentes }: Props) {
   const router = useRouter();
@@ -642,18 +697,7 @@ export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, 
 
       {/* Vaccinations récentes */}
       {vaccinationsRecentes.length > 0 && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
-            <CheckCircle size={16} className="text-green-600" />
-            Vaccinations récentes (7 derniers jours)
-          </h3>
-          <p className="text-xs text-gray-400 mb-3">Appuyer sur ✕ pour annuler une erreur de saisie</p>
-          <div className="space-y-1">
-            {vaccinationsRecentes.map((vacc) => (
-              <RecentRow key={vacc.id} vacc={vacc} onDeleted={() => router.refresh()} />
-            ))}
-          </div>
-        </div>
+        <RecentSection items={vaccinationsRecentes} onRefresh={() => router.refresh()} />
       )}
 
       {/* ── Floating selection bar ────────────────────────────────────────────── */}
@@ -669,9 +713,9 @@ export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, 
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelected(new Set())}
-                className="p-1.5 bg-green-600 rounded-lg hover:bg-green-500 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 bg-green-600 rounded-xl text-sm font-medium hover:bg-green-500 transition-colors"
               >
-                <X size={16} />
+                <X size={15} /> Tout décocher
               </button>
               <button
                 onClick={() => { setBatchDate(today); setShowModal(true); }}
