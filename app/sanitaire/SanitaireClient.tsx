@@ -419,20 +419,29 @@ export default function SanitaireClient({ veauxAVacciner, cryptoRotavec, bolus, 
           </button>
         </div>
 
-        {/* Session toggle */}
-        {totalPending > 0 && (
-          <button
-            onClick={toggleSession}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              sessionMode
-                ? "bg-green-600 text-white border-green-600"
-                : "border-green-300 text-green-700 hover:bg-green-50"
-            }`}
+        <div className="flex items-center gap-2">
+          {/* Session toggle */}
+          {totalPending > 0 && (
+            <button
+              onClick={toggleSession}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                sessionMode
+                  ? "bg-green-600 text-white border-green-600"
+                  : "border-green-300 text-green-700 hover:bg-green-50"
+              }`}
+            >
+              {sessionMode ? <CheckSquare size={15} /> : <Square size={15} />}
+              {sessionMode ? "Session active" : "Mode session"}
+            </button>
+          )}
+          {/* Lien impression */}
+          <Link
+            href="/sanitaire/impression"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            {sessionMode ? <CheckSquare size={15} /> : <Square size={15} />}
-            {sessionMode ? "Session active" : "Mode session"}
-          </button>
-        )}
+            🖨️ Imprimer
+          </Link>
+        </div>
       </div>
 
       {/* Vaccination form (always available) */}

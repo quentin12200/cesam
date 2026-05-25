@@ -31,6 +31,7 @@ import CowIcon from "@/components/CowIcon";
 import PeseeInlineForm from "./PeseeInlineForm";
 import SevrageButton from "./SevrageButton";
 import QuickActionsBar from "./QuickActionsBar";
+import PoidsCurve from "./PoidsCurve";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -111,6 +112,79 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const ivvMoyen = ivvList.length > 0
     ? Math.round(ivvList.reduce((s, x) => s + x.ivv, 0) / ivvList.length)
     : null;
+
+  // Score engraissement
+  const scoreEngraissement = (() => {
+    if (animal!.sexbov !== "F" || animal!.estGenisse) return null;
+
+    let score = 0;
+    const reasons: string[] = [];
+
+    // IVV moyen
+    if (ivvMoyen !== null) {
+      if (ivvMoyen > 450) {
+        score += 2;
+        reasons.push(`IVV moyen ${ivvMoyen}j`);
+      } else if (ivvMoyen > 400) {
+        score += 1;
+        reasons.push(`IVV moyen ${ivvMoyen}j`);
+      }
+    }
+
+    // Saillies en échec confirmé (gestation ROUGE) ≥ 3
+    const sailiesEchec = animal!.saillies.filter(
+      (s) => s.gestation?.etat === "ROUGE"
+    ).length;
+    if (sailiesEchec >= 3) {
+      score += 1;
+      reasons.push(`${sailiesEchec} IA/saillies sans résultat`);
+    }
+
+    // Vélages difficiles ≥ 2
+    const velagesDifficiles = animal!.velagesVache.filter(
+      (v) => v.qualificatif !== "NORMAL"
+    ).length;
+    if (velagesDifficiles >= 2) {
+      score += 1;
+      reasons.push(`${velagesDifficiles} vélages difficiles`);
+    }
+
+    // Événements sanitaires ≥ 4
+    if (animal!.evenements.length >= 4) {
+      score += 1;
+      reasons.push(`${animal!.evenements.length} événements sanitaires`);
+    }
+
+    // Notes contenant "réformer" ou "reformer"
+    if (animal!.notes && /r[ée]former/i.test(animal!.notes!)) {
+      score += 2;
+      reasons.push("Notée à réformer");
+    }
+
+    // Âge > 10 ans
+    const ageAns = differenceInDays(new Date(), animal!.danais) / 365;
+    if (ageAns > 10) {
+      score += 1;
+      reasons.push(`${Math.floor(ageAns)} ans`);
+    }
+
+    if (score === 0) return null;
+
+    let label: string;
+    let color: "red" | "orange" | "yellow";
+    if (score >= 3) {
+      label = "Candidat engraissement";
+      color = "red";
+    } else if (score === 2) {
+      label = "À surveiller";
+      color = "orange";
+    } else {
+      label = "Signal faible";
+      color = "yellow";
+    }
+
+    return { score, label, color, reasons };
+  })();
 
   const protocolSteps = getVaccinProtocolSteps(animal.danais, animal.vaccinations);
   const mheStatus = isMheVendable(animal.vaccinations);
@@ -370,6 +444,24 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 </div>
               )}
             </div>
+
+            {scoreEngraissement && (
+              <div className={`rounded-xl shadow p-4 border ${scoreEngraissement.color === 'red' ? 'bg-red-50 border-red-200' : scoreEngraissement.color === 'orange' ? 'bg-orange-50 border-orange-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-sm font-bold px-3 py-1 rounded-full ${scoreEngraissement.color === 'red' ? 'bg-red-500 text-white' : scoreEngraissement.color === 'orange' ? 'bg-orange-500 text-white' : 'bg-yellow-400 text-black'}`}>
+                    ⚖️ {scoreEngraissement.label}
+                  </span>
+                  <span className="text-xs text-gray-500">Score: {scoreEngraissement.score}/7</span>
+                </div>
+                <ul className="space-y-1">
+                  {scoreEngraissement.reasons.map((r, i) => (
+                    <li key={i} className="text-xs text-gray-700 flex items-center gap-1">
+                      <span className="text-gray-400">•</span> {r}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </>
         )}
 
@@ -522,6 +614,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               ) : (
                 <p className="text-sm text-gray-400 italic mb-2">Aucune pesée enregistrée</p>
               )}
+
+              <PoidsCurve pesees={pesees} gmqGlobal={gmqGlobal} />
 
               <div className="mt-3">
                 <PeseeInlineForm nutrav={animal.nutrav} />
