@@ -23,7 +23,8 @@ export async function POST() {
     // Calculate alerts
     const alerts: string[] = [];
 
-    const [vachesAvecSaillies, animaux, velagesSemaine, veauxABoucler, genissesArapatrier] =
+    const [vachesAvecSaillies, animaux, velagesSemaine, veauxABoucler, genissesArapatrier,
+           surveillanceActive, cryptoRotavecCount, bolusCount] =
       await Promise.all([
         prisma.animal.findMany({
           where: { statut: "ACTIF", sexbov: "F", estGenisse: false },
@@ -50,6 +51,27 @@ export async function POST() {
             etat: { in: ["VERT", "ROSE"] },
             dateVelagePrevue: { gte: addDays(now, 30), lte: addDays(now, 90) },
             saillie: { animal: { statut: "ACTIF", velagesVache: { none: {} } } },
+          },
+        }),
+        // Surveillance active: gestation ≥ 270 jours (9 mois), vélage dans les 21 prochains jours
+        prisma.gestation.count({
+          where: {
+            etat: { in: ["VERT", "ROSE"] },
+            dateVelagePrevue: { gte: now, lte: addDays(now, 21) },
+          },
+        }),
+        // Crypto/Rotavec à faire (fenêtre J-21 à J-90, simplified count)
+        prisma.gestation.count({
+          where: {
+            etat: { in: ["VERT", "ROSE"] },
+            dateVelagePrevue: { gte: addDays(now, 21), lte: addDays(now, 90) },
+          },
+        }),
+        // Bolus à donner (fenêtre J-21 à J-45)
+        prisma.gestation.count({
+          where: {
+            etat: { in: ["VERT", "ROSE"] },
+            dateVelagePrevue: { gte: addDays(now, 21), lte: addDays(now, 45) },
           },
         }),
       ]);
@@ -83,6 +105,8 @@ export async function POST() {
       alerts.push(`🔴 ${videsEnRetard} vache${videsEnRetard > 1 ? "s" : ""} vide${videsEnRetard > 1 ? "s" : ""} en retard`);
     if (aEchographier > 0)
       alerts.push(`🟡 ${aEchographier} à échographier`);
+    if (surveillanceActive > 0)
+      alerts.push(`🔔 ${surveillanceActive} vache${surveillanceActive > 1 ? "s" : ""} en surveillance active (vélage <21j)`);
     if (velagesSemaine > 0)
       alerts.push(`🍼 ${velagesSemaine} vélage${velagesSemaine > 1 ? "s" : ""} cette semaine`);
     if (veauxABoucler > 0)
@@ -91,6 +115,10 @@ export async function POST() {
       alerts.push(`💉 ${veauxAVacciner} vaccin${veauxAVacciner > 1 ? "s" : ""} en retard`);
     if (genissesArapatrier > 0)
       alerts.push(`⚠️ ${genissesArapatrier} génisse${genissesArapatrier > 1 ? "s" : ""} à rapatrier`);
+    if (cryptoRotavecCount > 0)
+      alerts.push(`💊 ${cryptoRotavecCount} Crypto/Rotavec pré-vélage`);
+    if (bolusCount > 0)
+      alerts.push(`🔵 ${bolusCount} bolus pré-vélage`);
 
     if (alerts.length === 0) {
       return NextResponse.json({ sent: 0, reason: "no_alerts" });

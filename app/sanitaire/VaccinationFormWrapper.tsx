@@ -13,6 +13,8 @@ const VACCINS = [
   "MHE",
   "CRYPTO",
   "ROTAVEC",
+  "BOLUS",
+  "METRABOL",
   "IBR",
   "AUTRE",
 ];

@@ -30,6 +30,7 @@ import EditAnimalDrawer from "./EditAnimalDrawer";
 import CowIcon from "@/components/CowIcon";
 import PeseeInlineForm from "./PeseeInlineForm";
 import SevrageButton from "./SevrageButton";
+import QuickActionsBar from "./QuickActionsBar";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -162,6 +163,13 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
           />
         </div>
       </div>
+
+      {/* Quick actions */}
+      <QuickActionsBar
+        animalId={animal.id}
+        isFemelle={isFemelle}
+        isActif={animal.statut === "ACTIF"}
+      />
 
       {/* Onglets */}
       <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 mt-3">
