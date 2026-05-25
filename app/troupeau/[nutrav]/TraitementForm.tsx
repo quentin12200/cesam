@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Save, X } from "lucide-react";
+import { Save, X, ScanLine, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface Medicament {
   id: string;
@@ -19,10 +19,23 @@ interface Props {
   onClose: () => void;
 }
 
+interface ScanResult {
+  medicamentNom: string | null;
+  voie: string | null;
+  dose: number | null;
+  uniteDosage: string | null;
+  dureeJours: number | null;
+  dateDebut: string | null;
+  veterinaire: string | null;
+  motif: string | null;
+}
+
 const today = new Date().toISOString().slice(0, 10);
 
 export default function TraitementForm({ animalId, onClose }: Props) {
   const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
+
   const [medicaments, setMedicaments] = useState<Medicament[]>([]);
   const [medicamentId, setMedicamentId] = useState("");
   const [medicamentNomLibre, setMedicamentNomLibre] = useState("");
@@ -34,6 +47,10 @@ export default function TraitementForm({ animalId, onClose }: Props) {
   const [motif, setMotif] = useState("");
   const [veterinaire, setVeterinaire] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [scanning, setScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [scanMsg, setScanMsg] = useState("");
 
   useEffect(() => {
     fetch("/api/medicaments")
@@ -52,9 +69,67 @@ export default function TraitementForm({ animalId, onClose }: Props) {
     }
   }
 
-  const effectiveNom = medicamentId
-    ? (selectedMed?.nom ?? "")
-    : medicamentNomLibre;
+  const effectiveNom = medicamentId ? (selectedMed?.nom ?? "") : medicamentNomLibre;
+
+  function applyScanned(result: ScanResult) {
+    if (result.medicamentNom) {
+      // Try to match existing medicament
+      const match = medicaments.find(
+        (m) =>
+          m.nom.toLowerCase().includes(result.medicamentNom!.toLowerCase()) ||
+          result.medicamentNom!.toLowerCase().includes(m.nom.toLowerCase())
+      );
+      if (match) {
+        onMedChange(match.id);
+      } else {
+        setMedicamentId("");
+        setMedicamentNomLibre(result.medicamentNom);
+      }
+    }
+    if (result.voie) setVoie(result.voie);
+    if (result.dose != null) setDose(String(result.dose));
+    if (result.uniteDosage) setUniteDosage(result.uniteDosage);
+    if (result.dureeJours != null) setDureeJours(String(result.dureeJours));
+    if (result.dateDebut) setDateDebut(result.dateDebut);
+    if (result.veterinaire) setVeterinaire(result.veterinaire);
+    if (result.motif) setMotif(result.motif);
+  }
+
+  async function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    setScanning(true);
+    setScanStatus("idle");
+    setScanMsg("");
+
+    try {
+      const base64 = await fileToBase64(file);
+      const mimeType = file.type || "image/jpeg";
+
+      const res = await fetch("/api/scan-ordonnance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64, mimeType }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Erreur serveur");
+      }
+
+      const result: ScanResult = await res.json();
+      applyScanned(result);
+      setScanStatus("ok");
+      setScanMsg("Ordonnance analysée — vérifiez les champs ci-dessous");
+    } catch (err) {
+      setScanStatus("error");
+      setScanMsg(err instanceof Error ? err.message : "Erreur lors du scan");
+    } finally {
+      setScanning(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,10 +160,42 @@ export default function TraitementForm({ animalId, onClose }: Props) {
     <form onSubmit={submit} className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-blue-800">Nouveau traitement</span>
-        <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Scanner button */}
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={scanning}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+            title="Scanner une ordonnance (photo ou PDF)"
+          >
+            {scanning ? <Loader2 size={13} className="animate-spin" /> : <ScanLine size={13} />}
+            {scanning ? "Analyse..." : "Scanner ordonnance"}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            onChange={handleFilePick}
+          />
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={16} />
+          </button>
+        </div>
       </div>
+
+      {/* Scan status banner */}
+      {scanStatus !== "idle" && (
+        <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${
+          scanStatus === "ok"
+            ? "bg-green-50 border-green-200 text-green-800"
+            : "bg-red-50 border-red-200 text-red-700"
+        }`}>
+          {scanStatus === "ok" ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+          {scanMsg}
+        </div>
+      )}
 
       <div>
         <label className="text-xs text-gray-500 block mb-1">Médicament *</label>
@@ -167,4 +274,17 @@ export default function TraitementForm({ animalId, onClose }: Props) {
       </div>
     </form>
   );
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Strip the data:...;base64, prefix
+      resolve(result.split(",")[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
