@@ -55,6 +55,7 @@ model Animal {
   parages         Parage[]
   complementsAlim ComplementAlim[]
   chaleurs        Chaleur[]
+  traitements     Traitement[]
 
   notes         String?
 
@@ -297,4 +298,40 @@ model ProtocoleVaccin {
   actif              Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+model Medicament {
+  id                  String       @id @default(cuid())
+  nom                 String       @unique
+  dci                 String?
+  categorie           String       @default("AUTRE")
+  voie                String?
+  dosagePourKg        Float?
+  uniteDosage         String?      @default("ml")
+  delaiAttenteViandeJ Int?
+  prescriptionRequise Boolean      @default(false)
+  actif               Boolean      @default(true)
+  traitements         Traitement[]
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+}
+
+model Traitement {
+  id            String      @id @default(cuid())
+  animalId      String
+  animal        Animal      @relation(fields: [animalId], references: [id])
+  medicamentId  String?
+  medicament    Medicament? @relation(fields: [medicamentId], references: [id])
+  medicamentNom String
+  dateDebut     DateTime
+  dureeJours    Int         @default(1)
+  voie          String?
+  dose          Float?
+  uniteDosage   String?
+  motif         String?
+  veterinaire   String?
+  statut        String      @default("EN_COURS")
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }

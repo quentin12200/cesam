@@ -22,6 +22,7 @@ import {
   Activity,
   CalendarCheck,
   MilkOff,
+  Pill,
 } from "lucide-react";
 
 async function getDashboardData() {
@@ -601,6 +602,16 @@ export default async function Dashboard() {
         actionLabel="Tarie"
         color="blue"
       />
+
+      {/* Accès rapide Pharmacie */}
+      <Link href="/pharmacie"
+        className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-200 hover:bg-blue-100 transition-colors">
+        <div className="flex items-center gap-2">
+          <Pill size={18} className="text-blue-600" />
+          <span className="text-sm font-medium text-blue-800">Pharmacie — traitements &amp; médicaments</span>
+        </div>
+        <span className="text-xs text-blue-600">→</span>
+      </Link>
 
       {/* Stats rapides */}
       <Collapsible title="Stats rapides" defaultOpen={true}>
