@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { differenceInDays } from "date-fns";
-import { getVaccinProtocolSteps } from "@/lib/utils";
+import { getVaccinProtocolSteps, type ProtocoleVaccinConfig } from "@/lib/utils";
 import VaccinationFormWrapper from "./VaccinationFormWrapper";
 import VaccineQuickButton from "./VaccineQuickButton";
 
@@ -78,13 +78,15 @@ interface Props {
   bolus: BolusItem[];
   toutesVaches: VacheVaccinsItem[];
   vaccinationsRecentes: RecentItem[];
+  protocoles: ProtocoleVaccinConfig[];
 }
 
 // ── Statut vaccinal global pour un veau ───────────────────────────────────────
-function getStatutVaccinal(veau: VeauProtocolItem): "complet" | "en_cours" | "a_faire" {
+function getStatutVaccinal(veau: VeauProtocolItem, protocoles: ProtocoleVaccinConfig[]): "complet" | "en_cours" | "a_faire" {
   const steps = getVaccinProtocolSteps(
     new Date(veau.danais),
-    veau.vaccinations.map((v) => ({ vaccin: v.vaccin, date: new Date(v.date) }))
+    veau.vaccinations.map((v) => ({ vaccin: v.vaccin, date: new Date(v.date) })),
+    protocoles
   );
   const done = steps.filter((s) => s.status === "done").length;
   const due = steps.filter((s) => s.status === "due").length;
@@ -318,12 +320,12 @@ function RecentSection({ items, onRefresh }: { items: RecentItem[]; onRefresh: (
 }
 
 // ── Onglet Vaccins Veaux ──────────────────────────────────────────────────────
-function VaccinsVeauxTab({ tousVeaux, onRefresh }: { tousVeaux: VeauProtocolItem[]; onRefresh: () => void }) {
+function VaccinsVeauxTab({ tousVeaux, protocoles, onRefresh }: { tousVeaux: VeauProtocolItem[]; protocoles: ProtocoleVaccinConfig[]; onRefresh: () => void }) {
   const [filtre, setFiltre] = useState<"tous" | "a_faire" | "en_cours" | "complet">("tous");
 
   const veauxAvecStatut = tousVeaux.map((v) => ({
     ...v,
-    statut: getStatutVaccinal(v),
+    statut: getStatutVaccinal(v, protocoles),
   }));
 
   const filtered = filtre === "tous" ? veauxAvecStatut : veauxAvecStatut.filter((v) => v.statut === filtre);
@@ -366,7 +368,8 @@ function VaccinsVeauxTab({ tousVeaux, onRefresh }: { tousVeaux: VeauProtocolItem
         {filtered.map((veau) => {
           const steps = getVaccinProtocolSteps(
             new Date(veau.danais),
-            veau.vaccinations.map((v) => ({ vaccin: v.vaccin, date: new Date(v.date) }))
+            veau.vaccinations.map((v) => ({ vaccin: v.vaccin, date: new Date(v.date) })),
+            protocoles
           );
           const urgentSteps = steps.filter((s) => s.status === "due" && s.isUrgent);
           const dueSteps = steps.filter((s) => s.status === "due");
@@ -499,7 +502,7 @@ function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVacc
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes }: Props) {
+export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes, protocoles }: Props) {
   const router = useRouter();
   const [onglet, setOnglet] = useState<"urgent" | "veaux" | "vaches">("urgent");
   const [viewMode, setViewMode] = useState<"animal" | "traitement">("animal");
@@ -641,7 +644,7 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
 
       {/* Contenu des onglets Vaccins */}
       {onglet === "veaux" && (
-        <VaccinsVeauxTab tousVeaux={tousVeaux} onRefresh={() => router.refresh()} />
+        <VaccinsVeauxTab tousVeaux={tousVeaux} protocoles={protocoles} onRefresh={() => router.refresh()} />
       )}
       {onglet === "vaches" && (
         <VaccinsVachesTab toutesVaches={toutesVaches} onRefresh={() => router.refresh()} />

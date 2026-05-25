@@ -11,6 +11,8 @@ import {
   getCategorieLabel,
   getCategorieColor,
   getCategorie,
+  DEFAULT_PROTOCOLES,
+  type ProtocoleVaccinConfig,
 } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -45,6 +47,16 @@ interface PageProps {
 
 async function getGroupes() {
   return prisma.groupe.findMany({ orderBy: { nom: "asc" } });
+}
+
+async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
+  try {
+    const rows = await prisma.protocoleVaccin.findMany({ orderBy: { ordre: "asc" } });
+    if (rows.length > 0) return rows;
+  } catch {
+    // table may not exist yet
+  }
+  return DEFAULT_PROTOCOLES;
 }
 
 async function getAnimal(nutrav: string) {
@@ -84,7 +96,7 @@ async function getAnimal(nutrav: string) {
 export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const { nutrav } = await params;
   const { onglet = "identite" } = await searchParams;
-  const [animal, groupes] = await Promise.all([getAnimal(nutrav), getGroupes()]);
+  const [animal, groupes, protocoles] = await Promise.all([getAnimal(nutrav), getGroupes(), getProtocoles()]);
 
   if (!animal) notFound();
 
@@ -123,7 +135,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     ? Math.round(ivvList.reduce((s, x) => s + x.ivv, 0) / ivvList.length)
     : null;
 
-  const protocolSteps = getVaccinProtocolSteps(animal.danais, animal.vaccinations);
+  const protocolSteps = getVaccinProtocolSteps(animal.danais, animal.vaccinations, protocoles);
   const mheStatus = isMheVendable(animal.vaccinations);
   const perePresentExploitation = animal.taureau?.present === true;
 

@@ -1,10 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
-import { getVaccinsManquants, formatDate, formatAge } from "@/lib/utils";
+import { getVaccinsManquants, formatDate, formatAge, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
 import { differenceInDays, subDays } from "date-fns";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Settings } from "lucide-react";
 import SanitaireClient, {
   type VeauItem,
   type CryptoItem,
@@ -13,7 +13,17 @@ import SanitaireClient, {
   type VeauProtocolItem,
 } from "./SanitaireClient";
 
-async function getSanitaireData() {
+async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
+  try {
+    const rows = await prisma.protocoleVaccin.findMany({ orderBy: { ordre: "asc" } });
+    if (rows.length > 0) return rows;
+  } catch {
+    // table may not exist yet during first deploy
+  }
+  return DEFAULT_PROTOCOLES;
+}
+
+async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
   const now = new Date();
 
   const [animaux, vaccinationsRecentes, vachesAvecGestation] = await Promise.all([
@@ -47,7 +57,8 @@ async function getSanitaireData() {
       ageLabel: formatAge(animal.danais),
       vaccinsManquants: getVaccinsManquants(
         animal.danais,
-        animal.vaccinations.map((v) => ({ vaccin: v.vaccin, date: v.date }))
+        animal.vaccinations.map((v) => ({ vaccin: v.vaccin, date: v.date })),
+        protocoles
       ),
     }))
     .filter((a) => a.vaccinsManquants.length > 0)
@@ -163,7 +174,8 @@ async function getSanitaireData() {
 }
 
 export default async function SanitairePage() {
-  const { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes } = await getSanitaireData();
+  const protocoles = await getProtocoles();
+  const { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes } = await getSanitaireData(protocoles);
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto pb-24">
@@ -172,6 +184,13 @@ export default async function SanitairePage() {
           <ArrowLeft size={18} />
         </Link>
         <h2 className="text-xl font-bold text-gray-800">Sanitaire</h2>
+        <Link
+          href="/config/protocoles"
+          className="ml-auto p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
+          title="Configurer les protocoles"
+        >
+          <Settings size={18} />
+        </Link>
       </div>
 
       <SanitaireClient
@@ -181,6 +200,7 @@ export default async function SanitairePage() {
         bolus={bolus}
         toutesVaches={toutesVaches}
         vaccinationsRecentes={recentes}
+        protocoles={protocoles}
       />
     </div>
   );
