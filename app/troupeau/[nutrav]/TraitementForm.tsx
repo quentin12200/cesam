@@ -17,6 +17,7 @@ interface Medicament {
 interface Props {
   animalId: string;
   onClose: () => void;
+  initialScan?: ScanResult;
 }
 
 interface ScanResult {
@@ -32,7 +33,7 @@ interface ScanResult {
 
 const today = new Date().toISOString().slice(0, 10);
 
-export default function TraitementForm({ animalId, onClose }: Props) {
+export default function TraitementForm({ animalId, onClose, initialScan }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -55,10 +56,44 @@ export default function TraitementForm({ animalId, onClose }: Props) {
   useEffect(() => {
     fetch("/api/medicaments")
       .then((r) => r.json())
-      .then((data: Medicament[]) => setMedicaments(data.filter((m) => (m as unknown as { actif: boolean }).actif)));
+      .then((data: Medicament[]) => {
+        const active = data.filter((m) => (m as unknown as { actif: boolean }).actif);
+        setMedicaments(active);
+        if (initialScan) {
+          applyScannedWithMeds(active, initialScan);
+          setScanStatus("ok");
+          setScanMsg("Ordonnance analysée — vérifiez les champs ci-dessous");
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedMed = medicaments.find((m) => m.id === medicamentId);
+
+  function applyScannedWithMeds(meds: Medicament[], result: ScanResult) {
+    if (result.medicamentNom) {
+      const match = meds.find(
+        (m) =>
+          m.nom.toLowerCase().includes(result.medicamentNom!.toLowerCase()) ||
+          result.medicamentNom!.toLowerCase().includes(m.nom.toLowerCase())
+      );
+      if (match) {
+        setMedicamentId(match.id);
+        setVoie(match.voie ?? "");
+        setUniteDosage(match.uniteDosage ?? "ml");
+      } else {
+        setMedicamentId("");
+        setMedicamentNomLibre(result.medicamentNom);
+      }
+    }
+    if (result.voie) setVoie(result.voie);
+    if (result.dose != null) setDose(String(result.dose));
+    if (result.uniteDosage) setUniteDosage(result.uniteDosage);
+    if (result.dureeJours != null) setDureeJours(String(result.dureeJours));
+    if (result.dateDebut) setDateDebut(result.dateDebut);
+    if (result.veterinaire) setVeterinaire(result.veterinaire);
+    if (result.motif) setMotif(result.motif);
+  }
 
   function onMedChange(id: string) {
     setMedicamentId(id);
