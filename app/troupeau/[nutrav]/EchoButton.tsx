@@ -3,15 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ScanLine } from "lucide-react";
+import EchoModal from "./EchoModal";
 
 interface Props {
   nutrav: string;
   aEchographier: boolean;
+  saillieId?: string | null;
+  saillieDate?: string | null;
 }
 
-export default function EchoButton({ nutrav, aEchographier }: Props) {
+export default function EchoButton({ nutrav, aEchographier, saillieId, saillieDate }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   async function toggle() {
     setLoading(true);
@@ -27,6 +31,31 @@ export default function EchoButton({ nutrav, aEchographier }: Props) {
     }
   }
 
+  // Animal marqué à écho ET a une saillie active → bouton "Saisir l'écho"
+  if (aEchographier && saillieId && saillieDate) {
+    return (
+      <>
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-1.5 text-xs rounded-lg px-2.5 py-1.5 border font-medium transition-colors shadow-sm bg-yellow-400 border-yellow-500 text-yellow-900 hover:bg-yellow-500 animate-pulse"
+        >
+          <ScanLine size={12} />
+          Saisir l&apos;écho
+        </button>
+        {showModal && (
+          <EchoModal
+            nutrav={nutrav}
+            saillieId={saillieId}
+            saillieDate={saillieDate}
+            onClose={() => setShowModal(false)}
+            onDone={() => { setShowModal(false); router.refresh(); }}
+          />
+        )}
+      </>
+    );
+  }
+
+  // Animal marqué à écho mais sans saillie (ou pas encore marqué) → simple toggle
   return (
     <button
       onClick={toggle}

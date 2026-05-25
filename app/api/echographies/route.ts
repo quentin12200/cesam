@@ -43,33 +43,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (saillie.gestation) {
-      const gestation = await prisma.gestation.update({
-        where: { id: saillie.gestation.id },
-        data: {
-          etat: nouvelEtat,
-          dateEcho: new Date(date),
-          resultatEcho: resultat,
-          joursGestation: joursGestationFinal ?? null,
-          dateVelagePrevue: dateVelagePrevue ?? null,
-          updatedAt: new Date(),
-        },
-      });
-      return NextResponse.json(gestation, { status: 200 });
-    } else {
-      const gestation = await prisma.gestation.create({
-        data: {
-          saillieId,
-          etat: nouvelEtat,
-          dateEcho: new Date(date),
-          resultatEcho: resultat,
-          joursGestation: joursGestationFinal ?? null,
-          dateVelagePrevue: dateVelagePrevue ?? null,
-          updatedAt: new Date(),
-        },
-      });
-      return NextResponse.json(gestation, { status: 201 });
-    }
+    const gestationData = {
+      etat: nouvelEtat,
+      dateEcho: new Date(date),
+      resultatEcho: resultat,
+      joursGestation: joursGestationFinal ?? null,
+      dateVelagePrevue: dateVelagePrevue ?? null,
+      updatedAt: new Date(),
+    };
+
+    const [gestation] = await prisma.$transaction([
+      saillie.gestation
+        ? prisma.gestation.update({ where: { id: saillie.gestation.id }, data: gestationData })
+        : prisma.gestation.create({ data: { saillieId, ...gestationData } }),
+      // Clear the "à échographier" flag automatically
+      prisma.animal.update({
+        where: { id: saillie.animalId },
+        data: { aEchographier: false },
+      }),
+    ]);
+
+    return NextResponse.json(gestation, { status: saillie.gestation ? 200 : 201 });
   } catch (err) {
     console.error("POST /api/echographies error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

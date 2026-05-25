@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Search, Plus, SlidersHorizontal, ArrowLeft } from "lucide-react";
 import { addDays, differenceInMonths } from "date-fns";
 import NouvelAnimalForm from "./NouvelAnimalForm";
+import GroupeCreateButton from "./GroupeCreateButton";
 
 interface PageProps {
   searchParams: Promise<{
@@ -374,10 +375,10 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
           )}
 
           {/* Groupe */}
-          {groupes.length > 0 && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 mb-1.5">Groupe / Lot</p>
-              <div className="flex gap-1.5 flex-wrap">
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-1.5">Groupe / Lot</p>
+            {groupes.length > 0 && (
+              <div className="flex gap-1.5 flex-wrap mb-1">
                 <Link
                   href={buildUrl({ groupe: undefined, page: "1" })}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
@@ -400,8 +401,9 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                   </Link>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+            <GroupeCreateButton />
+          </div>
 
           {/* Statut */}
           <div>
