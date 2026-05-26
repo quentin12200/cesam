@@ -3,9 +3,10 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
-import { Wifi, Baby, WifiOff, ArrowLeft } from "lucide-react";
+import { Baby, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import VelageFormWrapper from "./VelageFormWrapper";
+import CapteurManager from "./CapteurManager";
 
 async function getVelageData() {
   const now = new Date();
@@ -53,8 +54,6 @@ export default async function VelagePage() {
   const { capteurs, gestationsPrevues, velagesRecents } = await getVelageData();
   const now = new Date();
 
-  const capteursActifs = capteurs.filter((c) => c.actif);
-
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mt-2">
@@ -64,44 +63,13 @@ export default async function VelagePage() {
         <h2 className="text-xl font-bold text-gray-800">Vélage</h2>
       </div>
 
-      {/* Capteurs */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Wifi size={16} className="text-green-700" />
-          Capteurs vélage
-          <span className="text-xs text-gray-400 ml-auto">{capteursActifs.length}/4 actifs</span>
-        </h3>
-        <div className="grid grid-cols-2 gap-3">
-          {capteurs.map((capteur) => (
-            <div
-              key={capteur.id}
-              className={`p-3 rounded-xl border-2 ${capteur.actif ? "border-green-400 bg-green-50" : "border-gray-200 bg-gray-50"}`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-gray-700">Capteur {capteur.numero}</span>
-                {capteur.actif ? (
-                  <Wifi size={16} className="text-green-600" />
-                ) : (
-                  <WifiOff size={16} className="text-gray-400" />
-                )}
-              </div>
-              {capteur.actif ? (
-                <>
-                  <div className="text-sm font-medium text-green-800">{capteur.animalNom ?? capteur.animalNutrav ?? "Animal inconnu"}</div>
-                  {capteur.animalNutrav && capteur.animalNom && (
-                    <div className="text-xs text-green-600 font-mono">{capteur.animalNutrav}</div>
-                  )}
-                  {capteur.dateAttribution && (
-                    <div className="text-xs text-gray-400 mt-1">Depuis le {formatDate(capteur.dateAttribution)}</div>
-                  )}
-                </>
-              ) : (
-                <div className="text-sm text-gray-400">Disponible</div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Capteurs — composant interactif */}
+      <CapteurManager
+        capteurs={capteurs.map((c) => ({
+          ...c,
+          dateAttribution: c.dateAttribution?.toISOString() ?? null,
+        }))}
+      />
 
       {/* Formulaire vélage rapide */}
       <VelageFormWrapper />

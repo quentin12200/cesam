@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CAUSES_MORTALITE, CAUSES_MORTALITE_LABELS } from "@/lib/utils";
 
@@ -38,6 +38,18 @@ export default function SortieForm({ animaux, annee }: Props) {
   const [notes, setNotes] = useState("");
   const [causeMortalite, setCauseMortalite] = useState("");
   const [causeMortaliteCustom, setCauseMortaliteCustom] = useState("");
+  const [causesPersonnalisees, setCausesPersonnalisees] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (type !== "MORT") return;
+    fetch("/api/sorties/causes")
+      .then((r) => r.json())
+      .then((causes: string[]) => {
+        const predef = new Set<string>(CAUSES_MORTALITE);
+        setCausesPersonnalisees(causes.filter((c) => !predef.has(c)));
+      })
+      .catch(() => {});
+  }, [type]);
 
   const prixCalc =
     prixKilo && poids
@@ -147,7 +159,7 @@ export default function SortieForm({ animaux, annee }: Props) {
             Cause de mortalité *
           </label>
           <div className="grid grid-cols-2 gap-2 mb-2">
-            {CAUSES_MORTALITE.map((cause) => (
+            {CAUSES_MORTALITE.filter((c) => c !== "AUTRE").map((cause) => (
               <button
                 key={cause}
                 type="button"
@@ -161,6 +173,31 @@ export default function SortieForm({ animaux, annee }: Props) {
                 {CAUSES_MORTALITE_LABELS[cause]}
               </button>
             ))}
+            {causesPersonnalisees.map((cause) => (
+              <button
+                key={cause}
+                type="button"
+                onClick={() => setCauseMortalite(cause)}
+                className={`p-2 rounded-lg border text-sm font-medium transition-all ${
+                  causeMortalite === cause
+                    ? "border-red-600 bg-red-50 text-red-800"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                {cause}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setCauseMortalite("AUTRE")}
+              className={`p-2 rounded-lg border text-sm font-medium transition-all ${
+                causeMortalite === "AUTRE"
+                  ? "border-red-600 bg-red-50 text-red-800"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+              }`}
+            >
+              Autre…
+            </button>
           </div>
           {causeMortalite === "AUTRE" && (
             <input
