@@ -25,6 +25,7 @@ interface PageProps {
     categorie?: string;
     tarie?: string;
     repro?: string;
+    sanitaire?: string;
     groupe?: string;
     tri?: string;
     nouveau?: string;
@@ -41,10 +42,12 @@ async function getAnimaux(params: {
   page?: number;
   categorie?: string;
   tarie?: string;
+  repro?: string;
+  sanitaire?: string;
   groupe?: string;
   tri?: string;
 }) {
-  const { sexe, statut, q, page = 1, categorie, tarie, groupe, tri } = params;
+  const { sexe, statut, q, page = 1, categorie, tarie, repro, sanitaire, groupe, tri } = params;
   const now = new Date();
   const where: Prisma.AnimalWhereInput = {};
 
@@ -64,6 +67,26 @@ async function getAnimaux(params: {
   if (tarie === "non") where.tarieFaite = false;
 
   if (groupe) where.groupeId = groupe;
+
+  // Filtre statut reproduction
+  if (repro === "PLEINE") {
+    where.sexbov = "F";
+    where.estGenisse = false;
+    where.saillies = { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } };
+  } else if (repro === "VIDE") {
+    where.sexbov = "F";
+    where.estGenisse = false;
+    where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } } };
+  } else if (repro === "A_ECO") {
+    where.aEchographier = true;
+  }
+
+  // Filtre statut sanitaire
+  if (sanitaire === "PROBLEME") {
+    where.evenements = { some: { resolu: false } };
+  } else if (sanitaire === "OK") {
+    where.evenements = { none: { resolu: false } };
+  }
 
   // Filtre catégorie
   if (categorie && categorie !== "TOUS") {
@@ -165,13 +188,14 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const categorie = params.categorie;
   const tarie = params.tarie;
   const repro = params.repro;
+  const sanitaire = params.sanitaire;
   const groupe = params.groupe;
   const tri = params.tri;
   const showForm = params.nouveau === "1";
   const showFiltres = params.filtres === "1";
 
   const { animaux, total, pages, groupes } = await getAnimaux({
-    sexe, statut, q, page, categorie, tarie, groupe, tri,
+    sexe, statut, q, page, categorie, tarie, repro, sanitaire, groupe, tri,
   });
 
   function buildUrl(overrides: Record<string, string | undefined>) {
@@ -183,6 +207,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     if (categorie) p.categorie = categorie;
     if (tarie) p.tarie = tarie;
     if (repro) p.repro = repro;
+    if (sanitaire) p.sanitaire = sanitaire;
     if (groupe) p.groupe = groupe;
     if (tri) p.tri = tri;
     if (showFiltres) p.filtres = "1";
@@ -193,7 +218,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   }
 
   const activeFiltersCount = [
-    sexe, tarie, repro, groupe,
+    sexe, tarie, repro, sanitaire, groupe,
     categorie && categorie !== "TOUS" ? categorie : undefined,
   ].filter(Boolean).length;
 
@@ -374,6 +399,57 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             </div>
           )}
 
+          {/* Statut reproduction */}
+          {sexe !== "M" && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-1.5">Statut reproduction</p>
+              <div className="flex gap-1.5 flex-wrap">
+                {[
+                  { value: undefined, label: "Toutes" },
+                  { value: "PLEINE", label: "Pleines" },
+                  { value: "VIDE", label: "Vides" },
+                  { value: "A_ECO", label: "À écho" },
+                ].map((opt) => (
+                  <Link
+                    key={opt.label}
+                    href={buildUrl({ repro: opt.value, page: "1" })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                      repro === opt.value || (!repro && !opt.value)
+                        ? "bg-green-700 text-white border-green-700"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    {opt.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Statut sanitaire */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-1.5">Santé</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {[
+                { value: undefined, label: "Tous" },
+                { value: "PROBLEME", label: "En traitement" },
+                { value: "OK", label: "Sains" },
+              ].map((opt) => (
+                <Link
+                  key={opt.label}
+                  href={buildUrl({ sanitaire: opt.value, page: "1" })}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    sanitaire === opt.value || (!sanitaire && !opt.value)
+                      ? "bg-green-700 text-white border-green-700"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {opt.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
           {/* Groupe */}
           <div>
             <p className="text-xs font-medium text-gray-500 mb-1.5">Groupe / Lot</p>
@@ -461,6 +537,8 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         {statut && <input type="hidden" name="statut" value={statut} />}
         {categorie && <input type="hidden" name="categorie" value={categorie} />}
         {tarie && <input type="hidden" name="tarie" value={tarie} />}
+        {repro && <input type="hidden" name="repro" value={repro} />}
+        {sanitaire && <input type="hidden" name="sanitaire" value={sanitaire} />}
         {groupe && <input type="hidden" name="groupe" value={groupe} />}
         {tri && <input type="hidden" name="tri" value={tri} />}
         {showFiltres && <input type="hidden" name="filtres" value="1" />}
