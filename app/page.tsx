@@ -20,7 +20,6 @@ import {
   Tag,
   Scissors,
   Activity,
-  CalendarCheck,
   MilkOff,
   Pill,
 } from "lucide-react";
@@ -45,19 +44,12 @@ async function getDashboardData() {
     velagesPrevus,
     vaccinationPreVelage,
     bolusPreVelage,
-    // Checklist: veaux à boucler (with details)
     veauxABouclerList,
-    // Checklist: veaux à sevrer ≥6 mois
     veauxASevrerList,
-    // Collapsible: presque sevrables (5-6 mois)
     veauxPresqueSevrables,
-    // Checklist: vaches à tarir (calving in 40-70 days)
     vachesATarirList,
-    // Génisses primipares à rapatrier (calving in 30-90 days, jamais vêlé)
     genissesArapatrier,
-    // Vaches avec vélage dans les 23 prochains jours (à poser capteur)
     vachesACapteur,
-    // Composition
     nbVaches,
     nbGenissesBabies,
     nbGenissesMoyennes,
@@ -101,14 +93,12 @@ async function getDashboardData() {
         dateVelagePrevue: { gte: twentyOneDaysLater, lte: ninetyDaysLater },
       },
     }),
-    // Bolus / Métrabol pré-vélage (J-21 à J-45)
     prisma.gestation.count({
       where: {
         etat: { in: ["VERT", "ROSE"] },
         dateVelagePrevue: { gte: twentyOneDaysLater, lte: addDays(now, 45) },
       },
     }),
-    // Veaux à boucler avec infos mère
     prisma.animal.findMany({
       where: {
         statut: "ACTIF",
@@ -125,7 +115,6 @@ async function getDashboardData() {
       },
       orderBy: { danais: "asc" },
     }),
-    // Veaux à sevrer: ≥6 mois, pas encore sevrés
     prisma.animal.findMany({
       where: {
         statut: "ACTIF",
@@ -143,7 +132,6 @@ async function getDashboardData() {
       },
       orderBy: { danais: "asc" },
     }),
-    // Presque sevrables: 5 à 6 mois
     prisma.animal.findMany({
       where: {
         statut: "ACTIF",
@@ -161,7 +149,6 @@ async function getDashboardData() {
       },
       orderBy: { danais: "asc" },
     }),
-    // Vaches à tarir: vélage prévu dans 40-70 jours, pas encore tarées
     prisma.gestation.findMany({
       where: {
         etat: { in: ["VERT", "ROSE"] },
@@ -180,7 +167,6 @@ async function getDashboardData() {
       },
       orderBy: { dateVelagePrevue: "asc" },
     }),
-    // Génisses primipares à rapatrier (calving en 30-90j, aucun vélage antérieur)
     prisma.gestation.findMany({
       where: {
         etat: { in: ["VERT", "ROSE"] },
@@ -195,7 +181,6 @@ async function getDashboardData() {
       },
       orderBy: { dateVelagePrevue: "asc" },
     }),
-    // Vaches avec vélage dans les 23 prochains jours (pose capteur)
     prisma.gestation.findMany({
       where: {
         etat: { in: ["VERT", "ROSE"] },
@@ -207,7 +192,6 @@ async function getDashboardData() {
       },
       orderBy: { dateVelagePrevue: "asc" },
     }),
-    // Composition du troupeau
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: false } }),
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: true, danais: { gte: addDays(now, -365) } } }),
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: true, danais: { gte: addDays(now, -730), lt: addDays(now, -365) } } }),
@@ -250,10 +234,35 @@ async function getDashboardData() {
     }
   }
 
+  // Statistiques mortalité de l'année en cours
+  const debutAnnee = new Date(`${now.getFullYear()}-01-01`);
+  const mortsAnnee = await prisma.sortie.findMany({
+    where: { type: "MORT", date: { gte: debutAnnee } },
+    select: { causeMortalite: true },
+  });
+  const mortsCount = mortsAnnee.length;
+  const causeMapMort = new Map<string, number>();
+  for (const m of mortsAnnee) {
+    if (m.causeMortalite) {
+      causeMapMort.set(m.causeMortalite, (causeMapMort.get(m.causeMortalite) ?? 0) + 1);
+    }
+  }
+  const mortsParCause = [...causeMapMort.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([cause, count]) => ({
+      cause,
+      count,
+      pct: mortsCount > 0 ? Math.round((count / mortsCount) * 100) : 0,
+    }));
+  const mortsAnneeSansProbleme = mortsAnnee.filter((m) => !m.causeMortalite).length;
+  const tauxMortaliteAnnee =
+    (vachesActives + mortsCount) > 0
+      ? Math.round((mortsCount / (vachesActives + mortsCount)) * 100)
+      : 0;
+
   const pctPleine =
     vachesActives > 0 ? Math.round((vachesPleine / vachesActives) * 100) : 0;
 
-  // Build checklist items
   const bouclageItems: ChecklistItem[] = veauxABouclerList.map((a) => {
     const ageJours = differenceInDays(now, a.danais);
     const mere = a.velageVeau?.vache;
@@ -335,6 +344,10 @@ async function getDashboardData() {
     nbGenissesMoyennes,
     nbGenissesGrandes,
     nbMales,
+    mortsCount,
+    mortsParCause,
+    mortsAnneeSansProbleme,
+    tauxMortaliteAnnee,
   };
 }
 
@@ -343,30 +356,27 @@ export default async function Dashboard() {
   const capteursActifs = data.capteurs.filter((c) => c.actif);
   const capteursActifsNutravs = new Set(capteursActifs.map((c) => c.animalNutrav).filter(Boolean));
 
-  // Cows within 23 days calving WITHOUT a sensor already assigned
   const vachesACapteurSansCapteur = data.vachesACapteur.filter(
     (g) => !capteursActifsNutravs.has(g.saillie.animal.nutrav)
   );
 
-  const hasAlertesJour =
+  const hasRepro =
     data.vachesVidesEnRetard > 0 ||
-    data.evenementsSanitairesUrgents > 0 ||
-    data.bouclageItems.length > 0 ||
-    data.vaccinationPreVelage > 0 ||
-    data.bolusPreVelage > 0 ||
     data.aEchographier > 0 ||
-    data.veauxAVacciner > 0 ||
+    data.velagesSemaine > 0 ||
+    data.genissesArapatrier.length > 0 ||
     vachesACapteurSansCapteur.length > 0;
 
-  const hasAlertesHebdo =
-    data.velagesSemaine > 0 ||
-    data.sevrageItems.length > 0 ||
-    data.tarirItems.length > 0 ||
-    data.genissesArapatrier.length > 0;
+  const hasSante =
+    data.evenementsSanitairesUrgents > 0 ||
+    data.vaccinationPreVelage > 0 ||
+    data.bolusPreVelage > 0 ||
+    data.veauxAVacciner > 0;
+
+  const annee = new Date().getFullYear();
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
-      {/* Recherche rapide */}
       <QuickSearch />
       <h2 className="text-xl font-bold text-gray-800 mt-2">Tableau de bord</h2>
 
@@ -392,12 +402,12 @@ export default async function Dashboard() {
         </div>
       </div>
 
-      {/* CE QUE JE DOIS FAIRE AUJOURD'HUI */}
-      {hasAlertesJour && (
+      {/* REPRODUCTION & VÉLAGE */}
+      {hasRepro && (
         <div className="bg-white rounded-xl shadow p-4">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <AlertTriangle size={18} className="text-red-500" />
-            Ce que je dois faire aujourd&apos;hui
+            <Baby size={18} className="text-pink-500" />
+            Reproduction &amp; Vélage
           </h3>
           <div className="space-y-2">
             {data.vachesVidesEnRetard > 0 && (
@@ -414,6 +424,99 @@ export default async function Dashboard() {
                 </span>
               </Link>
             )}
+            {data.aEchographier > 0 && (
+              <Link
+                href="/reproduction"
+                className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200"
+              >
+                <div className="flex items-center gap-2">
+                  <RefreshCw size={16} className="text-yellow-600" />
+                  <span className="text-sm font-medium text-yellow-800">Vaches à échographier</span>
+                </div>
+                <span className="bg-yellow-400 text-black text-xs font-bold px-2 py-1 rounded-full">
+                  {data.aEchographier}
+                </span>
+              </Link>
+            )}
+            {data.velagesSemaine > 0 && (
+              <Link
+                href="/velage"
+                className="flex items-center justify-between p-3 bg-pink-50 rounded-lg border border-pink-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Baby size={16} className="text-pink-600" />
+                  <span className="text-sm font-medium text-pink-800">Vélages prévus cette semaine</span>
+                </div>
+                <span className="bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {data.velagesSemaine}
+                </span>
+              </Link>
+            )}
+            {vachesACapteurSansCapteur.length > 0 && (
+              <Link
+                href="/velage"
+                className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Wifi size={16} className="text-orange-600" />
+                  <div>
+                    <div className="text-sm font-medium text-orange-800">Poser capteur vélage</div>
+                    <div className="text-xs text-orange-600 mt-0.5">
+                      {vachesACapteurSansCapteur.map((g) =>
+                        g.saillie.animal.nobovi ?? g.saillie.animal.nutrav
+                      ).join(", ")}
+                    </div>
+                  </div>
+                </div>
+                <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {vachesACapteurSansCapteur.length}
+                </span>
+              </Link>
+            )}
+            {data.genissesArapatrier.length > 0 && (
+              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={16} className="text-amber-600" />
+                    <span className="text-sm font-medium text-amber-800">Génisses à rapatrier à la ferme</span>
+                  </div>
+                  <span className="bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {data.genissesArapatrier.length}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {data.genissesArapatrier.map((g, i) => {
+                    const jours = g.dateVelagePrevue
+                      ? differenceInDays(g.dateVelagePrevue, new Date())
+                      : null;
+                    return (
+                      <div key={i} className="flex items-center justify-between text-xs text-amber-700">
+                        <Link href={`/troupeau/${g.saillie.animal.nutrav}`} className="font-mono bg-white border border-amber-200 px-1.5 py-0.5 rounded">
+                          {g.saillie.animal.nutrav}
+                        </Link>
+                        <span>{g.saillie.animal.nobovi ?? "1er vélage"}</span>
+                        {jours !== null && (
+                          <span className="font-semibold">J-{jours}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-amber-600 mt-2 italic">⚠️ Primipare — surveillance renforcée requise</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SANTÉ & VACCINS */}
+      {hasSante && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Activity size={18} className="text-red-500" />
+            Santé &amp; Vaccins
+          </h3>
+          <div className="space-y-2">
             {data.evenementsSanitairesUrgents > 0 && (
               <Link
                 href="/sanitaire"
@@ -460,20 +563,6 @@ export default async function Dashboard() {
                 </span>
               </Link>
             )}
-            {data.aEchographier > 0 && (
-              <Link
-                href="/reproduction"
-                className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200"
-              >
-                <div className="flex items-center gap-2">
-                  <RefreshCw size={16} className="text-yellow-600" />
-                  <span className="text-sm font-medium text-yellow-800">Vaches à échographier</span>
-                </div>
-                <span className="bg-yellow-400 text-black text-xs font-bold px-2 py-1 rounded-full">
-                  {data.aEchographier}
-                </span>
-              </Link>
-            )}
             {data.veauxAVacciner > 0 && (
               <Link
                 href="/sanitaire"
@@ -488,30 +577,18 @@ export default async function Dashboard() {
                 </span>
               </Link>
             )}
-            {vachesACapteurSansCapteur.length > 0 && (
-              <Link
-                href="/velage"
-                className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200"
-              >
-                <div className="flex items-center gap-2">
-                  <Wifi size={16} className="text-orange-600" />
-                  <div>
-                    <div className="text-sm font-medium text-orange-800">Poser capteur vélage</div>
-                    <div className="text-xs text-orange-600 mt-0.5">
-                      {vachesACapteurSansCapteur.map((g) =>
-                        g.saillie.animal.nobovi ?? g.saillie.animal.nutrav
-                      ).join(", ")}
-                    </div>
-                  </div>
-                </div>
-                <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                  {vachesACapteurSansCapteur.length}
-                </span>
-              </Link>
-            )}
           </div>
         </div>
       )}
+
+      {/* CHECKLIST: Vaches à tarir */}
+      <ChecklistSection
+        title="Vaches à tarir"
+        icon={<MilkOff size={18} />}
+        items={data.tarirItems}
+        actionLabel="Tarie"
+        color="blue"
+      />
 
       {/* CHECKLIST: Veaux à boucler */}
       <ChecklistSection
@@ -521,64 +598,6 @@ export default async function Dashboard() {
         actionLabel="Bouclé"
         color="orange"
       />
-
-      {/* Focus hebdomadaire J+7 */}
-      {hasAlertesHebdo && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <CalendarCheck size={18} className="text-blue-500" />
-            Cette semaine (J+7)
-          </h3>
-          <div className="space-y-2">
-            {data.velagesSemaine > 0 && (
-              <Link
-                href="/velage"
-                className="flex items-center justify-between p-3 bg-pink-50 rounded-lg border border-pink-200"
-              >
-                <div className="flex items-center gap-2">
-                  <Baby size={16} className="text-pink-600" />
-                  <span className="text-sm font-medium text-pink-800">Vélages prévus cette semaine</span>
-                </div>
-                <span className="bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                  {data.velagesSemaine}
-                </span>
-              </Link>
-            )}
-            {data.genissesArapatrier.length > 0 && (
-              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle size={16} className="text-amber-600" />
-                    <span className="text-sm font-medium text-amber-800">Génisses à rapatrier à la ferme</span>
-                  </div>
-                  <span className="bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                    {data.genissesArapatrier.length}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  {data.genissesArapatrier.map((g, i) => {
-                    const jours = g.dateVelagePrevue
-                      ? differenceInDays(g.dateVelagePrevue, new Date())
-                      : null;
-                    return (
-                      <div key={i} className="flex items-center justify-between text-xs text-amber-700">
-                        <Link href={`/troupeau/${g.saillie.animal.nutrav}`} className="font-mono bg-white border border-amber-200 px-1.5 py-0.5 rounded">
-                          {g.saillie.animal.nutrav}
-                        </Link>
-                        <span>{g.saillie.animal.nobovi ?? "1er vélage"}</span>
-                        {jours !== null && (
-                          <span className="font-semibold">J-{jours}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-amber-600 mt-2 italic">⚠️ Primipare — surveillance renforcée requise</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* CHECKLIST: Veaux à sevrer */}
       <ChecklistSection
@@ -592,15 +611,6 @@ export default async function Dashboard() {
             ? { title: "Presque sevrables (5–6 mois)", items: data.presqueSevrables }
             : undefined
         }
-      />
-
-      {/* CHECKLIST: Vaches à tarir */}
-      <ChecklistSection
-        title="Vaches à tarir"
-        icon={<MilkOff size={18} />}
-        items={data.tarirItems}
-        actionLabel="Tarie"
-        color="blue"
       />
 
       {/* Accès rapide Pharmacie */}
@@ -638,6 +648,50 @@ export default async function Dashboard() {
             <div className="text-xs text-gray-600 mt-1">Vaccins en retard</div>
             <div className="text-xs text-gray-400">Protocoles</div>
           </div>
+        </div>
+      </Collapsible>
+
+      {/* Mortalité */}
+      <Collapsible
+        title={<span className="flex items-center gap-2">💀 Mortalité {annee}</span>}
+        badge={data.mortsCount > 0 ? `${data.mortsCount} décès` : "0 décès"}
+        badgeColor={data.mortsCount > 0 ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"}
+        defaultOpen={false}
+      >
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="text-center p-3 bg-red-50 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">{data.mortsCount}</div>
+              <div className="text-xs text-gray-600 mt-1">Décès cette année</div>
+            </div>
+            <div className="text-center p-3 bg-red-50 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">{data.tauxMortaliteAnnee}%</div>
+              <div className="text-xs text-gray-600 mt-1">Taux mortalité</div>
+            </div>
+          </div>
+          {data.mortsParCause.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Répartition par cause</p>
+              {data.mortsParCause.map((s) => (
+                <div key={s.cause} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-600 w-28 shrink-0 truncate">{s.cause}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div className="bg-red-400 h-2 rounded-full" style={{ width: `${s.pct}%` }} />
+                  </div>
+                  <span className="text-xs font-semibold text-gray-700 w-10 text-right shrink-0">{s.pct}%</span>
+                  <span className="text-xs text-gray-400 shrink-0">×{s.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {data.mortsAnneeSansProbleme > 0 && (
+            <p className="text-xs text-gray-400 italic">
+              + {data.mortsAnneeSansProbleme} mort{data.mortsAnneeSansProbleme > 1 ? "s" : ""} sans cause renseignée
+            </p>
+          )}
+          {data.mortsCount === 0 && (
+            <p className="text-sm text-gray-400 text-center py-2">Aucun décès enregistré cette année</p>
+          )}
         </div>
       </Collapsible>
 
