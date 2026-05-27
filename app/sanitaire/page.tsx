@@ -11,6 +11,8 @@ import SanitaireClient, {
   type BolusItem,
   type RecentItem,
   type VeauProtocolItem,
+  type EvenementItem,
+  type TraitementActifItem,
 } from "./SanitaireClient";
 
 async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
@@ -26,7 +28,7 @@ async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
 async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
   const now = new Date();
 
-  const [animaux, vaccinationsRecentes, vachesAvecGestation] = await Promise.all([
+  const [animaux, vaccinationsRecentes, vachesAvecGestation, evenementsRaw, traitementsRaw] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
       include: { vaccinations: { select: { id: true, vaccin: true, date: true } } },
@@ -44,6 +46,18 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
         saillies: { orderBy: { date: "desc" }, take: 1, include: { gestation: true } },
         vaccinations: { select: { vaccin: true, date: true } },
       },
+    }),
+    prisma.evenementSanitaire.findMany({
+      where: { resolu: false },
+      include: { animal: { select: { nutrav: true, nobovi: true } } },
+      orderBy: { date: "desc" },
+      take: 50,
+    }),
+    prisma.traitement.findMany({
+      where: { statut: "EN_COURS" },
+      include: { animal: { select: { nutrav: true, nobovi: true } } },
+      orderBy: { dateDebut: "desc" },
+      take: 50,
     }),
   ]);
 
@@ -170,12 +184,30 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     dateLabel: formatDate(v.date),
   }));
 
-  return { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes };
+  const evenements: EvenementItem[] = evenementsRaw.map((e) => ({
+    id: e.id,
+    animalNutrav: e.animal.nutrav,
+    animalNom: e.animal.nobovi,
+    type: e.type,
+    date: e.date.toISOString(),
+    description: e.description,
+  }));
+
+  const traitements: TraitementActifItem[] = traitementsRaw.map((t) => ({
+    id: t.id,
+    animalNutrav: t.animal.nutrav,
+    animalNom: t.animal.nobovi,
+    medicamentNom: t.medicamentNom,
+    dateDebut: t.dateDebut.toISOString(),
+    dureeJours: t.dureeJours,
+  }));
+
+  return { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements };
 }
 
 export default async function SanitairePage() {
   const protocoles = await getProtocoles();
-  const { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes } = await getSanitaireData(protocoles);
+  const { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements } = await getSanitaireData(protocoles);
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto pb-24">
@@ -210,6 +242,8 @@ export default async function SanitairePage() {
         toutesVaches={toutesVaches}
         vaccinationsRecentes={recentes}
         protocoles={protocoles}
+        evenements={evenements}
+        traitements={traitements}
       />
     </div>
   );

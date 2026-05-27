@@ -71,6 +71,24 @@ export interface VacheVaccinsItem {
   hasBolus: boolean;
 }
 
+export interface EvenementItem {
+  id: string;
+  animalNutrav: string;
+  animalNom: string | null;
+  type: string;
+  date: string;
+  description: string | null;
+}
+
+export interface TraitementActifItem {
+  id: string;
+  animalNutrav: string;
+  animalNom: string | null;
+  medicamentNom: string;
+  dateDebut: string;
+  dureeJours: number;
+}
+
 interface Props {
   veauxAVacciner: VeauItem[];
   tousVeaux: VeauProtocolItem[];
@@ -79,6 +97,8 @@ interface Props {
   toutesVaches: VacheVaccinsItem[];
   vaccinationsRecentes: RecentItem[];
   protocoles: ProtocoleVaccinConfig[];
+  evenements: EvenementItem[];
+  traitements: TraitementActifItem[];
 }
 
 // ── Statut vaccinal global pour un veau ───────────────────────────────────────
@@ -502,9 +522,10 @@ function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVacc
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes, protocoles }: Props) {
+export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes, protocoles, evenements, traitements }: Props) {
   const router = useRouter();
-  const [onglet, setOnglet] = useState<"urgent" | "veaux" | "vaches">("urgent");
+  const [onglet, setOnglet] = useState<"evenements" | "vaccination" | "pharmacie" | "ordonnances">("evenements");
+  const [vaccinTab, setVaccinTab] = useState<"urgent" | "veaux" | "vaches">("urgent");
   const [viewMode, setViewMode] = useState<"animal" | "traitement">("animal");
   const [sessionMode, setSessionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -612,46 +633,180 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
 
   return (
     <>
-      {/* Onglets principaux */}
-      <div className="flex bg-white rounded-xl shadow overflow-hidden">
+      {/* Navigation principale — 4 boutons */}
+      <div className="grid grid-cols-4 gap-1 bg-white rounded-xl shadow overflow-hidden p-1">
         {([
-          { id: "urgent", label: "🚨 Urgent", count: urgents.length + cryptoRotavec.length + bolus.length },
-          { id: "veaux", label: "🐄 Vaccins veaux", count: tousVeaux.length },
-          { id: "vaches", label: "🐮 Vaches", count: toutesVaches.length },
+          { id: "evenements", label: "Événements", icon: "🏥", count: evenements.length + traitements.length, urgent: evenements.length > 0 },
+          { id: "vaccination", label: "Vaccination", icon: "💉", count: urgents.length + cryptoRotavec.length + bolus.length, urgent: urgents.length > 0 },
+          { id: "pharmacie", label: "Pharmacie", icon: "💊", count: 0, urgent: false },
+          { id: "ordonnances", label: "Ordonnances", icon: "📋", count: 0, urgent: false },
         ] as const).map((tab) => (
           <button
             key={tab.id}
             onClick={() => setOnglet(tab.id)}
-            className={`flex-1 py-3 text-xs font-semibold border-b-2 transition-colors ${
+            className={`py-2.5 px-1 rounded-lg text-center transition-colors ${
               onglet === tab.id
-                ? "border-green-600 text-green-700 bg-green-50"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? "bg-green-700 text-white"
+                : "text-gray-600 hover:bg-gray-50"
             }`}
           >
-            {tab.label}
+            <div className="text-base">{tab.icon}</div>
+            <div className="text-xs font-semibold mt-0.5 leading-tight">{tab.label}</div>
             {tab.count > 0 && (
-              <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full font-bold ${
-                tab.id === "urgent" && (urgents.length > 0 || cryptoRotavec.length > 0 || bolus.length > 0)
-                  ? "bg-red-100 text-red-700"
-                  : "bg-gray-100 text-gray-500"
-              }`}>
+              <div className={`text-xs font-bold mt-0.5 ${onglet === tab.id ? "text-green-100" : tab.urgent ? "text-red-600" : "text-gray-400"}`}>
                 {tab.count}
-              </span>
+              </div>
             )}
           </button>
         ))}
       </div>
 
-      {/* Contenu des onglets Vaccins */}
-      {onglet === "veaux" && (
-        <VaccinsVeauxTab tousVeaux={tousVeaux} protocoles={protocoles} onRefresh={() => router.refresh()} />
-      )}
-      {onglet === "vaches" && (
-        <VaccinsVachesTab toutesVaches={toutesVaches} onRefresh={() => router.refresh()} />
+      {/* Onglet Événements & Soins */}
+      {onglet === "evenements" && (
+        <div className="space-y-4">
+          {evenements.length === 0 && traitements.length === 0 ? (
+            <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">
+              Aucun événement sanitaire ni traitement en cours
+            </div>
+          ) : null}
+
+          {evenements.length > 0 && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-sm">
+                <AlertTriangle size={15} className="text-red-500" />
+                Événements non résolus ({evenements.length})
+              </h3>
+              <div className="space-y-2">
+                {evenements.map((e) => (
+                  <Link
+                    key={e.id}
+                    href={`/troupeau/${e.animalNutrav}?onglet=sante`}
+                    className="flex items-start gap-3 p-3 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{e.animalNutrav}</span>
+                        <span className="text-sm font-medium text-gray-800">{e.animalNom ?? ""}</span>
+                        <span className="text-xs font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded">{e.type}</span>
+                      </div>
+                      {e.description && (
+                        <p className="text-xs text-gray-600 mt-1 truncate">{e.description}</p>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400 shrink-0">
+                      {new Date(e.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {traitements.length > 0 && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-sm">
+                <Pill size={15} className="text-blue-500" />
+                Traitements en cours ({traitements.length})
+              </h3>
+              <div className="space-y-2">
+                {traitements.map((t) => {
+                  const debut = new Date(t.dateDebut);
+                  const fin = new Date(debut.getTime() + t.dureeJours * 86400000);
+                  const joursRestants = Math.ceil((fin.getTime() - Date.now()) / 86400000);
+                  return (
+                    <Link
+                      key={t.id}
+                      href={`/troupeau/${t.animalNutrav}?onglet=sante`}
+                      className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{t.animalNutrav}</span>
+                          <span className="text-sm font-medium text-gray-800">{t.animalNom ?? ""}</span>
+                        </div>
+                        <p className="text-xs text-blue-700 font-medium mt-1">{t.medicamentNom}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className={`text-xs font-bold ${joursRestants <= 1 ? "text-red-600" : joursRestants <= 3 ? "text-orange-500" : "text-blue-600"}`}>
+                          {joursRestants > 0 ? `J+${joursRestants}` : "Terminé"}
+                        </div>
+                        <div className="text-xs text-gray-400">{t.dureeJours}j</div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Onglet Urgent — contenu existant */}
-      {onglet === "urgent" && (
+      {/* Onglet Vaccination — sous-navigation interne */}
+      {onglet === "vaccination" && (
+        <>
+          <div className="flex bg-white rounded-xl shadow overflow-hidden">
+            {([
+              { id: "urgent", label: "🚨 Urgent", count: urgents.length + cryptoRotavec.length + bolus.length },
+              { id: "veaux", label: "🐄 Veaux", count: tousVeaux.length },
+              { id: "vaches", label: "🐮 Vaches", count: toutesVaches.length },
+            ] as const).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setVaccinTab(tab.id)}
+                className={`flex-1 py-3 text-xs font-semibold border-b-2 transition-colors ${
+                  vaccinTab === tab.id
+                    ? "border-green-600 text-green-700 bg-green-50"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {tab.label}
+                {tab.count > 0 && (
+                  <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                    tab.id === "urgent" && (urgents.length > 0 || cryptoRotavec.length > 0 || bolus.length > 0)
+                      ? "bg-red-100 text-red-700"
+                      : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          {vaccinTab === "veaux" && (
+            <VaccinsVeauxTab tousVeaux={tousVeaux} protocoles={protocoles} onRefresh={() => router.refresh()} />
+          )}
+          {vaccinTab === "vaches" && (
+            <VaccinsVachesTab toutesVaches={toutesVaches} onRefresh={() => router.refresh()} />
+          )}
+        </>
+      )}
+
+      {/* Onglet Pharmacie — navigation */}
+      {onglet === "pharmacie" && (
+        <div className="bg-white rounded-xl shadow p-6 text-center space-y-4">
+          <div className="text-4xl">💊</div>
+          <p className="text-gray-600 text-sm">Gérer les médicaments, stocks et traitements</p>
+          <Link
+            href="/pharmacie"
+            className="inline-block px-6 py-3 bg-green-700 text-white font-semibold rounded-xl text-sm hover:bg-green-800 transition-colors"
+          >
+            Ouvrir la Pharmacie →
+          </Link>
+        </div>
+      )}
+
+      {/* Onglet Ordonnances — placeholder */}
+      {onglet === "ordonnances" && (
+        <div className="bg-white rounded-xl shadow p-6 text-center space-y-3">
+          <div className="text-4xl">📋</div>
+          <p className="font-semibold text-gray-700">Ordonnances</p>
+          <p className="text-gray-500 text-sm">Fonctionnalité en cours de développement</p>
+          <p className="text-xs text-gray-400">Numérisation, suivi des prescriptions et gestion des délais d&apos;attente</p>
+        </div>
+      )}
+
+      {/* Onglet vaccination urgent — contenu existant */}
+      {onglet === "vaccination" && vaccinTab === "urgent" && (
       <>
       {/* Stats bar */}
       <div className="grid grid-cols-4 gap-2">

@@ -67,7 +67,13 @@ export async function GET() {
     dernierVelage: v.velagesVache[0]?.date?.toISOString() ?? null,
     saillieId: v.saillies[0]?.id ?? null,
     taureauNom: v.saillies[0]?.taureau?.nopere ?? v.saillies[0]?.taureau?.nupere ?? null,
-    derniereChaleur: v.chaleurs[0]?.date?.toISOString() ?? null,
+    derniereChaleur: (() => {
+      const chaleur = v.chaleurs[0]?.date ?? null;
+      if (!chaleur) return null;
+      const saillieDate = v.saillies[0]?.date ?? null;
+      if (saillieDate && saillieDate >= chaleur) return null;
+      return chaleur.toISOString();
+    })(),
     aEchographier: v.aEchographier,
     estGenisse: v.estGenisse,
   }));

@@ -180,6 +180,11 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               )}
             </div>
             <h2 className="text-xl font-bold text-gray-800 mt-1">{animal.nobovi ?? "Sans nom"}</h2>
+            {(etat === "VERT" || etat === "ROSE") && animal.saillies[0]?.gestation?.dateVelagePrevue && (
+              <div className="text-xs text-gray-500 mt-0.5">
+                Vélage prévu : <span className="font-semibold text-gray-700">{formatDate(animal.saillies[0].gestation.dateVelagePrevue)}</span>
+              </div>
+            )}
           </div>
           <EditAnimalDrawer
             nutrav={animal.nutrav}
