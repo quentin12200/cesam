@@ -7,21 +7,24 @@ interface Props {
   nutrav: string;
   vaccin: string;
   label: string;
+  voie?: string;
+  compact?: boolean;
 }
 
-export default function VaccineQuickButton({ nutrav, vaccin, label }: Props) {
+export default function VaccineQuickButton({ nutrav, vaccin, label, voie = "IM", compact = false }: Props) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const router = useRouter();
 
-  async function handleClick() {
+  async function handleClick(e: React.MouseEvent) {
+    e.stopPropagation();
     setLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
       const res = await fetch("/api/vaccinations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nutrav, vaccin, date: today, voie: "IM" }),
+        body: JSON.stringify({ nutrav, vaccin, date: today, voie }),
       });
       if (res.ok) {
         setDone(true);
@@ -32,7 +35,26 @@ export default function VaccineQuickButton({ nutrav, vaccin, label }: Props) {
     }
   }
 
-  if (done) return <span className="text-xs text-green-600 font-semibold">✓ Enregistré</span>;
+  if (done) {
+    return (
+      <span className={compact ? "text-green-600 font-bold text-xs" : "text-xs text-green-600 font-semibold"}>
+        ✓
+      </span>
+    );
+  }
+
+  if (compact) {
+    return (
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/70 hover:bg-white font-bold text-xs text-current disabled:opacity-50 transition-colors shrink-0"
+        title={`Enregistrer ${label}`}
+      >
+        {loading ? "…" : "+"}
+      </button>
+    );
+  }
 
   return (
     <button
