@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { differenceInDays } from "date-fns";
-import { getVaccinProtocolSteps, type ProtocoleVaccinConfig } from "@/lib/utils";
+import { getVaccinProtocolSteps, formatDateShort, type ProtocoleVaccinConfig } from "@/lib/utils";
 import VaccinationFormWrapper from "./VaccinationFormWrapper";
 import VaccineQuickButton from "./VaccineQuickButton";
 
@@ -418,38 +418,47 @@ function VaccinsVeauxTab({ tousVeaux, protocoles, onRefresh }: { tousVeaux: Veau
 
                   {/* Étapes du protocole */}
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {steps.map((step) => (
-                      <span
-                        key={step.vaccin}
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-                          step.status === "done"
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : step.status === "due"
-                            ? step.isUrgent
-                              ? "bg-red-100 text-red-700 border-red-300 animate-pulse"
-                              : "bg-orange-50 text-orange-700 border-orange-200"
-                            : step.status === "pending"
-                            ? "bg-gray-50 text-gray-400 border-gray-200"
-                            : "bg-gray-50 text-gray-300 border-gray-100"
-                        }`}
-                        title={step.status === "done" ? "Fait" : step.status === "due" ? "À faire" : step.status === "pending" ? "En attente" : "Non éligible"}
-                      >
-                        <span className={`font-bold mr-0.5 ${step.isRappel ? "text-purple-600" : "text-blue-600"}`}>
-                          {step.isRappel ? "R" : "P"}
+                    {steps.map((step) => {
+                      if (step.status === "done") {
+                        return (
+                          <span key={step.vaccin} className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full font-medium border bg-green-50 text-green-700 border-green-200">
+                            <span className={`font-bold ${step.isRappel ? "text-purple-500" : "text-blue-500"}`}>{step.isRappel ? "R" : "P"}</span>
+                            ✓ {step.label}
+                            {step.doneDate && <span className="opacity-60 ml-0.5">{formatDateShort(step.doneDate)}</span>}
+                          </span>
+                        );
+                      }
+                      if (step.status === "due") {
+                        return (
+                          <span key={step.vaccin} className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium border ${step.isUrgent ? "bg-red-100 text-red-700 border-red-300 animate-pulse" : "bg-orange-50 text-orange-700 border-orange-200"}`}>
+                            <span className={`font-bold ${step.isRappel ? "text-purple-600" : "text-blue-600"}`}>{step.isRappel ? "R" : "P"}</span>
+                            {step.isUrgent ? "⚠" : "→"} {step.label}
+                            <span className="opacity-60">{step.voie}</span>
+                            {step.dueFrom && <span className="opacity-80 font-semibold">{formatDateShort(step.dueFrom)}</span>}
+                            <VaccineQuickButton nutrav={veau.nutrav} vaccin={step.vaccin} label={step.label} voie={step.voie} compact />
+                          </span>
+                        );
+                      }
+                      if (step.status === "pending") {
+                        return (
+                          <span key={step.vaccin} className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full font-medium border bg-gray-50 text-gray-400 border-gray-200">
+                            <span className="font-bold text-gray-300">{step.isRappel ? "R" : "P"}</span>
+                            ⏳ {step.label}
+                            {step.eligibleDate && <span className="opacity-70">{formatDateShort(step.eligibleDate)}</span>}
+                          </span>
+                        );
+                      }
+                      return (
+                        <span key={step.vaccin} className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full font-medium border bg-gray-50 text-gray-300 border-gray-100">
+                          ○ {step.label}
+                          {step.eligibleDate && <span className="opacity-70">{formatDateShort(step.eligibleDate)}</span>}
                         </span>
-                        {step.status === "done" ? "✓" : step.status === "due" ? (step.isUrgent ? "⚠" : "→") : step.status === "pending" ? "⏳" : "○"} {step.label}
-                        {(step.status === "due" || step.status === "not_eligible") && (
-                          <span className="ml-1 opacity-60">{step.voie}</span>
-                        )}
-                      </span>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                   <StatutBadge statut={veau.statut} />
-                  {dueSteps.slice(0, 1).map((s) => (
-                    <VaccineQuickButton key={s.vaccin} nutrav={veau.nutrav} vaccin={s.vaccin} label={`+ ${s.label}`} />
-                  ))}
                 </div>
               </div>
             </div>
@@ -462,6 +471,22 @@ function VaccinsVeauxTab({ tousVeaux, protocoles, onRefresh }: { tousVeaux: Veau
 
 // ── Onglet Vaccins Vaches ─────────────────────────────────────────────────────
 function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVaccinsItem[]; onRefresh: () => void }) {
+  const [filtre, setFiltre] = useState<"tous" | "a_faire" | "en_cours" | "complet">("tous");
+
+  const vachesAvecStatut = toutesVaches.map((v) => {
+    const allOk = v.hasCrypto && v.hasRotavec && v.hasBolus;
+    const noneOk = !v.hasCrypto && !v.hasRotavec && !v.hasBolus;
+    const statut: "complet" | "en_cours" | "a_faire" = allOk ? "complet" : noneOk ? "a_faire" : "en_cours";
+    return { ...v, statut };
+  });
+
+  const filtered = filtre === "tous" ? vachesAvecStatut : vachesAvecStatut.filter((v) => v.statut === filtre);
+  const counts = {
+    a_faire: vachesAvecStatut.filter((v) => v.statut === "a_faire").length,
+    en_cours: vachesAvecStatut.filter((v) => v.statut === "en_cours").length,
+    complet: vachesAvecStatut.filter((v) => v.statut === "complet").length,
+  };
+
   if (toutesVaches.length === 0) {
     return (
       <div className="text-center text-gray-400 py-8">
@@ -472,19 +497,42 @@ function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVacc
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-gray-500">Vaches gestantes · vaccins pré-vélage (Crypto/Rotavec/Bolus)</p>
-      {toutesVaches.map((vache) => {
-        const allOk = vache.hasCrypto && vache.hasRotavec && vache.hasBolus;
-        const noneOk = !vache.hasCrypto && !vache.hasRotavec && !vache.hasBolus;
-        const statut: "complet" | "en_cours" | "a_faire" = allOk ? "complet" : noneOk ? "a_faire" : "en_cours";
+    <div className="space-y-4">
+      {/* Filtres visuels */}
+      <div className="flex gap-2 flex-wrap">
+        {([
+          { value: "tous", label: "Tous", count: toutesVaches.length, cls: "bg-gray-100 text-gray-700 border-gray-200" },
+          { value: "a_faire", label: "🔴 À faire", count: counts.a_faire, cls: "bg-red-50 text-red-700 border-red-200" },
+          { value: "en_cours", label: "🟠 En cours", count: counts.en_cours, cls: "bg-orange-50 text-orange-700 border-orange-200" },
+          { value: "complet", label: "🟢 Complet", count: counts.complet, cls: "bg-green-50 text-green-700 border-green-200" },
+        ] as const).map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setFiltre(opt.value)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+              filtre === opt.value ? "ring-2 ring-offset-1 ring-gray-400 " + opt.cls : opt.cls
+            }`}
+          >
+            {opt.label} ({opt.count})
+          </button>
+        ))}
+      </div>
 
-        return (
+      {filtered.length === 0 && (
+        <div className="text-center text-gray-400 py-8">
+          <CheckCircle2 size={28} className="mx-auto mb-2 text-green-500" />
+          <div className="text-sm">Aucun animal dans cette catégorie</div>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-500">Vaches gestantes · vaccins pré-vélage (Crypto/Rotavec/Bolus)</p>
+      <div className="space-y-2">
+        {filtered.map((vache) => (
           <div
             key={vache.id}
             className={`bg-white rounded-xl shadow p-4 border-l-4 ${
-              statut === "complet" ? "border-green-400"
-              : statut === "en_cours" ? "border-orange-400"
+              vache.statut === "complet" ? "border-green-400"
+              : vache.statut === "en_cours" ? "border-orange-400"
               : "border-red-400"
             }`}
           >
@@ -495,36 +543,50 @@ function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVacc
                     {vache.nutrav}
                   </Link>
                   <span className="text-sm font-semibold text-gray-800">{vache.nobovi ?? "Sans nom"}</span>
-                  <span className="text-xs text-gray-400">
+                  <span className={`text-xs font-medium ${vache.joursAvantVelage <= 45 ? "text-red-500" : "text-gray-400"}`}>
                     {vache.joursAvantVelage > 0 ? `J-${vache.joursAvantVelage}` : "Terme dépassé"}
                   </span>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className="mt-2 flex flex-wrap gap-1.5 items-center">
                   {[
-                    { key: "hasCrypto", label: "Crypto", has: vache.hasCrypto },
-                    { key: "hasRotavec", label: "Rotavec", has: vache.hasRotavec },
-                    { key: "hasBolus", label: "Bolus", has: vache.hasBolus },
-                  ].map((item) => (
-                    <span
-                      key={item.key}
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-                        item.has
-                          ? "bg-green-50 text-green-700 border-green-200"
-                          : vache.joursAvantVelage <= 45
-                          ? "bg-red-100 text-red-700 border-red-300"
-                          : "bg-gray-50 text-gray-500 border-gray-200"
-                      }`}
-                    >
-                      {item.has ? "✓" : "○"} {item.label}
-                    </span>
-                  ))}
+                    { vaccin: "CRYPTO", label: "Crypto", has: vache.hasCrypto },
+                    { vaccin: "ROTAVEC", label: "Rotavec", has: vache.hasRotavec },
+                    { vaccin: "BOLUS", label: "Bolus", has: vache.hasBolus },
+                  ].map((item) =>
+                    item.has ? (
+                      <span
+                        key={item.vaccin}
+                        className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border bg-green-50 text-green-700 border-green-200"
+                      >
+                        ✓ {item.label}
+                      </span>
+                    ) : (
+                      <span
+                        key={item.vaccin}
+                        className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium border ${
+                          vache.joursAvantVelage <= 45
+                            ? "bg-red-100 text-red-700 border-red-300"
+                            : "bg-orange-50 text-orange-700 border-orange-200"
+                        }`}
+                      >
+                        {vache.joursAvantVelage <= 45 ? "⚠" : "○"} {item.label}
+                        <VaccineQuickButton
+                          nutrav={vache.nutrav}
+                          vaccin={item.vaccin}
+                          label={item.label}
+                          voie={item.vaccin === "BOLUS" ? "PO" : "IM"}
+                          compact
+                        />
+                      </span>
+                    )
+                  )}
                 </div>
               </div>
-              <StatutBadge statut={statut} />
+              <StatutBadge statut={vache.statut} />
             </div>
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 }

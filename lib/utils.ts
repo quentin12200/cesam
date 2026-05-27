@@ -114,6 +114,18 @@ export function formatAge(danais: Date): string {
   return `${totalMois} m ${joursRestants} j`;
 }
 
+export function formatAgeCompact(danais: Date): string {
+  const now = new Date();
+  const totalMois = differenceInMonths(now, danais);
+  if (totalMois >= 24) {
+    const ans = Math.floor(totalMois / 12);
+    const m = totalMois % 12;
+    return m === 0 ? `${ans}a` : `${ans}a${m}m`;
+  }
+  const j = differenceInDays(now, addMonths(danais, totalMois));
+  return j === 0 ? `${totalMois}m` : `${totalMois}m${j}j`;
+}
+
 export function formatDate(date: Date | null | undefined): string {
   if (!date) return "-";
   return new Date(date).toLocaleDateString("fr-FR");
@@ -280,6 +292,7 @@ export interface ProtocolStep {
   status: StepStatus;
   doneDate?: Date;
   eligibleDate?: Date;
+  dueFrom?: Date;
   isRappel: boolean;
   isMandatory: boolean;
   isUrgent: boolean;
@@ -311,6 +324,7 @@ export function getVaccinProtocolSteps(
         status: rappel ? "done" : joursDepuis >= delai ? "due" : "pending",
         doneDate: rappel?.date,
         eligibleDate: joursDepuis < delai ? addDays(primo.date, delai) : undefined,
+        dueFrom: !rappel && joursDepuis >= delai ? addDays(primo.date, delai) : undefined,
         isRappel: true,
         isMandatory: proto.obligatoireVente,
         isUrgent: !rappel && joursDepuis > urgence,
@@ -326,6 +340,7 @@ export function getVaccinProtocolSteps(
         status: vacc ? "done" : eligible ? "due" : "not_eligible",
         doneDate: vacc?.date,
         eligibleDate: !eligible ? addDays(danais, proto.ageMinJours) : undefined,
+        dueFrom: !vacc && eligible ? addDays(danais, proto.ageMinJours) : undefined,
         isRappel: false,
         isMandatory: proto.obligatoireVente,
         isUrgent: !vacc && ageJours > urgence,
