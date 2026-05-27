@@ -35,7 +35,6 @@ async function getDashboardData() {
 
   const [
     vachesActives,
-    veauxActifs,
     capteurs,
     vachesAvecSaillies,
     veauxPourVaccins,
@@ -57,7 +56,6 @@ async function getDashboardData() {
     nbMales,
   ] = await Promise.all([
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", velageVeau: { is: null } } }),
-    prisma.animal.count({ where: { statut: "ACTIF", OR: [{ sexbov: "M" }, { estGenisse: true }] } }),
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
     prisma.animal.findMany({
       where: { statut: "ACTIF", sexbov: "F", estGenisse: false },
@@ -321,7 +319,6 @@ async function getDashboardData() {
 
   return {
     vachesActives,
-    veauxActifs,
     capteurs,
     vachesPleine,
     pctPleine,
@@ -379,28 +376,6 @@ export default async function Dashboard() {
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
       <QuickSearch />
       <h2 className="text-xl font-bold text-gray-800 mt-2">Tableau de bord</h2>
-
-      {/* Stats principales */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-xl shadow p-4 flex items-center gap-3">
-          <div className="bg-green-100 rounded-full p-2">
-            <CowIcon size={24} className="text-green-700" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-gray-800">{data.vachesActives}</div>
-            <div className="text-xs text-gray-500">Vaches actives</div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow p-4 flex items-center gap-3">
-          <div className="bg-blue-100 rounded-full p-2">
-            <Baby size={24} className="text-blue-600" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-gray-800">{data.veauxActifs}</div>
-            <div className="text-xs text-gray-500">Veaux & génisses</div>
-          </div>
-        </div>
-      </div>
 
       {/* REPRODUCTION & VÉLAGE */}
       {hasRepro && (

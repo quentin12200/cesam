@@ -201,16 +201,19 @@ export type ProtocoleVaccinConfig = {
   delaiRappelJours: number | null;
   urgenceRappelJours: number | null;
   obligatoireVente: boolean;
+  voiePrimo: string;
+  voieRappel: string;
+  rappelAnnuel: boolean;
   actif: boolean;
 };
 
 export const DEFAULT_PROTOCOLES: ProtocoleVaccinConfig[] = [
-  { id: "proto_1", nom: "NASALGEN",         label: "Nasalgen",         ordre: 1, ageMinJours: 0,  urgenceJours: 7,    estRappel: false, primoNom: null,           delaiRappelJours: null, urgenceRappelJours: null, obligatoireVente: false, actif: true },
-  { id: "proto_2", nom: "NASALGEN_RAPPEL",  label: "Nasalgen rappel",  ordre: 2, ageMinJours: 0,  urgenceJours: null, estRappel: true,  primoNom: "NASALGEN",     delaiRappelJours: 90,   urgenceRappelJours: 105,  obligatoireVente: false, actif: true },
-  { id: "proto_3", nom: "HIPRABOVIS",       label: "Hiprabovis",       ordre: 3, ageMinJours: 30, urgenceJours: 60,   estRappel: false, primoNom: null,           delaiRappelJours: null, urgenceRappelJours: null, obligatoireVente: false, actif: true },
-  { id: "proto_4", nom: "HIPRABOVIS_RAPPEL",label: "Hiprabovis rappel",ordre: 4, ageMinJours: 0,  urgenceJours: null, estRappel: true,  primoNom: "HIPRABOVIS",   delaiRappelJours: 21,   urgenceRappelJours: 35,   obligatoireVente: false, actif: true },
-  { id: "proto_5", nom: "MHE",              label: "MHE primo",        ordre: 5, ageMinJours: 60, urgenceJours: 60,   estRappel: false, primoNom: null,           delaiRappelJours: null, urgenceRappelJours: null, obligatoireVente: true,  actif: true },
-  { id: "proto_6", nom: "MHE_RAPPEL",       label: "MHE rappel",       ordre: 6, ageMinJours: 0,  urgenceJours: null, estRappel: true,  primoNom: "MHE",          delaiRappelJours: 21,   urgenceRappelJours: 35,   obligatoireVente: true,  actif: true },
+  { id: "proto_1", nom: "NASALGEN",         label: "Nasalgen",         ordre: 1, ageMinJours: 0,  urgenceJours: 7,    estRappel: false, primoNom: null,           delaiRappelJours: null, urgenceRappelJours: null, obligatoireVente: false, voiePrimo: "IN", voieRappel: "IM", rappelAnnuel: false, actif: true },
+  { id: "proto_2", nom: "NASALGEN_RAPPEL",  label: "Nasalgen rappel",  ordre: 2, ageMinJours: 0,  urgenceJours: null, estRappel: true,  primoNom: "NASALGEN",     delaiRappelJours: 90,   urgenceRappelJours: 105,  obligatoireVente: false, voiePrimo: "IM", voieRappel: "IM", rappelAnnuel: true,  actif: true },
+  { id: "proto_3", nom: "HIPRABOVIS",       label: "Hiprabovis",       ordre: 3, ageMinJours: 30, urgenceJours: 60,   estRappel: false, primoNom: null,           delaiRappelJours: null, urgenceRappelJours: null, obligatoireVente: false, voiePrimo: "SC", voieRappel: "SC", rappelAnnuel: false, actif: true },
+  { id: "proto_4", nom: "HIPRABOVIS_RAPPEL",label: "Hiprabovis rappel",ordre: 4, ageMinJours: 0,  urgenceJours: null, estRappel: true,  primoNom: "HIPRABOVIS",   delaiRappelJours: 21,   urgenceRappelJours: 35,   obligatoireVente: false, voiePrimo: "SC", voieRappel: "SC", rappelAnnuel: true,  actif: true },
+  { id: "proto_5", nom: "MHE",              label: "MHE primo",        ordre: 5, ageMinJours: 60, urgenceJours: 60,   estRappel: false, primoNom: null,           delaiRappelJours: null, urgenceRappelJours: null, obligatoireVente: true,  voiePrimo: "SC", voieRappel: "SC", rappelAnnuel: false, actif: true },
+  { id: "proto_6", nom: "MHE_RAPPEL",       label: "MHE rappel",       ordre: 6, ageMinJours: 0,  urgenceJours: null, estRappel: true,  primoNom: "MHE",          delaiRappelJours: 21,   urgenceRappelJours: 35,   obligatoireVente: true,  voiePrimo: "SC", voieRappel: "SC", rappelAnnuel: true,  actif: true },
 ];
 
 export type VaccinInfo = {
@@ -280,6 +283,7 @@ export interface ProtocolStep {
   isRappel: boolean;
   isMandatory: boolean;
   isUrgent: boolean;
+  voie: string;
 }
 
 export function getVaccinProtocolSteps(
@@ -310,6 +314,7 @@ export function getVaccinProtocolSteps(
         isRappel: true,
         isMandatory: proto.obligatoireVente,
         isUrgent: !rappel && joursDepuis > urgence,
+        voie: proto.voieRappel ?? "IM",
       });
     } else {
       const vacc = get(proto.nom);
@@ -324,6 +329,7 @@ export function getVaccinProtocolSteps(
         isRappel: false,
         isMandatory: proto.obligatoireVente,
         isUrgent: !vacc && ageJours > urgence,
+        voie: proto.voiePrimo ?? "IM",
       });
     }
   }

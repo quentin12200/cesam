@@ -18,6 +18,7 @@ interface TraitementRow {
   motif: string | null;
   statut: string;
   delaiAttenteViandeJ: number | null;
+  delaiAttenteLaitJ: number | null;
 }
 
 interface ScanResult {
@@ -117,8 +118,11 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
             const dateDebut = new Date(t.dateDebut);
             const dateFin = addDays(dateDebut, t.dureeJours);
             const enCours = now < dateFin && t.statut === "EN_COURS";
-            const dateFinAttente = t.delaiAttenteViandeJ != null ? addDays(dateFin, t.delaiAttenteViandeJ) : null;
+            const dateFinAttenteViande = t.delaiAttenteViandeJ != null ? addDays(dateFin, t.delaiAttenteViandeJ + 1) : null;
+            const dateFinAttenteLait = t.delaiAttenteLaitJ != null ? addDays(dateFin, t.delaiAttenteLaitJ) : null;
+            const dateFinAttente = dateFinAttenteViande;
             const enAttente = dateFinAttente ? now < dateFinAttente : false;
+            const enAttenteLait = dateFinAttenteLait ? now < dateFinAttenteLait : false;
 
             return (
               <div key={t.id} className={`border rounded-lg p-3 text-sm ${
@@ -141,9 +145,14 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
                           <Clock size={10} /> jusqu&apos;au {formatDate(dateFin)}
                         </span>
                       )}
-                      {enAttente && dateFinAttente && (
+                      {enAttente && dateFinAttenteViande && (
                         <span className="flex items-center gap-1 text-orange-600 font-medium">
-                          <AlertTriangle size={10} /> Attente viande jusqu&apos;au {formatDate(dateFinAttente)}
+                          <AlertTriangle size={10} /> Attente viande jusqu&apos;au {formatDate(dateFinAttenteViande)}
+                        </span>
+                      )}
+                      {enAttenteLait && dateFinAttenteLait && (
+                        <span className="flex items-center gap-1 text-blue-600 font-medium">
+                          <AlertTriangle size={10} /> Attente lait jusqu&apos;au {formatDate(dateFinAttenteLait)}
                         </span>
                       )}
                       {!enCours && !enAttente && t.statut !== "EN_COURS" && (

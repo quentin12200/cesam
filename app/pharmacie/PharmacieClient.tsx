@@ -78,6 +78,7 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
   const [categorie, setCategorie] = useState("ANTIBIOTIQUE");
   const [voie, setVoie] = useState("");
   const [delai, setDelai] = useState("");
+  const [delaiLait, setDelaiLait] = useState("");
   const [rx, setRx] = useState(true);
   const [saving, setSaving] = useState(false);
   const router = useRouter();
@@ -95,6 +96,7 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
         categorie,
         voie: voie || null,
         delaiAttenteViandeJ: delai !== "" ? Number(delai) : null,
+        delaiAttenteLaitJ: delaiLait !== "" ? Number(delaiLait) : null,
         prescriptionRequise: rx,
       }),
     });
@@ -133,16 +135,21 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Délai attente viande (j)</label>
+          <label className="text-xs text-gray-500 block mb-1">Attente viande (j)</label>
           <input type="number" min={0} value={delai} onChange={(e) => setDelai(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0 = aucun" />
         </div>
-        <div className="flex items-end pb-1">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={rx} onChange={(e) => setRx(e.target.checked)} className="w-4 h-4" />
-            <span className="text-sm">Prescription requise</span>
-          </label>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Attente lait (j)</label>
+          <input type="number" min={0} value={delaiLait} onChange={(e) => setDelaiLait(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0 = aucun" />
         </div>
+      </div>
+      <div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={rx} onChange={(e) => setRx(e.target.checked)} className="w-4 h-4" />
+          <span className="text-sm">Prescription requise</span>
+        </label>
       </div>
       <div className="flex gap-2 pt-1">
         <button type="submit" disabled={saving || !nom.trim()}

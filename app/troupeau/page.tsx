@@ -19,7 +19,6 @@ import GroupeCreateButton from "./GroupeCreateButton";
 interface PageProps {
   searchParams: Promise<{
     sexe?: string;
-    statut?: string;
     q?: string;
     page?: string;
     categorie?: string;
@@ -37,7 +36,6 @@ const PAGE_SIZE = 30;
 
 async function getAnimaux(params: {
   sexe?: string;
-  statut?: string;
   q?: string;
   page?: number;
   categorie?: string;
@@ -47,13 +45,12 @@ async function getAnimaux(params: {
   groupe?: string;
   tri?: string;
 }) {
-  const { sexe, statut, q, page = 1, categorie, tarie, repro, sanitaire, groupe, tri } = params;
+  const { sexe, q, page = 1, categorie, tarie, repro, sanitaire, groupe, tri } = params;
   const now = new Date();
   const where: Prisma.AnimalWhereInput = {};
 
   if (sexe && (sexe === "F" || sexe === "M")) where.sexbov = sexe;
-  if (statut && (statut === "ACTIF" || statut === "SORTI")) where.statut = statut;
-  else if (!statut) where.statut = "ACTIF";
+  where.statut = "ACTIF";
 
   if (q && q.trim()) {
     where.OR = [
@@ -129,8 +126,8 @@ async function getAnimaux(params: {
   }
 
   const orderBy: Prisma.AnimalOrderByWithRelationInput =
-    tri === "age_asc" ? { danais: "asc" }
-    : tri === "age_desc" ? { danais: "desc" }
+    tri === "age_asc" ? { danais: "desc" }
+    : tri === "age_desc" ? { danais: "asc" }
     : { nutrav: "asc" };
 
   const [total, animaux, groupes] = await Promise.all([
@@ -182,7 +179,6 @@ async function getAnimaux(params: {
 export default async function TroupeauPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const sexe = params.sexe;
-  const statut = params.statut;
   const q = params.q;
   const page = parseInt(params.page ?? "1", 10);
   const categorie = params.categorie;
@@ -195,13 +191,12 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const showFiltres = params.filtres === "1";
 
   const { animaux, total, pages, groupes } = await getAnimaux({
-    sexe, statut, q, page, categorie, tarie, repro, sanitaire, groupe, tri,
+    sexe, q, page, categorie, tarie, repro, sanitaire, groupe, tri,
   });
 
   function buildUrl(overrides: Record<string, string | undefined>) {
     const p: Record<string, string> = {};
     if (sexe) p.sexe = sexe;
-    if (statut) p.statut = statut;
     if (q) p.q = q;
     if (page > 1) p.page = String(page);
     if (categorie) p.categorie = categorie;
@@ -222,14 +217,13 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     categorie && categorie !== "TOUS" ? categorie : undefined,
   ].filter(Boolean).length;
 
+
   const CATS_F: { value: string; label: string }[] = [
     { value: "VACHE", label: "Vaches" },
     { value: "PETITE_GENISSE", label: "Petite génisse" },
     { value: "MOYENNE_GENISSE", label: "Moy. génisse" },
     { value: "GRANDE_GENISSE", label: "Grande génisse" },
-    { value: "GENISSE_VALIDEE", label: "Génisse validée" },
     { value: "PRESELECTION_GENISSE", label: "Présélection" },
-    { value: "VEAU_F", label: "Veau femelle" },
     { value: "VELLE", label: "Velle" },
   ];
 
@@ -481,29 +475,6 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             <GroupeCreateButton />
           </div>
 
-          {/* Statut */}
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Statut</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {[
-                { value: undefined, label: "Actifs" },
-                { value: "SORTI", label: "Sortis" },
-              ].map((opt) => (
-                <Link
-                  key={opt.label}
-                  href={buildUrl({ statut: opt.value, page: "1" })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    statut === opt.value || (!statut && !opt.value)
-                      ? "bg-green-700 text-white border-green-700"
-                      : "bg-white text-gray-600 border-gray-200"
-                  }`}
-                >
-                  {opt.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
           {/* Tri */}
           <div>
             <p className="text-xs font-medium text-gray-500 mb-1.5">Trier par</p>
@@ -534,7 +505,6 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       <form method="GET" action="/troupeau" className="relative">
         {/* Preserve current filters */}
         {sexe && <input type="hidden" name="sexe" value={sexe} />}
-        {statut && <input type="hidden" name="statut" value={statut} />}
         {categorie && <input type="hidden" name="categorie" value={categorie} />}
         {tarie && <input type="hidden" name="tarie" value={tarie} />}
         {repro && <input type="hidden" name="repro" value={repro} />}
