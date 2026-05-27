@@ -15,6 +15,8 @@ import { Search, Plus, SlidersHorizontal, ArrowLeft } from "lucide-react";
 import { addDays, differenceInMonths } from "date-fns";
 import NouvelAnimalForm from "./NouvelAnimalForm";
 import GroupeCreateButton from "./GroupeCreateButton";
+import NutravBadge from "@/app/components/NutravBadge";
+import TroupeauScrollRestorer from "./TroupeauScrollRestorer";
 
 interface PageProps {
   searchParams: Promise<{
@@ -234,6 +236,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
 
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto pb-24">
+      <TroupeauScrollRestorer />
       <div className="flex items-center gap-3 mt-2">
         <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
           <ArrowLeft size={18} />
@@ -555,10 +558,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  {/* Numéro travail */}
-                  <span className="bg-green-700 text-white font-bold px-3 py-2 rounded-lg font-mono text-lg min-w-[4.5rem] text-center flex-shrink-0">
-                    {animal.nutrav}
-                  </span>
+                  <NutravBadge nutrav={animal.nutrav} />
                   <div className="min-w-0">
                     <div className="font-semibold text-gray-800 text-sm truncate">
                       {animal.nobovi ?? <span className="text-gray-400 italic">Sans nom</span>}

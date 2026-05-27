@@ -6,6 +6,7 @@ import SplashScreen from "@/components/SplashScreen";
 import InstallPrompt from "@/app/components/InstallPrompt";
 import NotificationBell from "@/app/components/NotificationBell";
 import GlobalScanner from "@/app/components/GlobalScanner";
+import VoiceButton from "@/app/components/VoiceButton";
 import Image from "next/image";
 
 const geist = Geist({
@@ -58,6 +59,7 @@ export default function RootLayout({
         <main className="flex-1 overflow-auto">
           {children}
         </main>
+        <VoiceButton />
         <BottomNav />
         <InstallPrompt />
       </body>
