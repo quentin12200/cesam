@@ -315,6 +315,9 @@ model Medicament {
   delaiAttenteLaitJ   Int?
   prescriptionRequise Boolean      @default(false)
   actif               Boolean      @default(true)
+  stockActuel         Float?
+  stockUnite          String?
+  stockSeuilAlert     Float?
   traitements         Traitement[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
@@ -338,4 +341,35 @@ model Traitement {
   notes         String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+}
+
+model ExploitationConfig {
+  id                 String   @id @default("singleton")
+  ipg                String?
+  raisonSociale      String?
+  adresse            String?
+  telephone          String?
+  veterinaireNom     String?
+  veterinaireAdresse String?
+  veterinaireTel     String?
+  ordonnancierNo     String?
+  updatedAt          DateTime @updatedAt
+}
+
+model Ordonnance {
+  id             String   @id @default(cuid())
+  date           DateTime @default(now())
+  numero         String?
+  veterinaireNom String?
+  medicamentNom  String   @default("")
+  dose           Float?
+  uniteDosage    String?
+  voie           String?
+  dureeJours     Int?
+  motif          String?
+  animaux        String?
+  statut         String   @default("VALIDE")
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

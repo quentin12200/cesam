@@ -17,7 +17,15 @@ async function getData() {
       },
       orderBy: { dateDebut: "desc" },
     }),
-    prisma.medicament.findMany({ orderBy: { nom: "asc" } }),
+    prisma.medicament.findMany({
+      orderBy: { nom: "asc" },
+      select: {
+        id: true, nom: true, dci: true, categorie: true, voie: true,
+        dosagePourKg: true, uniteDosage: true, delaiAttenteViandeJ: true,
+        prescriptionRequise: true, actif: true,
+        stockActuel: true, stockUnite: true, stockSeuilAlert: true,
+      },
+    }),
   ]);
 
   const traitementsItems: TraitementItem[] = traitements.map((t) => {
@@ -54,6 +62,20 @@ async function getData() {
     };
   });
 
+  // Last 3 traitements per medicamentId
+  const recentByMed: Record<string, { date: string; animalNutrav: string; motif: string | null }[]> = {};
+  for (const t of traitements) {
+    if (!t.medicamentId) continue;
+    if (!recentByMed[t.medicamentId]) recentByMed[t.medicamentId] = [];
+    if (recentByMed[t.medicamentId].length < 3) {
+      recentByMed[t.medicamentId].push({
+        date: t.dateDebut.toISOString(),
+        animalNutrav: t.animal.nutrav,
+        motif: t.motif,
+      });
+    }
+  }
+
   const medicamentItems: MedicamentItem[] = medicaments.map((m) => ({
     id: m.id,
     nom: m.nom,
@@ -65,6 +87,10 @@ async function getData() {
     delaiAttenteViandeJ: m.delaiAttenteViandeJ,
     prescriptionRequise: m.prescriptionRequise,
     actif: m.actif,
+    stockActuel: m.stockActuel,
+    stockUnite: m.stockUnite,
+    stockSeuilAlert: m.stockSeuilAlert,
+    recentTraitements: recentByMed[m.id] ?? [],
   }));
 
   return { traitementsItems, medicamentItems };

@@ -814,13 +814,17 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
         </div>
       )}
 
-      {/* Onglet Ordonnances — placeholder */}
+      {/* Onglet Ordonnances */}
       {onglet === "ordonnances" && (
-        <div className="bg-white rounded-xl shadow p-6 text-center space-y-3">
+        <div className="bg-white rounded-xl shadow p-6 text-center space-y-4">
           <div className="text-4xl">📋</div>
-          <p className="font-semibold text-gray-700">Ordonnances</p>
-          <p className="text-gray-500 text-sm">Fonctionnalité en cours de développement</p>
-          <p className="text-xs text-gray-400">Numérisation, suivi des prescriptions et gestion des délais d&apos;attente</p>
+          <p className="text-gray-600 text-sm">Numérisation et suivi des prescriptions vétérinaires</p>
+          <Link
+            href="/ordonnances"
+            className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl text-sm hover:bg-blue-700 transition-colors"
+          >
+            Ouvrir les ordonnances →
+          </Link>
         </div>
       )}
 

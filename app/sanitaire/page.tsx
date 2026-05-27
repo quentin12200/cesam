@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getVaccinsManquants, formatDate, formatAge, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
 import { differenceInDays, subDays } from "date-fns";
 import Link from "next/link";
-import { ArrowLeft, Settings, Printer } from "lucide-react";
+import { ArrowLeft, Settings, Printer, Building2 } from "lucide-react";
 import SanitaireClient, {
   type VeauItem,
   type CryptoItem,
@@ -235,6 +235,13 @@ export default async function SanitairePage() {
             title="Configurer les protocoles"
           >
             <Settings size={18} />
+          </Link>
+          <Link
+            href="/config/exploitation"
+            className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
+            title="Identité exploitation"
+          >
+            <Building2 size={18} />
           </Link>
         </div>
       </div>
