@@ -295,6 +295,9 @@ model ProtocoleVaccin {
   delaiRappelJours   Int?
   urgenceRappelJours Int?
   obligatoireVente   Boolean  @default(false)
+  voiePrimo          String   @default("IM")
+  voieRappel         String   @default("IM")
+  rappelAnnuel       Boolean  @default(false)
   actif              Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -309,6 +312,7 @@ model Medicament {
   dosagePourKg        Float?
   uniteDosage         String?      @default("ml")
   delaiAttenteViandeJ Int?
+  delaiAttenteLaitJ   Int?
   prescriptionRequise Boolean      @default(false)
   actif               Boolean      @default(true)
   traitements         Traitement[]

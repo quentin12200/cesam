@@ -87,6 +87,8 @@ export interface TraitementActifItem {
   medicamentNom: string;
   dateDebut: string;
   dureeJours: number;
+  delaiAttenteViandeJ: number | null;
+  delaiAttenteLaitJ: number | null;
 }
 
 interface Props {
@@ -432,7 +434,13 @@ function VaccinsVeauxTab({ tousVeaux, protocoles, onRefresh }: { tousVeaux: Veau
                         }`}
                         title={step.status === "done" ? "Fait" : step.status === "due" ? "À faire" : step.status === "pending" ? "En attente" : "Non éligible"}
                       >
+                        <span className={`font-bold mr-0.5 ${step.isRappel ? "text-purple-600" : "text-blue-600"}`}>
+                          {step.isRappel ? "R" : "P"}
+                        </span>
                         {step.status === "done" ? "✓" : step.status === "due" ? (step.isUrgent ? "⚠" : "→") : step.status === "pending" ? "⏳" : "○"} {step.label}
+                        {(step.status === "due" || step.status === "not_eligible") && (
+                          <span className="ml-1 opacity-60">{step.voie}</span>
+                        )}
                       </span>
                     ))}
                   </div>
@@ -725,6 +733,17 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
                           <span className="text-sm font-medium text-gray-800">{t.animalNom ?? ""}</span>
                         </div>
                         <p className="text-xs text-blue-700 font-medium mt-1">{t.medicamentNom}</p>
+                        {t.delaiAttenteViandeJ != null && (() => {
+                          const dateFin = new Date(new Date(t.dateDebut).getTime() + t.dureeJours * 86400000);
+                          const dateRetrait = new Date(dateFin.getTime() + (t.delaiAttenteViandeJ + 1) * 86400000);
+                          const jRestant = Math.ceil((dateRetrait.getTime() - Date.now()) / 86400000);
+                          if (jRestant > 0) return (
+                            <p className="text-xs text-orange-700 font-medium mt-0.5">
+                              ⏱ Attente viande : {jRestant}j restant{jRestant > 1 ? "s" : ""}
+                            </p>
+                          );
+                          return null;
+                        })()}
                       </div>
                       <div className="text-right shrink-0">
                         <div className={`text-xs font-bold ${joursRestants <= 1 ? "text-red-600" : joursRestants <= 3 ? "text-orange-500" : "text-blue-600"}`}>

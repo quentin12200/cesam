@@ -77,7 +77,7 @@ async function getAnimal(nutrav: string) {
       traitements: {
         orderBy: { dateDebut: "desc" },
         take: 10,
-        include: { medicament: { select: { delaiAttenteViandeJ: true } } },
+        include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
       },
       pesees: { orderBy: { date: "asc" } },
       velagesVache: {
@@ -617,6 +617,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 motif: t.motif,
                 statut: t.statut,
                 delaiAttenteViandeJ: t.medicament?.delaiAttenteViandeJ ?? null,
+                delaiAttenteLaitJ: t.medicament?.delaiAttenteLaitJ ?? null,
               }))}
             />
 

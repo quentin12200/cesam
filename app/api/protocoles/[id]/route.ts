@@ -10,6 +10,7 @@ export async function PATCH(
   const {
     label, actif, ageMinJours, urgenceJours,
     delaiRappelJours, urgenceRappelJours, obligatoireVente, ordre,
+    voiePrimo, voieRappel, rappelAnnuel,
   } = body;
 
   try {
@@ -24,6 +25,9 @@ export async function PATCH(
         ...(urgenceRappelJours !== undefined && { urgenceRappelJours }),
         ...(obligatoireVente !== undefined && { obligatoireVente }),
         ...(ordre !== undefined && { ordre }),
+        ...(voiePrimo !== undefined && { voiePrimo }),
+        ...(voieRappel !== undefined && { voieRappel }),
+        ...(rappelAnnuel !== undefined && { rappelAnnuel }),
       },
     });
     return NextResponse.json(protocole);

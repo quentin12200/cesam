@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     const [vachesAvecSaillies, animaux, velagesSemaine, veauxABoucler, genissesArapatrier,
-           surveillanceActive, cryptoRotavecCount, bolusCount] =
+           surveillanceActive, cryptoRotavecCount, bolusCount, chaleurJ19Raw] =
       await Promise.all([
         prisma.animal.findMany({
           where: { statut: "ACTIF", sexbov: "F", estGenisse: false },
@@ -69,6 +69,18 @@ export async function GET(request: NextRequest) {
             dateVelagePrevue: { gte: addDays(now, 21), lte: addDays(now, 45) },
           },
         }),
+        // Chaleurs J+19 à J+21 (fenêtre 72h de surveillance retour de cycle)
+        prisma.animal.findMany({
+          where: {
+            statut: "ACTIF",
+            sexbov: "F",
+            chaleurs: { some: { date: { gte: addDays(now, -21), lte: addDays(now, -18) } } },
+          },
+          include: {
+            chaleurs: { orderBy: { date: "desc" }, take: 1, select: { date: true } },
+            saillies: { orderBy: { date: "desc" }, take: 1, select: { date: true } },
+          },
+        }),
       ]);
 
     let aEchographier = 0;
@@ -83,6 +95,15 @@ export async function GET(request: NextRequest) {
       if (etat === "JAUNE") aEchographier++;
       if (etat === "ROUGE") videsEnRetard++;
     }
+
+    // Chaleurs J+19 : garder seulement celles sans saillie postérieure
+    const chaleurJ19 = chaleurJ19Raw.filter((a) => {
+      const derniereChaleur = a.chaleurs[0]?.date ?? null;
+      if (!derniereChaleur) return false;
+      const derniereSaillie = a.saillies[0]?.date ?? null;
+      if (derniereSaillie && derniereSaillie >= derniereChaleur) return false;
+      return true;
+    });
 
     let veauxAVacciner = 0;
     for (const a of animaux) {
@@ -115,6 +136,8 @@ export async function GET(request: NextRequest) {
       items.push(`${cryptoRotavecCount} Crypto/Rotavec pré-vélage`);
     if (bolusCount > 0)
       items.push(`${bolusCount} bolus pré-vélage`);
+    if (chaleurJ19.length > 0)
+      items.push(`${chaleurJ19.length} vache${chaleurJ19.length > 1 ? "s" : ""} à surveiller retour chaleur (J+19)`);
 
     const body =
       items.length === 0

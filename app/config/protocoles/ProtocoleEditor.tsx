@@ -15,6 +15,9 @@ interface EditState {
   urgenceJours: string;
   delaiRappelJours: string;
   urgenceRappelJours: string;
+  voiePrimo: string;
+  voieRappel: string;
+  rappelAnnuel: boolean;
 }
 
 export default function ProtocoleEditor({ protocoles }: Props) {
@@ -26,6 +29,9 @@ export default function ProtocoleEditor({ protocoles }: Props) {
     urgenceJours: "",
     delaiRappelJours: "",
     urgenceRappelJours: "",
+    voiePrimo: "IM",
+    voieRappel: "IM",
+    rappelAnnuel: false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -37,6 +43,9 @@ export default function ProtocoleEditor({ protocoles }: Props) {
       urgenceJours: p.urgenceJours != null ? String(p.urgenceJours) : "",
       delaiRappelJours: p.delaiRappelJours != null ? String(p.delaiRappelJours) : "",
       urgenceRappelJours: p.urgenceRappelJours != null ? String(p.urgenceRappelJours) : "",
+      voiePrimo: p.voiePrimo ?? "IM",
+      voieRappel: p.voieRappel ?? "IM",
+      rappelAnnuel: p.rappelAnnuel ?? false,
     });
   }
 
@@ -51,6 +60,9 @@ export default function ProtocoleEditor({ protocoles }: Props) {
         urgenceJours: editState.urgenceJours !== "" ? Number(editState.urgenceJours) : null,
         delaiRappelJours: editState.delaiRappelJours !== "" ? Number(editState.delaiRappelJours) : null,
         urgenceRappelJours: editState.urgenceRappelJours !== "" ? Number(editState.urgenceRappelJours) : null,
+        voiePrimo: editState.voiePrimo,
+        voieRappel: editState.voieRappel,
+        rappelAnnuel: editState.rappelAnnuel,
       }),
     });
     setSaving(false);
@@ -165,6 +177,43 @@ export default function ProtocoleEditor({ protocoles }: Props) {
                   </div>
                 </div>
               )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Voie primo-injection</label>
+                  <select
+                    value={editState.voiePrimo}
+                    onChange={(e) => setEditState((s) => ({ ...s, voiePrimo: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  >
+                    {["IM", "SC", "IV", "IN", "PO"].map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Voie rappel</label>
+                  <select
+                    value={editState.voieRappel}
+                    onChange={(e) => setEditState((s) => ({ ...s, voieRappel: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  >
+                    {["IM", "SC", "IV", "IN", "PO"].map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editState.rappelAnnuel}
+                  onChange={(e) => setEditState((s) => ({ ...s, rappelAnnuel: e.target.checked }))}
+                  className="rounded"
+                />
+                <span className="text-gray-700">Rappel annuel</span>
+              </label>
             </div>
           ) : (
             <div className="flex items-start justify-between gap-3">
@@ -186,6 +235,9 @@ export default function ProtocoleEditor({ protocoles }: Props) {
                     <>
                       <span>Âge min : {p.ageMinJours}j</span>
                       {p.urgenceJours != null && <span>Urgence : J+{p.urgenceJours}</span>}
+                      {p.voiePrimo && <span>Voie P : {p.voiePrimo}</span>}
+                      {p.voieRappel && <span>Voie R : {p.voieRappel}</span>}
+                      {p.rappelAnnuel && <span>Rappel annuel</span>}
                     </>
                   ) : (
                     <>

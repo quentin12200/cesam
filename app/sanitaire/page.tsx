@@ -55,7 +55,10 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     }),
     prisma.traitement.findMany({
       where: { statut: "EN_COURS" },
-      include: { animal: { select: { nutrav: true, nobovi: true } } },
+      include: {
+        animal: { select: { nutrav: true, nobovi: true } },
+        medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } },
+      },
       orderBy: { dateDebut: "desc" },
       take: 50,
     }),
@@ -200,6 +203,8 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     medicamentNom: t.medicamentNom,
     dateDebut: t.dateDebut.toISOString(),
     dureeJours: t.dureeJours,
+    delaiAttenteViandeJ: t.medicament?.delaiAttenteViandeJ ?? null,
+    delaiAttenteLaitJ: t.medicament?.delaiAttenteLaitJ ?? null,
   }));
 
   return { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements };
