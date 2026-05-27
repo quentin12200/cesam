@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_PROTOCOLES } from "@/lib/utils";
 import Link from "next/link";
-import { ArrowLeft, Settings } from "lucide-react";
+import { ArrowLeft, Settings, Building2 } from "lucide-react";
 import ProtocoleEditor from "./ProtocoleEditor";
 
 async function getProtocoles() {
@@ -39,10 +39,13 @@ export default async function ProtocolesConfigPage() {
         <Link href="/sanitaire" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
           <ArrowLeft size={18} />
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           <Settings size={20} className="text-gray-600" />
           <h2 className="text-xl font-bold text-gray-800">Protocoles vaccinaux</h2>
         </div>
+        <Link href="/config/exploitation" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" title="Identité exploitation">
+          <Building2 size={18} />
+        </Link>
       </div>
 
       <p className="text-sm text-gray-500">

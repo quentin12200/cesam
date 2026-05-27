@@ -43,6 +43,10 @@ export interface MedicamentItem {
   delaiAttenteViandeJ: number | null;
   prescriptionRequise: boolean;
   actif: boolean;
+  stockActuel: number | null;
+  stockUnite: string | null;
+  stockSeuilAlert: number | null;
+  recentTraitements: { date: string; animalNutrav: string; motif: string | null }[];
 }
 
 interface Props {
@@ -166,11 +170,28 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
 
 // ── Médicament card ────────────────────────────────────────────────────────────
 
+function StockBadge({ stock, seuil, unite }: { stock: number | null; seuil: number | null; unite: string | null }) {
+  if (stock == null) return null;
+  const low = seuil != null && stock <= seuil;
+  return (
+    <span className={`text-xs font-medium px-1.5 py-0.5 rounded border ${
+      low ? "bg-red-50 text-red-700 border-red-200" : "bg-green-50 text-green-700 border-green-200"
+    }`}>
+      {stock} {unite ?? "u"}
+      {low && " ⚠"}
+    </span>
+  );
+}
+
 function MedicamentCard({ med }: { med: MedicamentItem }) {
   const [editing, setEditing] = useState(false);
   const [delai, setDelai] = useState(String(med.delaiAttenteViandeJ ?? ""));
   const [voie, setVoie] = useState(med.voie ?? "");
+  const [stock, setStock] = useState(med.stockActuel != null ? String(med.stockActuel) : "");
+  const [stockUnite, setStockUnite] = useState(med.stockUnite ?? "");
+  const [stockSeuil, setStockSeuil] = useState(med.stockSeuilAlert != null ? String(med.stockSeuilAlert) : "");
   const [saving, setSaving] = useState(false);
+  const [showRecent, setShowRecent] = useState(false);
   const router = useRouter();
 
   async function toggleActif() {
@@ -190,10 +211,24 @@ function MedicamentCard({ med }: { med: MedicamentItem }) {
       body: JSON.stringify({
         voie: voie || null,
         delaiAttenteViandeJ: delai !== "" ? Number(delai) : null,
+        stockActuel: stock !== "" ? Number(stock) : null,
+        stockUnite: stockUnite || null,
+        stockSeuilAlert: stockSeuil !== "" ? Number(stockSeuil) : null,
       }),
     });
     setSaving(false);
     setEditing(false);
+    router.refresh();
+  }
+
+  async function adjustStock(delta: number) {
+    const current = med.stockActuel ?? 0;
+    const next = Math.max(0, current + delta);
+    await fetch(`/api/medicaments/${med.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stockActuel: next }),
+    });
     router.refresh();
   }
 
@@ -209,21 +244,42 @@ function MedicamentCard({ med }: { med: MedicamentItem }) {
             {med.prescriptionRequise && (
               <span className="text-xs bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-200">Rx</span>
             )}
+            <StockBadge stock={med.stockActuel} seuil={med.stockSeuilAlert} unite={med.stockUnite} />
           </div>
           {med.dci && <div className="text-xs text-gray-500 mt-0.5">{med.dci}</div>}
+
           {editing ? (
-            <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <div>
-                <label className="text-xs text-gray-400">Voie</label>
-                <input value={voie} onChange={(e) => setVoie(e.target.value)}
-                  className="block w-24 border rounded px-2 py-1 text-xs mt-0.5" placeholder="IM/SC..." />
+            <div className="mt-2 space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div>
+                  <label className="text-xs text-gray-400">Voie</label>
+                  <input value={voie} onChange={(e) => setVoie(e.target.value)}
+                    className="block w-24 border rounded px-2 py-1 text-xs mt-0.5" placeholder="IM/SC..." />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400">Délai viande (j)</label>
+                  <input type="number" min={0} value={delai} onChange={(e) => setDelai(e.target.value)}
+                    className="block w-20 border rounded px-2 py-1 text-xs mt-0.5" />
+                </div>
               </div>
-              <div>
-                <label className="text-xs text-gray-400">Délai viande (j)</label>
-                <input type="number" min={0} value={delai} onChange={(e) => setDelai(e.target.value)}
-                  className="block w-20 border rounded px-2 py-1 text-xs mt-0.5" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <div>
+                  <label className="text-xs text-gray-400">Stock actuel</label>
+                  <input type="number" min={0} step="0.5" value={stock} onChange={(e) => setStock(e.target.value)}
+                    className="block w-20 border rounded px-2 py-1 text-xs mt-0.5" placeholder="0" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400">Unité</label>
+                  <input value={stockUnite} onChange={(e) => setStockUnite(e.target.value)}
+                    className="block w-20 border rounded px-2 py-1 text-xs mt-0.5" placeholder="flacon" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400">Seuil alerte</label>
+                  <input type="number" min={0} step="0.5" value={stockSeuil} onChange={(e) => setStockSeuil(e.target.value)}
+                    className="block w-20 border rounded px-2 py-1 text-xs mt-0.5" placeholder="1" />
+                </div>
               </div>
-              <div className="flex gap-1 self-end">
+              <div className="flex gap-1">
                 <button onClick={save} disabled={saving}
                   className="p-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50">
                   <Save size={12} />
@@ -234,16 +290,51 @@ function MedicamentCard({ med }: { med: MedicamentItem }) {
               </div>
             </div>
           ) : (
-            <div className="text-xs text-gray-500 mt-0.5 flex gap-3">
-              {med.voie && <span>{med.voie}</span>}
-              {med.delaiAttenteViandeJ != null && (
-                <span className={med.delaiAttenteViandeJ > 0 ? "text-orange-600 font-medium" : "text-green-600"}>
-                  Attente viande : {med.delaiAttenteViandeJ === 0 ? "aucune" : `${med.delaiAttenteViandeJ}j`}
-                </span>
+            <>
+              <div className="text-xs text-gray-500 mt-0.5 flex gap-3">
+                {med.voie && <span>{med.voie}</span>}
+                {med.delaiAttenteViandeJ != null && (
+                  <span className={med.delaiAttenteViandeJ > 0 ? "text-orange-600 font-medium" : "text-green-600"}>
+                    Attente viande : {med.delaiAttenteViandeJ === 0 ? "aucune" : `${med.delaiAttenteViandeJ}j`}
+                  </span>
+                )}
+              </div>
+
+              {/* Stock quick-adjust */}
+              {med.stockActuel != null && (
+                <div className="flex items-center gap-1 mt-1.5">
+                  <button onClick={() => adjustStock(-1)}
+                    className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-gray-600 hover:bg-gray-200 text-sm font-bold">−</button>
+                  <span className="text-xs text-gray-600 min-w-[40px] text-center">{med.stockActuel} {med.stockUnite ?? "u"}</span>
+                  <button onClick={() => adjustStock(1)}
+                    className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-gray-600 hover:bg-gray-200 text-sm font-bold">+</button>
+                </div>
               )}
-            </div>
+
+              {/* Dernières prescriptions */}
+              {med.recentTraitements.length > 0 && (
+                <div className="mt-2">
+                  <button onClick={() => setShowRecent((v) => !v)}
+                    className="text-xs text-gray-400 hover:text-gray-600">
+                    {showRecent ? "▲" : "▼"} {med.recentTraitements.length} prescription{med.recentTraitements.length > 1 ? "s" : ""} récente{med.recentTraitements.length > 1 ? "s" : ""}
+                  </button>
+                  {showRecent && (
+                    <div className="mt-1 space-y-0.5">
+                      {med.recentTraitements.map((t, i) => (
+                        <div key={i} className="text-xs text-gray-500 flex gap-2">
+                          <span className="font-mono bg-gray-100 px-1 rounded">{t.animalNutrav}</span>
+                          <span>{new Date(t.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>
+                          {t.motif && <span className="text-gray-400 truncate">{t.motif}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
+
         <div className="flex items-center gap-1.5 shrink-0">
           {!editing && (
             <button onClick={() => setEditing(true)} className="p-1.5 text-gray-400 hover:text-gray-700 border border-transparent hover:border-gray-200 rounded">
