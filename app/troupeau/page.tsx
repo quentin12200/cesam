@@ -11,12 +11,13 @@ import {
   type CategorieAnimal,
 } from "@/lib/utils";
 import Link from "next/link";
-import { Search, Plus, SlidersHorizontal, ArrowLeft } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid } from "lucide-react";
 import { addDays, differenceInMonths } from "date-fns";
 import NouvelAnimalForm from "./NouvelAnimalForm";
 import GroupeCreateButton from "./GroupeCreateButton";
 import NutravBadge from "@/app/components/NutravBadge";
 import TroupeauScrollRestorer from "./TroupeauScrollRestorer";
+import TroupeauTableau, { type AnimalRow } from "./TroupeauTableau";
 
 interface PageProps {
   searchParams: Promise<{
@@ -31,6 +32,7 @@ interface PageProps {
     tri?: string;
     nouveau?: string;
     filtres?: string;
+    vue?: string;
   }>;
 }
 
@@ -197,6 +199,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const sanitaire = params.sanitaire;
   const groupe = params.groupe;
   const tri = params.tri;
+  const vue = params.vue;
   const showForm = params.nouveau === "1";
   const showFiltres = params.filtres === "1";
 
@@ -216,6 +219,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     if (groupe) p.groupe = groupe;
     if (tri) p.tri = tri;
     if (showFiltres) p.filtres = "1";
+    if (vue) p.vue = vue;
     Object.assign(p, overrides);
     Object.keys(p).forEach((k) => p[k] === undefined && delete p[k]);
     const qs = new URLSearchParams(p as Record<string, string>).toString();
@@ -243,7 +247,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   ];
 
   return (
-    <div className="p-4 space-y-4 max-w-2xl mx-auto pb-24">
+    <div className={`p-4 space-y-4 ${vue === "tableau" ? "max-w-5xl" : "max-w-2xl"} mx-auto pb-24`}>
       <TroupeauScrollRestorer />
       <div className="flex items-center gap-3 mt-2">
         <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
@@ -265,6 +269,15 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               {activeFiltersCount}
             </span>
           )}
+        </Link>
+        <Link
+          href={buildUrl({ vue: vue === "tableau" ? undefined : "tableau", page: "1" })}
+          className={`p-2 rounded-lg shadow transition-colors ${
+            vue === "tableau" ? "bg-green-700 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+          }`}
+          title={vue === "tableau" ? "Vue cartes" : "Vue tableau"}
+        >
+          {vue === "tableau" ? <LayoutGrid size={16} /> : <Table2 size={16} />}
         </Link>
         {!showForm && (
           <Link
@@ -542,87 +555,115 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         </span>
       </div>
 
-      {/* Liste */}
-      <div className="space-y-2">
-        {animaux.map((animal) => {
-          const cat = getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
-          const catLabel = getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
-          const catColor = getCategorieColor(cat);
-          const etat =
-            animal.sexbov === "F" && !animal.estGenisse
-              ? getEtatGestation(
-                  animal.saillies[0]?.date ?? null,
-                  animal.saillies[0]?.gestation?.etat ?? null,
-                  animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
-                  animal.velagesVache[0]?.date ?? null
-                )
-              : null;
-          const veau = animal.velagesVache[0]?.veau;
+      {/* Vue tableau */}
+      {vue === "tableau" ? (
+        <TroupeauTableau
+          animaux={animaux.map<AnimalRow>((a) => ({
+            id: a.id,
+            nutrav: a.nutrav,
+            nobovi: a.nobovi,
+            danais: a.danais.toISOString(),
+            sexbov: a.sexbov,
+            estGenisse: a.estGenisse,
+            tarieFaite: a.tarieFaite,
+            aEchographier: a.aEchographier,
+            categorie: a.categorie,
+            groupeNom: a.groupe?.nom ?? null,
+            saillieDate: a.saillies[0]?.date.toISOString() ?? null,
+            gestationEtat: a.saillies[0]?.gestation?.etat ?? null,
+            gestationVelagePrevue: a.saillies[0]?.gestation?.dateVelagePrevue?.toISOString() ?? null,
+            velageDate: a.velagesVache[0]?.date.toISOString() ?? null,
+            veauNutrav: a.velagesVache[0]?.veau?.nutrav ?? null,
+            veauStatut: a.velagesVache[0]?.veau?.statut ?? null,
+          }))}
+          tri={tri}
+          urlSortNutrav={buildUrl({ tri: undefined, page: "1" })}
+          urlSortAgeAsc={buildUrl({ tri: "age_asc", page: "1" })}
+          urlSortAgeDesc={buildUrl({ tri: "age_desc", page: "1" })}
+        />
+      ) : (
+        /* Vue cartes */
+        <div className="space-y-2">
+          {animaux.map((animal) => {
+            const cat = getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
+            const catLabel = getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
+            const catColor = getCategorieColor(cat);
+            const etat =
+              animal.sexbov === "F" && !animal.estGenisse
+                ? getEtatGestation(
+                    animal.saillies[0]?.date ?? null,
+                    animal.saillies[0]?.gestation?.etat ?? null,
+                    animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
+                    animal.velagesVache[0]?.date ?? null
+                  )
+                : null;
+            const veau = animal.velagesVache[0]?.veau;
 
-          return (
-            <Link
-              key={animal.id}
-              href={`/troupeau/${animal.nutrav}`}
-              className="block bg-white rounded-xl shadow p-4 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <NutravBadge nutrav={animal.nutrav} />
-                  <div className="min-w-0">
-                    <div className="font-semibold text-gray-800 text-sm truncate">
-                      {animal.nobovi ?? <span className="text-gray-400 italic">Sans nom</span>}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      <span className="text-xs text-gray-500">{formatAge(animal.danais)}</span>
-                      <span className="text-gray-300">·</span>
-                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${catColor}`}>
-                        {animal.sexbov === "F" ? "♀" : "♂"} {catLabel}
-                      </span>
-                      {animal.tarieFaite && (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
-                          Tarie
+            return (
+              <Link
+                key={animal.id}
+                href={`/troupeau/${animal.nutrav}`}
+                className="block bg-white rounded-xl shadow p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <NutravBadge nutrav={animal.nutrav} />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-gray-800 text-sm truncate">
+                        {animal.nobovi ?? <span className="text-gray-400 italic">Sans nom</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="text-xs text-gray-500">{formatAge(animal.danais)}</span>
+                        <span className="text-gray-300">·</span>
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${catColor}`}>
+                          {animal.sexbov === "F" ? "♀" : "♂"} {catLabel}
                         </span>
-                      )}
-                      {animal.aEchographier && (
-                        <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium">
-                          À écho
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {etat && (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getBadgeClass(etat)}`}>
-                          {etat === "VERT" ? "Pleine"
-                            : etat === "ROSE" ? "Imminente"
-                            : etat === "JAUNE" ? "À écho"
-                            : etat === "GRIS" ? "En attente"
-                            : "Vide"}
-                        </span>
-                      )}
-                      {veau && veau.statut === "ACTIF" && (
-                        <span className="text-xs text-blue-600 font-mono bg-blue-50 px-1.5 py-0.5 rounded">
-                          🐮 {veau.nutrav}
-                        </span>
-                      )}
-                      {animal.groupe && (
-                        <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-                          {animal.groupe.nom}
-                        </span>
-                      )}
+                        {animal.tarieFaite && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
+                            Tarie
+                          </span>
+                        )}
+                        {animal.aEchographier && (
+                          <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium">
+                            À écho
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {etat && (
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getBadgeClass(etat)}`}>
+                            {etat === "VERT" ? "Pleine"
+                              : etat === "ROSE" ? "Imminente"
+                              : etat === "JAUNE" ? "À écho"
+                              : etat === "GRIS" ? "En attente"
+                              : "Vide"}
+                          </span>
+                        )}
+                        {veau && veau.statut === "ACTIF" && (
+                          <span className="text-xs text-blue-600 font-mono bg-blue-50 px-1.5 py-0.5 rounded">
+                            🐮 {veau.nutrav}
+                          </span>
+                        )}
+                        {animal.groupe && (
+                          <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+                            {animal.groupe.nom}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  <svg className="text-gray-400 flex-shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
                 </div>
-                <svg className="text-gray-400 flex-shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
-              </div>
-            </Link>
-          );
-        })}
-        {animaux.length === 0 && (
-          <div className="text-center text-gray-500 py-12 bg-white rounded-xl shadow">
-            Aucun animal trouvé
-          </div>
-        )}
-      </div>
+              </Link>
+            );
+          })}
+          {animaux.length === 0 && (
+            <div className="text-center text-gray-500 py-12 bg-white rounded-xl shadow">
+              Aucun animal trouvé
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Pagination */}
       {pages > 1 && (
