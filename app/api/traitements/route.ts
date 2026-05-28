@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -50,5 +51,11 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json(traitement, { status: 201 });
+  const desc = `Traitement ${traitement.medicamentNom} enregistré pour ${traitement.animal.nutrav}`;
+  let undoId = "";
+  try {
+    undoId = await logAction("CREATE_TRAITEMENT", desc, { op: "delete", model: "traitement", id: traitement.id });
+  } catch {}
+
+  return NextResponse.json({ ...traitement, _undoId: undoId, _undoDesc: desc }, { status: 201 });
 }

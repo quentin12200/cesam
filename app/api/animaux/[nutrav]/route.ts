@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 
 export async function GET(
   _request: NextRequest,
@@ -57,6 +58,30 @@ export async function PATCH(
   });
   if (!animal) return NextResponse.json({ error: "Animal non trouvé" }, { status: 404 });
 
+  // Capture previous values for undo
+  const prevFields: Record<string, unknown> = {};
+  if ("nobovi"        in body) prevFields.nobovi        = animal.nobovi;
+  if ("statut"        in body) prevFields.statut        = animal.statut;
+  if ("estGenisse"    in body) prevFields.estGenisse    = animal.estGenisse;
+  if ("notes"         in body) prevFields.notes         = animal.notes;
+  if ("danais"        in body) prevFields.danais        = animal.danais;
+  if ("boucleFaite"   in body) prevFields.boucleFaite   = animal.boucleFaite;
+  if ("sevreFait"     in body) prevFields.sevreFait     = animal.sevreFait;
+  if ("tarieFaite"    in body) prevFields.tarieFaite    = animal.tarieFaite;
+  if ("categorie"     in body) prevFields.categorie     = animal.categorie;
+  if ("groupeId"      in body) prevFields.groupeId      = animal.groupeId;
+  if ("aEchographier" in body) prevFields.aEchographier = animal.aEchographier;
+
+  // Read mère's tarieFaite BEFORE cascade update
+  let merePrevTarieFaite: boolean | undefined;
+  if (body.sevreFait === true) {
+    const mereNutrav = animal.velageVeau?.vache?.nutrav;
+    if (mereNutrav) {
+      const mere = await prisma.animal.findUnique({ where: { nutrav: mereNutrav }, select: { tarieFaite: true } });
+      merePrevTarieFaite = mere?.tarieFaite;
+    }
+  }
+
   const data: Record<string, unknown> = { updatedAt: new Date() };
   if ("nobovi"       in body) data.nobovi       = body.nobovi?.trim() || null;
   if ("statut"       in body) data.statut       = body.statut;
@@ -83,6 +108,21 @@ export async function PATCH(
     }
   }
 
-  return NextResponse.json({ success: true, animal: updated });
+  const desc = `Animal ${nutrav}${animal.nobovi ? ` (${animal.nobovi})` : ''} modifié`;
+  let undoId = "";
+  try {
+    const revertSteps: Array<{ op: string; model: string; where?: Record<string, unknown>; data?: Record<string, unknown> }> = [
+      { op: "update", model: "animal", where: { nutrav }, data: prevFields },
+    ];
+    if (body.sevreFait === true) {
+      const mereNutrav = animal.velageVeau?.vache?.nutrav;
+      if (mereNutrav && merePrevTarieFaite !== undefined) {
+        revertSteps.push({ op: "update", model: "animal", where: { nutrav: mereNutrav }, data: { tarieFaite: merePrevTarieFaite } });
+      }
+    }
+    undoId = await logAction("PATCH_ANIMAL", desc, revertSteps as Parameters<typeof logAction>[2]);
+  } catch {}
+
+  return NextResponse.json({ success: true, animal: updated, _undoId: undoId, _undoDesc: desc });
 }
 

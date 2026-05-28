@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +15,9 @@ export async function POST(request: NextRequest) {
     if (!vache) {
       return NextResponse.json({ error: `Vache avec NUTRAV ${vacheNutrav} non trouvée` }, { status: 404 });
     }
+
+    // Capture previous tarieFaite for revert
+    const prevTarieFaite = vache.tarieFaite;
 
     let veauId: string | undefined;
     if (veauNutrav) {
@@ -60,7 +64,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(velage, { status: 201 });
+    const desc = `Vêlage enregistré pour ${vache.nobovi ?? vacheNutrav}`;
+    let undoId = "";
+    try {
+      undoId = await logAction("CREATE_VELAGE", desc, [
+        { op: "delete", model: "velage", id: velage.id },
+        { op: "update", model: "animal", where: { nutrav: vacheNutrav }, data: { tarieFaite: prevTarieFaite } },
+      ]);
+    } catch {}
+
+    return NextResponse.json({ ...velage, _undoId: undoId, _undoDesc: desc }, { status: 201 });
   } catch (err) {
     console.error("POST /api/velages error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

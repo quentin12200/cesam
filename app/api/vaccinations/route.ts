@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,7 +37,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(vaccination, { status: 201 });
+    const resolvedNutrav = nutrav ?? null;
+    const desc = `Vaccination ${vaccin} enregistrée${resolvedNutrav ? ` pour ${resolvedNutrav}` : ""}`;
+    let undoId = "";
+    try {
+      undoId = await logAction("CREATE_VACCINATION", desc, { op: "delete", model: "vaccination", id: vaccination.id });
+    } catch {}
+
+    return NextResponse.json({ ...vaccination, _undoId: undoId, _undoDesc: desc }, { status: 201 });
   } catch (err) {
     console.error("POST /api/vaccinations error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

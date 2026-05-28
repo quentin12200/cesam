@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { logAction } from "@/lib/action-log";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -104,7 +105,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ nutrav: animal.nutrav }, { status: 201 });
+    const desc = `Animal ${animal.nutrav}${animal.nobovi ? ` (${animal.nobovi})` : ''} ajouté`;
+    let undoId = "";
+    try {
+      undoId = await logAction("CREATE_ANIMAL", desc, { op: "delete", model: "animal", id: animal.id });
+    } catch {}
+
+    return NextResponse.json({ nutrav: animal.nutrav, _undoId: undoId, _undoDesc: desc }, { status: 201 });
   } catch (err) {
     console.error("POST /api/animaux error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

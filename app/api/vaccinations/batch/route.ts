@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,8 +36,21 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const result = await prisma.vaccination.createMany({ data });
-    return NextResponse.json({ count: result.count }, { status: 201 });
+    const vaccinations = await Promise.all(
+      data.map((d) => prisma.vaccination.create({ data: d }))
+    );
+
+    const desc = `Session vaccination : ${vaccinations.length} animal(s) vacciné(s)`;
+    let undoId = "";
+    try {
+      undoId = await logAction(
+        "BATCH_VACCINATION",
+        desc,
+        vaccinations.map((v) => ({ op: "delete" as const, model: "vaccination", id: v.id }))
+      );
+    } catch {}
+
+    return NextResponse.json({ count: vaccinations.length, _undoId: undoId, _undoDesc: desc }, { status: 201 });
   } catch (err) {
     console.error("POST /api/vaccinations/batch error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

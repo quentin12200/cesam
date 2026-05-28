@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 
 export async function GET() {
   const taureaux = await prisma.taureau.findMany({
@@ -34,7 +35,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(taureau, { status: 201 });
+    const desc = `Taureau ${taureau.nopere ?? taureau.nupere} ajouté`;
+    let undoId = "";
+    try {
+      undoId = await logAction("CREATE_TAUREAU", desc, { op: "delete", model: "taureau", id: taureau.id });
+    } catch {}
+
+    return NextResponse.json({ ...taureau, _undoId: undoId, _undoDesc: desc }, { status: 201 });
   } catch (err) {
     console.error("POST /api/taureaux error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
@@ -54,8 +61,22 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const taureau = await prisma.taureau.findUnique({ where: { id } });
+    if (!taureau) return NextResponse.json({ error: "Taureau non trouvé" }, { status: 404 });
+
     await prisma.taureau.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+
+    const desc = `Taureau ${taureau.nopere ?? taureau.nupere} supprimé`;
+    let undoId = "";
+    try {
+      undoId = await logAction("DELETE_TAUREAU", desc, {
+        op: "create",
+        model: "taureau",
+        data: { id: taureau.id, nupere: taureau.nupere, nopere: taureau.nopere, traper: taureau.traper, present: taureau.present, updatedAt: new Date() },
+      });
+    } catch {}
+
+    return NextResponse.json({ ok: true, _undoId: undoId, _undoDesc: desc });
   } catch (err) {
     console.error("DELETE /api/taureaux error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_PROTOCOLES } from "@/lib/utils";
+import { logAction } from "@/lib/action-log";
 
 export async function GET() {
   let protocoles = await prisma.protocoleVaccin.findMany({
@@ -53,7 +54,13 @@ export async function POST(request: NextRequest) {
         actif: true,
       },
     });
-    return NextResponse.json(protocole, { status: 201 });
+    const desc = `Protocole '${protocole.label}' créé`;
+    let undoId = "";
+    try {
+      undoId = await logAction("CREATE_PROTOCOLE", desc, { op: "delete", model: "protocoleVaccin", id: protocole.id });
+    } catch {}
+
+    return NextResponse.json({ ...protocole, _undoId: undoId, _undoDesc: desc }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Ce nom existe déjà" }, { status: 409 });
   }

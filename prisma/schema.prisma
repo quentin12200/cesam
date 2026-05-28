@@ -381,3 +381,13 @@ model NoteTerrain {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model ActionLog {
+  id          String    @id @default(cuid())
+  type        String
+  description String
+  revertData  String
+  reverted    Boolean   @default(false)
+  revertedAt  DateTime?
+  createdAt   DateTime  @default(now())
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { webpush } from "@/lib/push";
+import { logAction } from "@/lib/action-log";
 
 export async function GET() {
   const notes = await prisma.noteTerrain.findMany({
@@ -52,5 +53,11 @@ export async function POST(request: NextRequest) {
     // Push failure doesn't fail the note creation
   }
 
-  return NextResponse.json(note, { status: 201 });
+  const desc = "Note terrain enregistrée";
+  let undoId = "";
+  try {
+    undoId = await logAction("CREATE_NOTE", desc, { op: "delete", model: "noteTerrain", id: note.id });
+  } catch {}
+
+  return NextResponse.json({ ...note, _undoId: undoId, _undoDesc: desc }, { status: 201 });
 }

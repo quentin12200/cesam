@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,6 +58,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const animal = await prisma.animal.findUnique({
+      where: { id: animalId },
+      select: { nutrav: true, nobovi: true },
+    });
+
     const prixPrevuHT =
       prixKilo && poids ? Math.round(prixKilo * poids * 100) / 100 : null;
 
@@ -82,7 +88,16 @@ export async function POST(request: NextRequest) {
       data: { statut: "SORTI", updatedAt: new Date() },
     });
 
-    return NextResponse.json(sortie, { status: 201 });
+    const desc = `Sortie ${type.toLowerCase()} : ${animal?.nobovi ?? animal?.nutrav ?? animalId}`;
+    let undoId = "";
+    try {
+      undoId = await logAction("CREATE_SORTIE", desc, [
+        { op: "delete", model: "sortie", id: sortie.id },
+        { op: "update", model: "animal", where: { id: animalId }, data: { statut: "ACTIF" } },
+      ]);
+    } catch {}
+
+    return NextResponse.json({ ...sortie, _undoId: undoId, _undoDesc: desc }, { status: 201 });
   } catch (err) {
     console.error("POST /api/sorties error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
