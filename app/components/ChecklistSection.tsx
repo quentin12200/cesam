@@ -18,6 +18,7 @@ export interface SubItem {
   nom: string | null;
   ageLabel: string;
   extra?: string;
+  apiField?: string;
 }
 
 const COLOR_MAP = {
@@ -178,7 +179,48 @@ export interface ChecklistSectionProps {
   subSection?: {
     title: string;
     items: SubItem[];
+    actionLabel?: string;
   };
+}
+
+function SubActionButton({
+  item,
+  actionLabel,
+  color,
+  onDone,
+}: {
+  item: SubItem;
+  actionLabel: string;
+  color: keyof typeof COLOR_MAP;
+  onDone: (nutrav: string) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const c = COLOR_MAP[color];
+
+  async function handleClick() {
+    if (!item.apiField || loading) return;
+    setLoading(true);
+    try {
+      await fetch(`/api/animaux/${item.nutrav}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [item.apiField]: true }),
+      });
+      onDone(item.nutrav);
+    } catch {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors ${c.btn} disabled:opacity-50`}
+    >
+      {loading ? "…" : actionLabel}
+    </button>
+  );
 }
 
 export default function ChecklistSection({
@@ -190,6 +232,7 @@ export default function ChecklistSection({
   subSection,
 }: ChecklistSectionProps) {
   const [items, setItems] = useState(initialItems);
+  const [subItems, setSubItems] = useState(subSection?.items ?? []);
   const [subOpen, setSubOpen] = useState(false);
   const c = COLOR_MAP[color];
 
@@ -197,7 +240,11 @@ export default function ChecklistSection({
     setItems((prev) => prev.filter((i) => i.nutrav !== nutrav));
   }
 
-  if (items.length === 0 && (!subSection || subSection.items.length === 0)) {
+  function handleSubDone(nutrav: string) {
+    setSubItems((prev) => prev.filter((i) => i.nutrav !== nutrav));
+  }
+
+  if (items.length === 0 && subItems.length === 0) {
     return null;
   }
 
@@ -236,18 +283,18 @@ export default function ChecklistSection({
         </div>
       )}
 
-      {subSection && subSection.items.length > 0 && (
+      {subSection && subItems.length > 0 && (
         <div className={items.length > 0 ? "mt-3 pt-3 border-t border-gray-100" : ""}>
           <button
             onClick={() => setSubOpen((o) => !o)}
             className="flex items-center gap-1.5 text-xs text-gray-500 font-medium w-full py-1 hover:text-gray-700"
           >
             {subOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {subSection.title} ({subSection.items.length})
+            {subSection.title} ({subItems.length})
           </button>
           {subOpen && (
             <div className="space-y-2 mt-2">
-              {subSection.items.map((item) => (
+              {subItems.map((item) => (
                 <div
                   key={item.nutrav}
                   className="flex items-center justify-between p-2.5 rounded-lg bg-gray-50 border border-gray-100"
@@ -271,7 +318,16 @@ export default function ChecklistSection({
                       </div>
                     )}
                   </div>
-                  <span className="text-xs text-gray-400 flex-shrink-0 ml-2">bientôt</span>
+                  {item.apiField && subSection.actionLabel ? (
+                    <SubActionButton
+                      item={item}
+                      actionLabel={subSection.actionLabel}
+                      color={color}
+                      onDone={handleSubDone}
+                    />
+                  ) : (
+                    <span className="text-xs text-gray-400 flex-shrink-0 ml-2">bientôt</span>
+                  )}
                 </div>
               ))}
             </div>

@@ -3,10 +3,8 @@ import { differenceInMonths, differenceInDays, addMonths, addDays } from "date-f
 // ── Catégories métier ────────────────────────────────────────────────────────
 export type CategorieAnimal =
   | "VEAU_M"
-  | "VEAU_F"
   | "VELLE"
   | "PRESELECTION_GENISSE"
-  | "GENISSE_VALIDEE"
   | "PETITE_GENISSE"
   | "MOYENNE_GENISSE"
   | "GRANDE_GENISSE"
@@ -14,11 +12,9 @@ export type CategorieAnimal =
   | "VACHE";
 
 export const CATEGORIES_LABELS: Record<CategorieAnimal, string> = {
-  VEAU_M: "Veau mâle",
-  VEAU_F: "Veau femelle",
+  VEAU_M: "Veau",
   VELLE: "Velle",
   PRESELECTION_GENISSE: "Présélection génisse",
-  GENISSE_VALIDEE: "Génisse validée",
   PETITE_GENISSE: "Petite génisse",
   MOYENNE_GENISSE: "Moyenne génisse",
   GRANDE_GENISSE: "Grande génisse",
@@ -27,7 +23,7 @@ export const CATEGORIES_LABELS: Record<CategorieAnimal, string> = {
 };
 
 export const CATEGORIES_FEMELLES: CategorieAnimal[] = [
-  "VEAU_F", "VELLE", "PRESELECTION_GENISSE", "GENISSE_VALIDEE",
+  "VELLE", "PRESELECTION_GENISSE",
   "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "VACHE",
 ];
 
@@ -39,7 +35,9 @@ export function getCategorieAuto(sexbov: string, danais: Date, estGenisse: boole
   if (sexbov === "M") {
     return ageMois >= 15 ? "TAUREAU" : "VEAU_M";
   }
-  if (!estGenisse) return "VACHE";
+  if (!estGenisse) {
+    return ageMois < 12 ? "VELLE" : "VACHE";
+  }
   if (ageMois < 12) return "PETITE_GENISSE";
   if (ageMois < 24) return "MOYENNE_GENISSE";
   return "GRANDE_GENISSE";
@@ -60,15 +58,13 @@ export function getCategorieLabel(
   return CATEGORIES_LABELS[cat];
 }
 
-export function getCategorieColor(cat: CategorieAnimal): string {
+export function getCategorieColor(cat: CategorieAnimal | string): string {
   switch (cat) {
     case "VACHE": return "bg-purple-100 text-purple-800";
     case "TAUREAU": return "bg-blue-100 text-blue-800";
     case "VEAU_M": return "bg-sky-100 text-sky-800";
-    case "VEAU_F": return "bg-pink-100 text-pink-800";
     case "VELLE": return "bg-orange-100 text-orange-800";
     case "PRESELECTION_GENISSE": return "bg-yellow-100 text-yellow-800";
-    case "GENISSE_VALIDEE": return "bg-green-100 text-green-800";
     case "PETITE_GENISSE": return "bg-lime-100 text-lime-800";
     case "MOYENNE_GENISSE": return "bg-emerald-100 text-emerald-800";
     case "GRANDE_GENISSE": return "bg-teal-100 text-teal-800";

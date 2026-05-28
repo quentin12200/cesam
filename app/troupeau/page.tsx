@@ -93,9 +93,17 @@ async function getAnimaux(params: {
     const ageMoisMax = (m: number) => addDays(now, -(m * 30.44));
     switch (categorie as CategorieAnimal) {
       case "VACHE":
-        where.categorie = null;
         where.sexbov = "F";
         where.estGenisse = false;
+        where.danais = { lt: addDays(now, -365) };
+        where.categorie = null;
+        break;
+      case "VELLE":
+        where.sexbov = "F";
+        where.OR = [
+          { estGenisse: false, danais: { gte: addDays(now, -365) }, categorie: null },
+          { categorie: "VELLE" },
+        ];
         break;
       case "TAUREAU":
         where.sexbov = "M";
@@ -122,14 +130,14 @@ async function getAnimaux(params: {
         where.danais = { gte: addDays(now, -1095), lt: addDays(now, -730) };
         break;
       default:
-        // VEAU_F, VELLE, PRESELECTION_GENISSE, GENISSE_VALIDEE — filtre direct par champ categorie
+        // PRESELECTION_GENISSE et autres — filtre direct par champ categorie
         where.categorie = categorie;
     }
   }
 
   const orderBy: Prisma.AnimalOrderByWithRelationInput =
-    tri === "age_asc" ? { danais: "desc" }
-    : tri === "age_desc" ? { danais: "asc" }
+    tri === "age_asc" ? { danais: "asc" }
+    : tri === "age_desc" ? { danais: "desc" }
     : { nutrav: "asc" };
 
   const [total, animaux, groupes] = await Promise.all([
@@ -231,7 +239,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
 
   const CATS_M: { value: string; label: string }[] = [
     { value: "TAUREAU", label: "Taureaux" },
-    { value: "VEAU_M", label: "Veaux mâles" },
+    { value: "VEAU_M", label: "Veaux" },
   ];
 
   return (
@@ -284,6 +292,30 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                 Réinitialiser tout
               </Link>
             )}
+          </div>
+
+          {/* Tri — placé en premier */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-1.5">Trier par</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {[
+                { value: undefined, label: "N° Travail" },
+                { value: "age_asc", label: "Plus jeune d'abord" },
+                { value: "age_desc", label: "Plus âgé d'abord" },
+              ].map((opt) => (
+                <Link
+                  key={opt.label}
+                  href={buildUrl({ tri: opt.value, page: "1" })}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    tri === opt.value || (!tri && !opt.value)
+                      ? "bg-green-700 text-white border-green-700"
+                      : "bg-white text-gray-600 border-gray-200"
+                  }`}
+                >
+                  {opt.label}
+                </Link>
+              ))}
+            </div>
           </div>
 
           {/* Sexe */}
@@ -478,29 +510,6 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             <GroupeCreateButton />
           </div>
 
-          {/* Tri */}
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Trier par</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {[
-                { value: undefined, label: "N° Travail" },
-                { value: "age_asc", label: "Plus jeune d'abord" },
-                { value: "age_desc", label: "Plus âgé d'abord" },
-              ].map((opt) => (
-                <Link
-                  key={opt.label}
-                  href={buildUrl({ tri: opt.value, page: "1" })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    tri === opt.value || (!tri && !opt.value)
-                      ? "bg-green-700 text-white border-green-700"
-                      : "bg-white text-gray-600 border-gray-200"
-                  }`}
-                >
-                  {opt.label}
-                </Link>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
