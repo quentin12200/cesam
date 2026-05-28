@@ -16,8 +16,7 @@ export async function POST(
   const steps: RevertStep[] = Array.isArray(raw) ? raw : [raw];
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = prisma as any;
+    const db = prisma as Record<string, { delete: (a: unknown) => Promise<unknown>; update: (a: unknown) => Promise<unknown>; create: (a: unknown) => Promise<unknown> }>;
     for (const step of steps) {
       if (step.op === "delete") {
         await db[step.model].delete({ where: { id: step.id } });
