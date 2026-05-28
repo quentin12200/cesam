@@ -51,7 +51,10 @@ export async function PATCH(
   const { nutrav } = await params;
   const body = await request.json();
 
-  const animal = await prisma.animal.findUnique({ where: { nutrav } });
+  const animal = await prisma.animal.findUnique({
+    where: { nutrav },
+    include: { velageVeau: { select: { vache: { select: { nutrav: true } } } } },
+  });
   if (!animal) return NextResponse.json({ error: "Animal non trouvé" }, { status: 404 });
 
   const data: Record<string, unknown> = { updatedAt: new Date() };
@@ -68,6 +71,18 @@ export async function PATCH(
   if ("aEchographier" in body) data.aEchographier = Boolean(body.aEchographier);
 
   const updated = await prisma.animal.update({ where: { nutrav }, data });
+
+  // Cascade sevrage → mère devient tarie automatiquement
+  if (body.sevreFait === true) {
+    const mereNutrav = animal.velageVeau?.vache?.nutrav;
+    if (mereNutrav) {
+      await prisma.animal.update({
+        where: { nutrav: mereNutrav },
+        data: { tarieFaite: true },
+      });
+    }
+  }
+
   return NextResponse.json({ success: true, animal: updated });
 }
 

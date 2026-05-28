@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, addDays } from "date-fns";
-import { getEtatGestation, getVaccinsManquants, formatAge, formatDateShort } from "@/lib/utils";
+import { getEtatGestation, getVaccinsManquants, formatAge } from "@/lib/utils";
 import Link from "next/link";
 import CowIcon from "@/components/CowIcon";
 import Collapsible from "@/app/components/Collapsible";
@@ -20,7 +20,6 @@ import {
   Tag,
   Scissors,
   Activity,
-  MilkOff,
   Pill,
 } from "lucide-react";
 
@@ -46,7 +45,6 @@ async function getDashboardData() {
     veauxABouclerList,
     veauxASevrerList,
     veauxPresqueSevrables,
-    vachesATarirList,
     genissesArapatrier,
     vachesACapteur,
     nbVaches,
@@ -146,24 +144,6 @@ async function getDashboardData() {
         },
       },
       orderBy: { danais: "asc" },
-    }),
-    prisma.gestation.findMany({
-      where: {
-        etat: { in: ["VERT", "ROSE"] },
-        dateVelagePrevue: { gte: addDays(now, 40), lte: addDays(now, 70) },
-        saillie: {
-          animal: { statut: "ACTIF", sexbov: "F", estGenisse: false, tarieFaite: false },
-        },
-      },
-      select: {
-        dateVelagePrevue: true,
-        saillie: {
-          select: {
-            animal: { select: { nutrav: true, nobovi: true, danais: true } },
-          },
-        },
-      },
-      orderBy: { dateVelagePrevue: "asc" },
     }),
     prisma.gestation.findMany({
       where: {
@@ -298,22 +278,7 @@ async function getDashboardData() {
       extra: mere
         ? `Mère: ${mere.nutrav}${mere.nobovi ? " " + mere.nobovi : ""}`
         : undefined,
-    };
-  });
-
-  const tarirItems: ChecklistItem[] = vachesATarirList.map((g) => {
-    const a = g.saillie.animal;
-    const joursRestants = g.dateVelagePrevue
-      ? differenceInDays(g.dateVelagePrevue, now)
-      : null;
-    return {
-      nutrav: a.nutrav,
-      nom: a.nobovi ?? null,
-      ageLabel: formatAge(a.danais),
-      extra: g.dateVelagePrevue
-        ? `Vélage: ${formatDateShort(g.dateVelagePrevue)} (J-${joursRestants})`
-        : undefined,
-      apiField: "tarieFaite",
+      apiField: "sevreFait",
     };
   });
 
@@ -333,7 +298,6 @@ async function getDashboardData() {
     bouclageItems,
     sevrageItems,
     presqueSevrables,
-    tarirItems,
     genissesArapatrier,
     vachesACapteur,
     nbVaches,
@@ -556,15 +520,6 @@ export default async function Dashboard() {
         </div>
       )}
 
-      {/* CHECKLIST: Vaches à tarir */}
-      <ChecklistSection
-        title="Vaches à tarir"
-        icon={<MilkOff size={18} />}
-        items={data.tarirItems}
-        actionLabel="Tarie"
-        color="blue"
-      />
-
       {/* CHECKLIST: Veaux à boucler */}
       <ChecklistSection
         title="Veaux à boucler"
@@ -583,7 +538,7 @@ export default async function Dashboard() {
         color="green"
         subSection={
           data.presqueSevrables.length > 0
-            ? { title: "Presque sevrables (5–6 mois)", items: data.presqueSevrables }
+            ? { title: "Presque sevrables (5–6 mois)", items: data.presqueSevrables, actionLabel: "Sevrer quand même" }
             : undefined
         }
       />

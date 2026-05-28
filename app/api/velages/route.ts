@@ -46,6 +46,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Au vêlage, la vache redevient non tarie
+    await prisma.animal.update({
+      where: { nutrav: vacheNutrav },
+      data: { tarieFaite: false },
+    });
+
     // Si capteur utilisé, libérer ce capteur
     if (capteur) {
       await prisma.capteurVelage.updateMany({
