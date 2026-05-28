@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { addDays, differenceInDays } from "date-fns";
+import { logAction, RevertStep } from "@/lib/action-log";
 
 const DUREE_GESTATION = 285; // jours — Blonde Aquitaine
 
@@ -21,6 +22,11 @@ export async function POST(request: NextRequest) {
     if (!saillie) {
       return NextResponse.json({ error: "Saillie non trouvée" }, { status: 404 });
     }
+
+    // Capture previous states for undo
+    const prevGestation = saillie.gestation ? { ...saillie.gestation } : null;
+    const prevAnimal = await prisma.animal.findUnique({ where: { id: saillie.animalId }, select: { aEchographier: true } });
+    const prevAEchographier = prevAnimal?.aEchographier ?? false;
 
     const nouvelEtat = resultat === "PLEINE" ? "VERT" : "ROUGE";
 
@@ -63,7 +69,35 @@ export async function POST(request: NextRequest) {
       }),
     ]);
 
-    return NextResponse.json(gestation, { status: saillie.gestation ? 200 : 201 });
+    const desc = `Échographie ${resultat === "PLEINE" ? "positive" : "négative"} enregistrée`;
+    let undoId = "";
+    try {
+      const revertSteps: RevertStep[] = [];
+      if (prevGestation) {
+        // Gestation existed before — revert to previous state
+        revertSteps.push({
+          op: "update",
+          model: "gestation",
+          where: { id: prevGestation.id },
+          data: {
+            etat: prevGestation.etat,
+            dateEcho: prevGestation.dateEcho,
+            resultatEcho: prevGestation.resultatEcho,
+            joursGestation: prevGestation.joursGestation,
+            dateVelagePrevue: prevGestation.dateVelagePrevue,
+          },
+        });
+      } else {
+        // Gestation was created new — delete it
+        revertSteps.push({ op: "delete", model: "gestation", id: gestation.id });
+      }
+      // Restore animal's aEchographier flag
+      revertSteps.push({ op: "update", model: "animal", where: { id: saillie.animalId }, data: { aEchographier: prevAEchographier } });
+
+      undoId = await logAction("CREATE_ECHOGRAPHIE", desc, revertSteps);
+    } catch {}
+
+    return NextResponse.json({ ...gestation, _undoId: undoId, _undoDesc: desc }, { status: saillie.gestation ? 200 : 201 });
   } catch (err) {
     console.error("POST /api/echographies error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

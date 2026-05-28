@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 
 export async function GET() {
   const medicaments = await prisma.medicament.findMany({ orderBy: { nom: "asc" } });
@@ -26,7 +27,13 @@ export async function POST(request: NextRequest) {
         actif: true,
       },
     });
-    return NextResponse.json(med, { status: 201 });
+    const desc = `Médicament '${med.nom}' ajouté`;
+    let undoId = "";
+    try {
+      undoId = await logAction("CREATE_MEDICAMENT", desc, { op: "delete", model: "medicament", id: med.id });
+    } catch {}
+
+    return NextResponse.json({ ...med, _undoId: undoId, _undoDesc: desc }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Ce nom existe déjà" }, { status: 409 });
   }

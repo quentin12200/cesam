@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +24,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, pesee });
+    const desc = `Pesée ${pesee.poids}kg enregistrée pour ${nutrav}`;
+    let undoId = "";
+    try {
+      undoId = await logAction("CREATE_PESEE", desc, { op: "delete", model: "pesee", id: pesee.id });
+    } catch {}
+
+    return NextResponse.json({ success: true, pesee, _undoId: undoId, _undoDesc: desc });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/action-log";
 
 export async function PATCH(
   request: NextRequest,
@@ -12,6 +13,23 @@ export async function PATCH(
     delaiAttenteViandeJ, prescriptionRequise, actif,
     stockActuel, stockUnite, stockSeuilAlert,
   } = body;
+
+  const prev = await prisma.medicament.findUnique({ where: { id } });
+  if (!prev) return NextResponse.json({ error: "Médicament non trouvé" }, { status: 404 });
+
+  const prevFields: Record<string, unknown> = {};
+  if (nom !== undefined) prevFields.nom = prev.nom;
+  if (dci !== undefined) prevFields.dci = prev.dci;
+  if (categorie !== undefined) prevFields.categorie = prev.categorie;
+  if (voie !== undefined) prevFields.voie = prev.voie;
+  if (dosagePourKg !== undefined) prevFields.dosagePourKg = prev.dosagePourKg;
+  if (uniteDosage !== undefined) prevFields.uniteDosage = prev.uniteDosage;
+  if (delaiAttenteViandeJ !== undefined) prevFields.delaiAttenteViandeJ = prev.delaiAttenteViandeJ;
+  if (prescriptionRequise !== undefined) prevFields.prescriptionRequise = prev.prescriptionRequise;
+  if (actif !== undefined) prevFields.actif = prev.actif;
+  if (stockActuel !== undefined) prevFields.stockActuel = prev.stockActuel;
+  if (stockUnite !== undefined) prevFields.stockUnite = prev.stockUnite;
+  if (stockSeuilAlert !== undefined) prevFields.stockSeuilAlert = prev.stockSeuilAlert;
 
   try {
     const med = await prisma.medicament.update({
@@ -31,7 +49,14 @@ export async function PATCH(
         ...(stockSeuilAlert !== undefined && { stockSeuilAlert: stockSeuilAlert != null ? Number(stockSeuilAlert) : null }),
       },
     });
-    return NextResponse.json(med);
+
+    const desc = `Médicament '${prev.nom}' mis à jour`;
+    let undoId = "";
+    try {
+      undoId = await logAction("PATCH_MEDICAMENT", desc, { op: "update", model: "medicament", where: { id }, data: prevFields });
+    } catch {}
+
+    return NextResponse.json({ ...med, _undoId: undoId, _undoDesc: desc });
   } catch {
     return NextResponse.json({ error: "Médicament non trouvé" }, { status: 404 });
   }
