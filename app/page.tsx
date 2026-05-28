@@ -11,6 +11,7 @@ import ChecklistSection, {
   type SubItem,
 } from "@/app/components/ChecklistSection";
 import QuickSearch from "@/app/components/QuickSearch";
+import NotesTerrain from "@/app/components/NotesTerrain";
 import {
   Baby,
   Wifi,
@@ -312,8 +313,19 @@ async function getDashboardData() {
   };
 }
 
+async function getNotesTerrain() {
+  try {
+    return await prisma.noteTerrain.findMany({
+      where: { traitee: false },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch {
+    return [];
+  }
+}
+
 export default async function Dashboard() {
-  const data = await getDashboardData();
+  const [data, notesTerrain] = await Promise.all([getDashboardData(), getNotesTerrain()]);
   const capteursActifs = data.capteurs.filter((c) => c.actif);
   const capteursActifsNutravs = new Set(capteursActifs.map((c) => c.animalNutrav).filter(Boolean));
 
@@ -340,6 +352,9 @@ export default async function Dashboard() {
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
       <QuickSearch />
       <h2 className="text-xl font-bold text-gray-800 mt-2">Tableau de bord</h2>
+
+      {/* NOTES TERRAIN DICTÉES */}
+      <NotesTerrain initialNotes={notesTerrain.map((n) => ({ ...n, createdAt: n.createdAt.toISOString() }))} />
 
       {/* REPRODUCTION & VÉLAGE */}
       {hasRepro && (
