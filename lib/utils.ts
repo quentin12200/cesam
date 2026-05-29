@@ -35,10 +35,9 @@ export function getCategorieAuto(sexbov: string, danais: Date, estGenisse: boole
   if (sexbov === "M") {
     return ageMois >= 15 ? "TAUREAU" : "VEAU_M";
   }
-  if (!estGenisse) {
-    return ageMois < 12 ? "VELLE" : "VACHE";
-  }
-  if (ageMois < 12) return "PETITE_GENISSE";
+  // Toute femelle < 12 mois est VELLE par défaut — passage en génisse = action manuelle
+  if (ageMois < 12) return "VELLE";
+  if (!estGenisse) return "VACHE";
   if (ageMois < 24) return "MOYENNE_GENISSE";
   return "GRANDE_GENISSE";
 }

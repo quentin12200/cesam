@@ -150,8 +150,8 @@ export default function VoiceButton() {
     <>
       {/* Transcript bubble — fixed juste sous le header */}
       {(transcript || noteStatus !== "idle") && (
-        <div className={`fixed top-14 right-3 z-40 shadow-lg rounded-xl px-3 py-2.5 text-sm max-w-[260px] border ${
-          isNote ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"
+        <div className={`fixed top-14 right-3 z-40 shadow-lg rounded-xl px-3 py-2.5 text-sm max-w-[260px] border backdrop-blur-sm ${
+          isNote ? "bg-amber-50/90 border-amber-200" : "bg-white/90 border-gray-200"
         }`}>
           {transcript && (
             <div className="flex items-start gap-2">

@@ -317,7 +317,7 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
               const catColor = getCategorieColor(cat);
 
               const etat: EtatGestation | null =
-                animal.sexbov === "F" && !animal.estGenisse
+                ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(cat)
                   ? getEtatGestation(
                       animal.saillieDate ? new Date(animal.saillieDate) : null,
                       animal.gestationEtat ?? null,
