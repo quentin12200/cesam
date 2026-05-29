@@ -108,7 +108,7 @@ export default function VoiceButton() {
     }, 4000);
   }
 
-  const startListening = useCallback(() => {
+  const startListeningWithMode = useCallback((targetMode: VoiceMode) => {
     if (!supported || listening) return;
     const SpeechRec = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     const rec = new SpeechRec();
@@ -119,7 +119,7 @@ export default function VoiceButton() {
     rec.onresult = (event) => {
       const text = event.results[0][0].transcript;
       setTranscript(text);
-      if (mode === "commande") {
+      if (targetMode === "commande") {
         parseCommand(text);
         if (hideTimer.current) clearTimeout(hideTimer.current);
         hideTimer.current = setTimeout(() => setTranscript(null), 3000);
@@ -140,7 +140,7 @@ export default function VoiceButton() {
     setListening(true);
     setTranscript(null);
     setNoteStatus("idle");
-  }, [supported, listening, mode, parseCommand]);
+  }, [supported, listening, parseCommand]);
 
   function stopListening() {
     recognitionRef.current?.stop();
@@ -150,6 +150,18 @@ export default function VoiceButton() {
   if (!supported) return null;
 
   const isNote = mode === "note";
+
+  function handleModeToggle() {
+    if (isNote) {
+      // Retour en navigation — arrêter l'écoute si active
+      if (listening) stopListening();
+      setMode("commande");
+    } else {
+      // Passage en note — changer de mode ET démarrer le micro immédiatement
+      setMode("note");
+      startListeningWithMode("note");
+    }
+  }
 
   return (
     <>
@@ -182,10 +194,10 @@ export default function VoiceButton() {
         </div>
       )}
 
-      {/* Bouton mode (Nav / Note) */}
+      {/* Bouton mode (Nav / Note) — en mode note, démarre aussi le micro */}
       <button
-        onClick={() => setMode(isNote ? "commande" : "note")}
-        title={isNote ? "Mode Note — basculer en Navigation" : "Mode Navigation — basculer en Note"}
+        onClick={handleModeToggle}
+        title={isNote ? "Mode Note actif — cliquer pour revenir en Navigation" : "Dicter une note terrain"}
         className={`p-1.5 rounded-lg transition-colors ${
           isNote
             ? "bg-amber-500 text-white hover:bg-amber-400"
@@ -195,9 +207,9 @@ export default function VoiceButton() {
         {isNote ? <FileText size={16} /> : <Navigation size={16} />}
       </button>
 
-      {/* Bouton micro */}
+      {/* Bouton micro — commande vocale en mode nav, arrêt/relance en mode note */}
       <button
-        onClick={listening ? stopListening : startListening}
+        onClick={listening ? stopListening : () => startListeningWithMode(mode)}
         aria-label={listening ? "Arrêter" : isNote ? "Dicter une note" : "Commande vocale"}
         className={`p-1.5 rounded-lg transition-colors ${
           listening
