@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid } from "lucide-react";
 import { addDays, differenceInMonths } from "date-fns";
+import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
 import GroupeCreateButton from "./GroupeCreateButton";
 import NutravBadge from "@/app/components/NutravBadge";
@@ -557,30 +558,29 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
 
       {/* Vue tableau */}
       {vue === "tableau" ? (
-        <TroupeauTableau
-          animaux={animaux.map<AnimalRow>((a) => ({
-            id: a.id,
-            nutrav: a.nutrav,
-            nobovi: a.nobovi,
-            danais: a.danais.toISOString(),
-            sexbov: a.sexbov,
-            estGenisse: a.estGenisse,
-            tarieFaite: a.tarieFaite,
-            aEchographier: a.aEchographier,
-            categorie: a.categorie,
-            groupeNom: a.groupe?.nom ?? null,
-            saillieDate: a.saillies[0]?.date.toISOString() ?? null,
-            gestationEtat: a.saillies[0]?.gestation?.etat ?? null,
-            gestationVelagePrevue: a.saillies[0]?.gestation?.dateVelagePrevue?.toISOString() ?? null,
-            velageDate: a.velagesVache[0]?.date.toISOString() ?? null,
-            veauNutrav: a.velagesVache[0]?.veau?.nutrav ?? null,
-            veauStatut: a.velagesVache[0]?.veau?.statut ?? null,
-          }))}
-          tri={tri}
-          urlSortNutrav={buildUrl({ tri: undefined, page: "1" })}
-          urlSortAgeAsc={buildUrl({ tri: "age_asc", page: "1" })}
-          urlSortAgeDesc={buildUrl({ tri: "age_desc", page: "1" })}
-        />
+        <Suspense fallback={<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Chargement…</div>}>
+          <TroupeauTableau
+            animaux={animaux.map<AnimalRow>((a) => ({
+              id: a.id,
+              nutrav: a.nutrav,
+              nobovi: a.nobovi,
+              danais: a.danais.toISOString(),
+              sexbov: a.sexbov,
+              estGenisse: a.estGenisse,
+              tarieFaite: a.tarieFaite,
+              aEchographier: a.aEchographier,
+              categorie: a.categorie,
+              groupeNom: a.groupe?.nom ?? null,
+              saillieDate: a.saillies[0]?.date.toISOString() ?? null,
+              gestationEtat: a.saillies[0]?.gestation?.etat ?? null,
+              gestationVelagePrevue: a.saillies[0]?.gestation?.dateVelagePrevue?.toISOString() ?? null,
+              velageDate: a.velagesVache[0]?.date.toISOString() ?? null,
+              veauNutrav: a.velagesVache[0]?.veau?.nutrav ?? null,
+              veauStatut: a.velagesVache[0]?.veau?.statut ?? null,
+            }))}
+            groupes={groupes}
+          />
+        </Suspense>
       ) : (
         /* Vue cartes */
         <div className="space-y-2">
