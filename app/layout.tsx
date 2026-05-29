@@ -52,6 +52,7 @@ export default function RootLayout({
             </div>
             <div className="flex items-center gap-2">
               <GlobalScanner />
+              <VoiceButton />
               <NotificationBell />
             </div>
           </div>
@@ -61,7 +62,6 @@ export default function RootLayout({
           <main className="flex-1 overflow-auto">
             {children}
           </main>
-          <VoiceButton />
           <BottomNav />
           <InstallPrompt />
         </UndoProvider>
