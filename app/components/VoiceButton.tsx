@@ -41,16 +41,12 @@ interface SpeechRecognitionAlternative {
 type VoiceMode = "commande" | "note";
 
 function extractNutrav(t: string): string | null {
-  // 4-digit number directly: "3878"
   const fourDigit = t.match(/\b(\d{4})\b/);
   if (fourDigit) return fourDigit[1];
-  // Two adjacent 2-digit groups: "38 78" → "3878"
   const twoTwo = t.match(/\b(\d{2})\s+(\d{2})\b/);
   if (twoTwo) return twoTwo[1] + twoTwo[2];
-  // 3-digit, pad to 4
   const three = t.match(/\b(\d{3})\b/);
   if (three) return three[1].padStart(4, "0");
-  // 1-2 digit, pad to 4
   const short = t.match(/\b(\d{1,2})\b/);
   if (short) return short[1].padStart(4, "0");
   return null;
@@ -76,7 +72,6 @@ export default function VoiceButton() {
   const parseCommand = useCallback(
     (text: string) => {
       const t = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-
       if (/\b(accueil|maison|home)\b/.test(t)) return router.push("/");
       if (/\btroupeau\b/.test(t)) {
         const last = sessionStorage.getItem("troupeau:lastUrl");
@@ -88,8 +83,6 @@ export default function VoiceButton() {
       if (/\b(ordonnance|ordonnances)\b/.test(t)) return router.push("/ordonnances");
       if (/\b(velage|velages|v[eé]lage)\b/.test(t)) return router.push("/velage");
       if (/\bfinances?\b/.test(t)) return router.push("/finances");
-
-      // Animal navigation — handles "38 78" → "3878"
       const nutrav = extractNutrav(t);
       if (nutrav) return router.push(`/troupeau/${nutrav}`);
     },
@@ -154,10 +147,10 @@ export default function VoiceButton() {
   const isNote = mode === "note";
 
   return (
-    <div className="fixed bottom-24 right-4 z-50 flex flex-col items-end gap-2">
-      {/* Transcript / status bubble */}
+    <>
+      {/* Transcript bubble — fixed juste sous le header */}
       {(transcript || noteStatus !== "idle") && (
-        <div className={`shadow-lg rounded-xl px-3 py-2.5 text-sm max-w-[240px] border flex flex-col gap-1.5 ${
+        <div className={`fixed top-14 right-3 z-40 shadow-lg rounded-xl px-3 py-2.5 text-sm max-w-[260px] border ${
           isNote ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"
         }`}>
           {transcript && (
@@ -181,44 +174,33 @@ export default function VoiceButton() {
         </div>
       )}
 
-      {/* Mode toggle */}
-      <div className="flex rounded-xl overflow-hidden shadow border border-gray-200 bg-white">
-        <button
-          onClick={() => setMode("commande")}
-          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${
-            !isNote ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-50"
-          }`}
-          title="Mode navigation vocale"
-        >
-          <Navigation size={13} />
-          Nav
-        </button>
-        <button
-          onClick={() => setMode("note")}
-          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors border-l border-gray-200 ${
-            isNote ? "bg-amber-500 text-white" : "text-gray-500 hover:bg-gray-50"
-          }`}
-          title="Mode dictée de note terrain"
-        >
-          <FileText size={13} />
-          Note
-        </button>
-      </div>
+      {/* Bouton mode (Nav / Note) */}
+      <button
+        onClick={() => setMode(isNote ? "commande" : "note")}
+        title={isNote ? "Mode Note — basculer en Navigation" : "Mode Navigation — basculer en Note"}
+        className={`p-1.5 rounded-lg transition-colors ${
+          isNote
+            ? "bg-amber-500 text-white hover:bg-amber-400"
+            : "bg-green-800 text-green-300 hover:bg-green-600 hover:text-white"
+        }`}
+      >
+        {isNote ? <FileText size={16} /> : <Navigation size={16} />}
+      </button>
 
-      {/* Mic button */}
+      {/* Bouton micro */}
       <button
         onClick={listening ? stopListening : startListening}
         aria-label={listening ? "Arrêter" : isNote ? "Dicter une note" : "Commande vocale"}
-        className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 ${
+        className={`p-1.5 rounded-lg transition-colors ${
           listening
             ? "bg-red-500 text-white animate-pulse"
             : isNote
             ? "bg-amber-500 text-white hover:bg-amber-400"
-            : "bg-green-700 text-white hover:bg-green-600"
+            : "bg-green-600 text-white hover:bg-green-500"
         }`}
       >
-        {listening ? <MicOff size={22} /> : <Mic size={22} />}
+        {listening ? <MicOff size={18} /> : <Mic size={18} />}
       </button>
-    </div>
+    </>
   );
 }
