@@ -73,11 +73,9 @@ async function getAnimaux(params: {
   // Filtre statut reproduction
   if (repro === "PLEINE") {
     where.sexbov = "F";
-    where.estGenisse = false;
     where.saillies = { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } };
   } else if (repro === "VIDE") {
     where.sexbov = "F";
-    where.estGenisse = false;
     where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } } };
   } else if (repro === "A_ECO") {
     where.aEchographier = true;
@@ -139,8 +137,8 @@ async function getAnimaux(params: {
   }
 
   const orderBy: Prisma.AnimalOrderByWithRelationInput =
-    tri === "age_asc" ? { danais: "asc" }
-    : tri === "age_desc" ? { danais: "desc" }
+    tri === "age_asc" ? { danais: "desc" }
+    : tri === "age_desc" ? { danais: "asc" }
     : { nutrav: "asc" };
 
   const [total, animaux, groupes] = await Promise.all([
@@ -589,7 +587,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             const catLabel = getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
             const catColor = getCategorieColor(cat);
             const etat =
-              animal.sexbov === "F" && !animal.estGenisse
+              ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(cat)
                 ? getEtatGestation(
                     animal.saillies[0]?.date ?? null,
                     animal.saillies[0]?.gestation?.etat ?? null,

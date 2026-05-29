@@ -58,7 +58,7 @@ export default function VoiceButton() {
   const [mode, setMode] = useState<VoiceMode>("commande");
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState<string | null>(null);
-  const [noteStatus, setNoteStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [noteStatus, setNoteStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -92,14 +92,14 @@ export default function VoiceButton() {
   async function saveNote(text: string) {
     setNoteStatus("saving");
     try {
-      await fetch("/api/notes-terrain", {
+      const res = await fetch("/api/notes-terrain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ texte: text }),
       });
-      setNoteStatus("saved");
+      setNoteStatus(res.ok ? "saved" : "error");
     } catch {
-      setNoteStatus("idle");
+      setNoteStatus("error");
     }
     if (hideTimer.current) clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => {
@@ -128,7 +128,12 @@ export default function VoiceButton() {
       }
     };
     rec.onend = () => setListening(false);
-    rec.onerror = () => { setListening(false); setTranscript(null); };
+    rec.onerror = () => {
+      setListening(false);
+      setTranscript("⚠ Micro non disponible");
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      hideTimer.current = setTimeout(() => setTranscript(null), 3000);
+    };
 
     recognitionRef.current = rec;
     rec.start();
@@ -150,8 +155,8 @@ export default function VoiceButton() {
     <>
       {/* Transcript bubble — fixed juste sous le header */}
       {(transcript || noteStatus !== "idle") && (
-        <div className={`fixed top-14 right-3 z-40 shadow-lg rounded-xl px-3 py-2.5 text-sm max-w-[260px] border ${
-          isNote ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"
+        <div className={`fixed top-14 right-3 z-40 shadow-lg rounded-xl px-3 py-2.5 text-sm max-w-[260px] border backdrop-blur-sm ${
+          isNote ? "bg-amber-50/90 border-amber-200" : "bg-white/90 border-gray-200"
         }`}>
           {transcript && (
             <div className="flex items-start gap-2">
@@ -170,6 +175,9 @@ export default function VoiceButton() {
           )}
           {isNote && noteStatus === "saved" && (
             <span className="text-xs text-green-600 font-semibold">✓ Note enregistrée</span>
+          )}
+          {isNote && noteStatus === "error" && (
+            <span className="text-xs text-red-600 font-semibold">✗ Erreur — réessayer</span>
           )}
         </div>
       )}
