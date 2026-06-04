@@ -137,6 +137,7 @@ function ReproductionContent() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmVideId, setConfirmVideId] = useState<string | null>(null);
+  const [confirmDeleteSaillieId, setConfirmDeleteSaillieId] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(true);
 
   // ── Saillie form state ──
@@ -370,6 +371,26 @@ function ReproductionContent() {
     }
   }
 
+  async function deleteSaillie(vache: VacheRepro) {
+    if (!vache.saillieId) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/saillies/${vache.saillieId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setMessage(`Erreur : ${data.error ?? "impossible de supprimer"}`);
+        return;
+      }
+      setMessage(`✓ Saillie de ${vache.nutrav} supprimée`);
+      setConfirmDeleteSaillieId(null);
+      await fetchData();
+    } catch {
+      setMessage("Erreur réseau");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleGroupageSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (groupageIds.length === 0) { setGroupageError("Sélectionnez au moins une vache"); return; }
@@ -562,6 +583,9 @@ function ReproductionContent() {
                         {vache.aEchographier && (
                           <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium animate-pulse">📡 À écho</span>
                         )}
+                        {vache.derniereSaillie && new Date(vache.derniereSaillie) > now && (
+                          <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium animate-pulse">⚠️ Date saillie future</span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
                         {vache.derniereSaillie ? `Saillie : ${formatDate(new Date(vache.derniereSaillie))}` : "Pas de saillie"}
@@ -620,6 +644,22 @@ function ReproductionContent() {
                         <button onClick={() => setConfirmVideId(vache.id)}
                           className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-0.5">
                           ✗ Marquer vide
+                        </button>
+                      )
+                    )}
+                    {vache.saillieId && (
+                      confirmDeleteSaillieId === vache.id ? (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-xs text-gray-500">Supprimer saillie ?</span>
+                          <button onClick={() => deleteSaillie(vache)} disabled={saving}
+                            className="text-xs bg-red-600 text-white px-2 py-1 rounded-lg font-semibold">Oui</button>
+                          <button onClick={() => setConfirmDeleteSaillieId(null)}
+                            className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-lg">Non</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmDeleteSaillieId(vache.id)}
+                          className="text-xs text-gray-400 hover:text-red-600 transition-colors mt-0.5">
+                          🗑 Saillie incorrecte
                         </button>
                       )
                     )}

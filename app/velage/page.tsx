@@ -11,6 +11,8 @@ import CapteurManager from "./CapteurManager";
 async function getVelageData() {
   const now = new Date();
   const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  // Garder les vaches dont le terme est dépassé mais pas encore vêlées (jusqu'à 30j de retard)
+  const past30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const [capteurs, gestationsPrevues, velagesRecents] = await Promise.all([
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
@@ -18,7 +20,7 @@ async function getVelageData() {
       where: {
         etat: { in: ["VERT", "ROSE"] },
         dateVelagePrevue: {
-          gte: now,
+          gte: past30Days,
           lte: in30Days,
         },
         velage: null, // pas encore vêlé
@@ -78,7 +80,7 @@ export default async function VelagePage() {
       <div className="bg-white rounded-xl shadow p-4">
         <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
           <Baby size={16} className="text-pink-500" />
-          Vélages prévus ({gestationsPrevues.length})
+          Vélages à surveiller ({gestationsPrevues.length})
         </h3>
         {gestationsPrevues.length === 0 ? (
           <div className="text-center text-gray-400 py-6 text-sm">Aucun vélage prévu dans les 30 prochains jours</div>
@@ -89,13 +91,22 @@ export default async function VelagePage() {
               const jours = gestation.dateVelagePrevue
                 ? differenceInDays(new Date(gestation.dateVelagePrevue), now)
                 : null;
-              const urgent = jours !== null && jours <= 7;
-              const tres_urgent = jours !== null && jours <= 2;
+              const depasse = jours !== null && jours < 0;
+              const urgent = jours !== null && jours >= 0 && jours <= 7;
+              const tres_urgent = jours !== null && jours >= 0 && jours <= 2;
 
               return (
                 <div
                   key={gestation.id}
-                  className={`rounded-lg p-3 border ${tres_urgent ? "bg-red-50 border-red-300" : urgent ? "bg-orange-50 border-orange-200" : "bg-pink-50 border-pink-100"}`}
+                  className={`rounded-lg p-3 border ${
+                    depasse
+                      ? "bg-red-100 border-red-500"
+                      : tres_urgent
+                      ? "bg-red-50 border-red-300"
+                      : urgent
+                      ? "bg-orange-50 border-orange-200"
+                      : "bg-pink-50 border-pink-100"
+                  }`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -105,18 +116,31 @@ export default async function VelagePage() {
                       </div>
                       {gestation.dateVelagePrevue && (
                         <div className="text-sm font-semibold mt-1 text-gray-700">
-                          {formatDate(gestation.dateVelagePrevue)}
+                          Terme : {formatDate(gestation.dateVelagePrevue)}
+                        </div>
+                      )}
+                      {depasse && (
+                        <div className="text-xs text-red-700 font-semibold mt-0.5">
+                          ⚠️ Terme dépassé — surveiller de près
                         </div>
                       )}
                     </div>
                     <div className="text-right">
                       {jours !== null && (
-                        <div className={`text-lg font-bold ${tres_urgent ? "text-red-600" : urgent ? "text-orange-600" : "text-pink-600"}`}>
-                          J-{jours}
+                        <div className={`text-lg font-bold ${depasse ? "text-red-700" : tres_urgent ? "text-red-600" : urgent ? "text-orange-600" : "text-pink-600"}`}>
+                          {depasse ? `+${Math.abs(jours)}j` : `J-${jours}`}
                         </div>
                       )}
-                      <div className={`text-xs font-bold px-2 py-0.5 rounded-full mt-1 ${tres_urgent ? "bg-red-500 text-white" : urgent ? "bg-orange-400 text-white" : "bg-pink-400 text-white"}`}>
-                        {tres_urgent ? "IMMINENT" : urgent ? "BIENTÔT" : "PRÉVU"}
+                      <div className={`text-xs font-bold px-2 py-0.5 rounded-full mt-1 ${
+                        depasse
+                          ? "bg-red-600 text-white animate-pulse"
+                          : tres_urgent
+                          ? "bg-red-500 text-white"
+                          : urgent
+                          ? "bg-orange-400 text-white"
+                          : "bg-pink-400 text-white"
+                      }`}>
+                        {depasse ? "DÉPASSÉ" : tres_urgent ? "IMMINENT" : urgent ? "BIENTÔT" : "PRÉVU"}
                       </div>
                     </div>
                   </div>
