@@ -41,6 +41,7 @@ import CategorieButton from "./CategorieButton";
 import EchoButton from "./EchoButton";
 import GroupeButton from "./GroupeButton";
 import TraitementsSection from "./TraitementsSection";
+import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -748,6 +749,11 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                           )}
                         </div>
                       )}
+                      <DeleteHistoriqueButton
+                        endpoint={`/api/saillies/${saillie.id}`}
+                        label="🗑 Supprimer cette saillie"
+                        confirmLabel="Supprimer saillie + gestation ?"
+                      />
                     </div>
                   ))}
                 </div>
@@ -828,6 +834,11 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                         {velage.pereNom && (
                           <div className="text-xs text-gray-500 mt-1">Père: {velage.pereNom}</div>
                         )}
+                        <DeleteHistoriqueButton
+                          endpoint={`/api/velages/${velage.id}`}
+                          label="🗑 Supprimer ce vêlage"
+                          confirmLabel="Supprimer ce vêlage ?"
+                        />
                       </div>
                     );
                   })}
