@@ -362,6 +362,50 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               </div>
             )}
 
+            {/* Pesées — tous animaux, tous âges */}
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Scale size={16} className="text-blue-600" />
+                Pesées {pesees.length > 0 && `(${pesees.length})`}
+              </h3>
+              {gmqGlobal !== null && (
+                <div className="mb-3 bg-blue-50 rounded-lg p-2.5 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">GMQ global</span>
+                  <span className="text-lg font-bold text-blue-700">{gmqGlobal} g/j</span>
+                </div>
+              )}
+              {pesees.length > 0 ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50">
+                    <span className="text-gray-500">{formatDate(pesees[0].date)}</span>
+                    <span className="font-bold text-gray-800">{pesees[0].poids} kg</span>
+                  </div>
+                  {gmqParPeriode.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50">
+                      <span className="text-gray-500">{formatDate(p.date)}</span>
+                      <div className="flex items-center gap-3">
+                        {p.gmq !== null && (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                            p.gmq >= 1200 ? "bg-green-100 text-green-700"
+                            : p.gmq >= 800 ? "bg-yellow-100 text-yellow-700"
+                            : "bg-red-100 text-red-700"
+                          }`}>
+                            +{p.gmq} g/j
+                          </span>
+                        )}
+                        <span className="font-bold text-gray-800">{p.poids} kg</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic mb-2">Aucune pesée enregistrée</p>
+              )}
+              <div className="mt-3">
+                <PeseeInlineForm nutrav={animal.nutrav} />
+              </div>
+            </div>
+
             {/* Généalogie */}
             <div className="bg-white rounded-xl shadow p-4">
               <h3 className="font-semibold text-gray-800 mb-3">Généalogie</h3>
@@ -545,62 +589,6 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     </div>
                   );
                 })}
-              </div>
-            </div>
-
-            {/* Pesées */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Scale size={16} className="text-blue-600" />
-                Pesées {pesees.length > 0 && `(${pesees.length})`}
-              </h3>
-
-              {gmqGlobal !== null && (
-                <div className="mb-3 bg-blue-50 rounded-lg p-2.5 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">GMQ global</span>
-                  <span className="text-lg font-bold text-blue-700">{gmqGlobal} g/j</span>
-                </div>
-              )}
-
-              {pesees.length > 0 ? (
-                <div className="space-y-1">
-                  {/* Première pesée sans GMQ */}
-                  <div className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50">
-                    <span className="text-gray-500">{formatDate(pesees[0].date)}</span>
-                    <span className="font-bold text-gray-800">{pesees[0].poids} kg</span>
-                  </div>
-                  {/* Pesées suivantes avec GMQ par période */}
-                  {gmqParPeriode.map((p, i) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50"
-                    >
-                      <span className="text-gray-500">{formatDate(p.date)}</span>
-                      <div className="flex items-center gap-3">
-                        {p.gmq !== null && (
-                          <span
-                            className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                              p.gmq >= 1200
-                                ? "bg-green-100 text-green-700"
-                                : p.gmq >= 800
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-red-100 text-red-700"
-                            }`}
-                          >
-                            +{p.gmq} g/j
-                          </span>
-                        )}
-                        <span className="font-bold text-gray-800">{p.poids} kg</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic mb-2">Aucune pesée enregistrée</p>
-              )}
-
-              <div className="mt-3">
-                <PeseeInlineForm nutrav={animal.nutrav} />
               </div>
             </div>
 
