@@ -607,11 +607,11 @@ function ReproductionContent() {
                     <span className={`text-xs font-bold px-2 py-1 rounded-full ${getBadgeClass(vache.etat)}`}>
                       {getEtatLabel(vache.etat)}
                     </span>
-                    {joursDepuisChaleur !== null && joursDepuisChaleur <= 3 && (
+                    {joursDepuisChaleur !== null && joursDepuisChaleur <= 2 && (
                       <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">🌡️ En chaleur</span>
                     )}
-                    {joursDepuisChaleur !== null && joursDepuisChaleur >= 18 && joursDepuisChaleur <= 24 && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold animate-pulse">⚡ Retour J+21 ?</span>
+                    {joursDepuisChaleur !== null && joursDepuisChaleur >= 19 && joursDepuisChaleur <= 21 && (
+                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold animate-pulse">⚡ Retour chaleur J+{joursDepuisChaleur} ?</span>
                     )}
                     <div className="flex gap-1 flex-wrap justify-end">
                       {(vache.etat === "JAUNE" || vache.etat === "GRIS") && vache.saillieId && (
