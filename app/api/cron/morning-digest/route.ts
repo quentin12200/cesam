@@ -69,12 +69,12 @@ export async function GET(request: NextRequest) {
             dateVelagePrevue: { gte: addDays(now, 21), lte: addDays(now, 45) },
           },
         }),
-        // Chaleurs J+19 à J+21 (fenêtre 72h de surveillance retour de cycle)
+        // Chaleurs J+19 à J+21 (fenêtre 72h : surveiller retour de cycle)
         prisma.animal.findMany({
           where: {
             statut: "ACTIF",
             sexbov: "F",
-            chaleurs: { some: { date: { gte: addDays(now, -21), lte: addDays(now, -18) } } },
+            chaleurs: { some: { date: { gte: addDays(now, -21), lte: addDays(now, -19) } } },
           },
           include: {
             chaleurs: { orderBy: { date: "desc" }, take: 1, select: { date: true } },
