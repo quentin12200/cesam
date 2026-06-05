@@ -30,6 +30,7 @@ export interface AnimalRow {
   velageDate: string | null;
   veauNutrav: string | null;
   veauStatut: string | null;
+  veauSevreFait: boolean | null;
 }
 
 interface Props {
@@ -277,19 +278,18 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                   buildFilterUrl={buildFilterUrl}
                 />
               </th>
-              <th className="px-3 py-2.5 text-center font-semibold">
+              <th className="px-3 py-2.5 text-center font-semibold whitespace-nowrap">
+                À écho
+              </th>
+              <th className="px-3 py-2.5 text-left font-semibold">
                 <FilterDropdown
-                  label="Tarie"
+                  label="🐮 Allaitante"
                   options={TARIE_OPTIONS}
                   currentValue={currentTarie}
                   paramKey="tarie"
                   buildFilterUrl={buildFilterUrl}
                 />
               </th>
-              <th className="px-3 py-2.5 text-center font-semibold whitespace-nowrap">
-                À écho
-              </th>
-              <th className="px-3 py-2.5 text-left font-semibold">Veau</th>
               <th className="px-3 py-2.5 text-left font-semibold">
                 {groupes.length > 0 ? (
                   <FilterDropdown
@@ -329,7 +329,7 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                   : null;
 
               const veauActif =
-                animal.veauNutrav && animal.veauStatut === "ACTIF"
+                animal.veauNutrav && animal.veauStatut === "ACTIF" && !animal.veauSevreFait
                   ? animal.veauNutrav
                   : null;
 
@@ -373,15 +373,6 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-center">
-                    {animal.tarieFaite ? (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
-                        Tarie
-                      </span>
-                    ) : (
-                      <span className="text-gray-200 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
                     {animal.aEchographier ? (
                       <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium">
                         Oui
@@ -393,7 +384,7 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                   <td className="px-3 py-2.5">
                     {veauActif ? (
                       <span className="text-xs font-mono bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
-                        {veauActif}
+                        🐮 {veauActif}
                       </span>
                     ) : (
                       <span className="text-gray-200 text-xs">—</span>
