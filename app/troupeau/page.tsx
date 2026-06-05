@@ -65,8 +65,14 @@ async function getAnimaux(params: {
     ];
   }
 
-  if (tarie === "oui") where.tarieFaite = true;
-  if (tarie === "non") where.tarieFaite = false;
+  // Non tarie = a un veau actif non sevré ; tarie = femelle sans veau actif non sevré
+  if (tarie === "non") {
+    where.velagesVache = { some: { veau: { statut: "ACTIF", sevreFait: false } } };
+  }
+  if (tarie === "oui") {
+    if (!where.sexbov) where.sexbov = "F";
+    where.velagesVache = { none: { veau: { statut: "ACTIF", sevreFait: false } } };
+  }
 
   if (groupe) where.groupeId = groupe;
 
@@ -176,7 +182,7 @@ async function getAnimaux(params: {
           take: 1,
           select: {
             date: true,
-            veau: { select: { nutrav: true, statut: true } },
+            veau: { select: { nutrav: true, statut: true, sevreFait: true } },
           },
         },
       },
@@ -575,6 +581,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               velageDate: a.velagesVache[0]?.date.toISOString() ?? null,
               veauNutrav: a.velagesVache[0]?.veau?.nutrav ?? null,
               veauStatut: a.velagesVache[0]?.veau?.statut ?? null,
+              veauSevreFait: a.velagesVache[0]?.veau?.sevreFait ?? null,
             }))}
             groupes={groupes}
           />
@@ -616,11 +623,6 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                         <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${catColor}`}>
                           {animal.sexbov === "F" ? "♀" : "♂"} {catLabel}
                         </span>
-                        {animal.tarieFaite && (
-                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
-                            Tarie
-                          </span>
-                        )}
                         {animal.aEchographier && (
                           <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium">
                             À écho
@@ -637,7 +639,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                               : "Vide"}
                           </span>
                         )}
-                        {veau && veau.statut === "ACTIF" && (
+                        {veau && veau.statut === "ACTIF" && !veau.sevreFait && (
                           <span className="text-xs text-blue-600 font-mono bg-blue-50 px-1.5 py-0.5 rounded">
                             🐮 {veau.nutrav}
                           </span>
