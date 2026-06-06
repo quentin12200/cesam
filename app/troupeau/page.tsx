@@ -600,7 +600,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             const catLabel = getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
             const catColor = getCategorieColor(cat);
             const etat =
-              ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(cat)
+              ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "A_ENGRAISSER"].includes(cat)
                 ? getEtatGestation(
                     animal.saillies[0]?.date ?? null,
                     animal.saillies[0]?.gestation?.etat ?? null,
@@ -642,6 +642,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                               : etat === "ROSE" ? "Imminente"
                               : etat === "JAUNE" ? "À écho"
                               : etat === "GRIS" ? "En attente"
+                              : etat === "REPOS" ? "Repos"
                               : "Vide"}
                           </span>
                         )}
