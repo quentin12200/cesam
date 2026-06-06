@@ -9,6 +9,7 @@ import {
   RefreshCw, CheckCircle, ArrowLeft, CalendarDays,
   Settings, Printer, ChevronDown, ChevronRight, Users,
 } from "lucide-react";
+import ReproScrollRestorer from "./ReproScrollRestorer";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE";
 
@@ -565,6 +566,7 @@ function ReproductionContent() {
   // ── RENDER ──────────────────────────────────────────────────────────────
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
+      <ReproScrollRestorer />
 
       {/* Header */}
       <div className="flex items-center justify-between mt-2">
