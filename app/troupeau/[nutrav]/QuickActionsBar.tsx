@@ -197,7 +197,7 @@ export default function QuickActionsBar({ animalId, isFemelle, isActif }: Props)
                       type="text"
                       value={chaleurNotes}
                       onChange={(e) => setChaleurNotes(e.target.value)}
-                      placeholder="Observation..."
+                      placeholder="Observation…"
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
                     />
                   </div>
@@ -316,7 +316,7 @@ export default function QuickActionsBar({ animalId, isFemelle, isActif }: Props)
                       value={traitDesc}
                       onChange={(e) => setTraitDesc(e.target.value)}
                       rows={2}
-                      placeholder="Produit, dose, remarques..."
+                      placeholder="Produit, dose, remarques…"
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
                     />
                   </div>

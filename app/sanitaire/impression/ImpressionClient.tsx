@@ -157,7 +157,7 @@ export default function ImpressionClient({
           onClick={() => window.print()}
           className="w-full py-3 bg-green-700 text-white rounded-xl font-bold text-sm hover:bg-green-800 transition-colors"
         >
-          Imprimer ({filteredAnimaux.length} animal{filteredAnimaux.length > 1 ? "s" : ""}, {filteredProtocoles.length} protocole{filteredProtocoles.length > 1 ? "s" : ""})
+          Imprimer ({filteredAnimaux.length > 1 ? `${filteredAnimaux.length} animaux` : `${filteredAnimaux.length} animal`}, {filteredProtocoles.length} protocole{filteredProtocoles.length > 1 ? "s" : ""})
         </button>
       </div>
 
@@ -180,7 +180,7 @@ export default function ImpressionClient({
             Carnet sanitaire — Protocoles vaccinaux
           </p>
           <p className="text-xs text-gray-400 mt-0.5">
-            Imprimé le {printDate} · {filteredAnimaux.length} animal{filteredAnimaux.length > 1 ? "s" : ""}
+            Imprimé le {printDate} · {filteredAnimaux.length > 1 ? `${filteredAnimaux.length} animaux` : `${filteredAnimaux.length} animal`}
           </p>
         </div>
 
