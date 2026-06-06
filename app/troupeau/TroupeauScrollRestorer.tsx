@@ -17,7 +17,7 @@ export default function TroupeauScrollRestorer() {
       sessionStorage.removeItem(SCROLL_KEY);
       const y = parseInt(savedScroll, 10);
       // Defer to let the DOM render first
-      const id = setTimeout(() => window.scrollTo({ top: y, behavior: "instant" as ScrollBehavior }), 80);
+      const id = setTimeout(() => window.scrollTo({ top: y, behavior: "instant" as ScrollBehavior }), 200);
       return () => clearTimeout(id);
     }
   }, []);
