@@ -263,7 +263,7 @@ export default function GlobalScanner() {
                   disabled={saving || !selectedAnimalId || !medicamentNom.trim()}
                   className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
-                  <Save size={14} /> {saving ? "Enregistrement..." : "Enregistrer"}
+                  <Save size={14} /> {saving ? "Enregistrement…" : "Enregistrer"}
                 </button>
                 <button type="button" onClick={closeModal}
                   className="px-3 py-2 text-sm text-gray-500 border rounded-lg hover:bg-gray-50">

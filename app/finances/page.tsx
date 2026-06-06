@@ -342,7 +342,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
               <div key={buyer.name} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50">
                 <span className="text-xs font-bold text-gray-400 w-5 text-center">{i + 1}</span>
                 <span className="flex-1 text-sm text-gray-700 truncate">{buyer.name}</span>
-                <span className="text-xs text-gray-400">{buyer.count} animal{buyer.count > 1 ? "x" : ""}</span>
+                <span className="text-xs text-gray-400">{buyer.count > 1 ? `${buyer.count} animaux` : `${buyer.count} animal`}</span>
                 <span className="text-sm font-semibold text-green-700">{formatEuro(buyer.total)}</span>
               </div>
             ))}

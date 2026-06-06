@@ -113,7 +113,7 @@ export default function QuickSearch() {
           onChange={handleInput}
           onKeyDown={handleKeyDown}
           onFocus={() => query.length > 0 && results.length > 0 && setOpen(true)}
-          placeholder="N° animal ou nom..."
+          placeholder="N° animal ou nom…"
           className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-10 py-3 text-sm shadow focus:outline-none focus:ring-2 focus:ring-green-500"
           autoComplete="off"
         />
@@ -131,7 +131,7 @@ export default function QuickSearch() {
       {open && (
         <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">
           {loading && (
-            <div className="px-4 py-3 text-sm text-gray-400">Recherche...</div>
+            <div className="px-4 py-3 text-sm text-gray-400">Recherche…</div>
           )}
           {!loading && results.length === 0 && (
             <div className="px-4 py-3 text-sm text-gray-400">Aucun résultat</div>

@@ -539,7 +539,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
           type="text"
           name="q"
           defaultValue={q ?? ""}
-          placeholder="N° Travail, N° Nat ou nom..."
+          placeholder="N° Travail, N° Nat ou nom…"
           className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm shadow focus:outline-none focus:ring-2 focus:ring-green-500"
         />
       </form>
@@ -547,7 +547,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       {/* Résumé filtres actifs */}
       <div className="flex items-center justify-between text-xs text-gray-500">
         <span>
-          {total} animal{total > 1 ? "aux" : ""}
+          {total} {total > 1 ? "animaux" : "animal"}
           {activeFiltersCount > 0 && ` · ${activeFiltersCount} filtre${activeFiltersCount > 1 ? "s" : ""} actif${activeFiltersCount > 1 ? "s" : ""}`}
         </span>
       </div>

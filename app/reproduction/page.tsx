@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib/utils";
@@ -9,6 +9,7 @@ import {
   RefreshCw, CheckCircle, ArrowLeft, CalendarDays,
   Settings, Printer, ChevronDown, ChevronRight, Users,
 } from "lucide-react";
+import ReproScrollRestorer from "./ReproScrollRestorer";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE";
 
@@ -102,6 +103,141 @@ function VacheSearch({
   );
 }
 
+// ── Helpers dates JJ/MM/AA ────────────────────────────────────────────────
+function parseShortDate(val: string): string {
+  // Accepte JJ/MM/AA ou JJ/MM/AAAA → YYYY-MM-DD
+  const clean = val.replace(/[^0-9/]/g, "");
+  const parts = clean.split("/");
+  if (parts.length !== 3) return "";
+  const [d, m, y] = parts;
+  if (!d || !m || !y) return "";
+  const year = y.length === 2 ? (parseInt(y) >= 50 ? "19" : "20") + y : y;
+  if (d.length !== 2 || m.length !== 2 || year.length !== 4) return "";
+  return `${year}-${m}-${d}`;
+}
+
+function toShortDate(iso: string): string {
+  // YYYY-MM-DD → JJ/MM/AA
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return "";
+  return `${d}/${m}/${y.slice(2)}`;
+}
+
+function DateInput({ value, onChange, required, placeholder, className }: {
+  value: string; // ISO YYYY-MM-DD
+  onChange: (iso: string) => void;
+  required?: boolean;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [raw, setRaw] = useState(toShortDate(value));
+  // Track the last ISO value we pushed upward so the effect can tell apart
+  // an external change (form opening) from a re-render caused by our own onChange.
+  const ownValueRef = useRef(value);
+
+  useEffect(() => {
+    if (value !== ownValueRef.current) {
+      ownValueRef.current = value;
+      setRaw(toShortDate(value));
+    }
+  }, [value]);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let v = e.target.value.replace(/[^0-9/]/g, "");
+    // Auto-insert slashes after DD and MM
+    if (v.length === 2 && !v.includes("/") && raw.length === 1) v = v + "/";
+    if (v.length === 5 && v.split("/").length === 2 && raw.length === 4) v = v + "/";
+    setRaw(v);
+    const iso = parseShortDate(v);
+    if (iso) {
+      ownValueRef.current = iso;
+      onChange(iso);
+    } else if (v === "") {
+      ownValueRef.current = "";
+      onChange("");
+    }
+    // For partial input, don't call onChange — keep old parent value to avoid effect reset
+  }
+
+  const isValid = raw === "" || !!parseShortDate(raw);
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={raw}
+      onChange={handleChange}
+      required={required}
+      placeholder={placeholder ?? "JJ/MM/AA"}
+      maxLength={8}
+      className={`${className ?? ""} ${!isValid ? "border-red-400" : ""}`}
+    />
+  );
+}
+
+// ── Autocomplete taureau (saisie libre + création auto) ───────────────────
+function TaureauSearch({
+  taureaux, selectedId, onSelect, onClear,
+}: {
+  taureaux: Taureau[];
+  selectedId: string;
+  onSelect: (id: string | null, nom: string) => void;
+  onClear: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const selected = taureaux.find((t) => t.id === selectedId);
+
+  const filtered = query.length > 0
+    ? taureaux.filter((t) =>
+        (t.nopere ?? t.nupere).toLowerCase().includes(query.toLowerCase()) ||
+        t.nupere.toLowerCase().includes(query.toLowerCase())
+      )
+    : taureaux;
+
+  if (selected) {
+    return (
+      <div className="flex items-center gap-2 p-3 bg-green-50 rounded-xl border border-green-200">
+        <span className="text-2xl">🐂</span>
+        <span className="font-semibold text-sm text-gray-800 flex-1">{selected.nopere ?? selected.nupere}</span>
+        <button type="button" onClick={() => { onClear(); setQuery(""); }} className="text-gray-400 hover:text-red-500 text-xl leading-none">×</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); onClear(); }}
+        placeholder="Nom du taureau…"
+        className="w-full border border-gray-200 rounded-xl p-3 text-sm"
+      />
+      {query.length > 0 && (
+        <div className="mt-1 rounded-xl border border-gray-100 bg-white divide-y divide-gray-50 max-h-48 overflow-y-auto">
+          {filtered.map((t) => (
+            <button key={t.id} type="button"
+              onClick={() => { onSelect(t.id, t.nopere ?? t.nupere); setQuery(""); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-green-50 text-left">
+              <span className="text-lg">🐂</span>
+              <span className="text-sm text-gray-700">{t.nopere ?? t.nupere}</span>
+              <span className="text-xs text-gray-400 font-mono ml-auto">{t.nupere}</span>
+            </button>
+          ))}
+          {filtered.length === 0 && (
+            <button type="button"
+              onClick={() => { onSelect(null, query); setQuery(""); }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-yellow-50 text-left text-sm text-yellow-700 font-medium">
+              <span>➕</span> Créer « {query} »
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── SVG camembert ─────────────────────────────────────────────────────────
 function GestationCircle({ daysLeft }: { daysLeft: number }) {
   const progress = Math.min(100, Math.max(0, ((DUREE_GESTATION - daysLeft) / DUREE_GESTATION) * 100));
@@ -138,7 +274,7 @@ function ReproductionContent() {
   const [message, setMessage] = useState<string | null>(null);
   const [confirmVideId, setConfirmVideId] = useState<string | null>(null);
   const [confirmDeleteSaillieId, setConfirmDeleteSaillieId] = useState<string | null>(null);
-  const [calendarOpen, setCalendarOpen] = useState(true);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // ── Saillie form state ──
   const [showSaillieForm, setShowSaillieForm] = useState(false);
@@ -146,6 +282,7 @@ function ReproductionContent() {
   const [saillieDate, setSaillieDate] = useState("");
   const [saillieType, setSaillieType] = useState<"NATURELLE" | "IA">("NATURELLE");
   const [saillieTaureauId, setSaillieTaureauId] = useState("");
+  const [saillieTaureauNom, setSaillieTaureauNom] = useState("");
   const [iaSelectedId, setIaSelectedId] = useState("");
   const [iaNupere, setIaNupere] = useState("");
   const [iaNopere, setIaNopere] = useState("");
@@ -201,6 +338,7 @@ function ReproductionContent() {
     setSaillieDate(today);
     setSaillieType("NATURELLE");
     setSaillieTaureauId("");
+    setSaillieTaureauNom("");
     setIaSelectedId(""); setIaNupere(""); setIaNopere(""); setIaTraper("");
     setSaillieError(null);
     setShowSaillieForm(true);
@@ -275,7 +413,19 @@ function ReproductionContent() {
     try {
       let taureauId: string | undefined;
       if (saillieType === "NATURELLE") {
-        taureauId = saillieTaureauId || undefined;
+        if (saillieTaureauId) {
+          taureauId = saillieTaureauId;
+        } else if (saillieTaureauNom.trim()) {
+          const res = await fetch("/api/taureaux", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nupere: saillieTaureauNom.trim(), nopere: saillieTaureauNom.trim(), present: true }),
+          });
+          if (res.status === 409) {
+            taureauId = taureaux.find((t) => t.nupere === saillieTaureauNom.trim() || (t.nopere ?? "") === saillieTaureauNom.trim())?.id;
+          } else if (res.ok) {
+            taureauId = (await res.json()).id;
+          }
+        }
       } else {
         if (iaSelectedId) {
           taureauId = iaSelectedId;
@@ -689,7 +839,7 @@ function ReproductionContent() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;observation</label>
-                <input type="date" value={chaleurDate} onChange={(e) => setChaleurDate(e.target.value)} required
+                <DateInput value={chaleurDate} onChange={setChaleurDate} required
                   className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
               </div>
               <div>
@@ -722,7 +872,7 @@ function ReproductionContent() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input type="date" value={saillieDate} onChange={(e) => setSaillieDate(e.target.value)} required
+                <DateInput value={saillieDate} onChange={setSaillieDate} required
                   className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
               </div>
               <div>
@@ -742,21 +892,15 @@ function ReproductionContent() {
               {saillieType === "NATURELLE" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Taureau <span className="text-gray-400 font-normal">(optionnel)</span></label>
-                  {farmBulls.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2">
-                      {farmBulls.map((t) => (
-                        <button key={t.id} type="button"
-                          onClick={() => setSaillieTaureauId(saillieTaureauId === t.id ? "" : t.id)}
-                          className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all ${saillieTaureauId === t.id ? "bg-green-700 text-white border-green-700" : "border-gray-200 text-gray-700 bg-white"}`}>
-                          <span className="text-2xl mb-1">🐂</span>
-                          <span className="font-bold text-sm leading-tight text-center">{t.nopere ?? t.nupere}</span>
-                          <span className={`text-[11px] font-mono mt-0.5 ${saillieTaureauId === t.id ? "text-green-100" : "text-gray-400"}`}>{t.nupere}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-400 italic bg-gray-50 rounded-xl px-3 py-2">
-                      Aucun taureau — <Link href="/taureaux" className="text-green-700 underline">gérer les taureaux</Link>
+                  <TaureauSearch
+                    taureaux={farmBulls}
+                    selectedId={saillieTaureauId}
+                    onSelect={(id, nom) => { setSaillieTaureauId(id ?? ""); setSaillieTaureauNom(id ? "" : nom); }}
+                    onClear={() => { setSaillieTaureauId(""); setSaillieTaureauNom(""); }}
+                  />
+                  {saillieTaureauNom && !saillieTaureauId && (
+                    <p className="text-xs text-yellow-700 mt-1 bg-yellow-50 px-3 py-1.5 rounded-lg">
+                      Le taureau « {saillieTaureauNom} » sera créé automatiquement.
                     </p>
                   )}
                 </div>
@@ -819,7 +963,7 @@ function ReproductionContent() {
             <form onSubmit={handleGroupageSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input type="date" value={groupageDate} onChange={(e) => setGroupageDate(e.target.value)} required
+                <DateInput value={groupageDate} onChange={setGroupageDate} required
                   className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
               </div>
               <div>
@@ -932,7 +1076,7 @@ function ReproductionContent() {
               )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date de l&apos;écho</label>
-                <input type="date" value={echoDate} onChange={(e) => setEchoDate(e.target.value)} required
+                <DateInput value={echoDate} onChange={setEchoDate} required
                   className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
                 {selectedVache?.derniereSaillie && (() => {
                   const j = differenceInDays(new Date(echoDate), new Date(selectedVache.derniereSaillie));
