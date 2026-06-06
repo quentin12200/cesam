@@ -139,7 +139,7 @@ export function formatDateShort(date: Date | null | undefined): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE";
+export type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
 export function getEtatGestation(
   derniereSaillie: Date | null,
@@ -152,9 +152,18 @@ export function getEtatGestation(
   // Vide explicitement confirmé par écho ou annulation manuelle — priorité absolue
   if (gestationEtat === "ROUGE") return "ROUGE";
 
+  // Si le vêlage est plus récent que la dernière saillie (ou s'il n'y a aucune saillie),
+  // la vache vient de vêler et n'a pas encore été resaillie → repos post-vêlage
+  const velageApresSaillie =
+    dernierVelage && (!derniereSaillie || dernierVelage > derniereSaillie);
+
+  if (velageApresSaillie) {
+    const joursDepuisVelage = differenceInDays(now, dernierVelage!);
+    return joursDepuisVelage <= 60 ? "REPOS" : "ROUGE";
+  }
+
   // Pleine confirmée par écho
   if (gestationEtat === "VERT") {
-    // Vélage imminent (< 30 j)
     if (dateVelagePrevue) {
       const diffJours = differenceInDays(dateVelagePrevue, now);
       if (diffJours >= 0 && diffJours <= 30) return "ROSE";
@@ -162,17 +171,10 @@ export function getEtatGestation(
     return "VERT";
   }
 
-  // Pas de saillie enregistrée
-  if (!derniereSaillie) {
-    if (dernierVelage) {
-      const joursDepuisVelage = differenceInDays(now, dernierVelage);
-      if (joursDepuisVelage > 60) return "ROUGE";
-    }
-    return "ROUGE";
-  }
+  // Pas de saillie et pas de vêlage connu → vide
+  if (!derniereSaillie) return "ROUGE";
 
   // Saillie enregistrée — calcul par délai
-  // ROUGE ne vient jamais du délai seul : uniquement d'un écho VIDE ou d'un marquage manuel
   const joursDepuisSaillie = differenceInDays(now, derniereSaillie);
   if (joursDepuisSaillie < 35) return "GRIS";
   return "JAUNE";
@@ -185,6 +187,7 @@ export function getBadgeClass(etat: EtatGestation): string {
     case "ROUGE": return "bg-red-500 text-white";
     case "ROSE": return "bg-pink-400 text-white";
     case "GRIS": return "bg-gray-400 text-white";
+    case "REPOS": return "bg-sky-400 text-white";
     default: return "bg-gray-400 text-white";
   }
 }
@@ -196,6 +199,7 @@ export function getEtatLabel(etat: EtatGestation): string {
     case "ROUGE": return "Vide";
     case "ROSE": return "Vélage imminent";
     case "GRIS": return "Saillie récente";
+    case "REPOS": return "Repos post-vêlage";
     default: return "Inconnu";
   }
 }
