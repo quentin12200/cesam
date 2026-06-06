@@ -2,6 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+    const body = await req.json();
+    const { date, type, acheteur, poids, prixKilo, prixDefinitifHT, notes, causeMortalite } = body;
+
+    const sortie = await prisma.sortie.findUnique({ where: { id } });
+    if (!sortie) return NextResponse.json({ error: "Sortie introuvable" }, { status: 404 });
+
+    const updated = await prisma.sortie.update({
+      where: { id },
+      data: {
+        ...(date !== undefined && { date: new Date(date) }),
+        ...(type !== undefined && { type }),
+        ...(acheteur !== undefined && { acheteur: acheteur || null }),
+        ...(poids !== undefined && { poids: poids !== null ? parseFloat(poids) : null }),
+        ...(prixKilo !== undefined && { prixKilo: prixKilo !== null ? parseFloat(prixKilo) : null }),
+        ...(prixDefinitifHT !== undefined && { prixDefinitifHT: prixDefinitifHT !== null ? parseFloat(prixDefinitifHT) : null }),
+        ...(notes !== undefined && { notes: notes || null }),
+        ...(causeMortalite !== undefined && { causeMortalite: causeMortalite || null }),
+        updatedAt: new Date(),
+      },
+    });
+
+    await logAction("UPDATE_SORTIE", `Sortie ${id} modifiée`, []);
+    return NextResponse.json(updated);
+  } catch (err) {
+    console.error("PATCH /api/sorties/[id] error:", err);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
