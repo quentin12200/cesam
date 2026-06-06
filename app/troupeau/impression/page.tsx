@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { addDays, differenceInMonths } from "date-fns";
+import { addDays, differenceInMonths, subDays } from "date-fns";
 import {
   getCategorie, getCategorieLabel, getCategorieColor,
   type CategorieAnimal,
@@ -48,7 +48,15 @@ export default async function TroupeauImpressionPage({ searchParams }: PageProps
 
   if (repro === "PLEINE") { where.sexbov = "F"; where.saillies = { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } }; }
   else if (repro === "VIDE") { where.sexbov = "F"; where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } } }; }
-  else if (repro === "A_ECO") { where.aEchographier = true; }
+  else if (repro === "A_ECO") {
+    where.sexbov = "F";
+    where.saillies = {
+      some: {
+        date: { lte: subDays(now, 35) },
+        gestation: { etat: { notIn: ["VERT", "ROUGE"] } },
+      },
+    };
+  }
 
   if (sanitaire === "PROBLEME") where.evenements = { some: { resolu: false } };
   else if (sanitaire === "OK") where.evenements = { none: { resolu: false } };
