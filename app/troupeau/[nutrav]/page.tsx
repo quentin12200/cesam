@@ -15,9 +15,9 @@ import {
   type ProtocoleVaccinConfig,
 } from "@/lib/utils";
 import Link from "next/link";
+import BackButton from "./BackButton";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft,
   Scale,
   Baby,
   AlertCircle,
@@ -159,16 +159,11 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto min-h-screen bg-gray-50">
+    <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto min-h-screen bg-gray-50">
       {/* Header */}
       <div className="p-4 pb-0">
         <div className="flex items-center gap-3 mt-2">
-          <Link
-            href="/troupeau"
-            className="p-2 bg-white rounded-lg shadow text-gray-600 hover:bg-gray-50"
-          >
-            <ArrowLeft size={18} />
-          </Link>
+          <BackButton />
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="bg-green-700 text-white font-bold px-3 py-1 rounded-lg font-mono text-lg">

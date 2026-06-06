@@ -215,7 +215,7 @@ export default async function SanitairePage() {
   const { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements } = await getSanitaireData(protocoles);
 
   return (
-    <div className="p-4 space-y-4 max-w-2xl mx-auto pb-24">
+    <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
       <div className="flex items-center gap-3 mt-2">
         <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
           <ArrowLeft size={18} />
