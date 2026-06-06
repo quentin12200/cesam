@@ -712,7 +712,7 @@ function ReproductionContent() {
           const isActive = filterEtat === etat;
           const cls =
             etat === "TOUS" ? (isActive ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-600")
-            : etat === "ROUGE" ? (isActive ? "bg-red-500 text-white" : "bg-red-100 text-red-600")
+            : etat === "ROUGE" ? (isActive ? "bg-blue-500 text-white" : "bg-blue-100 text-blue-600")
             : etat === "JAUNE" ? (isActive ? "bg-yellow-400 text-black" : "bg-yellow-50 text-yellow-700")
             : etat === "VERT" ? (isActive ? "bg-green-500 text-white" : "bg-green-100 text-green-700")
             : etat === "ROSE" ? (isActive ? "bg-pink-400 text-white" : "bg-pink-100 text-pink-600")
@@ -807,7 +807,7 @@ function ReproductionContent() {
                         <div className="flex items-center gap-1 mt-0.5">
                           <span className="text-xs text-gray-500">Non pleine ?</span>
                           <button onClick={() => marquerVide(vache)} disabled={saving}
-                            className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg font-semibold">Oui</button>
+                            className="text-xs bg-blue-500 text-white px-2 py-1 rounded-lg font-semibold">Oui</button>
                           <button onClick={() => setConfirmVideId(null)}
                             className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-lg">Non</button>
                         </div>
@@ -1112,7 +1112,7 @@ function ReproductionContent() {
                     ✓ Pleine
                   </button>
                   <button type="button" onClick={() => setEchoResultat("VIDE")}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 ${echoResultat === "VIDE" ? "bg-red-500 text-white border-red-500" : "border-gray-200 text-gray-700"}`}>
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 ${echoResultat === "VIDE" ? "bg-blue-500 text-white border-blue-500" : "border-gray-200 text-gray-700"}`}>
                     ✗ Vide
                   </button>
                 </div>
