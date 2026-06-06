@@ -160,7 +160,7 @@ export default function EditAnimalDrawer({
                 value={form.notes}
                 onChange={(e) => set("notes", e.target.value)}
                 rows={3}
-                placeholder="Observations, traitements, particularités..."
+                placeholder="Observations, traitements, particularités…"
                 className="w-full border border-gray-200 rounded-lg p-2.5 text-sm resize-none"
               />
             </div>
@@ -171,7 +171,7 @@ export default function EditAnimalDrawer({
               className="w-full bg-green-700 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Save size={18} />
-              {saving ? "Enregistrement..." : "Enregistrer"}
+              {saving ? "Enregistrement…" : "Enregistrer"}
             </button>
           </div>
         </div>

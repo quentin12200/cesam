@@ -161,7 +161,7 @@ export default function GroupeButton({ nutrav, groupeId, groupeNom, groupes }: P
                       type="text"
                       value={newNom}
                       onChange={(e) => setNewNom(e.target.value)}
-                      placeholder="Nom du groupe..."
+                      placeholder="Nom du groupe…"
                       className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") createAndAssign();

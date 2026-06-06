@@ -1161,7 +1161,7 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
                         vaccin === "BOLUS" || vaccin === "METRABOL" ? "bg-amber-500 text-white" :
                         "bg-purple-600 text-white"
                       }`}>{vaccin}</span>
-                      <span className="text-sm text-gray-600">{animals.length} animal{animals.length > 1 ? "x" : ""}</span>
+                      <span className="text-sm text-gray-600">{animals.length > 1 ? `${animals.length} animaux` : `${animals.length} animal`}</span>
                     </div>
                     {sessionMode && (
                       <button
@@ -1281,7 +1281,7 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
                     return (
                       <div key={vaccin} className="flex items-center justify-between text-xs text-green-700">
                         <span className="font-medium">{vaccin}</span>
-                        <span>{count} animal{count > 1 ? "x" : ""}</span>
+                        <span>{count > 1 ? `${count} animaux` : `${count} animal`}</span>
                       </div>
                     );
                   })

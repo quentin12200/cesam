@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib/utils";
@@ -9,6 +9,7 @@ import {
   RefreshCw, CheckCircle, ArrowLeft, CalendarDays,
   Settings, Printer, ChevronDown, ChevronRight, Users,
 } from "lucide-react";
+import ReproScrollRestorer from "./ReproScrollRestorer";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE";
 
@@ -131,9 +132,15 @@ function DateInput({ value, onChange, required, placeholder, className }: {
   className?: string;
 }) {
   const [raw, setRaw] = useState(toShortDate(value));
+  // Track the last ISO value we pushed upward so the effect can tell apart
+  // an external change (form opening) from a re-render caused by our own onChange.
+  const ownValueRef = useRef(value);
 
   useEffect(() => {
-    setRaw(toShortDate(value));
+    if (value !== ownValueRef.current) {
+      ownValueRef.current = value;
+      setRaw(toShortDate(value));
+    }
   }, [value]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -143,8 +150,14 @@ function DateInput({ value, onChange, required, placeholder, className }: {
     if (v.length === 5 && v.split("/").length === 2 && raw.length === 4) v = v + "/";
     setRaw(v);
     const iso = parseShortDate(v);
-    if (iso) onChange(iso);
-    else if (v === "") onChange("");
+    if (iso) {
+      ownValueRef.current = iso;
+      onChange(iso);
+    } else if (v === "") {
+      ownValueRef.current = "";
+      onChange("");
+    }
+    // For partial input, don't call onChange — keep old parent value to avoid effect reset
   }
 
   const isValid = raw === "" || !!parseShortDate(raw);
@@ -565,6 +578,7 @@ function ReproductionContent() {
   // ── RENDER ──────────────────────────────────────────────────────────────
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto">
+      <ReproScrollRestorer />
 
       {/* Header */}
       <div className="flex items-center justify-between mt-2">

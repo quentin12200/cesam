@@ -126,7 +126,7 @@ export default function VaccinationFormWrapper() {
                 disabled={saving}
                 className="w-full bg-purple-600 text-white py-3 rounded-xl font-medium disabled:opacity-50"
               >
-                {saving ? "Enregistrement..." : "Enregistrer"}
+                {saving ? "Enregistrement…" : "Enregistrer"}
               </button>
             </form>
           </div>

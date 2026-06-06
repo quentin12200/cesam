@@ -218,7 +218,7 @@ export default function VelageFormWrapper() {
                 disabled={saving}
                 className="w-full bg-pink-500 text-white py-4 rounded-xl font-semibold text-base disabled:opacity-50"
               >
-                {saving ? "Enregistrement..." : "Enregistrer le vélage"}
+                {saving ? "Enregistrement…" : "Enregistrer le vélage"}
               </button>
             </form>
           </div>

@@ -122,7 +122,7 @@ export default function SortieForm({ animaux, annee }: Props) {
           required
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
         >
-          <option value="">Sélectionner un animal...</option>
+          <option value="">Sélectionner un animal…</option>
           {animaux.map((a) => (
             <option key={a.id} value={a.id}>
               {a.nutrav} — {a.nobovi ?? "Sans nom"} ({a.sexbov === "F" ? "F" : "M"})
@@ -204,7 +204,7 @@ export default function SortieForm({ animaux, annee }: Props) {
               type="text"
               value={causeMortaliteCustom}
               onChange={(e) => setCauseMortaliteCustom(e.target.value)}
-              placeholder="Préciser la cause..."
+              placeholder="Préciser la cause…"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
             />
           )}
@@ -232,7 +232,7 @@ export default function SortieForm({ animaux, annee }: Props) {
               type="text"
               value={acheteur}
               onChange={(e) => setAcheteur(e.target.value)}
-              placeholder="Nom du maquignon / abattoir..."
+              placeholder="Nom du maquignon / abattoir…"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
@@ -299,7 +299,7 @@ export default function SortieForm({ animaux, annee }: Props) {
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
-          placeholder="Informations complémentaires..."
+          placeholder="Informations complémentaires…"
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
         />
       </div>
@@ -317,7 +317,7 @@ export default function SortieForm({ animaux, annee }: Props) {
           disabled={loading}
           className="flex-1 py-2.5 bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
         >
-          {loading ? "Enregistrement..." : "Enregistrer"}
+          {loading ? "Enregistrement…" : "Enregistrer"}
         </button>
       </div>
     </form>
