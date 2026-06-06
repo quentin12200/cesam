@@ -49,6 +49,7 @@ const ETAT_LABEL: Record<string, string> = {
   JAUNE: "À écho",
   GRIS: "En attente",
   ROUGE: "Vide",
+  REPOS: "Repos",
 };
 
 const CATS_OPTIONS: FilterOption[] = [
@@ -317,7 +318,7 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
               const catColor = getCategorieColor(cat);
 
               const etat: EtatGestation | null =
-                ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(cat)
+                ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "A_ENGRAISSER"].includes(cat)
                   ? getEtatGestation(
                       animal.saillieDate ? new Date(animal.saillieDate) : null,
                       animal.gestationEtat ?? null,
