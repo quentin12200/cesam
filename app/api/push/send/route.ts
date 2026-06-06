@@ -27,7 +27,7 @@ export async function POST() {
            surveillanceActive, cryptoRotavecCount, bolusCount] =
       await Promise.all([
         prisma.animal.findMany({
-          where: { statut: "ACTIF", sexbov: "F", estGenisse: false },
+          where: { statut: "ACTIF", sexbov: "F", estGenisse: false, NOT: { categorie: "ENGRAISSEMENT" } },
           include: {
             saillies: { orderBy: { date: "desc" }, take: 1, include: { gestation: true } },
             velagesVache: { orderBy: { date: "desc" }, take: 1 },

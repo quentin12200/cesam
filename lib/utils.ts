@@ -9,7 +9,9 @@ export type CategorieAnimal =
   | "MOYENNE_GENISSE"
   | "GRANDE_GENISSE"
   | "TAUREAU"
-  | "VACHE";
+  | "VACHE"
+  | "A_ENGRAISSER"
+  | "ENGRAISSEMENT";
 
 export const CATEGORIES_LABELS: Record<CategorieAnimal, string> = {
   VEAU_M: "Veau",
@@ -20,11 +22,14 @@ export const CATEGORIES_LABELS: Record<CategorieAnimal, string> = {
   GRANDE_GENISSE: "Grande génisse",
   TAUREAU: "Taureau",
   VACHE: "Vache",
+  A_ENGRAISSER: "À engraisser",
+  ENGRAISSEMENT: "Engraissement",
 };
 
 export const CATEGORIES_FEMELLES: CategorieAnimal[] = [
   "VELLE", "PRESELECTION_GENISSE",
   "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "VACHE",
+  "A_ENGRAISSER", "ENGRAISSEMENT",
 ];
 
 export const CATEGORIES_MALES: CategorieAnimal[] = ["VEAU_M", "TAUREAU"];
@@ -67,6 +72,8 @@ export function getCategorieColor(cat: CategorieAnimal | string): string {
     case "PETITE_GENISSE": return "bg-lime-100 text-lime-800";
     case "MOYENNE_GENISSE": return "bg-emerald-100 text-emerald-800";
     case "GRANDE_GENISSE": return "bg-teal-100 text-teal-800";
+    case "A_ENGRAISSER": return "bg-orange-100 text-orange-800";
+    case "ENGRAISSEMENT": return "bg-red-100 text-red-800";
     default: return "bg-gray-100 text-gray-800";
   }
 }

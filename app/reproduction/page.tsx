@@ -27,6 +27,7 @@ interface VacheRepro {
   derniereChaleur: string | null;
   aEchographier: boolean;
   estGenisse: boolean;
+  categorie: string | null;
 }
 
 interface Taureau {
@@ -729,6 +730,9 @@ function ReproductionContent() {
                         <span className="font-semibold text-gray-800 text-sm">{vache.nobovi ?? "Sans nom"}</span>
                         {vache.estGenisse && (
                           <span className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-medium">Génisse</span>
+                        )}
+                        {vache.categorie === "A_ENGRAISSER" && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">🥩 À engraisser</span>
                         )}
                         {vache.aEchographier && (
                           <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium animate-pulse">📡 À écho</span>
