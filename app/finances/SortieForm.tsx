@@ -34,6 +34,8 @@ export default function SortieForm({ animaux, annee }: Props) {
   const [acheteur, setAcheteur] = useState("");
   const [prixKilo, setPrixKilo] = useState("");
   const [poids, setPoids] = useState("");
+  const [poidsVif, setPoidsVif] = useState("");
+  const [rendementCarcasse, setRendementCarcasse] = useState("55");
   const [prixDefinitifHT, setPrixDefinitifHT] = useState("");
   const [notes, setNotes] = useState("");
   const [causeMortalite, setCauseMortalite] = useState("");
@@ -51,9 +53,17 @@ export default function SortieForm({ animaux, annee }: Props) {
       .catch(() => {});
   }, [type]);
 
+  // Pour boucherie : si poids vif + rendement, calcule le poids carcasse auto
+  const poidsCarcasseCalc =
+    type === "BOUCHERIE" && poidsVif && rendementCarcasse
+      ? (parseFloat(poidsVif) * parseFloat(rendementCarcasse) / 100).toFixed(1)
+      : null;
+
+  const poidsEffectif = type === "BOUCHERIE" ? (poids || poidsCarcasseCalc || "") : poids;
+
   const prixCalc =
-    prixKilo && poids
-      ? (parseFloat(prixKilo) * parseFloat(poids)).toFixed(2)
+    prixKilo && poidsEffectif
+      ? (parseFloat(prixKilo) * parseFloat(poidsEffectif)).toFixed(2)
       : null;
 
   const hasFinancials = type === "ELEVAGE" || type === "BOUCHERIE";
@@ -80,7 +90,9 @@ export default function SortieForm({ animaux, annee }: Props) {
           type,
           acheteur: acheteur || null,
           prixKilo: prixKilo ? parseFloat(prixKilo) : null,
-          poids: poids ? parseFloat(poids) : null,
+          poids: poids ? parseFloat(poids) : (poidsCarcasseCalc ? parseFloat(poidsCarcasseCalc) : null),
+          poidsVif: type === "BOUCHERIE" && poidsVif ? parseFloat(poidsVif) : null,
+          rendementCarcasse: type === "BOUCHERIE" && rendementCarcasse ? parseFloat(rendementCarcasse) : null,
           prixDefinitifHT: prixDefinitifHT ? parseFloat(prixDefinitifHT) : null,
           notes: notes || null,
           causeMortalite: type === "MORT"
@@ -237,10 +249,57 @@ export default function SortieForm({ animaux, annee }: Props) {
             />
           </div>
 
+          {/* Poids vif + rendement carcasse (boucherie uniquement) */}
+          {type === "BOUCHERIE" && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-3">
+              <p className="text-xs font-medium text-orange-700">Calcul rendement carcasse</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Poids vif (kg)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={poidsVif}
+                    onChange={(e) => setPoidsVif(e.target.value)}
+                    placeholder="ex: 700"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Rendement (%)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="100"
+                    value={rendementCarcasse}
+                    onChange={(e) => setRendementCarcasse(e.target.value)}
+                    placeholder="ex: 55"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+              </div>
+              {poidsCarcasseCalc && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-600">Poids carcasse calculé :</span>
+                  <span className="font-bold text-orange-700">{poidsCarcasseCalc} kg</span>
+                  <button
+                    type="button"
+                    onClick={() => setPoids(poidsCarcasseCalc)}
+                    className="text-xs text-orange-600 underline hover:text-orange-800"
+                  >
+                    Utiliser
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Poids ({type === "BOUCHERIE" ? "carcasse" : "vif"}) kg
+                Poids carcasse (kg)
               </label>
               <input
                 type="number"
@@ -248,12 +307,12 @@ export default function SortieForm({ animaux, annee }: Props) {
                 min="0"
                 value={poids}
                 onChange={(e) => setPoids(e.target.value)}
-                placeholder="ex: 280"
+                placeholder={poidsCarcasseCalc ?? (type === "BOUCHERIE" ? "ex: 385" : "ex: 280")}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prix / kg (€)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Prix / kg carcasse (€)</label>
               <input
                 type="number"
                 step="0.01"

@@ -11,6 +11,8 @@ interface Sortie {
   type: string;
   acheteur: string | null;
   poids: number | null;
+  poidsVif: number | null;
+  rendementCarcasse: number | null;
   prixKilo: number | null;
   prixDefinitifHT: number | null;
   prixPrevuHT: number | null;
@@ -36,13 +38,22 @@ export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
   const [type, setType] = useState(sortie.type);
   const [acheteur, setAcheteur] = useState(sortie.acheteur ?? "");
   const [poids, setPoids] = useState(sortie.poids?.toString() ?? "");
+  const [poidsVif, setPoidsVif] = useState(sortie.poidsVif?.toString() ?? "");
+  const [rendementCarcasse, setRendementCarcasse] = useState(sortie.rendementCarcasse?.toString() ?? "55");
   const [prixKilo, setPrixKilo] = useState(sortie.prixKilo?.toString() ?? "");
   const [prixDefinitifHT, setPrixDefinitifHT] = useState(sortie.prixDefinitifHT?.toString() ?? "");
   const [notes, setNotes] = useState(sortie.notes ?? "");
   const [causeMortalite, setCauseMortalite] = useState(sortie.causeMortalite ?? "");
 
   const hasFinancials = type === "ELEVAGE" || type === "BOUCHERIE";
-  const prixCalc = prixKilo && poids ? (parseFloat(prixKilo) * parseFloat(poids)).toFixed(2) : null;
+
+  const poidsCarcasseCalc =
+    type === "BOUCHERIE" && poidsVif && rendementCarcasse
+      ? (parseFloat(poidsVif) * parseFloat(rendementCarcasse) / 100).toFixed(1)
+      : null;
+
+  const poidsEffectif = type === "BOUCHERIE" ? (poids || poidsCarcasseCalc || "") : poids;
+  const prixCalc = prixKilo && poidsEffectif ? (parseFloat(prixKilo) * parseFloat(poidsEffectif)).toFixed(2) : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,7 +67,9 @@ export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
           date,
           type,
           acheteur: acheteur || null,
-          poids: poids ? parseFloat(poids) : null,
+          poids: poids ? parseFloat(poids) : (poidsCarcasseCalc ? parseFloat(poidsCarcasseCalc) : null),
+          poidsVif: type === "BOUCHERIE" && poidsVif ? parseFloat(poidsVif) : null,
+          rendementCarcasse: type === "BOUCHERIE" && rendementCarcasse ? parseFloat(rendementCarcasse) : null,
           prixKilo: prixKilo ? parseFloat(prixKilo) : null,
           prixDefinitifHT: prixDefinitifHT ? parseFloat(prixDefinitifHT) : null,
           notes: notes || null,
@@ -181,10 +194,57 @@ export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
                     />
                   </div>
 
+                  {/* Rendement carcasse (boucherie uniquement) */}
+                  {type === "BOUCHERIE" && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-3">
+                      <p className="text-xs font-medium text-orange-700">Calcul rendement carcasse</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Poids vif (kg)</label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            value={poidsVif}
+                            onChange={(e) => setPoidsVif(e.target.value)}
+                            placeholder="ex: 700"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Rendement (%)</label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            max="100"
+                            value={rendementCarcasse}
+                            onChange={(e) => setRendementCarcasse(e.target.value)}
+                            placeholder="ex: 55"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                          />
+                        </div>
+                      </div>
+                      {poidsCarcasseCalc && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-gray-600">Poids carcasse calculé :</span>
+                          <span className="font-bold text-orange-700">{poidsCarcasseCalc} kg</span>
+                          <button
+                            type="button"
+                            onClick={() => setPoids(poidsCarcasseCalc)}
+                            className="text-xs text-orange-600 underline hover:text-orange-800"
+                          >
+                            Utiliser
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Poids ({type === "BOUCHERIE" ? "carcasse" : "vif"}) kg
+                        {type === "BOUCHERIE" ? "Poids carcasse (kg)" : "Poids vif (kg)"}
                       </label>
                       <input
                         type="number"
@@ -192,12 +252,14 @@ export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
                         min="0"
                         value={poids}
                         onChange={(e) => setPoids(e.target.value)}
-                        placeholder="ex: 280"
+                        placeholder={poidsCarcasseCalc ?? "ex: 280"}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Prix / kg (€)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {type === "BOUCHERIE" ? "Prix / kg carcasse (€)" : "Prix / kg (€)"}
+                      </label>
                       <input
                         type="number"
                         step="0.01"

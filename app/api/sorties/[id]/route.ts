@@ -9,7 +9,7 @@ export async function PATCH(
   const { id } = await params;
   try {
     const body = await req.json();
-    const { date, type, acheteur, poids, prixKilo, prixDefinitifHT, notes, causeMortalite } = body;
+    const { date, type, acheteur, poids, poidsVif, rendementCarcasse, prixKilo, prixDefinitifHT, notes, causeMortalite } = body;
 
     const sortie = await prisma.sortie.findUnique({ where: { id } });
     if (!sortie) return NextResponse.json({ error: "Sortie introuvable" }, { status: 404 });
@@ -21,6 +21,8 @@ export async function PATCH(
         ...(type !== undefined && { type }),
         ...(acheteur !== undefined && { acheteur: acheteur || null }),
         ...(poids !== undefined && { poids: poids !== null ? parseFloat(poids) : null }),
+        ...(poidsVif !== undefined && { poidsVif: poidsVif !== null ? parseFloat(poidsVif) : null }),
+        ...(rendementCarcasse !== undefined && { rendementCarcasse: rendementCarcasse !== null ? parseFloat(rendementCarcasse) : null }),
         ...(prixKilo !== undefined && { prixKilo: prixKilo !== null ? parseFloat(prixKilo) : null }),
         ...(prixDefinitifHT !== undefined && { prixDefinitifHT: prixDefinitifHT !== null ? parseFloat(prixDefinitifHT) : null }),
         ...(notes !== undefined && { notes: notes || null }),

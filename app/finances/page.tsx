@@ -435,7 +435,10 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                 <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
                   <span>{new Date(sortie.date).toLocaleDateString("fr-FR")}</span>
                   <div className="flex items-center gap-3">
-                    {sortie.poids && <span>{formatPoids(sortie.poids)}</span>}
+                    {sortie.type === "BOUCHERIE" && sortie.poidsVif && (
+                      <span>{formatPoids(sortie.poidsVif)} vif{sortie.rendementCarcasse ? ` → ${sortie.rendementCarcasse}%` : ""}</span>
+                    )}
+                    {sortie.poids && <span>{formatPoids(sortie.poids)}{sortie.type === "BOUCHERIE" ? " carc." : ""}</span>}
                     {sortie.prixKilo && <span>{sortie.prixKilo.toFixed(2)} €/kg</span>}
                     {(sortie.prixDefinitifHT ?? sortie.prixPrevuHT) && (
                       <span className="font-semibold text-green-700">
@@ -454,6 +457,8 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                     type: sortie.type,
                     acheteur: sortie.acheteur,
                     poids: sortie.poids,
+                    poidsVif: sortie.poidsVif,
+                    rendementCarcasse: sortie.rendementCarcasse,
                     prixKilo: sortie.prixKilo,
                     prixDefinitifHT: sortie.prixDefinitifHT,
                     prixPrevuHT: sortie.prixPrevuHT,
