@@ -246,7 +246,9 @@ model Sortie {
 
   acheteur        String?
   prixKilo        Float?
-  poids           Float?
+  poids           Float?   // poids carcasse pour BOUCHERIE, poids vif sinon
+  poidsVif        Float?   // poids vif avant abattage (BOUCHERIE)
+  rendementCarcasse Float? // % rendement carcasse (ex: 55.0)
   prixPrevuHT     Float?
   prixDefinitifHT Float?
 
