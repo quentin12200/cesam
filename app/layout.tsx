@@ -39,7 +39,7 @@ export default function RootLayout({
     <html lang="fr" className={`${geist.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-gray-100 pb-16">
         <header className="bg-green-700 text-white px-4 py-3 shadow-md sticky top-0 z-30">
-          <div className="flex items-center justify-between w-full">
+          <div className="flex items-center justify-between w-full max-w-4xl mx-auto">
             <div className="flex items-center gap-2.5">
               <Image
                 src="/logo-cesam.svg"

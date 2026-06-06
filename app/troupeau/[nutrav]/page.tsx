@@ -159,7 +159,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto min-h-screen bg-gray-50">
+    <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto min-h-screen bg-gray-50">
       {/* Header */}
       <div className="p-4 pb-0">
         <div className="flex items-center gap-3 mt-2">
