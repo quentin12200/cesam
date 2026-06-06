@@ -12,7 +12,7 @@ import {
 } from "@/lib/utils";
 import Link from "next/link";
 import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid, Printer } from "lucide-react";
-import { addDays, differenceInMonths } from "date-fns";
+import { addDays, differenceInMonths, subDays } from "date-fns";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
 import GroupeCreateButton from "./GroupeCreateButton";
@@ -80,7 +80,13 @@ async function getAnimaux(params: {
     where.sexbov = "F";
     where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } } };
   } else if (repro === "A_ECO") {
-    where.aEchographier = true;
+    where.sexbov = "F";
+    where.saillies = {
+      some: {
+        date: { lte: subDays(now, 35) },
+        gestation: { etat: { notIn: ["VERT", "ROUGE"] } },
+      },
+    };
   }
 
   // Filtre statut sanitaire
