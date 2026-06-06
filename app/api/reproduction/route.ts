@@ -13,10 +13,19 @@ export async function GET() {
     where: {
       statut: "ACTIF",
       sexbov: "F",
-      NOT: { categorie: "ENGRAISSEMENT" },
-      OR: [
-        { estGenisse: false },
-        { estGenisse: true, danais: { lte: dateMax24Mois } },
+      AND: [
+        {
+          OR: [
+            { categorie: null },
+            { categorie: { not: "ENGRAISSEMENT" } },
+          ],
+        },
+        {
+          OR: [
+            { estGenisse: false },
+            { estGenisse: true, danais: { lte: dateMax24Mois } },
+          ],
+        },
       ],
     },
     select: {
