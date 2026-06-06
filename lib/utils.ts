@@ -152,17 +152,7 @@ export function getEtatGestation(
   // Vide explicitement confirmé par écho ou annulation manuelle — priorité absolue
   if (gestationEtat === "ROUGE") return "ROUGE";
 
-  // Si le vêlage est plus récent que la dernière saillie (ou s'il n'y a aucune saillie),
-  // la vache vient de vêler et n'a pas encore été resaillie → repos post-vêlage
-  const velageApresSaillie =
-    dernierVelage && (!derniereSaillie || dernierVelage > derniereSaillie);
-
-  if (velageApresSaillie) {
-    const joursDepuisVelage = differenceInDays(now, dernierVelage!);
-    return joursDepuisVelage <= 60 ? "REPOS" : "ROUGE";
-  }
-
-  // Pleine confirmée par écho
+  // Pleine confirmée par écho — priorité avant tout calcul de vêlage
   if (gestationEtat === "VERT") {
     if (dateVelagePrevue) {
       const diffJours = differenceInDays(dateVelagePrevue, now);
@@ -171,8 +161,22 @@ export function getEtatGestation(
     return "VERT";
   }
 
-  // Pas de saillie et pas de vêlage connu → vide
-  if (!derniereSaillie) return "ROUGE";
+  // Pas de saillie enregistrée
+  if (!derniereSaillie) {
+    if (dernierVelage) {
+      const joursDepuisVelage = differenceInDays(now, dernierVelage);
+      if (joursDepuisVelage <= 60) return "REPOS"; // < 2 mois post-vêlage
+      return "ROUGE";
+    }
+    return "ROUGE";
+  }
+
+  // Saillie enregistrée : si un vêlage est plus récent que la saillie,
+  // la vache a vêlé sans être resaillie depuis → repos ou vide
+  if (dernierVelage && dernierVelage > derniereSaillie) {
+    const joursDepuisVelage = differenceInDays(now, dernierVelage);
+    return joursDepuisVelage <= 60 ? "REPOS" : "ROUGE";
+  }
 
   // Saillie enregistrée — calcul par délai
   const joursDepuisSaillie = differenceInDays(now, derniereSaillie);
