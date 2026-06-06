@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, TrendingUp, Package, Euro, Plus } from "lucide-react";
 import SortieForm from "./SortieForm";
 import AnnulerSortieButton from "./AnnulerSortieButton";
+import EditSortieDrawer from "./EditSortieDrawer";
 
 function formatEuro(val: number | null | undefined) {
   if (val == null) return "—";
@@ -446,7 +447,20 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                 {sortie.acheteur && (
                   <div className="text-xs text-gray-400 mt-1">Acheteur : {sortie.acheteur}</div>
                 )}
-                <div className="flex justify-end mt-1">
+                <div className="flex justify-between items-center mt-1">
+                  <EditSortieDrawer sortie={{
+                    id: sortie.id,
+                    date: sortie.date.toISOString(),
+                    type: sortie.type,
+                    acheteur: sortie.acheteur,
+                    poids: sortie.poids,
+                    prixKilo: sortie.prixKilo,
+                    prixDefinitifHT: sortie.prixDefinitifHT,
+                    prixPrevuHT: sortie.prixPrevuHT,
+                    notes: sortie.notes,
+                    causeMortalite: sortie.causeMortalite,
+                    animal: { nutrav: sortie.animal.nutrav, nobovi: sortie.animal.nobovi },
+                  }} />
                   <AnnulerSortieButton sortieId={sortie.id} nutrav={sortie.animal.nutrav} />
                 </div>
               </div>
