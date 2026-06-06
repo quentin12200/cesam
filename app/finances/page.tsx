@@ -193,7 +193,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
   };
 
   return (
-    <div className="p-4 space-y-4 max-w-2xl mx-auto">
+    <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mt-2">
         <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-600 hover:bg-gray-50">
           <ArrowLeft size={18} />
