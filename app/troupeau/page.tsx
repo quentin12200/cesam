@@ -11,7 +11,7 @@ import {
   type CategorieAnimal,
 } from "@/lib/utils";
 import Link from "next/link";
-import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid, Printer } from "lucide-react";
 import { addDays, differenceInMonths } from "date-fns";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
@@ -236,6 +236,8 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     { value: "GRANDE_GENISSE", label: "Grande génisse" },
     { value: "PRESELECTION_GENISSE", label: "Présélection" },
     { value: "VELLE", label: "Velle" },
+    { value: "A_ENGRAISSER", label: "À engraisser" },
+    { value: "ENGRAISSEMENT", label: "Engraissement" },
   ];
 
   const CATS_M: { value: string; label: string }[] = [
@@ -251,6 +253,18 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
           <ArrowLeft size={18} />
         </Link>
         <h2 className="text-xl font-bold text-gray-800 flex-1">Troupeau</h2>
+        <Link
+          href={`/troupeau/impression?${new URLSearchParams(
+            Object.fromEntries(
+              Object.entries({ sexe, q, categorie, tarie, repro, sanitaire, groupe, tri })
+                .filter(([, v]) => v !== undefined && v !== null) as [string, string][]
+            )
+          ).toString()}`}
+          className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
+          title="Imprimer la liste filtrée"
+        >
+          <Printer size={16} />
+        </Link>
         <Link
           href={buildUrl({ filtres: showFiltres ? undefined : "1" })}
           className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-medium transition-colors ${

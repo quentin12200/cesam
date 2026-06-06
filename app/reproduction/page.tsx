@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import ReproScrollRestorer from "./ReproScrollRestorer";
 
-type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE";
+type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
 interface VacheRepro {
   id: string;
@@ -27,6 +27,7 @@ interface VacheRepro {
   derniereChaleur: string | null;
   aEchographier: boolean;
   estGenisse: boolean;
+  categorie: string | null;
 }
 
 interface Taureau {
@@ -41,7 +42,7 @@ type FilterEtat = "TOUS" | EtatGestation;
 
 const filterLabels: Record<FilterEtat, string> = {
   TOUS: "Tous", GRIS: "Récente", JAUNE: "À écho",
-  VERT: "Pleine", ROUGE: "Vide", ROSE: "Imminent",
+  VERT: "Pleine", ROUGE: "Vide", ROSE: "Imminent", REPOS: "Repos",
 };
 
 const DUREE_GESTATION = 285;
@@ -385,7 +386,7 @@ function ReproductionContent() {
   }));
 
   const filtered = filterEtat === "TOUS" ? vachesAvecEtat : vachesAvecEtat.filter((v) => v.etat === filterEtat);
-  const counts: Record<EtatGestation, number> = { GRIS: 0, JAUNE: 0, VERT: 0, ROUGE: 0, ROSE: 0 };
+  const counts: Record<EtatGestation, number> = { GRIS: 0, JAUNE: 0, VERT: 0, ROUGE: 0, ROSE: 0, REPOS: 0 };
   vachesAvecEtat.forEach((v) => counts[v.etat]++);
 
   const gestationsActives = vachesAvecEtat
@@ -690,7 +691,7 @@ function ReproductionContent() {
 
       {/* Filtres */}
       <div className="bg-white rounded-xl shadow p-2 flex gap-1 overflow-x-auto">
-        {(["TOUS", "ROUGE", "JAUNE", "VERT", "ROSE", "GRIS"] as FilterEtat[]).map((etat) => {
+        {(["TOUS", "ROUGE", "REPOS", "JAUNE", "VERT", "ROSE", "GRIS"] as FilterEtat[]).map((etat) => {
           const count = etat === "TOUS" ? vachesAvecEtat.length : counts[etat];
           const isActive = filterEtat === etat;
           const cls =
@@ -699,6 +700,7 @@ function ReproductionContent() {
             : etat === "JAUNE" ? (isActive ? "bg-yellow-400 text-black" : "bg-yellow-50 text-yellow-700")
             : etat === "VERT" ? (isActive ? "bg-green-500 text-white" : "bg-green-100 text-green-700")
             : etat === "ROSE" ? (isActive ? "bg-pink-400 text-white" : "bg-pink-100 text-pink-600")
+            : etat === "REPOS" ? (isActive ? "bg-sky-500 text-white" : "bg-sky-100 text-sky-700")
             : (isActive ? "bg-gray-400 text-white" : "bg-gray-100 text-gray-600");
           return (
             <button key={etat} onClick={() => setFilterEtat(etat)}
@@ -729,6 +731,9 @@ function ReproductionContent() {
                         <span className="font-semibold text-gray-800 text-sm">{vache.nobovi ?? "Sans nom"}</span>
                         {vache.estGenisse && (
                           <span className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-medium">Génisse</span>
+                        )}
+                        {vache.categorie === "A_ENGRAISSER" && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">🥩 À engraisser</span>
                         )}
                         {vache.aEchographier && (
                           <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium animate-pulse">📡 À écho</span>
@@ -770,7 +775,7 @@ function ReproductionContent() {
                           <CheckCircle size={12} /> Écho
                         </button>
                       )}
-                      {vache.etat === "ROUGE" && (
+                      {(vache.etat === "ROUGE" || vache.etat === "REPOS") && (
                         <button onClick={() => openChaleurForm(vache)}
                           className="text-xs bg-pink-100 text-pink-700 px-2 py-1 rounded-lg">
                           🌡️ Chaleur
@@ -781,7 +786,7 @@ function ReproductionContent() {
                         <RefreshCw size={12} /> Saillie
                       </button>
                     </div>
-                    {vache.saillieId && vache.etat !== "ROUGE" && (
+                    {vache.saillieId && vache.etat !== "ROUGE" && vache.etat !== "REPOS" && (
                       confirmVideId === vache.id ? (
                         <div className="flex items-center gap-1 mt-0.5">
                           <span className="text-xs text-gray-500">Non pleine ?</span>

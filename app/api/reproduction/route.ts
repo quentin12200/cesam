@@ -6,16 +6,17 @@ import { addDays } from "date-fns";
 
 export async function GET() {
   const now = new Date();
-  // Génisses ≥ 20 mois entrent en reproduction
-  const dateMax20Mois = addDays(now, -(20 * 30.44));
+  // Génisses ≥ 24 mois (grandes génisses) entrent en reproduction
+  const dateMax24Mois = addDays(now, -(24 * 30.44));
 
   const vaches = await prisma.animal.findMany({
     where: {
       statut: "ACTIF",
       sexbov: "F",
+      NOT: { categorie: "ENGRAISSEMENT" },
       OR: [
         { estGenisse: false },
-        { estGenisse: true, danais: { lte: dateMax20Mois } },
+        { estGenisse: true, danais: { lte: dateMax24Mois } },
       ],
     },
     select: {
@@ -25,6 +26,7 @@ export async function GET() {
       danais: true,
       estGenisse: true,
       aEchographier: true,
+      categorie: true,
       saillies: {
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         take: 1,
@@ -76,6 +78,7 @@ export async function GET() {
     })(),
     aEchographier: v.aEchographier,
     estGenisse: v.estGenisse,
+    categorie: v.categorie ?? null,
   }));
 
   return NextResponse.json({ vaches: result });
