@@ -24,7 +24,6 @@ interface PageProps {
   searchParams: Promise<{
     sexe?: string;
     q?: string;
-    page?: string;
     categorie?: string;
     tarie?: string;
     repro?: string;
@@ -37,12 +36,9 @@ interface PageProps {
   }>;
 }
 
-const PAGE_SIZE = 30;
-
 async function getAnimaux(params: {
   sexe?: string;
   q?: string;
-  page?: number;
   categorie?: string;
   tarie?: string;
   repro?: string;
@@ -50,7 +46,7 @@ async function getAnimaux(params: {
   groupe?: string;
   tri?: string;
 }) {
-  const { sexe, q, page = 1, categorie, tarie, repro, sanitaire, groupe, tri } = params;
+  const { sexe, q, categorie, tarie, repro, sanitaire, groupe, tri } = params;
   const now = new Date();
   const where: Prisma.AnimalWhereInput = {};
 
@@ -152,8 +148,6 @@ async function getAnimaux(params: {
     prisma.animal.findMany({
       where,
       orderBy,
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
       select: {
         id: true,
         nutrav: true,
@@ -190,14 +184,13 @@ async function getAnimaux(params: {
     prisma.groupe.findMany({ orderBy: { nom: "asc" } }),
   ]);
 
-  return { animaux, total, pages: Math.ceil(total / PAGE_SIZE), groupes };
+  return { animaux, total, groupes };
 }
 
 export default async function TroupeauPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const sexe = params.sexe;
   const q = params.q;
-  const page = parseInt(params.page ?? "1", 10);
   const categorie = params.categorie;
   const tarie = params.tarie;
   const repro = params.repro;
@@ -208,15 +201,14 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const showForm = params.nouveau === "1";
   const showFiltres = params.filtres === "1";
 
-  const { animaux, total, pages, groupes } = await getAnimaux({
-    sexe, q, page, categorie, tarie, repro, sanitaire, groupe, tri,
+  const { animaux, total, groupes } = await getAnimaux({
+    sexe, q, categorie, tarie, repro, sanitaire, groupe, tri,
   });
 
   function buildUrl(overrides: Record<string, string | undefined>) {
     const p: Record<string, string> = {};
     if (sexe) p.sexe = sexe;
     if (q) p.q = q;
-    if (page > 1) p.page = String(page);
     if (categorie) p.categorie = categorie;
     if (tarie) p.tarie = tarie;
     if (repro) p.repro = repro;
@@ -260,7 +252,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         </Link>
         <h2 className="text-xl font-bold text-gray-800 flex-1">Troupeau</h2>
         <Link
-          href={buildUrl({ filtres: showFiltres ? undefined : "1", page: "1" })}
+          href={buildUrl({ filtres: showFiltres ? undefined : "1" })}
           className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-medium transition-colors ${
             showFiltres || activeFiltersCount > 0
               ? "bg-green-700 text-white"
@@ -276,7 +268,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
           )}
         </Link>
         <Link
-          href={buildUrl({ vue: vue === "tableau" ? undefined : "tableau", page: "1" })}
+          href={buildUrl({ vue: vue === "tableau" ? undefined : "tableau" })}
           className={`p-2 rounded-lg shadow transition-colors ${
             vue === "tableau" ? "bg-green-700 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
           }`}
@@ -323,7 +315,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               ].map((opt) => (
                 <Link
                   key={opt.label}
-                  href={buildUrl({ tri: opt.value, page: "1" })}
+                  href={buildUrl({ tri: opt.value })}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     tri === opt.value || (!tri && !opt.value)
                       ? "bg-green-700 text-white border-green-700"
@@ -347,7 +339,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               ].map((opt) => (
                 <Link
                   key={opt.label}
-                  href={buildUrl({ sexe: opt.value, page: "1" })}
+                  href={buildUrl({ sexe: opt.value })}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     sexe === opt.value || (!sexe && !opt.value)
                       ? "bg-green-700 text-white border-green-700"
@@ -366,7 +358,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               <p className="text-xs font-medium text-gray-500 mb-1.5">Catégorie femelle</p>
               <div className="flex gap-1.5 flex-wrap">
                 <Link
-                  href={buildUrl({ categorie: undefined, page: "1" })}
+                  href={buildUrl({ categorie: undefined })}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     !categorie ? "bg-green-700 text-white border-green-700" : "bg-white text-gray-600 border-gray-200"
                   }`}
@@ -376,7 +368,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                 {CATS_F.map((c) => (
                   <Link
                     key={c.value}
-                    href={buildUrl({ categorie: c.value, sexe: "F", page: "1" })}
+                    href={buildUrl({ categorie: c.value, sexe: "F" })}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                       categorie === c.value
                         ? "bg-green-700 text-white border-green-700"
@@ -396,7 +388,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               <p className="text-xs font-medium text-gray-500 mb-1.5">Catégorie mâle</p>
               <div className="flex gap-1.5 flex-wrap">
                 <Link
-                  href={buildUrl({ categorie: undefined, page: "1" })}
+                  href={buildUrl({ categorie: undefined })}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     !categorie ? "bg-green-700 text-white border-green-700" : "bg-white text-gray-600 border-gray-200"
                   }`}
@@ -406,7 +398,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                 {CATS_M.map((c) => (
                   <Link
                     key={c.value}
-                    href={buildUrl({ categorie: c.value, sexe: "M", page: "1" })}
+                    href={buildUrl({ categorie: c.value, sexe: "M" })}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                       categorie === c.value
                         ? "bg-green-700 text-white border-green-700"
@@ -432,7 +424,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                 ].map((opt) => (
                   <Link
                     key={opt.label}
-                    href={buildUrl({ tarie: opt.value, page: "1" })}
+                    href={buildUrl({ tarie: opt.value })}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                       tarie === opt.value || (!tarie && !opt.value)
                         ? "bg-green-700 text-white border-green-700"
@@ -459,7 +451,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                 ].map((opt) => (
                   <Link
                     key={opt.label}
-                    href={buildUrl({ repro: opt.value, page: "1" })}
+                    href={buildUrl({ repro: opt.value })}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                       repro === opt.value || (!repro && !opt.value)
                         ? "bg-green-700 text-white border-green-700"
@@ -484,7 +476,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               ].map((opt) => (
                 <Link
                   key={opt.label}
-                  href={buildUrl({ sanitaire: opt.value, page: "1" })}
+                  href={buildUrl({ sanitaire: opt.value })}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     sanitaire === opt.value || (!sanitaire && !opt.value)
                       ? "bg-green-700 text-white border-green-700"
@@ -503,7 +495,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             {groupes.length > 0 && (
               <div className="flex gap-1.5 flex-wrap mb-1">
                 <Link
-                  href={buildUrl({ groupe: undefined, page: "1" })}
+                  href={buildUrl({ groupe: undefined })}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     !groupe ? "bg-green-700 text-white border-green-700" : "bg-white text-gray-600 border-gray-200"
                   }`}
@@ -513,7 +505,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                 {groupes.map((g) => (
                   <Link
                     key={g.id}
-                    href={buildUrl({ groupe: g.id, page: "1" })}
+                    href={buildUrl({ groupe: g.id })}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                       groupe === g.id
                         ? "bg-green-700 text-white border-green-700"
@@ -665,26 +657,6 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* Pagination */}
-      {pages > 1 && (
-        <div className="flex items-center justify-center gap-2 py-2">
-          {page > 1 && (
-            <Link href={buildUrl({ page: String(page - 1) })}
-              className="px-4 py-2 bg-white rounded-lg shadow text-sm text-gray-700 hover:bg-gray-50"
-            >
-              Précédent
-            </Link>
-          )}
-          <span className="text-sm text-gray-500">Page {page} / {pages}</span>
-          {page < pages && (
-            <Link href={buildUrl({ page: String(page + 1) })}
-              className="px-4 py-2 bg-white rounded-lg shadow text-sm text-gray-700 hover:bg-gray-50"
-            >
-              Suivant
-            </Link>
-          )}
-        </div>
-      )}
     </div>
   );
 }

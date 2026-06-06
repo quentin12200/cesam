@@ -219,7 +219,7 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
     } else {
       params.delete(key);
     }
-    params.set("page", "1");
+    params.delete("page");
     params.set("vue", "tableau");
     return `/troupeau?${params.toString()}`;
   }
