@@ -2,12 +2,11 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { addDays } from "date-fns";
+import { subMonths } from "date-fns";
 
 export async function GET() {
   const now = new Date();
-  // Génisses ≥ 24 mois (grandes génisses) entrent en reproduction
-  const dateMax24Mois = addDays(now, -(24 * 30.44));
+  const dateMin24Mois = subMonths(now, 24);
 
   const vaches = await prisma.animal.findMany({
     where: {
@@ -21,9 +20,12 @@ export async function GET() {
           ],
         },
         {
+          // Entrent en repro : vaches ≥ 24 mois, ou jeune vache ayant déjà vêlé,
+          // ou grande génisse ≥ 24 mois. Exclut toute femelle < 24 mois sans velage.
           OR: [
-            { estGenisse: false },
-            { estGenisse: true, danais: { lte: dateMax24Mois } },
+            { estGenisse: false, danais: { lte: dateMin24Mois } },
+            { estGenisse: false, velagesVache: { some: {} } },
+            { estGenisse: true, danais: { lte: dateMin24Mois } },
           ],
         },
       ],
