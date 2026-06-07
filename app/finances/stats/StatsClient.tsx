@@ -176,6 +176,46 @@ function StackedBarChart({ data, labels, keys, colors, keyLabels }: {
   );
 }
 
+// ── Bouton seed données historiques ──────────────────────────────────────────
+
+function BoutonSeedHistorique({ onDone }: { onDone: () => void }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function seed() {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch("/api/stats-annuelles/seed", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erreur");
+      setDone(true);
+      router.refresh();
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (done) return null;
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between gap-3">
+      <div>
+        <p className="text-sm font-semibold text-amber-800">Données historiques non chargées</p>
+        <p className="text-xs text-amber-600">Clique pour importer 2021–2025 depuis ton Excel</p>
+        {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+      </div>
+      <button onClick={seed} disabled={loading}
+        className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50">
+        {loading ? "Import…" : "Importer"}
+      </button>
+    </div>
+  );
+}
+
 // ── Analyse IA ────────────────────────────────────────────────────────────────
 
 function AnalyseIA({ stats }: { stats: AnneeStats[] }) {
@@ -604,6 +644,11 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
 
   return (
     <div className="space-y-4">
+      {/* Bandeau import historique si données manquantes */}
+      {stats.length <= 1 && (
+        <BoutonSeedHistorique onDone={() => {}} />
+      )}
+
       {/* Onglets + IA */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex bg-white rounded-xl shadow p-1 gap-1">

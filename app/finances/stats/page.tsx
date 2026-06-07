@@ -17,6 +17,7 @@ export interface AnneeStats {
   vachesCA: number;
   caTotal: number;
   tauxProductivite: number | null;
+  isHistorique?: boolean; // données saisies manuellement, pas d'animaux individuels
 }
 
 export interface SortieDetail {
@@ -37,9 +38,9 @@ export interface SortieDetail {
 }
 
 async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: Record<number, SortieDetail[]> }> {
-  const anneeMin = new Date().getFullYear() - 5;
+  const anneeMin = new Date().getFullYear() - 10;
 
-  const [sorties, velagesParAnneeRaw] = await Promise.all([
+  const [sorties, velagesParAnneeRaw, historiques] = await Promise.all([
     prisma.sortie.findMany({
       where: { date: { gte: new Date(`${anneeMin}-01-01`) } },
       include: {
@@ -56,6 +57,7 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
       where: { date: { gte: new Date(`${anneeMin}-01-01`) } },
       select: { date: true },
     }),
+    prisma.statsAnnuelle.findMany({ orderBy: { annee: "asc" } }),
   ]);
 
   const velagesCountByAnnee = new Map<number, number>();
@@ -71,9 +73,11 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     byAnnee.get(annee)!.push(s);
   }
 
-  const annees = [...new Set([...byAnnee.keys()])].sort();
+  // Années avec sorties réelles
+  const anneesReelles = new Set(byAnnee.keys());
 
-  const stats = annees.map((annee) => {
+  // Années historiques (saisies manuellement, sans sortie réelle)
+  const statsReelles = [...anneesReelles].sort().map((annee) => {
     const rows = byAnnee.get(annee) ?? [];
     const veaux = rows.filter((s) => s.type === "ELEVAGE" && s.animal.velageVeau !== null);
     const vaches = rows.filter((s) => s.type === "BOUCHERIE");
@@ -97,15 +101,31 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     const velagesAnnee = velagesCountByAnnee.get(annee) ?? 0;
     const tauxProductivite = velagesAnnee > 0 ? Math.round((veauxCount / velagesAnnee) * 100) : null;
 
-    return {
-      annee, veauxCount, veauxKgTotal, veauxPrixMoyen, veauxCA,
-      vachesCount, vachesKgCarcasse, vachesPrixMoyen, vachesCA,
-      caTotal, tauxProductivite,
-    };
+    return { annee, veauxCount, veauxKgTotal, veauxPrixMoyen, veauxCA, vachesCount, vachesKgCarcasse, vachesPrixMoyen, vachesCA, caTotal, tauxProductivite };
   });
 
+  // Fusionner avec historiques (les années historiques qui n'ont pas de sorties réelles)
+  const statsHistoriques: AnneeStats[] = historiques
+    .filter((h) => !anneesReelles.has(h.annee))
+    .map((h) => ({
+      annee: h.annee,
+      veauxCount: h.veauxCount,
+      veauxKgTotal: h.veauxKgTotal,
+      veauxPrixMoyen: h.veauxPrixMoyen,
+      veauxCA: h.veauxCA,
+      vachesCount: h.vachesCount,
+      vachesKgCarcasse: h.vachesKgCarcasse,
+      vachesPrixMoyen: h.vachesPrixMoyen,
+      vachesCA: h.vachesCA,
+      caTotal: h.veauxCA + h.vachesCA,
+      tauxProductivite: h.velagesCount > 0 ? Math.round((h.veauxCount / h.velagesCount) * 100) : null,
+      isHistorique: true,
+    }));
+
+  const stats = [...statsHistoriques, ...statsReelles].sort((a, b) => a.annee - b.annee);
+
   const sortiesParAnnee: Record<number, SortieDetail[]> = {};
-  for (const annee of annees) {
+  for (const annee of anneesReelles) {
     const rows = byAnnee.get(annee) ?? [];
     sortiesParAnnee[annee] = rows.map((s) => ({
       id: s.id,
@@ -145,7 +165,7 @@ export default async function FinancesStatsPage({ searchParams }: PageProps) {
             <ArrowLeft size={18} />
           </Link>
           <h2 className="text-xl font-bold text-gray-800 flex-1">Statistiques pluriannuelles</h2>
-          <span className="text-xs text-gray-400">{stats.length} années</span>
+          <span className="text-xs text-gray-400">{stats.length} année{stats.length > 1 ? "s" : ""}</span>
         </div>
         <StatsClient stats={stats} sortiesParAnnee={sortiesParAnnee} anneeActive={anneeActive} />
       </div>
