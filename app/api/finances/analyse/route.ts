@@ -5,6 +5,10 @@ export async function POST(req: NextRequest) {
   try {
     const { stats } = await req.json();
 
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: "Clé API OpenAI non configurée (OPENAI_API_KEY manquant)" }, { status: 500 });
+    }
+
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const lines = stats.map((s: {
@@ -53,6 +57,7 @@ Réponds en français, clairement, sans jargon inutile. Maximum 250 mots.`,
     return NextResponse.json({ analyse: text });
   } catch (err) {
     console.error("POST /api/finances/analyse error:", err);
-    return NextResponse.json({ error: "Erreur lors de l'analyse" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: `Erreur lors de l'analyse : ${msg}` }, { status: 500 });
   }
 }
