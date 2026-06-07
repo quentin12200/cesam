@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, TrendingUp, Package, Euro, Plus } from "lucide-react";
+import { ArrowLeft, TrendingUp, Package, Euro, Plus, BarChart2 } from "lucide-react";
 import SortieForm from "./SortieForm";
 import AnnulerSortieButton from "./AnnulerSortieButton";
 import EditSortieDrawer from "./EditSortieDrawer";
@@ -200,6 +200,13 @@ export default async function FinancesPage({ searchParams }: PageProps) {
           <ArrowLeft size={18} />
         </Link>
         <h2 className="text-xl font-bold text-gray-800 flex-1">Finances & Sorties</h2>
+        <Link
+          href="/finances/stats"
+          className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-sm font-medium px-3 py-2 rounded-lg shadow-sm hover:bg-gray-50"
+        >
+          <BarChart2 size={16} />
+          Stats
+        </Link>
         {!showForm && (
           <Link
             href={`/finances?annee=${annee}&nouvelle=1`}
