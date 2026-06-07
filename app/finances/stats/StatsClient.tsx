@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { TrendingUp, TrendingDown, Minus, Sparkles, X, Loader2, Pencil, BarChart2, List } from "lucide-react";
-import type { AnneeStats, SortieDetail } from "./page";
+import type { AnneeStats, SortieDetail, VenteHisto } from "./page";
 import { CAUSES_MORTALITE, CAUSES_MORTALITE_LABELS } from "@/lib/utils";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -254,8 +254,10 @@ function BoutonSeedHistorique({ onDone }: { onDone: () => void }) {
     try {
       // 1. Appliquer les migrations manquantes
       await fetch("/api/migrate", { method: "POST" });
-      // 2. Insérer les données historiques
-      const res = await fetch("/api/stats-annuelles/seed", { method: "POST" });
+      // 2. Insérer les totaux annuels
+      await fetch("/api/stats-annuelles/seed", { method: "POST" });
+      // 3. Insérer les 274 ventes individuelles depuis l'Excel
+      const res = await fetch("/api/ventes-historiques/seed", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erreur");
       setDone(true);
@@ -518,6 +520,177 @@ function EditDrawer({ sortie, onClose, onSaved }: { sortie: SortieDetail; onClos
   );
 }
 
+// ── Edit vente historique ─────────────────────────────────────────────────────
+
+function EditVenteHisto({ vente, onClose, onSaved }: { vente: VenteHisto; onClose: () => void; onSaved: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [date, setDate] = useState(new Date(vente.date).toISOString().slice(0, 10));
+  const [typeAnimal, setTypeAnimal] = useState(vente.typeAnimal);
+  const [typeVente, setTypeVente] = useState(vente.typeVente);
+  const [nutrav, setNutrav] = useState(vente.nutrav ?? "");
+  const [sexe, setSexe] = useState(vente.sexe ?? "");
+  const [poidsVif, setPoidsVif] = useState(vente.poidsVif?.toString() ?? "");
+  const [prixKgVif, setPrixKgVif] = useState(vente.prixKgVif?.toString() ?? "");
+  const [poidsCarc, setPoidsCarc] = useState(vente.poidsCarc?.toString() ?? "");
+  const [prixKgCarc, setPrixKgCarc] = useState(vente.prixKgCarc?.toString() ?? "");
+  const [acheteur, setAcheteur] = useState(vente.acheteur ?? "");
+  const [total, setTotal] = useState(vente.total?.toString() ?? "");
+  const [notes, setNotes] = useState(vente.notes ?? "");
+
+  const isVif = typeVente === "vif";
+  const prixCalc = isVif
+    ? (prixKgVif && poidsVif ? (parseFloat(prixKgVif) * parseFloat(poidsVif)).toFixed(2) : null)
+    : (prixKgCarc && poidsCarc ? (parseFloat(prixKgCarc) * parseFloat(poidsCarc)).toFixed(2) : null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(`/api/ventes-historiques/${vente.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date, typeAnimal, typeVente, nutrav: nutrav || null, sexe: sexe || null,
+          poidsVif: poidsVif ? parseFloat(poidsVif) : null,
+          prixKgVif: prixKgVif ? parseFloat(prixKgVif) : null,
+          poidsCarc: poidsCarc ? parseFloat(poidsCarc) : null,
+          prixKgCarc: prixKgCarc ? parseFloat(prixKgCarc) : null,
+          acheteur: acheteur || null,
+          total: total ? parseFloat(total) : (prixCalc ? parseFloat(prixCalc) : null),
+          notes: notes || null,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Erreur");
+      onSaved(); onClose();
+    } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setLoading(false); }
+  }
+
+  async function supprimer() {
+    if (!confirm("Supprimer cette vente ?")) return;
+    setLoading(true);
+    try {
+      await fetch(`/api/ventes-historiques/${vente.id}`, { method: "DELETE" });
+      onSaved(); onClose();
+    } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+          <span className="font-semibold text-gray-800 text-sm">Modifier la vente — {vente.nutrav ?? "?"} ({vente.annee})</span>
+          <button onClick={onClose}><X size={18} className="text-gray-400" /></button>
+        </div>
+        <form onSubmit={submit} className="p-4 space-y-3">
+          {error && <p className="text-red-600 text-sm bg-red-50 rounded-lg p-2">{error}</p>}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">N° animal</label>
+              <input value={nutrav} onChange={(e) => setNutrav(e.target.value)} placeholder="Ex: 9284"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Type animal</label>
+              <select value={typeAnimal} onChange={(e) => setTypeAnimal(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="veaux">Veaux</option>
+                <option value="vaches">Vaches</option>
+                <option value="taureau">Taureau</option>
+                <option value="génisse">Génisse</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Type vente</label>
+              <select value={typeVente} onChange={(e) => setTypeVente(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="vif">Vif</option>
+                <option value="carcasse">Carcasse</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Sexe</label>
+              <select value={sexe} onChange={(e) => setSexe(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="">—</option>
+                <option value="M">M</option>
+                <option value="F">F</option>
+              </select>
+            </div>
+          </div>
+          {isVif ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Poids vif (kg)</label>
+                <input type="number" step="0.5" value={poidsVif} onChange={(e) => setPoidsVif(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Prix €/kg vif</label>
+                <input type="number" step="0.01" value={prixKgVif} onChange={(e) => setPrixKgVif(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Poids carcasse (kg)</label>
+                <input type="number" step="0.1" value={poidsCarc} onChange={(e) => setPoidsCarc(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Prix €/kg carc.</label>
+                <input type="number" step="0.01" value={prixKgCarc} onChange={(e) => setPrixKgCarc(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Acheteur</label>
+              <input value={acheteur} onChange={(e) => setAcheteur(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Total HT {prixCalc && !total && <span className="text-green-600 font-normal">≈ {prixCalc} €</span>}
+              </label>
+              <input type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)}
+                placeholder={prixCalc ?? ""}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+            <input value={notes} onChange={(e) => setNotes(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={supprimer} disabled={loading}
+              className="px-3 py-2.5 border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50">
+              Supprimer
+            </button>
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium">Annuler</button>
+            <button type="submit" disabled={loading} className="flex-1 py-2.5 bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+              {loading ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 
 function KpiCard({ label, value, sub, delta, color = "text-gray-800" }: {
@@ -586,37 +759,51 @@ function SortieRow({ s, onEdit }: { s: SortieDetail; onEdit: (s: SortieDetail) =
   );
 }
 
-function VueDetail({ stats, sortiesParAnnee, anneeActive }: {
+function VueDetail({ stats, sortiesParAnnee, ventesHisto, anneeActive }: {
   stats: AnneeStats[];
   sortiesParAnnee: Record<number, SortieDetail[]>;
+  ventesHisto: VenteHisto[];
   anneeActive: number;
 }) {
   const router = useRouter();
-  const annees = stats.map((s) => s.annee).sort((a, b) => b - a); // desc
+  const annees = stats.map((s) => s.annee).sort((a, b) => b - a);
   const [filtreAnnee, setFiltreAnnee] = useState<number | "all">("all");
   const [filtreType, setFiltreType] = useState<string>("all");
   const [editSortie, setEditSortie] = useState<SortieDetail | null>(null);
+  const [editVente, setEditVente] = useState<VenteHisto | null>(null);
 
+  // Sorties réelles
   const toutesLesSorties: (SortieDetail & { anneeNum: number })[] = annees.flatMap((a) =>
     (sortiesParAnnee[a] ?? []).map((s) => ({ ...s, anneeNum: a }))
   );
-
   const sortiesFiltrees = toutesLesSorties.filter((s) => {
     if (filtreAnnee !== "all" && s.anneeNum !== filtreAnnee) return false;
     if (filtreType !== "all") {
-      if (filtreType === "VEAU" && !s.isVeau) return false;
-      if (filtreType !== "VEAU" && s.type !== filtreType) return false;
+      if (filtreType === "veaux" && !s.isVeau) return false;
+      if (filtreType === "vaches" && (s.type !== "BOUCHERIE" || s.isVeau)) return false;
     }
     return true;
   });
 
-  // Grouper par année pour les séparateurs
-  const parAnnee = annees
-    .filter((a) => filtreAnnee === "all" || a === filtreAnnee)
-    .map((a) => ({ annee: a, sorties: sortiesFiltrees.filter((s) => s.anneeNum === a) }))
-    .filter((g) => g.sorties.length > 0);
+  // Ventes historiques
+  const ventesFiltrees = ventesHisto.filter((v) => {
+    if (filtreAnnee !== "all" && v.annee !== filtreAnnee) return false;
+    if (filtreType !== "all") {
+      if (filtreType === "veaux" && v.typeAnimal !== "veaux") return false;
+      if (filtreType === "vaches" && v.typeAnimal === "veaux") return false;
+    }
+    return true;
+  });
 
-  const totalCA = sortiesFiltrees.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+  const anneesAvecData = [...new Set([
+    ...sortiesFiltrees.map((s) => s.anneeNum),
+    ...ventesFiltrees.map((v) => v.annee),
+  ])].sort((a, b) => b - a);
+
+  const caTotal =
+    sortiesFiltrees.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0) +
+    ventesFiltrees.reduce((sum, v) => sum + (v.total ?? 0), 0);
+  const nbTotal = sortiesFiltrees.length + ventesFiltrees.length;
 
   function onSaved() { router.refresh(); }
 
@@ -638,47 +825,77 @@ function VueDetail({ stats, sortiesParAnnee, anneeActive }: {
         </div>
         <div className="h-5 w-px bg-gray-200 hidden sm:block" />
         <div className="flex gap-1.5 flex-wrap">
-          {[
-            { key: "all", label: "Tous" },
-            { key: "VEAU", label: "Veaux vif" },
-            { key: "ELEVAGE", label: "Vente vif" },
-            { key: "BOUCHERIE", label: "Boucherie" },
-            { key: "MORT", label: "Mortalité" },
-          ].map(({ key, label }) => (
+          {[{ key: "all", label: "Tous" }, { key: "veaux", label: "Veaux" }, { key: "vaches", label: "Vaches" }].map(({ key, label }) => (
             <button key={key} onClick={() => setFiltreType(key)}
               className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${filtreType === key ? "bg-gray-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
               {label}
             </button>
           ))}
         </div>
-        <span className="ml-auto text-xs text-gray-400">{sortiesFiltrees.length} entrée{sortiesFiltrees.length > 1 ? "s" : ""} · {fmtEuro(totalCA)}</span>
+        <span className="ml-auto text-xs text-gray-400">{nbTotal} entrée{nbTotal > 1 ? "s" : ""} · {fmtEuro(caTotal)}</span>
       </div>
 
       {/* Tableau toutes années */}
-      {parAnnee.length === 0 ? (
-        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Aucune sortie</div>
+      {anneesAvecData.length === 0 ? (
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Aucune vente</div>
       ) : (
-        parAnnee.map(({ annee, sorties }) => {
+        anneesAvecData.map((annee) => {
           const statAnnee = stats.find((s) => s.annee === annee);
-          const caAnnee = sorties.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+          const sortiesAnnee = sortiesFiltrees.filter((s) => s.anneeNum === annee);
+          const ventesAnnee = ventesFiltrees.filter((v) => v.annee === annee);
+          const caAnnee =
+            sortiesAnnee.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0) +
+            ventesAnnee.reduce((sum, v) => sum + (v.total ?? 0), 0);
           return (
             <div key={annee} className="bg-white rounded-xl shadow overflow-hidden">
-              {/* En-tête année */}
               <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-gray-800 text-sm">{annee}</span>
                   {statAnnee && (
                     <span className="text-xs text-gray-500">
-                      {statAnnee.veauxCount} veaux · {statAnnee.vachesCount} vaches boucherie
-                      {statAnnee.tauxProductivite != null && ` · ${statAnnee.tauxProductivite}% productivité`}
+                      {statAnnee.veauxCount} veaux · {statAnnee.vachesCount} vaches
+                      {statAnnee.tauxProductivite != null && ` · ${statAnnee.tauxProductivite}%`}
                     </span>
+                  )}
+                  {ventesAnnee.length > 0 && sortiesAnnee.length === 0 && (
+                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">historique Excel</span>
                   )}
                 </div>
                 <span className="text-xs font-semibold text-green-700">{fmtEuro(caAnnee)}</span>
               </div>
               <div className="divide-y divide-gray-50">
-                {sorties.map((s) => (
+                {/* Sorties réelles */}
+                {sortiesAnnee.map((s) => (
                   <SortieRow key={s.id} s={s} onEdit={setEditSortie} />
+                ))}
+                {/* Ventes historiques Excel */}
+                {ventesAnnee.map((v) => (
+                  <div key={v.id} className="px-4 py-3 flex items-start justify-between gap-3 hover:bg-gray-50">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-amber-700 text-xs bg-amber-50 px-1.5 py-0.5 rounded">
+                          {v.nutrav ?? "—"}
+                        </span>
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${v.typeAnimal === "veaux" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
+                          {v.typeAnimal} {v.typeVente}
+                        </span>
+                        {v.sexe && <span className="text-[10px] text-gray-400">{v.sexe}</span>}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
+                        <span>{fmtDate(v.date)}</span>
+                        {v.poidsVif && <span>{fmtKg(v.poidsVif)} vif</span>}
+                        {v.poidsCarc && <span>{fmtKg(v.poidsCarc)} carc.</span>}
+                        {v.prixKgVif && <span>{v.prixKgVif.toFixed(2)} €/kg vif</span>}
+                        {v.prixKgCarc && <span>{v.prixKgCarc.toFixed(2)} €/kg carc.</span>}
+                        {v.total && <span className="font-semibold text-green-700">{fmtEuro(v.total)}</span>}
+                        {v.acheteur && <span className="text-gray-400">→ {v.acheteur}</span>}
+                      </div>
+                    </div>
+                    <button onClick={() => setEditVente(v)}
+                      className="shrink-0 flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors mt-0.5">
+                      <Pencil size={13} /><span className="hidden sm:inline">Modifier</span>
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -686,19 +903,19 @@ function VueDetail({ stats, sortiesParAnnee, anneeActive }: {
         })
       )}
 
-      {editSortie && (
-        <EditDrawer sortie={editSortie} onClose={() => setEditSortie(null)} onSaved={onSaved} />
-      )}
+      {editSortie && <EditDrawer sortie={editSortie} onClose={() => setEditSortie(null)} onSaved={onSaved} />}
+      {editVente && <EditVenteHisto vente={editVente} onClose={() => setEditVente(null)} onSaved={onSaved} />}
     </div>
   );
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
+export default function StatsClient({ stats, sortiesParAnnee, anneeActive, ventesHisto }: {
   stats: AnneeStats[];
   sortiesParAnnee: Record<number, SortieDetail[]>;
   anneeActive: number;
+  ventesHisto: VenteHisto[];
 }) {
   const [vue, setVue] = useState<"graphiques" | "detail">("graphiques");
   const anneeMax = new Date().getFullYear();
@@ -907,7 +1124,7 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
       )}
 
       {vue === "detail" && (
-        <VueDetail stats={stats} sortiesParAnnee={sortiesParAnnee} anneeActive={anneeActive} />
+        <VueDetail stats={stats} sortiesParAnnee={sortiesParAnnee} ventesHisto={ventesHisto} anneeActive={anneeActive} />
       )}
     </div>
   );

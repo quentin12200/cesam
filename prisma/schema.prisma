@@ -262,6 +262,25 @@ model Sortie {
   updatedAt       DateTime  @updatedAt
 }
 
+model VenteHistorique {
+  id          String  @id @default(cuid())
+  annee       Int
+  typeAnimal  String  // veaux, vaches, taureau, génisse
+  typeVente   String  // vif, carcasse
+  nutrav      String?
+  sexe        String? // M, F
+  poidsVif    Float?
+  prixKgVif   Float?
+  poidsCarc   Float?
+  prixKgCarc  Float?
+  acheteur    String?
+  date        DateTime
+  total       Float?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model StatsAnnuelle {
   id               String  @id @default(cuid())
   annee            Int     @unique
