@@ -262,6 +262,22 @@ model Sortie {
   updatedAt       DateTime  @updatedAt
 }
 
+model StatsAnnuelle {
+  id               String  @id @default(cuid())
+  annee            Int     @unique
+  veauxCount       Int     @default(0)
+  veauxKgTotal     Float   @default(0)
+  veauxPrixMoyen   Float?
+  veauxCA          Float   @default(0)
+  vachesCount      Int     @default(0)
+  vachesKgCarcasse Float   @default(0)
+  vachesPrixMoyen  Float?
+  vachesCA         Float   @default(0)
+  velagesCount     Int     @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model Chaleur {
   id        String   @id @default(cuid())
   animalId  String
