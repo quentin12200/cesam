@@ -17,3 +17,22 @@ CREATE UNIQUE INDEX "StatsAnnuelle_annee_key" ON "StatsAnnuelle"("annee");
 
 ALTER TABLE "StatsAnnuelle" ADD COLUMN "veauxMCount" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "StatsAnnuelle" ADD COLUMN "veauxFCount" INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS "VenteHistorique" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "annee" INTEGER NOT NULL,
+  "typeAnimal" TEXT NOT NULL,
+  "typeVente" TEXT NOT NULL,
+  "nutrav" TEXT,
+  "sexe" TEXT,
+  "poidsVif" REAL,
+  "prixKgVif" REAL,
+  "poidsCarc" REAL,
+  "prixKgCarc" REAL,
+  "acheteur" TEXT,
+  "date" DATETIME NOT NULL,
+  "total" REAL,
+  "notes" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL
+);

@@ -39,10 +39,27 @@ export interface SortieDetail {
   animal: { nutrav: string; nobovi: string | null; sexbov: string };
 }
 
-async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: Record<number, SortieDetail[]> }> {
+export interface VenteHisto {
+  id: string;
+  annee: number;
+  typeAnimal: string;
+  typeVente: string;
+  nutrav: string | null;
+  sexe: string | null;
+  poidsVif: number | null;
+  prixKgVif: number | null;
+  poidsCarc: number | null;
+  prixKgCarc: number | null;
+  acheteur: string | null;
+  date: string;
+  total: number | null;
+  notes: string | null;
+}
+
+async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: Record<number, SortieDetail[]>; ventesHisto: VenteHisto[] }> {
   const anneeMin = new Date().getFullYear() - 10;
 
-  const [sorties, velagesParAnneeRaw, historiques] = await Promise.all([
+  const [sorties, velagesParAnneeRaw, historiques, ventesHistoRaw] = await Promise.all([
     prisma.sortie.findMany({
       where: { date: { gte: new Date(`${anneeMin}-01-01`) } },
       include: {
@@ -60,6 +77,7 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
       select: { date: true },
     }),
     prisma.statsAnnuelle.findMany({ orderBy: { annee: "asc" } }).catch(() => []),
+    prisma.venteHistorique.findMany({ orderBy: [{ annee: "asc" }, { date: "asc" }] }).catch(() => []),
   ]);
 
   const velagesCountByAnnee = new Map<number, number>();
@@ -151,7 +169,24 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     }));
   }
 
-  return { stats, sortiesParAnnee };
+  const ventesHisto: VenteHisto[] = ventesHistoRaw.map((v) => ({
+    id: v.id,
+    annee: v.annee,
+    typeAnimal: v.typeAnimal,
+    typeVente: v.typeVente,
+    nutrav: v.nutrav,
+    sexe: v.sexe,
+    poidsVif: v.poidsVif,
+    prixKgVif: v.prixKgVif,
+    poidsCarc: v.poidsCarc,
+    prixKgCarc: v.prixKgCarc,
+    acheteur: v.acheteur,
+    date: v.date.toISOString(),
+    total: v.total,
+    notes: v.notes,
+  }));
+
+  return { stats, sortiesParAnnee, ventesHisto };
 }
 
 interface PageProps {
@@ -160,7 +195,7 @@ interface PageProps {
 
 export default async function FinancesStatsPage({ searchParams }: PageProps) {
   const sp = await searchParams;
-  const { stats, sortiesParAnnee } = await getStatsPluri();
+  const { stats, sortiesParAnnee, ventesHisto } = await getStatsPluri();
   const anneeActive = sp.annee ? parseInt(sp.annee) : new Date().getFullYear();
 
   return (
@@ -173,7 +208,7 @@ export default async function FinancesStatsPage({ searchParams }: PageProps) {
           <h2 className="text-xl font-bold text-gray-800 flex-1">Statistiques pluriannuelles</h2>
           <span className="text-xs text-gray-400">{stats.length} année{stats.length > 1 ? "s" : ""}</span>
         </div>
-        <StatsClient stats={stats} sortiesParAnnee={sortiesParAnnee} anneeActive={anneeActive} />
+        <StatsClient stats={stats} sortiesParAnnee={sortiesParAnnee} anneeActive={anneeActive} ventesHisto={ventesHisto} />
       </div>
     </div>
   );
