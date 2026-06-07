@@ -24,7 +24,7 @@ function Evolution({ val }: { val: number | null }) {
   return <span className="flex items-center gap-0.5 text-gray-400 text-xs"><Minus size={11} />0%</span>;
 }
 
-function fmt€(v: number | null) {
+function fmtEuro(v: number | null) {
   if (v == null) return "—";
   return v.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 }
@@ -222,7 +222,7 @@ export default async function FinancesStatsPage() {
                 <td className="px-3 py-2 text-gray-700 font-medium">CA veaux</td>
                 {stats.map((s) => (
                   <td key={s.annee} className={`px-3 py-2 text-center ${s.annee === anneeMax ? "bg-green-50/50" : ""}`}>
-                    <div className="font-bold text-green-700">{fmt€(s.veauxCA || null)}</div>
+                    <div className="font-bold text-green-700">{fmtEuro(s.veauxCA || null)}</div>
                     <Evolution val={s.annee > stats[0].annee ? getEvol(s.annee, "veauxCA") : null} />
                   </td>
                 ))}
@@ -265,7 +265,7 @@ export default async function FinancesStatsPage() {
                 <td className="px-3 py-2 text-gray-700 font-medium">CA vaches</td>
                 {stats.map((s) => (
                   <td key={s.annee} className={`px-3 py-2 text-center ${s.annee === anneeMax ? "bg-green-50/50" : ""}`}>
-                    <div className="font-bold text-orange-700">{fmt€(s.vachesCA || null)}</div>
+                    <div className="font-bold text-orange-700">{fmtEuro(s.vachesCA || null)}</div>
                     <Evolution val={s.annee > stats[0].annee ? getEvol(s.annee, "vachesCA") : null} />
                   </td>
                 ))}
@@ -276,7 +276,7 @@ export default async function FinancesStatsPage() {
                 <td className="px-3 py-3 text-white font-bold">CA TOTAL</td>
                 {stats.map((s) => (
                   <td key={s.annee} className="px-3 py-3 text-center">
-                    <div className="font-bold text-white text-base">{fmt€(s.caTotal || null)}</div>
+                    <div className="font-bold text-white text-base">{fmtEuro(s.caTotal || null)}</div>
                     <Evolution val={s.annee > stats[0].annee ? getEvol(s.annee, "caTotal") : null} />
                   </td>
                 ))}
@@ -317,7 +317,7 @@ export default async function FinancesStatsPage() {
                   const prevCaParVeau = prev && prev.veauxCount > 0 ? Math.round(prev.veauxCA / prev.veauxCount) : null;
                   return (
                     <td key={s.annee} className={`px-3 py-2 text-center ${s.annee === anneeMax ? "bg-green-50/50" : ""}`}>
-                      <div className="font-bold text-gray-800">{caParVeau ? fmt€(caParVeau) : "—"}</div>
+                      <div className="font-bold text-gray-800">{caParVeau ? fmtEuro(caParVeau) : "—"}</div>
                       <Evolution val={caParVeau && prevCaParVeau ? pct(caParVeau, prevCaParVeau) : null} />
                     </td>
                   );
@@ -345,16 +345,16 @@ export default async function FinancesStatsPage() {
                   <div
                     className="bg-green-500 h-full transition-all"
                     style={{ width: `${(s.veauxCA / maxCA) * 100}%` }}
-                    title={`Veaux : ${fmt€(s.veauxCA)}`}
+                    title={`Veaux : ${fmtEuro(s.veauxCA)}`}
                   />
                   <div
                     className="bg-orange-400 h-full transition-all"
                     style={{ width: `${(s.vachesCA / maxCA) * 100}%` }}
-                    title={`Vaches : ${fmt€(s.vachesCA)}`}
+                    title={`Vaches : ${fmtEuro(s.vachesCA)}`}
                   />
                 </div>
                 <span className="text-sm font-bold text-gray-700 w-24 text-right shrink-0">
-                  {fmt€(s.caTotal)}
+                  {fmtEuro(s.caTotal)}
                 </span>
               </div>
             );
