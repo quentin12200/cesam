@@ -955,8 +955,8 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive, vente
 
   return (
     <div className="space-y-4">
-      {/* Bandeau import historique si moins de 3 années */}
-      {stats.length < 3 && (
+      {/* Bandeau import si les ventes individuelles ne sont pas encore chargées */}
+      {ventesHisto.length === 0 && (
         <BoutonSeedHistorique onDone={() => {}} />
       )}
 
