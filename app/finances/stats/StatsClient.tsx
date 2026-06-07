@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { TrendingUp, TrendingDown, Minus, Sparkles, X, Loader2, Pencil, ChevronLeft, ChevronRight, BarChart2, List } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Sparkles, X, Loader2, Pencil, BarChart2, List } from "lucide-react";
 import type { AnneeStats, SortieDetail } from "./page";
 import { CAUSES_MORTALITE, CAUSES_MORTALITE_LABELS } from "@/lib/utils";
 
@@ -426,7 +426,57 @@ function KpiCard({ label, value, sub, delta, color = "text-gray-800" }: {
   );
 }
 
-// ── Vue Détail (liste par année modifiable) ───────────────────────────────────
+// ── Vue Détail (toutes les années, tableau complet) ───────────────────────────
+
+const TYPE_BADGE: Record<string, string> = {
+  ELEVAGE: "bg-green-100 text-green-700",
+  BOUCHERIE: "bg-orange-100 text-orange-700",
+  ENGRAISSEMENT: "bg-blue-100 text-blue-700",
+  MORT: "bg-gray-100 text-gray-600",
+};
+const TYPE_LABEL: Record<string, string> = {
+  ELEVAGE: "Vente vif", BOUCHERIE: "Boucherie", ENGRAISSEMENT: "Engraissement", MORT: "Mort",
+};
+
+function SortieRow({ s, onEdit }: { s: SortieDetail; onEdit: (s: SortieDetail) => void }) {
+  return (
+    <div className="px-4 py-3 flex items-start justify-between gap-3 hover:bg-gray-50">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono font-bold text-green-700 text-xs bg-green-50 px-1.5 py-0.5 rounded">
+            {s.animal.nutrav}
+          </span>
+          <span className="text-sm font-medium text-gray-700 truncate max-w-[140px]">
+            {s.animal.nobovi ?? "Sans nom"}
+          </span>
+          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${TYPE_BADGE[s.type] ?? "bg-gray-100 text-gray-600"}`}>
+            {TYPE_LABEL[s.type] ?? s.type}
+          </span>
+          {s.isVeau && <span className="text-[10px] text-gray-400 italic">veau</span>}
+        </div>
+        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
+          <span>{fmtDate(s.date)}</span>
+          {s.poidsVif && <span>{fmtKg(s.poidsVif)} vif{s.rendementCarcasse ? ` → ${s.rendementCarcasse}%` : ""}</span>}
+          {s.poids && <span>{fmtKg(s.poids)}{s.type === "BOUCHERIE" ? " carc." : ""}</span>}
+          {s.prixKilo && <span>{s.prixKilo.toFixed(2)} €/kg</span>}
+          {(s.prixDefinitifHT ?? s.prixPrevuHT) && (
+            <span className="font-semibold text-green-700">
+              {fmtEuro(s.prixDefinitifHT ?? s.prixPrevuHT)}
+            </span>
+          )}
+          {s.acheteur && <span className="text-gray-400">→ {s.acheteur}</span>}
+        </div>
+      </div>
+      <button
+        onClick={() => onEdit(s)}
+        className="shrink-0 flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors mt-0.5"
+      >
+        <Pencil size={13} />
+        <span className="hidden sm:inline">Modifier</span>
+      </button>
+    </div>
+  );
+}
 
 function VueDetail({ stats, sortiesParAnnee, anneeActive }: {
   stats: AnneeStats[];
@@ -434,118 +484,99 @@ function VueDetail({ stats, sortiesParAnnee, anneeActive }: {
   anneeActive: number;
 }) {
   const router = useRouter();
-  const annees = stats.map((s) => s.annee).sort();
-  const [annee, setAnnee] = useState(annees.includes(anneeActive) ? anneeActive : annees[annees.length - 1]);
+  const annees = stats.map((s) => s.annee).sort((a, b) => b - a); // desc
+  const [filtreAnnee, setFiltreAnnee] = useState<number | "all">("all");
+  const [filtreType, setFiltreType] = useState<string>("all");
   const [editSortie, setEditSortie] = useState<SortieDetail | null>(null);
 
-  const idxAnnee = annees.indexOf(annee);
-  const sortiesAnnee = (sortiesParAnnee[annee] ?? []);
-  const statAnnee = stats.find((s) => s.annee === annee);
-  const statPrev = stats.find((s) => s.annee === annee - 1);
+  const toutesLesSorties: (SortieDetail & { anneeNum: number })[] = annees.flatMap((a) =>
+    (sortiesParAnnee[a] ?? []).map((s) => ({ ...s, anneeNum: a }))
+  );
 
-  const TYPE_BADGE: Record<string, string> = {
-    ELEVAGE: "bg-green-100 text-green-700",
-    BOUCHERIE: "bg-orange-100 text-orange-700",
-    ENGRAISSEMENT: "bg-blue-100 text-blue-700",
-    MORT: "bg-gray-100 text-gray-600",
-  };
-  const TYPE_LABEL: Record<string, string> = {
-    ELEVAGE: "Vente vif", BOUCHERIE: "Boucherie", ENGRAISSEMENT: "Engraissement", MORT: "Mort",
-  };
+  const sortiesFiltrees = toutesLesSorties.filter((s) => {
+    if (filtreAnnee !== "all" && s.anneeNum !== filtreAnnee) return false;
+    if (filtreType !== "all") {
+      if (filtreType === "VEAU" && !s.isVeau) return false;
+      if (filtreType !== "VEAU" && s.type !== filtreType) return false;
+    }
+    return true;
+  });
+
+  // Grouper par année pour les séparateurs
+  const parAnnee = annees
+    .filter((a) => filtreAnnee === "all" || a === filtreAnnee)
+    .map((a) => ({ annee: a, sorties: sortiesFiltrees.filter((s) => s.anneeNum === a) }))
+    .filter((g) => g.sorties.length > 0);
+
+  const totalCA = sortiesFiltrees.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
 
   function onSaved() { router.refresh(); }
 
   return (
     <div className="space-y-4">
-      {/* Navigation années */}
-      <div className="flex items-center justify-between bg-white rounded-xl shadow px-4 py-2">
-        <button
-          onClick={() => setAnnee(annees[idxAnnee - 1])}
-          disabled={idxAnnee <= 0}
-          className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30"
-        >
-          <ChevronLeft size={18} className="text-gray-600" />
-        </button>
-        <div className="flex gap-2 overflow-x-auto">
+      {/* Filtres */}
+      <div className="bg-white rounded-xl shadow px-4 py-3 flex flex-wrap gap-3 items-center">
+        <div className="flex gap-1.5 flex-wrap">
+          <button onClick={() => setFiltreAnnee("all")}
+            className={`px-3 py-1 rounded-full text-sm font-semibold transition-colors ${filtreAnnee === "all" ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
+            Toutes
+          </button>
           {annees.map((a) => (
-            <button key={a} onClick={() => setAnnee(a)}
-              className={`px-3 py-1 rounded-full text-sm font-semibold transition-colors ${a === annee ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
+            <button key={a} onClick={() => setFiltreAnnee(a)}
+              className={`px-3 py-1 rounded-full text-sm font-semibold transition-colors ${filtreAnnee === a ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
               {a}
             </button>
           ))}
         </div>
-        <button
-          onClick={() => setAnnee(annees[idxAnnee + 1])}
-          disabled={idxAnnee >= annees.length - 1}
-          className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30"
-        >
-          <ChevronRight size={18} className="text-gray-600" />
-        </button>
+        <div className="h-5 w-px bg-gray-200 hidden sm:block" />
+        <div className="flex gap-1.5 flex-wrap">
+          {[
+            { key: "all", label: "Tous" },
+            { key: "VEAU", label: "Veaux vif" },
+            { key: "ELEVAGE", label: "Vente vif" },
+            { key: "BOUCHERIE", label: "Boucherie" },
+            { key: "MORT", label: "Mortalité" },
+          ].map(({ key, label }) => (
+            <button key={key} onClick={() => setFiltreType(key)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${filtreType === key ? "bg-gray-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="ml-auto text-xs text-gray-400">{sortiesFiltrees.length} entrée{sortiesFiltrees.length > 1 ? "s" : ""} · {fmtEuro(totalCA)}</span>
       </div>
 
-      {/* KPIs de l'année sélectionnée */}
-      {statAnnee && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="CA total" value={fmtEuro(statAnnee.caTotal)} delta={{ curr: statAnnee.caTotal, prev: statPrev?.caTotal ?? null }} color="text-green-700" />
-          <KpiCard label="Veaux vendus" value={String(statAnnee.veauxCount)} sub={fmtKg(statAnnee.veauxKgTotal) + " vif"} delta={{ curr: statAnnee.veauxCount, prev: statPrev?.veauxCount ?? null }} />
-          <KpiCard label="Prix moy. veaux" value={fmtPrix(statAnnee.veauxPrixMoyen)} delta={{ curr: statAnnee.veauxPrixMoyen, prev: statPrev?.veauxPrixMoyen ?? null }} />
-          <KpiCard label="Productivité" value={statAnnee.tauxProductivite != null ? `${statAnnee.tauxProductivite}%` : "—"} sub="veaux / vêlages"
-            color={statAnnee.tauxProductivite != null ? statAnnee.tauxProductivite >= 80 ? "text-green-600" : statAnnee.tauxProductivite >= 60 ? "text-yellow-600" : "text-red-500" : "text-gray-400"} />
-        </div>
-      )}
-
-      {/* Liste des sorties */}
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800">Sorties {annee}</h3>
-          <span className="text-xs text-gray-400">{sortiesAnnee.length} entrées</span>
-        </div>
-        {sortiesAnnee.length === 0 ? (
-          <p className="text-center text-gray-400 text-sm py-8">Aucune sortie enregistrée</p>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {sortiesAnnee.map((s) => (
-              <div key={s.id} className="px-4 py-3 flex items-start justify-between gap-3 hover:bg-gray-50">
-                <div className="flex items-start gap-2 min-w-0">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono font-bold text-green-700 text-xs bg-green-50 px-1.5 py-0.5 rounded">
-                        {s.animal.nutrav}
-                      </span>
-                      <span className="text-sm font-medium text-gray-700 truncate max-w-[120px]">
-                        {s.animal.nobovi ?? "Sans nom"}
-                      </span>
-                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${TYPE_BADGE[s.type] ?? "bg-gray-100 text-gray-600"}`}>
-                        {TYPE_LABEL[s.type] ?? s.type}
-                      </span>
-                      {s.isVeau && <span className="text-xs text-gray-400">🐄 veau</span>}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
-                      <span>{fmtDate(s.date)}</span>
-                      {s.poidsVif && <span>{fmtKg(s.poidsVif)} vif{s.rendementCarcasse ? ` → ${s.rendementCarcasse}%` : ""}</span>}
-                      {s.poids && <span>{fmtKg(s.poids)}{s.type === "BOUCHERIE" ? " carc." : ""}</span>}
-                      {s.prixKilo && <span>{s.prixKilo.toFixed(2)} €/kg</span>}
-                      {(s.prixDefinitifHT ?? s.prixPrevuHT) && (
-                        <span className="font-semibold text-green-700">
-                          {fmtEuro(s.prixDefinitifHT ?? s.prixPrevuHT)}
-                        </span>
-                      )}
-                    </div>
-                    {s.acheteur && <div className="text-xs text-gray-400 mt-0.5">→ {s.acheteur}</div>}
-                  </div>
+      {/* Tableau toutes années */}
+      {parAnnee.length === 0 ? (
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Aucune sortie</div>
+      ) : (
+        parAnnee.map(({ annee, sorties }) => {
+          const statAnnee = stats.find((s) => s.annee === annee);
+          const caAnnee = sorties.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+          return (
+            <div key={annee} className="bg-white rounded-xl shadow overflow-hidden">
+              {/* En-tête année */}
+              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-gray-800 text-sm">{annee}</span>
+                  {statAnnee && (
+                    <span className="text-xs text-gray-500">
+                      {statAnnee.veauxCount} veaux · {statAnnee.vachesCount} vaches boucherie
+                      {statAnnee.tauxProductivite != null && ` · ${statAnnee.tauxProductivite}% productivité`}
+                    </span>
+                  )}
                 </div>
-                <button
-                  onClick={() => setEditSortie(s)}
-                  className="shrink-0 flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors mt-0.5"
-                >
-                  <Pencil size={13} />
-                  <span className="hidden sm:inline">Modifier</span>
-                </button>
+                <span className="text-xs font-semibold text-green-700">{fmtEuro(caAnnee)}</span>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <div className="divide-y divide-gray-50">
+                {sorties.map((s) => (
+                  <SortieRow key={s.id} s={s} onEdit={setEditSortie} />
+                ))}
+              </div>
+            </div>
+          );
+        })
+      )}
 
       {editSortie && (
         <EditDrawer sortie={editSortie} onClose={() => setEditSortie(null)} onSaved={onSaved} />
@@ -563,7 +594,11 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
 }) {
   const [vue, setVue] = useState<"graphiques" | "detail">("graphiques");
   const anneeMax = new Date().getFullYear();
-  const curr = stats.find((s) => s.annee === anneeMax) ?? stats[stats.length - 1];
+  const anneesDispos = stats.map((s) => s.annee).sort((a, b) => b - a);
+  const [anneeKpi, setAnneeKpi] = useState<number>(
+    stats.find((s) => s.annee === anneeMax)?.annee ?? anneesDispos[0] ?? anneeMax
+  );
+  const curr = stats.find((s) => s.annee === anneeKpi) ?? stats[stats.length - 1];
   const prev = stats.find((s) => s.annee === (curr?.annee ?? 0) - 1);
   const labels = stats.map((s) => String(s.annee));
 
@@ -586,10 +621,20 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
 
       {vue === "graphiques" && (
         <div className="space-y-5">
-          {/* KPIs */}
+          {/* Sélecteur d'année + KPIs */}
           {curr && (
             <div>
-              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{curr.annee} — en bref</h3>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Résumé —</span>
+                <div className="flex gap-1.5 flex-wrap">
+                  {anneesDispos.map((a) => (
+                    <button key={a} onClick={() => setAnneeKpi(a)}
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition-colors ${a === anneeKpi ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
+                      {a}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <KpiCard label="CA total" value={fmtEuro(curr.caTotal)} delta={{ curr: curr.caTotal, prev: prev?.caTotal ?? null }} color="text-green-700" />
                 <KpiCard label="Veaux vendus" value={String(curr.veauxCount)} sub={fmtKg(curr.veauxKgTotal) + " vif"} delta={{ curr: curr.veauxCount, prev: prev?.veauxCount ?? null }} />
