@@ -8,6 +8,8 @@ import StatsClient from "./StatsClient";
 export interface AnneeStats {
   annee: number;
   veauxCount: number;
+  veauxMCount: number;
+  veauxFCount: number;
   veauxKgTotal: number;
   veauxPrixMoyen: number | null;
   veauxCA: number;
@@ -17,7 +19,7 @@ export interface AnneeStats {
   vachesCA: number;
   caTotal: number;
   tauxProductivite: number | null;
-  isHistorique?: boolean; // données saisies manuellement, pas d'animaux individuels
+  isHistorique?: boolean;
 }
 
 export interface SortieDetail {
@@ -101,7 +103,9 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     const velagesAnnee = velagesCountByAnnee.get(annee) ?? 0;
     const tauxProductivite = velagesAnnee > 0 ? Math.round((veauxCount / velagesAnnee) * 100) : null;
 
-    return { annee, veauxCount, veauxKgTotal, veauxPrixMoyen, veauxCA, vachesCount, vachesKgCarcasse, vachesPrixMoyen, vachesCA, caTotal, tauxProductivite };
+    const veauxMCount = veaux.filter((v) => v.animal.sexbov === "M").length;
+    const veauxFCount = veaux.filter((v) => v.animal.sexbov === "F").length;
+    return { annee, veauxCount, veauxMCount, veauxFCount, veauxKgTotal, veauxPrixMoyen, veauxCA, vachesCount, vachesKgCarcasse, vachesPrixMoyen, vachesCA, caTotal, tauxProductivite };
   });
 
   // Fusionner avec historiques (les années historiques qui n'ont pas de sorties réelles)
@@ -110,6 +114,8 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     .map((h) => ({
       annee: h.annee,
       veauxCount: h.veauxCount,
+      veauxMCount: h.veauxMCount ?? 0,
+      veauxFCount: h.veauxFCount ?? 0,
       veauxKgTotal: h.veauxKgTotal,
       veauxPrixMoyen: h.veauxPrixMoyen,
       veauxCA: h.veauxCA,

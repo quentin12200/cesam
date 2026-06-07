@@ -14,3 +14,6 @@ CREATE TABLE "StatsAnnuelle" (
   "updatedAt" DATETIME NOT NULL
 );
 CREATE UNIQUE INDEX "StatsAnnuelle_annee_key" ON "StatsAnnuelle"("annee");
+
+ALTER TABLE "StatsAnnuelle" ADD COLUMN "veauxMCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StatsAnnuelle" ADD COLUMN "veauxFCount" INTEGER NOT NULL DEFAULT 0;

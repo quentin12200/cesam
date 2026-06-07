@@ -266,6 +266,8 @@ model StatsAnnuelle {
   id               String  @id @default(cuid())
   annee            Int     @unique
   veauxCount       Int     @default(0)
+  veauxMCount      Int     @default(0)
+  veauxFCount      Int     @default(0)
   veauxKgTotal     Float   @default(0)
   veauxPrixMoyen   Float?
   veauxCA          Float   @default(0)
