@@ -59,7 +59,7 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
       where: { date: { gte: new Date(`${anneeMin}-01-01`) } },
       select: { date: true },
     }),
-    prisma.statsAnnuelle.findMany({ orderBy: { annee: "asc" } }),
+    prisma.statsAnnuelle.findMany({ orderBy: { annee: "asc" } }).catch(() => []),
   ]);
 
   const velagesCountByAnnee = new Map<number, number>();

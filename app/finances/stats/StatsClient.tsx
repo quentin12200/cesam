@@ -252,6 +252,9 @@ function BoutonSeedHistorique({ onDone }: { onDone: () => void }) {
   async function seed() {
     setLoading(true); setError(null);
     try {
+      // 1. Appliquer les migrations manquantes
+      await fetch("/api/migrate", { method: "POST" });
+      // 2. Insérer les données historiques
       const res = await fetch("/api/stats-annuelles/seed", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erreur");
@@ -735,8 +738,8 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
 
   return (
     <div className="space-y-4">
-      {/* Bandeau import historique si données manquantes */}
-      {stats.length <= 1 && (
+      {/* Bandeau import historique si moins de 3 années */}
+      {stats.length < 3 && (
         <BoutonSeedHistorique onDone={() => {}} />
       )}
 
