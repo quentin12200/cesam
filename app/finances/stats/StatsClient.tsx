@@ -176,6 +176,71 @@ function StackedBarChart({ data, labels, keys, colors, keyLabels }: {
   );
 }
 
+// ── Prix mensuel dans l'année ─────────────────────────────────────────────────
+
+const MOIS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+
+function PrixMensuelChart({ sortiesParAnnee, anneeSelectionnee }: {
+  sortiesParAnnee: Record<number, SortieDetail[]>;
+  anneeSelectionnee: number;
+}) {
+  const [annee, setAnnee] = useState(anneeSelectionnee);
+  const anneesDispos = Object.keys(sortiesParAnnee).map(Number).sort((a, b) => b - a);
+
+  const sorties = sortiesParAnnee[annee] ?? [];
+  if (sorties.length === 0) return null;
+
+  // Prix moyen veaux par mois
+  const veauxParMois: { prix: number[]; count: number }[] = Array.from({ length: 12 }, () => ({ prix: [], count: 0 }));
+  const vachesParMois: { prix: number[]; count: number }[] = Array.from({ length: 12 }, () => ({ prix: [], count: 0 }));
+
+  for (const s of sorties) {
+    const mois = new Date(s.date).getMonth();
+    if (s.prixKilo) {
+      if (s.isVeau || s.type === "ELEVAGE") veauxParMois[mois].prix.push(s.prixKilo);
+      else if (s.type === "BOUCHERIE") vachesParMois[mois].prix.push(s.prixKilo);
+    }
+  }
+
+  const veauxMoyens = veauxParMois.map((m) => m.prix.length ? m.prix.reduce((a, b) => a + b, 0) / m.prix.length : null);
+  const vachesMoyens = vachesParMois.map((m) => m.prix.length ? m.prix.reduce((a, b) => a + b, 0) / m.prix.length : null);
+  const hasData = veauxMoyens.some((v) => v !== null) || vachesMoyens.some((v) => v !== null);
+  if (!hasData) return null;
+
+  return (
+    <div className="bg-white rounded-xl shadow p-4">
+      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+        <div>
+          <h3 className="font-semibold text-gray-800">Variation du prix au kilo dans l&apos;année</h3>
+          <p className="text-xs text-gray-400">Prix moyen mensuel — données saisies individuellement</p>
+        </div>
+        <div className="flex gap-1.5">
+          {anneesDispos.map((a) => (
+            <button key={a} onClick={() => setAnnee(a)}
+              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition-colors ${a === annee ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
+              {a}
+            </button>
+          ))}
+        </div>
+      </div>
+      <LineChart
+        series={[
+          { name: "Veaux €/kg vif", values: veauxMoyens },
+          { name: "Vaches €/kg carc.", values: vachesMoyens },
+        ]}
+        labels={MOIS}
+        colors={["#22c55e","#f97316"]}
+        unit=" €"
+        height={120}
+      />
+      <div className="flex gap-4 mt-1 text-xs text-gray-500 justify-end">
+        <span className="flex items-center gap-1"><span className="w-2.5 h-1.5 rounded inline-block bg-green-500" />Veaux vif</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-1.5 rounded inline-block bg-orange-500" />Vaches carc.</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Bouton seed données historiques ──────────────────────────────────────────
 
 function BoutonSeedHistorique({ onDone }: { onDone: () => void }) {
@@ -638,9 +703,35 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
   const [anneeKpi, setAnneeKpi] = useState<number>(
     stats.find((s) => s.annee === anneeMax)?.annee ?? anneesDispos[0] ?? anneeMax
   );
-  const curr = stats.find((s) => s.annee === anneeKpi) ?? stats[stats.length - 1];
-  const prev = stats.find((s) => s.annee === (curr?.annee ?? 0) - 1);
-  const labels = stats.map((s) => String(s.annee));
+  // Filtres graphiques
+  const [filtreAnneesGraph, setFiltreAnneesGraph] = useState<number[]>([]); // vide = toutes
+  const [filtreSexe, setFiltreSexe] = useState<"all" | "M" | "F">("all");
+
+  const statsFiltrees = stats.filter((s) =>
+    filtreAnneesGraph.length === 0 || filtreAnneesGraph.includes(s.annee)
+  ).map((s) => {
+    if (filtreSexe === "all") return s;
+    // Pour les veaux : filtrer par sexe (M ou F)
+    const ratio = s.veauxCount > 0
+      ? (filtreSexe === "M" ? s.veauxMCount / s.veauxCount : s.veauxFCount / s.veauxCount)
+      : 0;
+    return {
+      ...s,
+      veauxCount: filtreSexe === "M" ? s.veauxMCount : s.veauxFCount,
+      veauxKgTotal: Math.round(s.veauxKgTotal * ratio),
+      veauxCA: Math.round(s.veauxCA * ratio),
+    };
+  });
+
+  const curr = statsFiltrees.find((s) => s.annee === anneeKpi) ?? statsFiltrees[statsFiltrees.length - 1];
+  const prev = statsFiltrees.find((s) => s.annee === (curr?.annee ?? 0) - 1);
+  const labels = statsFiltrees.map((s) => String(s.annee));
+
+  function toggleAnneeGraph(a: number) {
+    setFiltreAnneesGraph((prev) =>
+      prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -666,13 +757,44 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
 
       {vue === "graphiques" && (
         <div className="space-y-5">
+          {/* Filtres graphiques */}
+          <div className="bg-white rounded-xl shadow px-4 py-3 flex flex-wrap gap-3 items-center">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Années</span>
+              <div className="flex gap-1.5 flex-wrap">
+                <button onClick={() => setFiltreAnneesGraph([])}
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filtreAnneesGraph.length === 0 ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
+                  Toutes
+                </button>
+                {anneesDispos.slice().reverse().map((a) => (
+                  <button key={a} onClick={() => toggleAnneeGraph(a)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filtreAnneesGraph.includes(a) ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="h-8 w-px bg-gray-200 hidden sm:block" />
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Sexe veaux</span>
+              <div className="flex gap-1.5">
+                {([["all","Tous"],["M","Mâles ♂"],["F","Femelles ♀"]] as const).map(([key, label]) => (
+                  <button key={key} onClick={() => setFiltreSexe(key)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filtreSexe === key ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Sélecteur d'année + KPIs */}
           {curr && (
             <div>
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Résumé —</span>
                 <div className="flex gap-1.5 flex-wrap">
-                  {anneesDispos.map((a) => (
+                  {statsFiltrees.map((s) => s.annee).map((a) => (
                     <button key={a} onClick={() => setAnneeKpi(a)}
                       className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition-colors ${a === anneeKpi ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
                       {a}
@@ -693,34 +815,43 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
           <div className="bg-white rounded-xl shadow p-4">
             <h3 className="font-semibold text-gray-800 mb-1">Chiffre d&apos;affaires par année</h3>
             <p className="text-xs text-gray-400 mb-3">Veaux vif + Vaches boucherie</p>
-            <StackedBarChart data={stats.map((s) => ({ veaux: s.veauxCA, vaches: s.vachesCA }))} labels={labels} keys={["veaux","vaches"]} colors={["#22c55e","#f97316"]} keyLabels={["Veaux vif","Vaches boucherie"]} />
+            <StackedBarChart data={statsFiltrees.map((s) => ({ veaux: s.veauxCA, vaches: s.vachesCA }))} labels={labels} keys={["veaux","vaches"]} colors={["#22c55e","#f97316"]} keyLabels={["Veaux vif","Vaches boucherie"]} />
           </div>
 
           <div className="bg-white rounded-xl shadow p-4">
-            <h3 className="font-semibold text-gray-800 mb-1">Évolution du prix au kilo</h3>
-            <p className="text-xs text-gray-400 mb-3">Veaux (€/kg vif) et vaches (€/kg carcasse)</p>
-            <LineChart series={[{ name:"Veaux €/kg vif", values: stats.map((s) => s.veauxPrixMoyen) }, { name:"Vaches €/kg carc.", values: stats.map((s) => s.vachesPrixMoyen) }]} labels={labels} colors={["#22c55e","#f97316"]} unit=" €" height={130} />
+            <h3 className="font-semibold text-gray-800 mb-1">Évolution du prix moyen au kilo</h3>
+            <p className="text-xs text-gray-400 mb-3">Veaux (€/kg vif) et vaches (€/kg carcasse) — année par année</p>
+            <LineChart series={[{ name:"Veaux €/kg vif", values: statsFiltrees.map((s) => s.veauxPrixMoyen) }, { name:"Vaches €/kg carc.", values: statsFiltrees.map((s) => s.vachesPrixMoyen) }]} labels={labels} colors={["#22c55e","#f97316"]} unit=" €" height={130} />
             <div className="flex gap-4 mt-1 text-xs text-gray-500 justify-end">
               <span className="flex items-center gap-1"><span className="w-2.5 h-1.5 rounded inline-block bg-green-500" />Veaux vif</span>
               <span className="flex items-center gap-1"><span className="w-2.5 h-1.5 rounded inline-block bg-orange-500" />Vaches carc.</span>
             </div>
           </div>
 
+          {/* Variation du prix dans l'année (par mois, sorties réelles seulement) */}
+          <PrixMensuelChart sortiesParAnnee={sortiesParAnnee} anneeSelectionnee={anneeKpi} />
+
           <div className="bg-white rounded-xl shadow p-4">
             <h3 className="font-semibold text-gray-800 mb-1">Volumes — nombre d&apos;animaux</h3>
             <p className="text-xs text-gray-400 mb-3">Évolution du nombre de têtes vendues</p>
-            <LineChart series={[{ name:"Veaux", values: stats.map((s) => s.veauxCount) }, { name:"Vaches boucherie", values: stats.map((s) => s.vachesCount) }]} labels={labels} colors={["#3b82f6","#f59e0b"]} height={110} />
+            <LineChart
+              series={[
+                { name: filtreSexe === "M" ? "Veaux mâles" : filtreSexe === "F" ? "Veaux femelles" : "Veaux", values: statsFiltrees.map((s) => filtreSexe === "M" ? s.veauxMCount : filtreSexe === "F" ? s.veauxFCount : s.veauxCount) },
+                { name:"Vaches boucherie", values: statsFiltrees.map((s) => s.vachesCount) },
+              ]}
+              labels={labels} colors={["#3b82f6","#f59e0b"]} height={110}
+            />
             <div className="flex gap-4 mt-1 text-xs text-gray-500 justify-end">
               <span className="flex items-center gap-1"><span className="w-2.5 h-1.5 rounded inline-block bg-blue-500" />Veaux</span>
               <span className="flex items-center gap-1"><span className="w-2.5 h-1.5 rounded inline-block bg-amber-500" />Vaches carc.</span>
             </div>
           </div>
 
-          {stats.some((s) => s.tauxProductivite != null) && (
+          {statsFiltrees.some((s) => s.tauxProductivite != null) && (
             <div className="bg-white rounded-xl shadow p-4">
               <h3 className="font-semibold text-gray-800 mb-1">Taux de productivité</h3>
               <p className="text-xs text-gray-400 mb-3">Veaux vendus / vêlages — objectif ≥ 80%</p>
-              <LineChart series={[{ name:"Productivité", values: stats.map((s) => s.tauxProductivite) }]} labels={labels} colors={["#8b5cf6"]} unit="%" height={110} />
+              <LineChart series={[{ name:"Productivité", values: statsFiltrees.map((s) => s.tauxProductivite) }]} labels={labels} colors={["#8b5cf6"]} unit="%" height={110} />
             </div>
           )}
 
@@ -732,7 +863,7 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Indicateur</th>
-                    {stats.map((s) => (
+                    {statsFiltrees.map((s) => (
                       <th key={s.annee} className={`px-3 py-2 text-center font-semibold ${s.annee === anneeMax ? "bg-green-50 text-green-700" : "text-gray-600"}`}>
                         {s.annee}{s.annee === anneeMax && <span className="block text-[10px] font-normal text-green-400">en cours</span>}
                       </th>
@@ -754,8 +885,8 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive }: {
                   ].map((row) => (
                     <tr key={row.label} className="hover:bg-gray-50">
                       <td className={`px-3 py-2 text-gray-600 ${row.bold?"font-bold":""}`}>{row.label}</td>
-                      {stats.map((s, si) => {
-                        const prevS = stats[si - 1];
+                      {statsFiltrees.map((s, si) => {
+                        const prevS = statsFiltrees[si - 1];
                         return (
                           <td key={s.annee} className={`px-3 py-2 text-center ${s.annee===anneeMax?"bg-green-50/40":""}`}>
                             <span className={`block ${row.bold?"font-bold text-green-700":"text-gray-800"}`}>{String(row.fn(s))}</span>
