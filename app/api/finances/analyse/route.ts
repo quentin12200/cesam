@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     ).join("\n");
 
     const completion = await client.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       max_tokens: 1024,
       messages: [
         {
