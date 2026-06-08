@@ -21,15 +21,21 @@ async function getFinancesData(annee: number) {
   const debut = new Date(`${annee}-01-01`);
   const fin = new Date(`${annee + 1}-01-01`);
 
-  const sorties = await prisma.sortie.findMany({
-    where: { date: { gte: debut, lt: fin } },
-    include: {
-      animal: {
-        select: { nutrav: true, nobovi: true, sexbov: true, danais: true, estGenisse: true, velageVeau: { select: { id: true } } },
+  const [sorties, ventesHistoriques] = await Promise.all([
+    prisma.sortie.findMany({
+      where: { date: { gte: debut, lt: fin } },
+      include: {
+        animal: {
+          select: { nutrav: true, nobovi: true, sexbov: true, danais: true, estGenisse: true, velageVeau: { select: { id: true } } },
+        },
       },
-    },
-    orderBy: { date: "desc" },
-  });
+      orderBy: { date: "desc" },
+    }),
+    prisma.venteHistorique.findMany({
+      where: { annee },
+      orderBy: { date: "desc" },
+    }),
+  ]);
 
   const ventesElevage = sorties.filter((s) => s.type === "ELEVAGE");
   const ventesBoucherie = sorties.filter((s) => s.type === "BOUCHERIE");
@@ -129,6 +135,7 @@ async function getFinancesData(annee: number) {
 
   return {
     sorties,
+    ventesHistoriques,
     caVeaux,
     caVaches,
     caTotal,
@@ -406,80 +413,150 @@ export default async function FinancesPage({ searchParams }: PageProps) {
       )}
 
       {/* Liste des sorties */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">
-          Sorties {annee} ({data.sorties.length})
-        </h3>
-        {data.sorties.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">Aucune sortie enregistrée pour {annee}</p>
-        ) : (
-          <div className="space-y-2">
-            {data.sorties.map((sortie) => (
-              <div key={sortie.id} className="border border-gray-100 rounded-lg p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Link
-                      href={`/troupeau/${sortie.animal.nutrav}`}
-                      className="bg-gray-700 text-white text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0"
-                    >
-                      {sortie.animal.nutrav}
-                    </Link>
-                    <span className="text-sm font-medium text-gray-700 truncate">
-                      {sortie.animal.nobovi ?? "—"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${typeBadge[sortie.type] ?? "bg-gray-100 text-gray-600"}`}>
-                      {typeLabel[sortie.type] ?? sortie.type}
-                    </span>
-                    {sortie.type === "MORT" && sortie.causeMortalite && (
-                      <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-                        {sortie.causeMortalite}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-                  <span>{new Date(sortie.date).toLocaleDateString("fr-FR")}</span>
-                  <div className="flex items-center gap-3">
-                    {sortie.type === "BOUCHERIE" && sortie.poidsVif && (
-                      <span>{formatPoids(sortie.poidsVif)} vif{sortie.rendementCarcasse ? ` → ${sortie.rendementCarcasse}%` : ""}</span>
-                    )}
-                    {sortie.poids && <span>{formatPoids(sortie.poids)}{sortie.type === "BOUCHERIE" ? " carc." : ""}</span>}
-                    {sortie.prixKilo && <span>{sortie.prixKilo.toFixed(2)} €/kg</span>}
-                    {(sortie.prixDefinitifHT ?? sortie.prixPrevuHT) && (
-                      <span className="font-semibold text-green-700">
-                        {formatEuro(sortie.prixDefinitifHT ?? sortie.prixPrevuHT)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {sortie.acheteur && (
-                  <div className="text-xs text-gray-400 mt-1">Acheteur : {sortie.acheteur}</div>
-                )}
-                <div className="flex justify-between items-center mt-1">
-                  <EditSortieDrawer sortie={{
-                    id: sortie.id,
-                    date: sortie.date.toISOString(),
-                    type: sortie.type,
-                    acheteur: sortie.acheteur,
-                    poids: sortie.poids,
-                    poidsVif: sortie.poidsVif,
-                    rendementCarcasse: sortie.rendementCarcasse,
-                    prixKilo: sortie.prixKilo,
-                    prixDefinitifHT: sortie.prixDefinitifHT,
-                    prixPrevuHT: sortie.prixPrevuHT,
-                    notes: sortie.notes,
-                    causeMortalite: sortie.causeMortalite,
-                    animal: { nutrav: sortie.animal.nutrav, nobovi: sortie.animal.nobovi },
-                  }} />
-                  <AnnulerSortieButton sortieId={sortie.id} nutrav={sortie.animal.nutrav} />
-                </div>
+      {(() => {
+        type SortieItem =
+          | { kind: "sortie"; date: Date; id: string; data: (typeof data.sorties)[number] }
+          | { kind: "historique"; date: Date; id: string; data: (typeof data.ventesHistoriques)[number] };
+
+        const items: SortieItem[] = [
+          ...data.sorties.map((s) => ({ kind: "sortie" as const, date: s.date, id: s.id, data: s })),
+          ...data.ventesHistoriques.map((v) => ({ kind: "historique" as const, date: v.date, id: v.id, data: v })),
+        ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+        const totalCount = items.length;
+
+        return (
+          <div className="bg-white rounded-xl shadow p-4">
+            <h3 className="font-semibold text-gray-800 mb-3">
+              Sorties {annee} ({totalCount})
+            </h3>
+            {totalCount === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">Aucune sortie enregistrée pour {annee}</p>
+            ) : (
+              <div className="space-y-2">
+                {items.map((item) => {
+                  if (item.kind === "sortie") {
+                    const sortie = item.data;
+                    return (
+                      <div key={`s-${sortie.id}`} className="border border-gray-100 rounded-lg p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Link
+                              href={`/troupeau/${sortie.animal.nutrav}`}
+                              className="bg-gray-700 text-white text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0"
+                            >
+                              {sortie.animal.nutrav}
+                            </Link>
+                            <span className="text-sm font-medium text-gray-700 truncate">
+                              {sortie.animal.nobovi ?? "—"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${typeBadge[sortie.type] ?? "bg-gray-100 text-gray-600"}`}>
+                              {typeLabel[sortie.type] ?? sortie.type}
+                            </span>
+                            {sortie.type === "MORT" && sortie.causeMortalite && (
+                              <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                {sortie.causeMortalite}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                          <span>{new Date(sortie.date).toLocaleDateString("fr-FR")}</span>
+                          <div className="flex items-center gap-3">
+                            {sortie.type === "BOUCHERIE" && sortie.poidsVif && (
+                              <span>{formatPoids(sortie.poidsVif)} vif{sortie.rendementCarcasse ? ` → ${sortie.rendementCarcasse}%` : ""}</span>
+                            )}
+                            {sortie.poids && <span>{formatPoids(sortie.poids)}{sortie.type === "BOUCHERIE" ? " carc." : ""}</span>}
+                            {sortie.prixKilo && <span>{sortie.prixKilo.toFixed(2)} €/kg</span>}
+                            {(sortie.prixDefinitifHT ?? sortie.prixPrevuHT) && (
+                              <span className="font-semibold text-green-700">
+                                {formatEuro(sortie.prixDefinitifHT ?? sortie.prixPrevuHT)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {sortie.acheteur && (
+                          <div className="text-xs text-gray-400 mt-1">Acheteur : {sortie.acheteur}</div>
+                        )}
+                        <div className="flex justify-between items-center mt-1">
+                          <EditSortieDrawer sortie={{
+                            id: sortie.id,
+                            date: sortie.date.toISOString(),
+                            type: sortie.type,
+                            acheteur: sortie.acheteur,
+                            poids: sortie.poids,
+                            poidsVif: sortie.poidsVif,
+                            rendementCarcasse: sortie.rendementCarcasse,
+                            prixKilo: sortie.prixKilo,
+                            prixDefinitifHT: sortie.prixDefinitifHT,
+                            prixPrevuHT: sortie.prixPrevuHT,
+                            notes: sortie.notes,
+                            causeMortalite: sortie.causeMortalite,
+                            animal: { nutrav: sortie.animal.nutrav, nobovi: sortie.animal.nobovi },
+                          }} />
+                          <AnnulerSortieButton sortieId={sortie.id} nutrav={sortie.animal.nutrav} />
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    const vh = item.data;
+                    return (
+                      <div key={`h-${vh.id}`} className="border border-amber-100 bg-amber-50/40 rounded-lg p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {vh.nutrav ? (
+                              <span className="bg-gray-500 text-white text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0">
+                                {vh.nutrav}
+                              </span>
+                            ) : (
+                              <span className="bg-gray-300 text-gray-600 text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0">
+                                —
+                              </span>
+                            )}
+                            <span className="text-sm font-medium text-gray-700 truncate">
+                              {vh.typeAnimal}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                              {vh.typeVente === "carcasse" ? "Boucherie" : "Vente vif"}
+                            </span>
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                              historique
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                          <span>{new Date(vh.date).toLocaleDateString("fr-FR")}</span>
+                          <div className="flex items-center gap-3">
+                            {vh.poidsVif && <span>{formatPoids(vh.poidsVif)} vif</span>}
+                            {vh.poidsCarc && <span>{formatPoids(vh.poidsCarc)} carc.</span>}
+                            {vh.prixKgCarc && <span>{vh.prixKgCarc.toFixed(2)} €/kg carc.</span>}
+                            {vh.prixKgVif && !vh.prixKgCarc && <span>{vh.prixKgVif.toFixed(2)} €/kg vif</span>}
+                            {vh.total && (
+                              <span className="font-semibold text-green-700">
+                                {formatEuro(vh.total)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {vh.acheteur && (
+                          <div className="text-xs text-gray-400 mt-1">Acheteur : {vh.acheteur}</div>
+                        )}
+                        {vh.notes && (
+                          <div className="text-xs text-gray-400 mt-0.5 italic">{vh.notes}</div>
+                        )}
+                      </div>
+                    );
+                  }
+                })}
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
     </div>
   );
 }

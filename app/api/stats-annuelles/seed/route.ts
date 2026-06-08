@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 const HISTORIQUES = [
-  { annee: 2021, veauxCount: 37, veauxMCount: 14, veauxFCount: 23, veauxKgTotal: 15682, veauxPrixMoyen: 2.96, veauxCA: 46337, vachesCount: 9,  vachesKgCarcasse: 4550, vachesPrixMoyen: 4.16, vachesCA: 18943, velagesCount: 0 },
-  { annee: 2022, veauxCount: 46, veauxMCount: 24, veauxFCount: 22, veauxKgTotal: 19343, veauxPrixMoyen: 3.34, veauxCA: 64598, vachesCount: 10, vachesKgCarcasse: 4901, vachesPrixMoyen: 4.99, vachesCA: 24652, velagesCount: 0 },
-  { annee: 2023, veauxCount:  1, veauxMCount:  1, veauxFCount:  0, veauxKgTotal:     0, veauxPrixMoyen: null, veauxCA:     0, vachesCount: 55, vachesKgCarcasse: 5041, vachesPrixMoyen: 5.57, vachesCA: 28148, velagesCount: 0 },
-  { annee: 2024, veauxCount: 48, veauxMCount: 30, veauxFCount: 18, veauxKgTotal: 21260, veauxPrixMoyen: 3.97, veauxCA: 85850, vachesCount:  9, vachesKgCarcasse: 4552, vachesPrixMoyen: 5.91, vachesCA: 26952, velagesCount: 0 },
-  { annee: 2025, veauxCount: 43, veauxMCount: 33, veauxFCount: 10, veauxKgTotal: 18887, veauxPrixMoyen: 5.61, veauxCA: 106135, vachesCount: 4, vachesKgCarcasse: 1909, vachesPrixMoyen: 6.38, vachesCA: 12200, velagesCount: 0 },
+  { annee: 2021, veauxCount: 37, veauxMCount: 14, veauxFCount: 23, veauxKgTotal: 15682, veauxPrixMoyen: 2.96,  veauxCA: 46337,  vachesCount: 9,  vachesKgCarcasse: 4550, vachesPrixMoyen: 4.16, vachesCA: 18943,  velagesCount: 0 },
+  { annee: 2022, veauxCount: 46, veauxMCount: 24, veauxFCount: 22, veauxKgTotal: 19343, veauxPrixMoyen: 3.34,  veauxCA: 64598,  vachesCount: 10, vachesKgCarcasse: 4901, vachesPrixMoyen: 4.99, vachesCA: 24652,  velagesCount: 0 },
+  { annee: 2023, veauxCount: 46, veauxMCount: 30, veauxFCount: 16, veauxKgTotal: 20233, veauxPrixMoyen: 3.76,  veauxCA: 76820,  vachesCount: 10, vachesKgCarcasse: 5041, vachesPrixMoyen: 5.57, vachesCA: 28148,  velagesCount: 0 },
+  { annee: 2024, veauxCount: 48, veauxMCount: 30, veauxFCount: 18, veauxKgTotal: 21260, veauxPrixMoyen: 3.97,  veauxCA: 85850,  vachesCount: 9,  vachesKgCarcasse: 4552, vachesPrixMoyen: 5.91, vachesCA: 26952,  velagesCount: 0 },
+  { annee: 2025, veauxCount: 43, veauxMCount: 33, veauxFCount: 10, veauxKgTotal: 18887, veauxPrixMoyen: 5.61,  veauxCA: 106135, vachesCount: 4,  vachesKgCarcasse: 1909, vachesPrixMoyen: 6.38, vachesCA: 12200,  velagesCount: 0 },
 ];
 
 export async function POST() {
