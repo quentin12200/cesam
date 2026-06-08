@@ -11,7 +11,7 @@ import {
   type CategorieAnimal,
 } from "@/lib/utils";
 import Link from "next/link";
-import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid, Printer } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid, Printer, TrendingUp } from "lucide-react";
 import { addDays, differenceInMonths, subDays } from "date-fns";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
@@ -309,6 +309,14 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
           title={vue === "tableau" ? "Vue cartes" : "Vue tableau"}
         >
           {vue === "tableau" ? <LayoutGrid size={16} /> : <Table2 size={16} />}
+        </Link>
+        <Link
+          href="/troupeau/gmq"
+          className="flex items-center gap-1.5 px-3 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg shadow hover:bg-gray-50"
+          title="Performances GMQ"
+        >
+          <TrendingUp size={16} className="text-green-600" />
+          <span className="hidden sm:inline">GMQ</span>
         </Link>
         {!showForm && (
           <Link
