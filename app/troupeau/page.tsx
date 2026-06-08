@@ -212,7 +212,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   });
 
   // Velles à vendre rapidement : categorie = "VELLE", statut ACTIF, âge entre 351 et 365 jours
-  const today = new Date("2026-06-08");
+  const today = new Date();
   const dateMin = new Date(today); dateMin.setDate(dateMin.getDate() - 365);
   const dateMax = new Date(today); dateMax.setDate(dateMax.getDate() - 351);
   const vellesUrgentes = await prisma.animal.findMany({
@@ -331,27 +331,38 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
 
       {showForm && <NouvelAnimalForm />}
 
-      {/* Alerte velles bientôt 1 an */}
+      {/* 🚨 Alerte velles bientôt 1 an — très visible */}
       {vellesUrgentes.length > 0 && (
-        <div className="bg-orange-50 border border-orange-300 rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">⚠️</span>
-            <span className="font-semibold text-orange-800 text-sm">
-              {vellesUrgentes.length} velle{vellesUrgentes.length > 1 ? "s" : ""} à vendre rapidement (bientôt 1 an)
-            </span>
+        <div className="bg-red-600 text-white rounded-xl p-4 shadow-lg space-y-3 animate-pulse-once border-2 border-red-400">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🚨</span>
+            <div>
+              <p className="font-bold text-base leading-tight">
+                {vellesUrgentes.length} velle{vellesUrgentes.length > 1 ? "s" : ""} à vendre RAPIDEMENT
+              </p>
+              <p className="text-red-200 text-xs mt-0.5">Bientôt 1 an — le marchand peut refuser au-delà</p>
+            </div>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             {vellesUrgentes.map((v) => {
               const agejours = Math.floor((today.getTime() - v.danais.getTime()) / (1000 * 60 * 60 * 24));
+              const joursRestants = 365 - agejours;
               return (
                 <Link
                   key={v.nutrav}
                   href={`/troupeau/${v.nutrav}`}
-                  className="flex items-center gap-2 text-xs text-orange-700 hover:text-orange-900"
+                  className="flex items-center justify-between bg-red-700 hover:bg-red-800 rounded-lg px-3 py-2 transition-colors"
                 >
-                  <span className="font-mono font-bold bg-orange-200 px-1.5 py-0.5 rounded">{v.nutrav}</span>
-                  <span>{v.nobovi ?? "—"}</span>
-                  <span className="text-orange-500">{agejours} j</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold bg-white text-red-700 px-1.5 py-0.5 rounded text-xs">{v.nutrav}</span>
+                    <span className="text-sm font-medium">{v.nobovi ?? "Sans nom"}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-red-200">{agejours} j</span>
+                    <span className="ml-2 text-xs font-bold bg-red-500 px-2 py-0.5 rounded-full">
+                      {joursRestants > 0 ? `J-${joursRestants}` : "URGENT"}
+                    </span>
+                  </div>
                 </Link>
               );
             })}

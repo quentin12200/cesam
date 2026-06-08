@@ -21,8 +21,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ sent: 0, reason: "no_subscriptions" });
     }
 
+    const dateMinVelle = new Date(now); dateMinVelle.setDate(dateMinVelle.getDate() - 365);
+    const dateMaxVelle = new Date(now); dateMaxVelle.setDate(dateMaxVelle.getDate() - 351);
+
     const [vachesAvecSaillies, animaux, velagesSemaine, veauxABoucler, genissesArapatrier,
-           surveillanceActive, cryptoRotavecCount, bolusCount, chaleurJ19Raw] =
+           surveillanceActive, cryptoRotavecCount, bolusCount, chaleurJ19Raw, vellesUrgentes] =
       await Promise.all([
         prisma.animal.findMany({
           where: { statut: "ACTIF", sexbov: "F", estGenisse: false, OR: [{ categorie: null }, { categorie: { not: "ENGRAISSEMENT" } }] },
@@ -81,6 +84,11 @@ export async function GET(request: NextRequest) {
             saillies: { orderBy: { date: "desc" }, take: 1, select: { date: true } },
           },
         }),
+        // Velles bientôt 1 an (11.5 à 12 mois)
+        prisma.animal.findMany({
+          where: { statut: "ACTIF", categorie: "VELLE", danais: { gte: dateMinVelle, lte: dateMaxVelle } },
+          select: { nutrav: true, nobovi: true, danais: true },
+        }),
       ]);
 
     let aEchographier = 0;
@@ -138,16 +146,24 @@ export async function GET(request: NextRequest) {
       items.push(`${bolusCount} bolus pré-vélage`);
     if (chaleurJ19.length > 0)
       items.push(`${chaleurJ19.length} vache${chaleurJ19.length > 1 ? "s" : ""} à surveiller retour chaleur (J+19)`);
+    if (vellesUrgentes.length > 0) {
+      const noms = vellesUrgentes.map((v) => v.nobovi ?? v.nutrav).join(", ");
+      items.unshift(`🚨 ${vellesUrgentes.length} velle${vellesUrgentes.length > 1 ? "s" : ""} à vendre rapidement (bientôt 1 an) : ${noms}`);
+    }
 
     const body =
       items.length === 0
         ? "Rien de particulier aujourd'hui — bonne journée ! 🌿"
         : `Aujourd'hui : ${items.join(", ")}.`;
 
+    const title = vellesUrgentes.length > 0
+      ? `🚨 URGENT — ${vellesUrgentes.length} velle${vellesUrgentes.length > 1 ? "s" : ""} à vendre`
+      : "Bonjour 🌅 — GAEC CESAM";
+
     const payload = JSON.stringify({
-      title: "Bonjour 🌅 — GAEC CESAM",
+      title,
       body,
-      url: "/",
+      url: vellesUrgentes.length > 0 ? "/troupeau" : "/",
     });
 
     let sent = 0;
