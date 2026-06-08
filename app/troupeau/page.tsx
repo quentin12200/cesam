@@ -211,6 +211,20 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     sexe, q, categorie, tarie, repro, sanitaire, groupe, tri,
   });
 
+  // Velles à vendre rapidement : categorie = "VELLE", statut ACTIF, âge entre 351 et 365 jours
+  const today = new Date("2026-06-08");
+  const dateMin = new Date(today); dateMin.setDate(dateMin.getDate() - 365);
+  const dateMax = new Date(today); dateMax.setDate(dateMax.getDate() - 351);
+  const vellesUrgentes = await prisma.animal.findMany({
+    where: {
+      statut: "ACTIF",
+      categorie: "VELLE",
+      danais: { gte: dateMin, lte: dateMax },
+    },
+    select: { nutrav: true, nobovi: true, danais: true },
+    orderBy: { danais: "asc" },
+  });
+
   function buildUrl(overrides: Record<string, string | undefined>) {
     const p: Record<string, string> = {};
     if (sexe) p.sexe = sexe;
@@ -308,6 +322,34 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       </div>
 
       {showForm && <NouvelAnimalForm />}
+
+      {/* Alerte velles bientôt 1 an */}
+      {vellesUrgentes.length > 0 && (
+        <div className="bg-orange-50 border border-orange-300 rounded-xl p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">⚠️</span>
+            <span className="font-semibold text-orange-800 text-sm">
+              {vellesUrgentes.length} velle{vellesUrgentes.length > 1 ? "s" : ""} à vendre rapidement (bientôt 1 an)
+            </span>
+          </div>
+          <div className="space-y-1">
+            {vellesUrgentes.map((v) => {
+              const agejours = Math.floor((today.getTime() - v.danais.getTime()) / (1000 * 60 * 60 * 24));
+              return (
+                <Link
+                  key={v.nutrav}
+                  href={`/troupeau/${v.nutrav}`}
+                  className="flex items-center gap-2 text-xs text-orange-700 hover:text-orange-900"
+                >
+                  <span className="font-mono font-bold bg-orange-200 px-1.5 py-0.5 rounded">{v.nutrav}</span>
+                  <span>{v.nobovi ?? "—"}</span>
+                  <span className="text-orange-500">{agejours} j</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Panneau de filtres */}
       {showFiltres && (
