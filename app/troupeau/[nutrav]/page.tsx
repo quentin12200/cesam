@@ -30,6 +30,7 @@ import {
   Circle,
   Clock,
   Printer,
+  GitBranch,
 } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import EditAnimalDrawer from "./EditAnimalDrawer";
@@ -192,6 +193,13 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             notes={animal.notes ?? null}
             boucleFaite={animal.boucleFaite}
           />
+          <Link
+            href={`/troupeau/${animal.nutrav}/arbre`}
+            className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
+            title="Arbre généalogique"
+          >
+            <GitBranch size={18} />
+          </Link>
           <Link
             href={`/troupeau/${animal.nutrav}/impression`}
             className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
