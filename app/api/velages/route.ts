@@ -5,7 +5,7 @@ import { logAction } from "@/lib/action-log";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { vacheNutrav, veauNutrav, veauSexe, veauNom, date, qualificatif, capteur, pereNom } = body;
+    const { vacheNutrav, veauNutrav, veauSexe, veauNom, date, qualificatif, sousType, capteur, pereNom } = body;
 
     if (!vacheNutrav || !date) {
       return NextResponse.json({ error: "vacheNutrav et date sont requis" }, { status: 400 });
@@ -16,21 +16,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Vache avec NUTRAV ${vacheNutrav} non trouvée` }, { status: 404 });
     }
 
-    // Capture previous tarieFaite for revert
     const prevTarieFaite = vache.tarieFaite;
 
+    // Résoudre le veau et récupérer ses données avant modif pour undo
     let veauId: string | undefined;
+    let veauPrev: { sexbov: string; nobovi: string | null; mereId: string | null; danais: Date | null } | undefined;
     if (veauNutrav) {
       const veau = await prisma.animal.findUnique({ where: { nutrav: veauNutrav } });
       if (veau) {
         veauId = veau.id;
-        // Mettre à jour sexe et nom si fournis
-        const updateData: Record<string, string> = {};
+        veauPrev = { sexbov: veau.sexbov, nobovi: veau.nobovi, mereId: veau.mereId, danais: veau.danais };
+        const updateData: Record<string, unknown> = {
+          mereId: vache.id,
+          danais: new Date(date),
+        };
         if (veauSexe) updateData.sexbov = veauSexe;
         if (veauNom) updateData.nobovi = veauNom;
-        if (Object.keys(updateData).length > 0) {
-          await prisma.animal.update({ where: { nutrav: veauNutrav }, data: updateData });
-        }
+        await prisma.animal.update({ where: { nutrav: veauNutrav }, data: updateData });
+      } else {
+        // Veau introuvable en base : on prévient mais on continue
+        return NextResponse.json(
+          { error: `Veau avec NUTRAV ${veauNutrav} non trouvé en base. Crée d'abord l'animal dans le troupeau.` },
+          { status: 404 }
+        );
       }
     }
 
@@ -41,8 +49,13 @@ export async function POST(request: NextRequest) {
         etat: { in: ["VERT", "GRIS", "ROSE"] },
         velage: null,
       },
+      include: { saillie: { include: { taureau: true } } },
       orderBy: { createdAt: "desc" },
     });
+
+    // Récupérer pereNunati depuis le taureau de la saillie
+    const pereNunati = derniereGestation?.saillie?.taureau?.nupere ?? null;
+    const isJumeaux = qualificatif === "JUMEAUX";
 
     const velage = await prisma.velage.create({
       data: {
@@ -50,12 +63,23 @@ export async function POST(request: NextRequest) {
         veauId: veauId ?? null,
         date: new Date(date),
         qualificatif: qualificatif ?? "NORMAL",
+        sousType: sousType ?? null,
         capteur: capteur ?? null,
         pereNom: pereNom ?? null,
+        pereNunati: pereNunati ?? null,
+        jumeaux: isJumeaux,
         gestationId: derniereGestation?.id ?? null,
         updatedAt: new Date(),
       },
     });
+
+    // Clôturer la gestation
+    if (derniereGestation) {
+      await prisma.gestation.update({
+        where: { id: derniereGestation.id },
+        data: { etat: "VELAGE" },
+      });
+    }
 
     // Au vêlage, la vache redevient non tarie
     await prisma.animal.update({
@@ -63,7 +87,7 @@ export async function POST(request: NextRequest) {
       data: { tarieFaite: false },
     });
 
-    // Si capteur utilisé, libérer ce capteur
+    // Libérer le capteur si utilisé
     if (capteur) {
       await prisma.capteurVelage.updateMany({
         where: { numero: capteur },
@@ -74,10 +98,20 @@ export async function POST(request: NextRequest) {
     const desc = `Vêlage enregistré pour ${vache.nobovi ?? vacheNutrav}`;
     let undoId = "";
     try {
-      undoId = await logAction("CREATE_VELAGE", desc, [
+      const undoOps: import("@/lib/action-log").RevertStep[] = [
         { op: "delete", model: "velage", id: velage.id },
         { op: "update", model: "animal", where: { nutrav: vacheNutrav }, data: { tarieFaite: prevTarieFaite } },
-      ]);
+      ];
+      if (veauNutrav && veauPrev) {
+        undoOps.push({
+          op: "update", model: "animal", where: { nutrav: veauNutrav },
+          data: { mereId: veauPrev.mereId ?? null, danais: veauPrev.danais?.toISOString() ?? null, sexbov: veauPrev.sexbov, nobovi: veauPrev.nobovi ?? null },
+        });
+      }
+      if (derniereGestation) {
+        undoOps.push({ op: "update", model: "gestation", where: { id: derniereGestation.id }, data: { etat: derniereGestation.etat } });
+      }
+      undoId = await logAction("CREATE_VELAGE", desc, undoOps);
     } catch {}
 
     return NextResponse.json({ ...velage, _undoId: undoId, _undoDesc: desc }, { status: 201 });

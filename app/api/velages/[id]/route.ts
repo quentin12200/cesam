@@ -8,13 +8,36 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const velage = await prisma.velage.findUnique({ where: { id } });
+    const velage = await prisma.velage.findUnique({
+      where: { id },
+      include: {
+        veau: { select: { nutrav: true } },
+        vache: { select: { nutrav: true, tarieFaite: true } },
+        gestation: { select: { id: true } },
+      },
+    });
 
     if (!velage) {
       return NextResponse.json({ error: "Vêlage introuvable" }, { status: 404 });
     }
 
     await prisma.velage.delete({ where: { id } });
+
+    // Restaurer le mereId/danais du veau
+    if (velage.veau) {
+      await prisma.animal.update({
+        where: { nutrav: velage.veau.nutrav },
+        data: { mereId: null, danais: null as unknown as undefined },
+      });
+    }
+
+    // Rouvrir la gestation
+    if (velage.gestation) {
+      await prisma.gestation.update({
+        where: { id: velage.gestation.id },
+        data: { etat: "VERT" },
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {
