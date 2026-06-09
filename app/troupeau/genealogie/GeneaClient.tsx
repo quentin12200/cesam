@@ -676,8 +676,6 @@ function VueParPere({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData:
 /* ─── Vue globale ───────────────────────────────────── */
 export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData: GeneaEntry[] }) {
   const [search, setSearch] = useState("");
-  const [forceOpen, setForceOpen] = useState<boolean | null>(null);
-  const [treeKey, setTreeKey] = useState(0);
   const [vue, setVue] = useState<"arbre" | "paysage" | "mere" | "pere" | "consang">("arbre");
 
   const highlight = search.trim().toLowerCase();
@@ -771,23 +769,6 @@ export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNo
           )}
         </div>
 
-        {/* Tout déplier / replier */}
-        <button
-          onClick={() => { setForceOpen(true); setTreeKey((k) => k + 1); }}
-          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border shadow-sm transition-colors
-            ${forceOpen === true ? "bg-emerald-600 text-white border-emerald-700" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
-        >
-          <Expand size={13} />
-          Tout déplier
-        </button>
-        <button
-          onClick={() => { setForceOpen(false); setTreeKey((k) => k + 1); }}
-          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border shadow-sm transition-colors
-            ${forceOpen === false ? "bg-gray-700 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
-        >
-          <Minimize2 size={13} />
-          Tout replier
-        </button>
       </div>
 
       {vue === "arbre" && (
@@ -808,8 +789,7 @@ export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNo
             <span className="text-gray-400">· × père indique le père du veau</span>
           </div>
 
-          {/* Arbre — key change quand forceOpen change pour re-mount et appliquer defaultOpen */}
-          <div key={treeKey} className="bg-white rounded-2xl shadow-lg p-4 space-y-1 overflow-x-auto">
+          <div className="bg-white rounded-2xl shadow-lg p-4 space-y-1 overflow-x-auto">
             {filteredRoots.length === 0 && (
               <p className="text-center text-gray-400 text-sm py-8">Aucun animal trouvé pour « {search} »</p>
             )}
@@ -819,7 +799,7 @@ export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNo
                 node={root}
                 depth={0}
                 isLast={i === filteredRoots.length - 1}
-                defaultOpen={forceOpen !== null ? forceOpen : true}
+                defaultOpen={true}
                 highlight={highlight}
               />
             ))}
