@@ -13,6 +13,7 @@ export interface AnimalGeneaNode {
   danais: string | null;
   mereId: string | null;
   pereNom: string | null;   // depuis velageVeau
+  pereNat: string | null;   // N°National du père
   children: AnimalGeneaNode[];
 }
 
@@ -66,6 +67,7 @@ async function getGeneaData(): Promise<AnimalGeneaNode[]> {
       danais: a.danais?.toISOString() ?? null,
       mereId: a.mereId,
       pereNom,
+      pereNat: a.velageVeau?.pereNunati ?? a.velageVeau?.gestation?.saillie?.taureau?.nupere ?? null,
       children: [],
     });
   }

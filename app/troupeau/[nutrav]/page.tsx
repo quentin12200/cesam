@@ -389,8 +389,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                       <div className="flex items-center gap-3">
                         {p.gmq !== null && (
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                            p.gmq >= 1200 ? "bg-green-100 text-green-700"
-                            : p.gmq >= 800 ? "bg-yellow-100 text-yellow-700"
+                            p.gmq >= 1500 ? "bg-green-100 text-green-700"
+                            : p.gmq >= 1200 ? "bg-yellow-100 text-yellow-700"
                             : "bg-red-100 text-red-700"
                           }`}>
                             +{p.gmq} g/j

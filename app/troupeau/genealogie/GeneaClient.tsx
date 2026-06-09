@@ -198,10 +198,227 @@ function GeneaNode({
   );
 }
 
+/* ─── Vue par mère ──────────────────────────────────── */
+function VueParMere({ roots }: { roots: AnimalGeneaNode[] }) {
+  // Collecter toutes les vaches qui ont des descendants directs
+  const groupes = useMemo(() => {
+    const map = new Map<string, { mere: AnimalGeneaNode; veaux: AnimalGeneaNode[] }>();
+    function collect(node: AnimalGeneaNode) {
+      if (node.children.length > 0) {
+        map.set(node.id, { mere: node, veaux: node.children });
+      }
+      node.children.forEach(collect);
+    }
+    roots.forEach(collect);
+    return [...map.values()].sort((a, b) => b.veaux.length - a.veaux.length);
+  }, [roots]);
+
+  const [openMere, setOpenMere] = useState<string | null>(null);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+      {groupes.length === 0 && (
+        <p className="text-center text-gray-400 text-sm py-8">Aucune relation mère-veau enregistrée.</p>
+      )}
+      {groupes.map(({ mere, veaux }) => (
+        <div key={mere.id} className="border-b border-gray-100 last:border-0">
+          <button
+            onClick={() => setOpenMere(openMere === mere.id ? null : mere.id)}
+            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
+          >
+            {openMere === mere.id
+              ? <ChevronDown size={15} className="text-emerald-500 flex-shrink-0" />
+              : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />}
+            <Link href={`/troupeau/${mere.nutrav}`} onClick={(e) => e.stopPropagation()}
+              className="font-mono font-bold text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded hover:underline">
+              {mere.nutrav}
+            </Link>
+            {mere.nobovi && <span className="text-sm text-gray-700">{mere.nobovi}</span>}
+            {ageFmt(mere.danais) && <span className="text-xs text-gray-400">{ageFmt(mere.danais)}</span>}
+            {mere.statut === "SORTI" && <span className="text-[10px] text-gray-400 line-through">sortie</span>}
+            <span className="ml-auto text-xs bg-emerald-50 text-emerald-600 font-bold px-2 py-0.5 rounded-full">
+              {veaux.length} veau{veaux.length > 1 ? "x" : ""}
+            </span>
+          </button>
+          {openMere === mere.id && (
+            <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+              {veaux.map((v) => (
+                <Link key={v.id} href={`/troupeau/${v.nutrav}`}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-medium hover:shadow transition-all
+                    ${v.sexe === "M" ? "bg-sky-50 border-sky-200 text-sky-700" : "bg-pink-50 border-pink-200 text-pink-700"}
+                    ${v.statut === "SORTI" ? "opacity-40" : ""}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${v.sexe === "M" ? "bg-sky-400" : "bg-pink-400"}`} />
+                  <span className="font-mono">{v.nutrav}</span>
+                  {v.nobovi && <span className="opacity-70">{v.nobovi}</span>}
+                  {v.pereNom && <span className="text-[10px] opacity-50">× {v.pereNom}</span>}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Vue consanguinité ─────────────────────────────── */
+// Risque = un animal dont le père apparaît aussi dans la lignée maternelle (grand-père, arrière-grand-père)
+function VueConsanguinite({ roots }: { roots: AnimalGeneaNode[] }) {
+  const alertes = useMemo(() => {
+    const byId = new Map<string, AnimalGeneaNode>();
+    function index(n: AnimalGeneaNode) { byId.set(n.id, n); n.children.forEach(index); }
+    roots.forEach(index);
+
+    // Remonte la lignée maternelle et collecte tous les pères trouvés
+    function peresDansLigneeMere(nodeId: string | null, depth = 0): Set<string> {
+      if (!nodeId || depth > 5) return new Set();
+      const node = byId.get(nodeId);
+      if (!node) return new Set();
+      const peres = new Set<string>();
+      if (node.pereNat) peres.add(node.pereNat);
+      if (node.pereNom) peres.add(node.pereNom);
+      // Remonter la mère
+      const fromMere = peresDansLigneeMere(node.mereId, depth + 1);
+      fromMere.forEach((p) => peres.add(p));
+      return peres;
+    }
+
+    const risques: { animal: AnimalGeneaNode; pereCommun: string; niveau: "elevé" | "modéré" }[] = [];
+
+    function check(node: AnimalGeneaNode) {
+      if (node.pereNat || node.pereNom) {
+        const pereLigne = peresDansLigneeMere(node.mereId);
+        const pereKey = node.pereNat ?? node.pereNom ?? "";
+        const pereNomKey = node.pereNom ?? "";
+        if (pereLigne.has(pereKey) || pereLigne.has(pereNomKey)) {
+          // Vérifier le niveau : si c'est le père direct de la mère → élevé
+          const mere = node.mereId ? byId.get(node.mereId) : null;
+          const grandPereNat = mere?.pereNat ?? mere?.pereNom ?? "";
+          const niveau = (pereKey && pereKey === grandPereNat) || (pereNomKey && pereNomKey === grandPereNat)
+            ? "elevé" : "modéré";
+          risques.push({ animal: node, pereCommun: node.pereNom ?? node.pereNat ?? "?", niveau });
+        }
+      }
+      node.children.forEach(check);
+    }
+    roots.forEach(check);
+    return risques.sort((a, b) => (a.niveau === "elevé" ? -1 : 1) - (b.niveau === "elevé" ? -1 : 1));
+  }, [roots]);
+
+  if (alertes.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+        <div className="text-4xl mb-3">✅</div>
+        <p className="text-gray-700 font-semibold">Aucun risque de consanguinité détecté</p>
+        <p className="text-xs text-gray-400 mt-2">Vérification sur les 5 générations disponibles en base</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+        <p className="text-sm font-semibold text-red-800">
+          ⚠ {alertes.length} animal{alertes.length > 1 ? "x" : ""} avec risque de consanguinité détecté{alertes.length > 1 ? "s" : ""}
+        </p>
+        <p className="text-xs text-red-600 mt-1">
+          Le père utilisé apparaît déjà dans la lignée maternelle — risque de dépression de consanguinité (réduction des performances, défauts génétiques).
+        </p>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        {alertes.map(({ animal, pereCommun, niveau }) => (
+          <div key={animal.id}
+            className={`flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-0
+              ${niveau === "elevé" ? "bg-red-50/60" : "bg-orange-50/40"}`}
+          >
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${niveau === "elevé" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>
+              {niveau === "elevé" ? "🔴 Élevé" : "🟠 Modéré"}
+            </span>
+            <Link href={`/troupeau/${animal.nutrav}`}
+              className="font-mono font-bold text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded hover:underline">
+              {animal.nutrav}
+            </Link>
+            {animal.nobovi && <span className="text-sm text-gray-700">{animal.nobovi}</span>}
+            <span className="ml-auto text-xs text-gray-500">
+              père <strong>{pereCommun}</strong> déjà dans la lignée maternelle
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-xs text-gray-400 text-center">
+        Conseil : alterner les taureaux entre générations et éviter de saillir avec un taureau déjà grand-père maternel.
+      </p>
+    </div>
+  );
+}
+
+/* ─── Vue par père ──────────────────────────────────── */
+function VueParPere({ roots }: { roots: AnimalGeneaNode[] }) {
+  const groupes = useMemo(() => {
+    const map = new Map<string, AnimalGeneaNode[]>();
+    function collect(node: AnimalGeneaNode) {
+      const pere = node.pereNom ?? "Père inconnu";
+      const list = map.get(pere) ?? [];
+      list.push(node);
+      map.set(pere, list);
+      node.children.forEach(collect);
+    }
+    roots.forEach(collect);
+    return [...map.entries()]
+      .map(([pere, veaux]) => ({ pere, veaux, nb: veaux.length }))
+      .sort((a, b) => b.nb - a.nb);
+  }, [roots]);
+
+  const [openPere, setOpenPere] = useState<string | null>(null);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+      {groupes.map(({ pere, veaux, nb }) => (
+        <div key={pere} className="border-b border-gray-100 last:border-0">
+          <button
+            onClick={() => setOpenPere(openPere === pere ? null : pere)}
+            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
+          >
+            {openPere === pere
+              ? <ChevronDown size={15} className="text-blue-500 flex-shrink-0" />
+              : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />}
+            <span className="font-semibold text-blue-700 text-sm">{pere}</span>
+            <span className="ml-auto text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full">
+              {nb} descendant{nb > 1 ? "s" : ""}
+            </span>
+          </button>
+          {openPere === pere && (
+            <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+              {veaux.map((v) => (
+                <Link
+                  key={v.id}
+                  href={`/troupeau/${v.nutrav}`}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-medium hover:shadow transition-all
+                    ${v.sexe === "M" ? "bg-sky-50 border-sky-200 text-sky-700" : "bg-pink-50 border-pink-200 text-pink-700"}
+                    ${v.statut === "SORTI" ? "opacity-40 line-through" : ""}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${v.sexe === "M" ? "bg-sky-400" : "bg-pink-400"}`} />
+                  <span className="font-mono">{v.nutrav}</span>
+                  {v.nobovi && <span className="opacity-70">{v.nobovi}</span>}
+                  {ageFmt(v.danais) && <span className="opacity-50">{ageFmt(v.danais)}</span>}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ─── Vue globale ───────────────────────────────────── */
 export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
   const [search, setSearch] = useState("");
   const [forceOpen, setForceOpen] = useState<boolean | null>(null);
+  const [vue, setVue] = useState<"arbre" | "mere" | "pere" | "consang">("arbre");
 
   const highlight = search.trim().toLowerCase();
 
@@ -242,6 +459,25 @@ export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
     <div className="space-y-4">
       {/* Import généalogie PDF */}
       <BoutonImportGenea />
+
+      {/* Onglets */}
+      <div className="flex flex-wrap gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        {([
+          { key: "arbre",   label: "🌳 Arbre mère" },
+          { key: "mere",    label: "🐄 Par mère" },
+          { key: "pere",    label: "🐂 Par père" },
+          { key: "consang", label: "⚠ Consanguinité" },
+        ] as const).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setVue(key)}
+            className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors
+              ${vue === key ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {/* Stats globales */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -295,42 +531,50 @@ export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
         </button>
       </div>
 
-      {/* Légende */}
-      <div className="flex flex-wrap gap-3 text-xs text-gray-500 px-1">
-        {[
-          { dot: "bg-emerald-500", label: "Vache active" },
-          { dot: "bg-sky-400",     label: "Mâle" },
-          { dot: "bg-violet-400",  label: "Génisse / Velle" },
-          { dot: "bg-gray-300",    label: "Sorti" },
-        ].map(({ dot, label }) => (
-          <span key={label} className="flex items-center gap-1.5">
-            <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
-            {label}
-          </span>
-        ))}
-        <span className="text-gray-400">· × père indique le père du veau</span>
-      </div>
+      {vue === "arbre" && (
+        <>
+          {/* Légende */}
+          <div className="flex flex-wrap gap-3 text-xs text-gray-500 px-1">
+            {[
+              { dot: "bg-emerald-500", label: "Vache active" },
+              { dot: "bg-sky-400",     label: "Mâle" },
+              { dot: "bg-violet-400",  label: "Génisse / Velle" },
+              { dot: "bg-gray-300",    label: "Sorti" },
+            ].map(({ dot, label }) => (
+              <span key={label} className="flex items-center gap-1.5">
+                <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
+                {label}
+              </span>
+            ))}
+            <span className="text-gray-400">· × père indique le père du veau</span>
+          </div>
 
-      {/* Arbre */}
-      <div className="bg-white rounded-2xl shadow-lg p-4 space-y-1 overflow-x-auto">
-        {filteredRoots.length === 0 && (
-          <p className="text-center text-gray-400 text-sm py-8">Aucun animal trouvé pour « {search} »</p>
-        )}
-        {filteredRoots.map((root, i) => (
-          <GeneaNode
-            key={root.id}
-            node={root}
-            depth={0}
-            isLast={i === filteredRoots.length - 1}
-            forceOpen={forceOpen}
-            highlight={highlight}
-          />
-        ))}
-      </div>
+          {/* Arbre */}
+          <div className="bg-white rounded-2xl shadow-lg p-4 space-y-1 overflow-x-auto">
+            {filteredRoots.length === 0 && (
+              <p className="text-center text-gray-400 text-sm py-8">Aucun animal trouvé pour « {search} »</p>
+            )}
+            {filteredRoots.map((root, i) => (
+              <GeneaNode
+                key={root.id}
+                node={root}
+                depth={0}
+                isLast={i === filteredRoots.length - 1}
+                forceOpen={forceOpen}
+                highlight={highlight}
+              />
+            ))}
+          </div>
 
-      <p className="text-center text-xs text-gray-400">
-        Les animaux sans mère connue dans la base sont affichés à la racine de l&apos;arbre.
-      </p>
+          <p className="text-center text-xs text-gray-400">
+            Les animaux sans mère connue dans la base sont affichés à la racine de l&apos;arbre.
+          </p>
+        </>
+      )}
+
+      {vue === "mere"    && <VueParMere roots={roots} />}
+      {vue === "pere"    && <VueParPere roots={roots} />}
+      {vue === "consang" && <VueConsanguinite roots={roots} />}
     </div>
   );
 }
