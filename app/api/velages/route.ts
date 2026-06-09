@@ -5,7 +5,7 @@ import { logAction } from "@/lib/action-log";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { vacheNutrav, veauNutrav, date, qualificatif, capteur, pereNom } = body;
+    const { vacheNutrav, veauNutrav, veauSexe, veauNom, date, qualificatif, capteur, pereNom } = body;
 
     if (!vacheNutrav || !date) {
       return NextResponse.json({ error: "vacheNutrav et date sont requis" }, { status: 400 });
@@ -24,6 +24,13 @@ export async function POST(request: NextRequest) {
       const veau = await prisma.animal.findUnique({ where: { nutrav: veauNutrav } });
       if (veau) {
         veauId = veau.id;
+        // Mettre à jour sexe et nom si fournis
+        const updateData: Record<string, string> = {};
+        if (veauSexe) updateData.sexbov = veauSexe;
+        if (veauNom) updateData.nobovi = veauNom;
+        if (Object.keys(updateData).length > 0) {
+          await prisma.animal.update({ where: { nutrav: veauNutrav }, data: updateData });
+        }
       }
     }
 

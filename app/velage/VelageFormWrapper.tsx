@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Plus } from "lucide-react";
 
 type QualificatifPrincipal = "NORMAL" | "DIFFICILE" | "AVORTEMENT" | "MORT_NEE" | "JUMEAUX";
@@ -36,18 +36,57 @@ const SOUS_TYPES: Record<QualificatifPrincipal, { value: string; label: string }
 export default function VelageFormWrapper() {
   const [showForm, setShowForm] = useState(false);
   const [vacheNutrav, setVacheNutrav] = useState("");
+  const [vacheInfo, setVacheInfo] = useState<{ nobovi: string | null } | null>(null);
   const [veauNutrav, setVeauNutrav] = useState("");
+  const [veauSexe, setVeauSexe] = useState<"M" | "F" | "">("");
+  const [veauNom, setVeauNom] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [qualificatif, setQualificatif] = useState<QualificatifPrincipal>("NORMAL");
   const [sousType, setSousType] = useState<string>("");
   const [capteur, setCapteur] = useState<string>("");
   const [pereNom, setPereNom] = useState("");
+  const [pereAutoFilled, setPereAutoFilled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const vacheDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleQualificatifChange(q: QualificatifPrincipal) {
     setQualificatif(q);
     setSousType("");
+  }
+
+  async function fetchVacheInfo(nutrav: string) {
+    if (nutrav.length < 3) { setVacheInfo(null); return; }
+    try {
+      const res = await fetch(`/api/animaux/${nutrav}`);
+      if (!res.ok) { setVacheInfo(null); return; }
+      const data = await res.json();
+      setVacheInfo({ nobovi: data.nobovi });
+      // Auto-remplir le père depuis la dernière saillie
+      if (!pereAutoFilled || !pereNom) {
+        const saillies: { date: string; taureau?: { nopere?: string; nupere?: string } | null; pereNom?: string | null }[] = data.saillies ?? [];
+        if (saillies.length > 0) {
+          const last = saillies[0];
+          const nom = last.taureau?.nopere ?? last.taureau?.nupere ?? last.pereNom ?? "";
+          if (nom) { setPereNom(nom); setPereAutoFilled(true); }
+        }
+      }
+    } catch {}
+  }
+
+  function handleVacheChange(val: string) {
+    setVacheNutrav(val.toUpperCase());
+    setVacheInfo(null);
+    if (vacheDebounce.current) clearTimeout(vacheDebounce.current);
+    vacheDebounce.current = setTimeout(() => fetchVacheInfo(val.toUpperCase()), 500);
+  }
+
+  function resetForm() {
+    setVacheNutrav(""); setVacheInfo(null);
+    setVeauNutrav(""); setVeauSexe(""); setVeauNom("");
+    setQualificatif("NORMAL"); setSousType("");
+    setPereNom(""); setPereAutoFilled(false);
+    setCapteur("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -60,6 +99,8 @@ export default function VelageFormWrapper() {
         body: JSON.stringify({
           vacheNutrav,
           veauNutrav: veauNutrav || undefined,
+          veauSexe: veauSexe || undefined,
+          veauNom: veauNom || undefined,
           date,
           qualificatif,
           sousType: sousType || undefined,
@@ -73,10 +114,7 @@ export default function VelageFormWrapper() {
       }
       setMessage("Vélage enregistré !");
       setShowForm(false);
-      setVacheNutrav("");
-      setVeauNutrav("");
-      setQualificatif("NORMAL");
-      setSousType("");
+      resetForm();
     } catch (err) {
       setMessage("Erreur: " + String(err));
     } finally {
@@ -107,33 +145,73 @@ export default function VelageFormWrapper() {
           <div className="bg-white rounded-t-2xl w-full p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">Enregistrer un vélage</h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 text-2xl leading-none px-2">×</button>
+              <button onClick={() => { setShowForm(false); resetForm(); }} className="text-gray-400 text-2xl leading-none px-2">×</button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
 
+              {/* Vache */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">NUTRAV de la vache</label>
                 <input
                   type="text"
                   value={vacheNutrav}
-                  onChange={(e) => setVacheNutrav(e.target.value.toUpperCase())}
+                  onChange={(e) => handleVacheChange(e.target.value)}
                   placeholder="ex: 0042"
                   required
                   className="w-full border border-gray-200 rounded-lg p-3 text-base font-mono"
                 />
+                {vacheInfo?.nobovi && (
+                  <p className="text-xs text-emerald-600 mt-1 font-medium">{vacheInfo.nobovi}</p>
+                )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">NUTRAV du veau (optionnel)</label>
-                <input
-                  type="text"
-                  value={veauNutrav}
-                  onChange={(e) => setVeauNutrav(e.target.value.toUpperCase())}
-                  placeholder="ex: 0166"
-                  className="w-full border border-gray-200 rounded-lg p-3 text-base font-mono"
-                />
+              {/* Veau : nutrav + sexe + nom sur la même section */}
+              <div className="bg-sky-50 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-sky-800">Informations du veau</p>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">NUTRAV du veau (optionnel)</label>
+                  <input
+                    type="text"
+                    value={veauNutrav}
+                    onChange={(e) => setVeauNutrav(e.target.value.toUpperCase())}
+                    placeholder="ex: 0166"
+                    className="w-full border border-gray-200 rounded-lg p-3 text-base font-mono bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">Sexe</label>
+                  <div className="flex gap-2">
+                    {(["M", "F"] as const).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setVeauSexe(veauSexe === s ? "" : s)}
+                        className={`flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-colors
+                          ${veauSexe === s
+                            ? s === "M" ? "bg-sky-500 text-white border-sky-500" : "bg-pink-500 text-white border-pink-500"
+                            : "border-gray-200 text-gray-700 bg-white"}`}
+                      >
+                        {s === "M" ? "♂ Mâle" : "♀ Femelle"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Nom / surnom (optionnel)</label>
+                  <input
+                    type="text"
+                    value={veauNom}
+                    onChange={(e) => setVeauNom(e.target.value)}
+                    placeholder="ex: BOOSTIFLOR"
+                    className="w-full border border-gray-200 rounded-lg p-3 text-base bg-white"
+                  />
+                </div>
               </div>
 
+              {/* Date */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date du vélage</label>
                 <input
@@ -187,6 +265,22 @@ export default function VelageFormWrapper() {
                 </div>
               )}
 
+              {/* Père */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nom du père
+                  {pereAutoFilled && <span className="ml-2 text-xs text-emerald-500 font-normal">auto-rempli depuis la dernière saillie</span>}
+                </label>
+                <input
+                  type="text"
+                  value={pereNom}
+                  onChange={(e) => { setPereNom(e.target.value); setPereAutoFilled(false); }}
+                  placeholder="ex: ZEUS"
+                  className="w-full border border-gray-200 rounded-lg p-3 text-base"
+                />
+              </div>
+
+              {/* Capteur */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Capteur utilisé (optionnel)</label>
                 <select
@@ -200,17 +294,6 @@ export default function VelageFormWrapper() {
                   <option value="3">Capteur 3</option>
                   <option value="4">Capteur 4</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom du père (optionnel)</label>
-                <input
-                  type="text"
-                  value={pereNom}
-                  onChange={(e) => setPereNom(e.target.value)}
-                  placeholder="ex: BALOO"
-                  className="w-full border border-gray-200 rounded-lg p-3 text-base"
-                />
               </div>
 
               <button
