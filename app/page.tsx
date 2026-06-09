@@ -54,7 +54,7 @@ async function getDashboardData() {
     nbGenissesGrandes,
     nbMales,
   ] = await Promise.all([
-    prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", velageVeau: { is: null } } }),
+    prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: false } }),
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
     prisma.animal.findMany({
       where: { statut: "ACTIF", sexbov: "F", estGenisse: false },
@@ -68,7 +68,7 @@ async function getDashboardData() {
       },
     }),
     prisma.animal.findMany({
-      where: { statut: "ACTIF" },
+      where: { statut: "ACTIF", danais: { gte: addDays(now, -730) } },
       include: { vaccinations: { select: { vaccin: true, date: true } } },
     }),
     prisma.evenementSanitaire.count({ where: { resolu: false } }),
@@ -213,7 +213,7 @@ async function getDashboardData() {
     }
   }
 
-  // Statistiques mortalité de l'année en cours
+  // Statistiques mortalité de l'année en cours (dans le Promise.all au dessus idéalement, ici isolé pour lisibilité)
   const debutAnnee = new Date(`${now.getFullYear()}-01-01`);
   const mortsAnnee = await prisma.sortie.findMany({
     where: { type: "MORT", date: { gte: debutAnnee } },
@@ -234,9 +234,10 @@ async function getDashboardData() {
       pct: mortsCount > 0 ? Math.round((count / mortsCount) * 100) : 0,
     }));
   const mortsAnneeSansProbleme = mortsAnnee.filter((m) => !m.causeMortalite).length;
+  const totalTroupeauActif = nbVaches + nbGenissesBabies + nbGenissesMoyennes + nbGenissesGrandes + nbMales;
   const tauxMortaliteAnnee =
-    (vachesActives + mortsCount) > 0
-      ? Math.round((mortsCount / (vachesActives + mortsCount)) * 100)
+    (totalTroupeauActif + mortsCount) > 0
+      ? Math.round((mortsCount / (totalTroupeauActif + mortsCount)) * 100)
       : 0;
 
   const pctPleine =
@@ -448,7 +449,7 @@ export default async function Dashboard() {
                         <Link href={`/troupeau/${g.saillie.animal.nutrav}`} className="font-mono bg-white border border-amber-200 px-1.5 py-0.5 rounded">
                           {g.saillie.animal.nutrav}
                         </Link>
-                        <span>{g.saillie.animal.nobovi ?? "1er vélage"}</span>
+                        <span>{g.saillie.animal.nobovi ?? <em className="opacity-50 not-italic">sans nom</em>}</span>
                         {jours !== null && (
                           <span className="font-semibold">J-{jours}</span>
                         )}
@@ -653,10 +654,10 @@ export default async function Dashboard() {
       >
         <div className="space-y-1.5">
           {([
-            { label: "Vaches", count: data.nbVaches, color: "bg-green-100 text-green-700", href: "/troupeau?lot=vaches" },
-            { label: "Génisses < 1 an", count: data.nbGenissesBabies, color: "bg-sky-100 text-sky-700", href: "/troupeau?lot=babies" },
-            { label: "Génisses 1–2 ans", count: data.nbGenissesMoyennes, color: "bg-indigo-100 text-indigo-700", href: "/troupeau?lot=moyennes" },
-            { label: "Génisses 2–3 ans", count: data.nbGenissesGrandes, color: "bg-purple-100 text-purple-700", href: "/troupeau?lot=grandes" },
+            { label: "Vaches", count: data.nbVaches, color: "bg-green-100 text-green-700", href: "/troupeau?categorie=VACHE" },
+            { label: "Génisses < 1 an", count: data.nbGenissesBabies, color: "bg-sky-100 text-sky-700", href: "/troupeau?categorie=VELLE" },
+            { label: "Génisses 1–2 ans", count: data.nbGenissesMoyennes, color: "bg-indigo-100 text-indigo-700", href: "/troupeau?categorie=MOYENNE_GENISSE" },
+            { label: "Génisses 2–3 ans", count: data.nbGenissesGrandes, color: "bg-purple-100 text-purple-700", href: "/troupeau?categorie=GRANDE_GENISSE" },
             { label: "Mâles", count: data.nbMales, color: "bg-gray-100 text-gray-600", href: "/troupeau?sexe=M" },
           ] as const).map(({ label, count, color, href }) => (
             <Link key={label} href={href} className="flex items-center justify-between p-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
@@ -675,7 +676,7 @@ export default async function Dashboard() {
             Capteurs vélage
           </span>
         }
-        badge={`${capteursActifs.length} actif${capteursActifs.length > 1 ? "s" : ""}`}
+        badge={capteursActifs.length === 0 ? "Aucun actif" : `${capteursActifs.length} actif${capteursActifs.length > 1 ? "s" : ""}`}
         badgeColor={capteursActifs.length > 0 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}
         defaultOpen={false}
       >
