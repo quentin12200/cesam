@@ -3,7 +3,8 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { ChevronRight, ChevronDown, Search, X, Expand, Minimize2, RefreshCw } from "lucide-react";
-import type { AnimalGeneaNode } from "./page";
+import type { AnimalGeneaNode, GeneaEntry } from "./page";
+import { nutravFromNat } from "@/app/api/genealogie-import/data";
 
 /* ─── Bouton import généalogie PDF ──────────────────── */
 function BoutonImportGenea() {
@@ -486,66 +487,107 @@ function VueConsanguinite({ roots }: { roots: AnimalGeneaNode[] }) {
 }
 
 /* ─── Vue par père ──────────────────────────────────── */
-function VueParPere({ roots }: { roots: AnimalGeneaNode[] }) {
-  const groupes = useMemo(() => {
-    const map = new Map<string, AnimalGeneaNode[]>();
+function VueParPere({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData: GeneaEntry[] }) {
+  // Build a set of nutravs that exist in the DB
+  const dbNutravs = useMemo(() => {
+    const set = new Set<string>();
     function collect(node: AnimalGeneaNode) {
-      const pere = node.pereNom ?? "Père inconnu";
-      const list = map.get(pere) ?? [];
-      list.push(node);
-      map.set(pere, list);
+      set.add(node.nutrav);
       node.children.forEach(collect);
     }
     roots.forEach(collect);
+    return set;
+  }, [roots]);
+
+  // Group all PDF entries by bull name
+  const groupes = useMemo(() => {
+    const map = new Map<string, GeneaEntry[]>();
+    for (const e of geneaData) {
+      const list = map.get(e.pereNom) ?? [];
+      list.push(e);
+      map.set(e.pereNom, list);
+    }
     return [...map.entries()]
       .map(([pere, veaux]) => ({ pere, veaux, nb: veaux.length }))
       .sort((a, b) => b.nb - a.nb);
-  }, [roots]);
+  }, [geneaData]);
 
   const [openPere, setOpenPere] = useState<string | null>(null);
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-      {groupes.map(({ pere, veaux, nb }) => (
-        <div key={pere} className="border-b border-gray-100 last:border-0">
-          <button
-            onClick={() => setOpenPere(openPere === pere ? null : pere)}
-            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
-          >
-            {openPere === pere
-              ? <ChevronDown size={15} className="text-blue-500 flex-shrink-0" />
-              : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />}
-            <span className="font-semibold text-blue-700 text-sm">{pere}</span>
-            <span className="ml-auto text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full">
-              {nb} descendant{nb > 1 ? "s" : ""}
-            </span>
-          </button>
-          {openPere === pere && (
-            <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-              {veaux.map((v) => (
-                <Link
-                  key={v.id}
-                  href={`/troupeau/${v.nutrav}`}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-medium hover:shadow transition-all
-                    ${v.sexe === "M" ? "bg-sky-50 border-sky-200 text-sky-700" : "bg-pink-50 border-pink-200 text-pink-700"}
-                    ${v.statut === "SORTI" ? "opacity-40 line-through" : ""}`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${v.sexe === "M" ? "bg-sky-400" : "bg-pink-400"}`} />
-                  <span className="font-mono">{v.nutrav}</span>
-                  {v.nobovi && <span className="opacity-70">{v.nobovi}</span>}
-                  {ageFmt(v.danais) && <span className="opacity-50">{ageFmt(v.danais)}</span>}
-                </Link>
-              ))}
+    <div className="space-y-3">
+      <p className="text-xs text-gray-500 px-1">
+        Tous les descendants issus des PDFs ZEUS/MICKEY/ULYSSE · <span className="text-gray-400">grisé = absent de la DB CESAM</span>
+      </p>
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        {groupes.map(({ pere, veaux, nb }) => {
+          const nbInDb = veaux.filter(v => dbNutravs.has(nutravFromNat(v.veauNat))).length;
+          return (
+            <div key={pere} className="border-b border-gray-100 last:border-0">
+              <button
+                onClick={() => setOpenPere(openPere === pere ? null : pere)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
+              >
+                {openPere === pere
+                  ? <ChevronDown size={15} className="text-blue-500 flex-shrink-0" />
+                  : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />}
+                <span className="font-semibold text-blue-700 text-sm">{pere}</span>
+                <span className="ml-auto flex items-center gap-2">
+                  <span className="text-xs text-emerald-600 font-medium">{nbInDb} en DB</span>
+                  <span className="text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full">
+                    {nb} au total
+                  </span>
+                </span>
+              </button>
+              {openPere === pere && (
+                <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+                  {veaux
+                    .slice()
+                    .sort((a, b) => (a.danais ?? "").localeCompare(b.danais ?? ""))
+                    .map((v) => {
+                      const nutrav = nutravFromNat(v.veauNat);
+                      const inDb = dbNutravs.has(nutrav);
+                      const isMale = v.sexe === "M";
+                      return inDb ? (
+                        <Link
+                          key={v.veauNat}
+                          href={`/troupeau/${nutrav}`}
+                          title={v.nom ?? nutrav}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-medium hover:shadow transition-all
+                            ${isMale ? "bg-sky-50 border-sky-200 text-sky-700" : "bg-pink-50 border-pink-200 text-pink-700"}`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${isMale ? "bg-sky-400" : "bg-pink-400"}`} />
+                          <span className="font-mono">{nutrav}</span>
+                          {v.nom && <span className="opacity-70">{v.nom}</span>}
+                          {v.danais && <span className="opacity-40 text-[10px]">{v.danais.slice(0, 4)}</span>}
+                        </Link>
+                      ) : (
+                        <div
+                          key={v.veauNat}
+                          title={`${v.veauNat} · absent de CESAM`}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-medium opacity-40
+                            ${isMale ? "bg-gray-50 border-gray-200 text-gray-500" : "bg-gray-50 border-gray-200 text-gray-500"}`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                          <span className="font-mono">{nutrav}</span>
+                          {v.nom && <span className="opacity-70">{v.nom}</span>}
+                          {v.danais && <span className="opacity-60 text-[10px]">{v.danais.slice(0, 4)}</span>}
+                          <span className="text-[9px] text-gray-400 ml-0.5">↗ ext.</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      ))}
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 /* ─── Vue globale ───────────────────────────────────── */
-export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
+export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData: GeneaEntry[] }) {
   const [search, setSearch] = useState("");
   const [forceOpen, setForceOpen] = useState<boolean | null>(null);
   const [vue, setVue] = useState<"arbre" | "paysage" | "mere" | "pere" | "consang">("arbre");
@@ -705,7 +747,7 @@ export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
 
       {vue === "paysage" && <VuePaysage roots={filteredRoots} highlight={highlight} />}
       {vue === "mere"    && <VueParMere roots={roots} />}
-      {vue === "pere"    && <VueParPere roots={roots} />}
+      {vue === "pere"    && <VueParPere roots={roots} geneaData={geneaData} />}
       {vue === "consang" && <VueConsanguinite roots={roots} />}
     </div>
   );
