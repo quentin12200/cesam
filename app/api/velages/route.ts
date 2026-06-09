@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     // Résoudre le veau et récupérer ses données avant modif pour undo
     let veauId: string | undefined;
     let veauPrev: { sexbov: string; nobovi: string | null; mereId: string | null; danais: Date | null } | undefined;
+    let veauNonTrouve = false;
     if (veauNutrav) {
       const veau = await prisma.animal.findUnique({ where: { nutrav: veauNutrav } });
       if (veau) {
@@ -34,11 +35,8 @@ export async function POST(request: NextRequest) {
         if (veauNom) updateData.nobovi = veauNom;
         await prisma.animal.update({ where: { nutrav: veauNutrav }, data: updateData });
       } else {
-        // Veau introuvable en base : on prévient mais on continue
-        return NextResponse.json(
-          { error: `Veau avec NUTRAV ${veauNutrav} non trouvé en base. Crée d'abord l'animal dans le troupeau.` },
-          { status: 404 }
-        );
+        // Veau pas encore en base : on enregistre quand même le vêlage sans le lier
+        veauNonTrouve = true;
       }
     }
 
@@ -114,7 +112,12 @@ export async function POST(request: NextRequest) {
       undoId = await logAction("CREATE_VELAGE", desc, undoOps);
     } catch {}
 
-    return NextResponse.json({ ...velage, _undoId: undoId, _undoDesc: desc }, { status: 201 });
+    return NextResponse.json({
+      ...velage,
+      _undoId: undoId,
+      _undoDesc: desc,
+      _warning: veauNonTrouve ? `Veau ${veauNutrav} non trouvé en base — vêlage enregistré sans lien veau. Ajoute le veau dans le troupeau puis lie-le manuellement.` : undefined,
+    }, { status: 201 });
   } catch (err) {
     console.error("POST /api/velages error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
