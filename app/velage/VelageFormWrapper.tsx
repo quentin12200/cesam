@@ -115,8 +115,8 @@ export default function VelageFormWrapper() {
         throw new Error(err.error ?? "Erreur");
       }
       const data = await res.json();
-      const txt = data._warning
-        ? `Vélage enregistré ⚠ ${data._warning}`
+      const txt = data._veauCree
+        ? `Vélage enregistré ! Veau ${data._veauCree} créé dans le troupeau — pense à ajouter son N° national.`
         : "Vélage enregistré !";
       setMessage({ text: txt, ok: true });
       setShowForm(false);
