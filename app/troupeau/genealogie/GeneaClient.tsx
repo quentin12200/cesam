@@ -703,8 +703,6 @@ export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNo
 
   return (
     <div className="space-y-4">
-      {/* Import généalogie PDF */}
-      <BoutonImportGenea />
 
       {/* Onglets */}
       <div className="flex flex-wrap gap-1 bg-gray-100 rounded-xl p-1 w-fit">
