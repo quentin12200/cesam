@@ -6,8 +6,9 @@ import { ChevronRight, ChevronDown, Search, X, Expand, Minimize2, RefreshCw } fr
 import type { AnimalGeneaNode, GeneaEntry } from "./page";
 import { nutravFromNat } from "@/app/api/genealogie-import/data";
 
-/* ─── Bouton import généalogie PDF ──────────────────── */
+/* ─── Bouton import généalogie (discret, en bas de page) ── */
 function BoutonImportGenea() {
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<null | { mere: { ok: number; ko: number }; pere: { ok: number }; veauxNonTrouves: number }>(null);
 
@@ -22,6 +23,16 @@ function BoutonImportGenea() {
     }
   }
 
+  if (!open) {
+    return (
+      <p className="text-center text-[10px] text-gray-300 pt-2">
+        <button onClick={() => setOpen(true)} className="hover:text-gray-400 underline underline-offset-2">
+          Relancer la liaison généalogie PDF
+        </button>
+      </p>
+    );
+  }
+
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -29,14 +40,17 @@ function BoutonImportGenea() {
           <p className="text-sm font-semibold text-amber-800">Lier généalogie depuis PDFs (ZEUS / MICKEY / ULYSSE)</p>
           <p className="text-xs text-amber-600 mt-0.5">Met à jour les liens mère→veau et père (172 entrées)</p>
         </div>
-        <button
-          onClick={run}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-50 whitespace-nowrap"
-        >
-          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-          {loading ? "En cours…" : "Importer"}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setOpen(false)} className="text-xs text-gray-400 hover:text-gray-600 px-2">Annuler</button>
+          <button
+            onClick={run}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-50 whitespace-nowrap"
+          >
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+            {loading ? "En cours…" : "Importer"}
+          </button>
+        </div>
       </div>
       {result && (
         <div className="text-xs text-amber-800 bg-amber-100 rounded-lg p-2 space-y-0.5">
@@ -821,6 +835,9 @@ export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNo
       {vue === "mere"    && <VueParMere roots={roots} />}
       {vue === "pere"    && <VueParPere roots={roots} geneaData={geneaData} />}
       {vue === "consang" && <VueConsanguinite roots={roots} />}
+
+      {/* Lien discret pour relancer l'import si nécessaire */}
+      <BoutonImportGenea />
     </div>
   );
 }
