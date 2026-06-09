@@ -276,56 +276,89 @@ function PaysageNode({ node, x, y, highlight }: { node: AnimalGeneaNode; x: numb
   );
 }
 
-function VuePaysage({ roots, highlight }: { roots: AnimalGeneaNode[]; highlight: string }) {
-  const MAX_ROOTS = 30; // limiter pour éviter un SVG trop lourd
-  const limited = roots.slice(0, MAX_ROOTS);
-  const { placed, totalW, totalH } = useMemo(() => layoutTree(limited), [limited]);
+function PaysageSvg({ roots, highlight }: { roots: AnimalGeneaNode[]; highlight: string }) {
+  const { placed, totalW, totalH } = useMemo(() => layoutTree(roots), [roots]);
 
-  // Construire les connexions (parent → enfants)
   const lines: { x1: number; y1: number; x2: number; y2: number }[] = [];
   const posById = new Map(placed.map((p) => [p.node.id, p]));
   for (const { node, x, y } of placed) {
     for (const child of node.children) {
       const cp = posById.get(child.id);
       if (!cp) continue;
-      lines.push({
-        x1: x + NODE_W,
-        y1: y + NODE_H / 2,
-        x2: cp.x,
-        y2: cp.y + NODE_H / 2,
-      });
+      lines.push({ x1: x + NODE_W, y1: y + NODE_H / 2, x2: cp.x, y2: cp.y + NODE_H / 2 });
     }
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg overflow-auto">
-      {roots.length > MAX_ROOTS && (
-        <p className="text-xs text-amber-600 px-4 pt-3">
-          Affichage limité aux {MAX_ROOTS} premières racines pour la lisibilité.
-        </p>
+    <svg
+      width={totalW + 20}
+      height={totalH + 20}
+      style={{ display: "block", minWidth: totalW + 20 }}
+      viewBox={`-10 -10 ${totalW + 20} ${totalH + 20}`}
+    >
+      {lines.map((l, i) => {
+        const cx = (l.x1 + l.x2) / 2;
+        return (
+          <path key={i}
+            d={`M${l.x1},${l.y1} C${cx},${l.y1} ${cx},${l.y2} ${l.x2},${l.y2}`}
+            fill="none" stroke="#d1d5db" strokeWidth={1.5} strokeLinecap="round"
+          />
+        );
+      })}
+      {placed.map(({ node, x, y }) => (
+        <PaysageNode key={node.id} node={node} x={x} y={y} highlight={highlight} />
+      ))}
+    </svg>
+  );
+}
+
+function VuePaysage({ roots, highlight }: { roots: AnimalGeneaNode[]; highlight: string }) {
+  const MAX_ROOTS = 30;
+  const [fullscreen, setFullscreen] = useState(false);
+  const limited = roots.slice(0, MAX_ROOTS);
+
+  return (
+    <>
+      {/* Vue normale dans la page */}
+      <div className="bg-white rounded-2xl shadow-lg overflow-auto">
+        {roots.length > MAX_ROOTS && (
+          <p className="text-xs text-amber-600 px-4 pt-3">
+            Affichage limité aux {MAX_ROOTS} premières racines. Ouvre le plein écran pour tout voir.
+          </p>
+        )}
+        <div className="relative">
+          <button
+            onClick={() => setFullscreen(true)}
+            className="absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2.5 py-1.5 bg-white/90 backdrop-blur border border-gray-200 rounded-lg shadow text-xs font-medium text-gray-600 hover:bg-gray-50"
+          >
+            <Expand size={13} /> Plein écran
+          </button>
+          <div className="overflow-auto">
+            <PaysageSvg roots={limited} highlight={highlight} />
+          </div>
+        </div>
+      </div>
+
+      {/* Overlay plein écran */}
+      {fullscreen && (
+        <div className="fixed inset-0 z-50 bg-gray-950/95 overflow-auto">
+          <div className="sticky top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 bg-gray-900/80 backdrop-blur border-b border-gray-700">
+            <span className="text-white text-sm font-semibold">
+              Généalogie paysage · {roots.length} animaux
+            </span>
+            <button
+              onClick={() => setFullscreen(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white text-xs font-medium"
+            >
+              <Minimize2 size={13} /> Fermer
+            </button>
+          </div>
+          <div className="p-4 overflow-auto min-h-[calc(100vh-44px)]">
+            <PaysageSvg roots={roots} highlight={highlight} />
+          </div>
+        </div>
       )}
-      <svg
-        width={totalW + 20}
-        height={totalH + 20}
-        style={{ display: "block", minWidth: totalW + 20 }}
-        viewBox={`-10 -10 ${totalW + 20} ${totalH + 20}`}
-      >
-        {/* Connexions courbes */}
-        {lines.map((l, i) => {
-          const cx = (l.x1 + l.x2) / 2;
-          return (
-            <path key={i}
-              d={`M${l.x1},${l.y1} C${cx},${l.y1} ${cx},${l.y2} ${l.x2},${l.y2}`}
-              fill="none" stroke="#d1d5db" strokeWidth={1.5} strokeLinecap="round"
-            />
-          );
-        })}
-        {/* Nœuds */}
-        {placed.map(({ node, x, y }) => (
-          <PaysageNode key={node.id} node={node} x={x} y={y} highlight={highlight} />
-        ))}
-      </svg>
-    </div>
+    </>
   );
 }
 
