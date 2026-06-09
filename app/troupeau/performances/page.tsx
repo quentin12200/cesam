@@ -170,7 +170,7 @@ async function getPerformancesData(): Promise<VachePerf[]> {
       scores.push(ivvScore);
     }
     if (gmqMoyen !== null) {
-      const gmqScore = Math.min(100, (gmqMoyen / 1200) * 100);
+      const gmqScore = Math.min(100, (gmqMoyen / 1500) * 100);
       scores.push(gmqScore);
     }
     if (scores.length > 0) {

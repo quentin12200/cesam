@@ -27,9 +27,9 @@ function IvvBadge({ ivv }: { ivv: number | null }) {
 function GmqBadge({ gmq }: { gmq: number | null }) {
   if (gmq === null) return <span className="text-gray-400 text-xs">—</span>;
   const color =
-    gmq >= 1200
+    gmq >= 1500
       ? "text-green-700 bg-green-50"
-      : gmq >= 900
+      : gmq >= 1200
       ? "text-yellow-700 bg-yellow-50"
       : "text-red-700 bg-red-50";
   return (
@@ -315,9 +315,9 @@ export default function PerformancesClient({ data }: { data: VachePerf[] }) {
         </div>
         <div>
           <span className="font-semibold text-gray-600">GMQ</span> :{" "}
-          <span className="px-1.5 rounded-full bg-green-50 text-green-700">≥1200</span>{" "}
-          <span className="px-1.5 rounded-full bg-yellow-50 text-yellow-700">≥900</span>{" "}
-          <span className="px-1.5 rounded-full bg-red-50 text-red-700">&lt;900</span>
+          <span className="px-1.5 rounded-full bg-green-50 text-green-700">≥1500</span>{" "}
+          <span className="px-1.5 rounded-full bg-yellow-50 text-yellow-700">≥1200</span>{" "}
+          <span className="px-1.5 rounded-full bg-red-50 text-red-700">&lt;1000</span>
         </div>
         <div className="text-gray-400">· Cliquer sur une ligne pour voir le détail</div>
       </div>

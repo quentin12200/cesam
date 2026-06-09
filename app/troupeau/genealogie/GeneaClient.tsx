@@ -198,10 +198,70 @@ function GeneaNode({
   );
 }
 
+/* ─── Vue par père ──────────────────────────────────── */
+function VueParPere({ roots }: { roots: AnimalGeneaNode[] }) {
+  const groupes = useMemo(() => {
+    const map = new Map<string, AnimalGeneaNode[]>();
+    function collect(node: AnimalGeneaNode) {
+      const pere = node.pereNom ?? "Père inconnu";
+      const list = map.get(pere) ?? [];
+      list.push(node);
+      map.set(pere, list);
+      node.children.forEach(collect);
+    }
+    roots.forEach(collect);
+    return [...map.entries()]
+      .map(([pere, veaux]) => ({ pere, veaux, nb: veaux.length }))
+      .sort((a, b) => b.nb - a.nb);
+  }, [roots]);
+
+  const [openPere, setOpenPere] = useState<string | null>(null);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+      {groupes.map(({ pere, veaux, nb }) => (
+        <div key={pere} className="border-b border-gray-100 last:border-0">
+          <button
+            onClick={() => setOpenPere(openPere === pere ? null : pere)}
+            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
+          >
+            {openPere === pere
+              ? <ChevronDown size={15} className="text-blue-500 flex-shrink-0" />
+              : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />}
+            <span className="font-semibold text-blue-700 text-sm">{pere}</span>
+            <span className="ml-auto text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full">
+              {nb} descendant{nb > 1 ? "s" : ""}
+            </span>
+          </button>
+          {openPere === pere && (
+            <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+              {veaux.map((v) => (
+                <Link
+                  key={v.id}
+                  href={`/troupeau/${v.nutrav}`}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-medium hover:shadow transition-all
+                    ${v.sexe === "M" ? "bg-sky-50 border-sky-200 text-sky-700" : "bg-pink-50 border-pink-200 text-pink-700"}
+                    ${v.statut === "SORTI" ? "opacity-40 line-through" : ""}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${v.sexe === "M" ? "bg-sky-400" : "bg-pink-400"}`} />
+                  <span className="font-mono">{v.nutrav}</span>
+                  {v.nobovi && <span className="opacity-70">{v.nobovi}</span>}
+                  {ageFmt(v.danais) && <span className="opacity-50">{ageFmt(v.danais)}</span>}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ─── Vue globale ───────────────────────────────────── */
 export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
   const [search, setSearch] = useState("");
   const [forceOpen, setForceOpen] = useState<boolean | null>(null);
+  const [vue, setVue] = useState<"arbre" | "pere">("arbre");
 
   const highlight = search.trim().toLowerCase();
 
@@ -242,6 +302,20 @@ export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
     <div className="space-y-4">
       {/* Import généalogie PDF */}
       <BoutonImportGenea />
+
+      {/* Onglets */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        {(["arbre", "pere"] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setVue(v)}
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors
+              ${vue === v ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            {v === "arbre" ? "🌳 Arbre mère" : "🐂 Par père"}
+          </button>
+        ))}
+      </div>
 
       {/* Stats globales */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -295,42 +369,48 @@ export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
         </button>
       </div>
 
-      {/* Légende */}
-      <div className="flex flex-wrap gap-3 text-xs text-gray-500 px-1">
-        {[
-          { dot: "bg-emerald-500", label: "Vache active" },
-          { dot: "bg-sky-400",     label: "Mâle" },
-          { dot: "bg-violet-400",  label: "Génisse / Velle" },
-          { dot: "bg-gray-300",    label: "Sorti" },
-        ].map(({ dot, label }) => (
-          <span key={label} className="flex items-center gap-1.5">
-            <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
-            {label}
-          </span>
-        ))}
-        <span className="text-gray-400">· × père indique le père du veau</span>
-      </div>
+      {vue === "arbre" && (
+        <>
+          {/* Légende */}
+          <div className="flex flex-wrap gap-3 text-xs text-gray-500 px-1">
+            {[
+              { dot: "bg-emerald-500", label: "Vache active" },
+              { dot: "bg-sky-400",     label: "Mâle" },
+              { dot: "bg-violet-400",  label: "Génisse / Velle" },
+              { dot: "bg-gray-300",    label: "Sorti" },
+            ].map(({ dot, label }) => (
+              <span key={label} className="flex items-center gap-1.5">
+                <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
+                {label}
+              </span>
+            ))}
+            <span className="text-gray-400">· × père indique le père du veau</span>
+          </div>
 
-      {/* Arbre */}
-      <div className="bg-white rounded-2xl shadow-lg p-4 space-y-1 overflow-x-auto">
-        {filteredRoots.length === 0 && (
-          <p className="text-center text-gray-400 text-sm py-8">Aucun animal trouvé pour « {search} »</p>
-        )}
-        {filteredRoots.map((root, i) => (
-          <GeneaNode
-            key={root.id}
-            node={root}
-            depth={0}
-            isLast={i === filteredRoots.length - 1}
-            forceOpen={forceOpen}
-            highlight={highlight}
-          />
-        ))}
-      </div>
+          {/* Arbre */}
+          <div className="bg-white rounded-2xl shadow-lg p-4 space-y-1 overflow-x-auto">
+            {filteredRoots.length === 0 && (
+              <p className="text-center text-gray-400 text-sm py-8">Aucun animal trouvé pour « {search} »</p>
+            )}
+            {filteredRoots.map((root, i) => (
+              <GeneaNode
+                key={root.id}
+                node={root}
+                depth={0}
+                isLast={i === filteredRoots.length - 1}
+                forceOpen={forceOpen}
+                highlight={highlight}
+              />
+            ))}
+          </div>
 
-      <p className="text-center text-xs text-gray-400">
-        Les animaux sans mère connue dans la base sont affichés à la racine de l&apos;arbre.
-      </p>
+          <p className="text-center text-xs text-gray-400">
+            Les animaux sans mère connue dans la base sont affichés à la racine de l&apos;arbre.
+          </p>
+        </>
+      )}
+
+      {vue === "pere" && <VueParPere roots={roots} />}
     </div>
   );
 }

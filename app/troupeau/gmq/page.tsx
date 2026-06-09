@@ -207,8 +207,8 @@ async function getGmqData(): Promise<{ parMere: GroupeMere[]; parPere: GroupePer
 function GmqBadge({ gmq }: { gmq: number | null }) {
   if (gmq === null) return <span className="text-gray-400">—</span>;
   const color =
-    gmq >= 1200 ? "text-green-700 bg-green-50" :
-    gmq >= 900  ? "text-yellow-700 bg-yellow-50" :
+    gmq >= 1500 ? "text-green-700 bg-green-50" :
+    gmq >= 1200  ? "text-yellow-700 bg-yellow-50" :
     "text-red-700 bg-red-50";
   return (
     <span className={`font-semibold px-2 py-0.5 rounded-full text-xs ${color}`}>
@@ -366,9 +366,9 @@ export default async function GmqPage() {
         <p>• Poids naissance = 1ʳᵉ pesée enregistrée</p>
         <p>• Minimum 2 pesées requises pour calculer le GMQ</p>
         <div className="flex gap-3 mt-2 flex-wrap">
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-100 inline-block"></span> ≥ 1 200 g/j excellent</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-100 inline-block"></span> ≥ 900 g/j correct</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-100 inline-block"></span> &lt; 900 g/j faible</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-100 inline-block"></span> ≥ 1 500 g/j excellent</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-100 inline-block"></span> ≥ 1 200 g/j correct</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-100 inline-block"></span> &lt; 1 000 g/j faible</span>
         </div>
       </div>
     </div>
