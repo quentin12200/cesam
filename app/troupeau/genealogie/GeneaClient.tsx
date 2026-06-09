@@ -42,7 +42,7 @@ function BoutonImportGenea() {
           <p>✓ Mères liées : <strong>{result.mere.ok}</strong> · Non trouvées : {result.mere.ko}</p>
           <p>✓ Pères mis à jour : <strong>{result.pere.ok}</strong></p>
           {result.veauxNonTrouves > 0 && <p className="text-amber-600">⚠ Veaux non trouvés en DB : {result.veauxNonTrouves}</p>}
-          <p className="text-amber-600 font-medium mt-1">Rafraîchis la page pour voir les changements dans l'arbre.</p>
+          <p className="text-amber-600 font-medium mt-1">Rafraîchis la page pour voir les changements dans l&apos;arbre.</p>
         </div>
       )}
     </div>
@@ -216,7 +216,11 @@ export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
 
   const filteredRoots = useMemo(() => {
     if (!highlight || highlight.length < 2) return roots;
-    return roots.filter((r) => nodeMatchesSearch(r, highlight));
+    function matchSearch(node: AnimalGeneaNode, q: string): boolean {
+      if (node.nutrav.toLowerCase().includes(q) || (node.nobovi ?? "").toLowerCase().includes(q)) return true;
+      return node.children.some((c) => matchSearch(c, q));
+    }
+    return roots.filter((r) => matchSearch(r, highlight));
   }, [roots, highlight]);
 
   // Stats
