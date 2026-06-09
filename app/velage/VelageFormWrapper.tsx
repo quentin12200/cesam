@@ -47,7 +47,7 @@ export default function VelageFormWrapper() {
   const [pereNom, setPereNom] = useState("");
   const [pereAutoFilled, setPereAutoFilled] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const vacheDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleQualificatifChange(q: QualificatifPrincipal) {
@@ -67,7 +67,7 @@ export default function VelageFormWrapper() {
         const saillies: { date: string; taureau?: { nopere?: string; nupere?: string } | null; pereNom?: string | null }[] = data.saillies ?? [];
         if (saillies.length > 0) {
           const last = saillies[0];
-          const nom = last.taureau?.nopere ?? last.taureau?.nupere ?? last.pereNom ?? "";
+          const nom = last.taureau?.nopere ?? last.pereNom ?? "";
           if (nom) { setPereNom(nom); setPereAutoFilled(true); }
         }
       }
@@ -87,6 +87,8 @@ export default function VelageFormWrapper() {
     setQualificatif("NORMAL"); setSousType("");
     setPereNom(""); setPereAutoFilled(false);
     setCapteur("");
+    setDate(new Date().toISOString().split("T")[0]);
+    setMessage(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -112,11 +114,11 @@ export default function VelageFormWrapper() {
         const err = await res.json();
         throw new Error(err.error ?? "Erreur");
       }
-      setMessage("Vélage enregistré !");
+      setMessage({ text: "Vélage enregistré !", ok: true });
       setShowForm(false);
       resetForm();
     } catch (err) {
-      setMessage("Erreur: " + String(err));
+      setMessage({ text: String(err).replace("Error: ", ""), ok: false });
     } finally {
       setSaving(false);
     }
@@ -127,9 +129,12 @@ export default function VelageFormWrapper() {
   return (
     <>
       {message && (
-        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl text-sm flex items-center justify-between">
-          {message}
-          <button onClick={() => setMessage(null)} className="text-green-600 font-bold ml-2">×</button>
+        <div className={`px-4 py-3 rounded-xl text-sm flex items-center justify-between border
+          ${message.ok
+            ? "bg-green-50 border-green-200 text-green-800"
+            : "bg-red-50 border-red-200 text-red-800"}`}>
+          {message.text}
+          <button onClick={() => setMessage(null)} className="font-bold ml-2 opacity-60 hover:opacity-100">×</button>
         </div>
       )}
 
