@@ -43,6 +43,7 @@ import EchoButton from "./EchoButton";
 import GroupeButton from "./GroupeButton";
 import TraitementsSection from "./TraitementsSection";
 import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
+import LierVeauButton from "./LierVeauButton";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -824,6 +825,9 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                         )}
                         {velage.pereNom && (
                           <div className="text-xs text-gray-500 mt-1">Père: {velage.pereNom}</div>
+                        )}
+                        {!velage.veau && (
+                          <LierVeauButton velageId={velage.id} />
                         )}
                         <DeleteHistoriqueButton
                           endpoint={`/api/velages/${velage.id}`}
