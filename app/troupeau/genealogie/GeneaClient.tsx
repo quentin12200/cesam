@@ -344,20 +344,39 @@ function VueParMere({ roots }: { roots: AnimalGeneaNode[] }) {
     return [...map.values()].sort((a, b) => b.veaux.length - a.veaux.length);
   }, [roots]);
 
-  const [openMere, setOpenMere] = useState<string | null>(null);
+  const [openMeres, setOpenMeres] = useState<Set<string>>(new Set());
+
+  function toggleMere(id: string) {
+    setOpenMeres((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <button onClick={() => setOpenMeres(new Set(groupes.map((g) => g.mere.id)))}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white border-gray-200 hover:bg-gray-50 shadow-sm">
+          <Expand size={12} /> Tout déplier
+        </button>
+        <button onClick={() => setOpenMeres(new Set())}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white border-gray-200 hover:bg-gray-50 shadow-sm">
+          <Minimize2 size={12} /> Tout replier
+        </button>
+      </div>
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
       {groupes.length === 0 && (
         <p className="text-center text-gray-400 text-sm py-8">Aucune relation mère-veau enregistrée.</p>
       )}
       {groupes.map(({ mere, veaux }) => (
         <div key={mere.id} className="border-b border-gray-100 last:border-0">
           <button
-            onClick={() => setOpenMere(openMere === mere.id ? null : mere.id)}
+            onClick={() => toggleMere(mere.id)}
             className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
           >
-            {openMere === mere.id
+            {openMeres.has(mere.id)
               ? <ChevronDown size={15} className="text-emerald-500 flex-shrink-0" />
               : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />}
             <Link href={`/troupeau/${mere.nutrav}`} onClick={(e) => e.stopPropagation()}
@@ -371,7 +390,7 @@ function VueParMere({ roots }: { roots: AnimalGeneaNode[] }) {
               {veaux.length} veau{veaux.length > 1 ? "x" : ""}
             </span>
           </button>
-          {openMere === mere.id && (
+          {openMeres.has(mere.id) && (
             <div className="px-4 pb-3 flex flex-wrap gap-1.5">
               {veaux.map((v) => (
                 <Link key={v.id} href={`/troupeau/${v.nutrav}`}
@@ -389,6 +408,7 @@ function VueParMere({ roots }: { roots: AnimalGeneaNode[] }) {
           )}
         </div>
       ))}
+      </div>
     </div>
   );
 }
@@ -512,23 +532,43 @@ function VueParPere({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData:
       .sort((a, b) => b.nb - a.nb);
   }, [geneaData]);
 
-  const [openPere, setOpenPere] = useState<string | null>(null);
+  const [openPeres, setOpenPeres] = useState<Set<string>>(new Set());
+
+  function togglePere(pere: string) {
+    setOpenPeres((prev) => {
+      const next = new Set(prev);
+      if (next.has(pere)) next.delete(pere); else next.add(pere);
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-gray-500 px-1">
-        Tous les descendants issus des PDFs ZEUS/MICKEY/ULYSSE · <span className="text-gray-400">grisé = absent de la DB CESAM</span>
-      </p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className="text-xs text-gray-500">
+          Tous les descendants issus des PDFs ZEUS/MICKEY/ULYSSE · <span className="text-gray-400">grisé = absent de la DB CESAM</span>
+        </p>
+        <div className="flex gap-2 ml-auto">
+          <button onClick={() => setOpenPeres(new Set(groupes.map((g) => g.pere)))}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white border-gray-200 hover:bg-gray-50 shadow-sm">
+            <Expand size={12} /> Tout déplier
+          </button>
+          <button onClick={() => setOpenPeres(new Set())}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white border-gray-200 hover:bg-gray-50 shadow-sm">
+            <Minimize2 size={12} /> Tout replier
+          </button>
+        </div>
+      </div>
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         {groupes.map(({ pere, veaux, nb }) => {
           const nbInDb = veaux.filter(v => dbNutravs.has(nutravFromNat(v.veauNat))).length;
           return (
             <div key={pere} className="border-b border-gray-100 last:border-0">
               <button
-                onClick={() => setOpenPere(openPere === pere ? null : pere)}
+                onClick={() => togglePere(pere)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left"
               >
-                {openPere === pere
+                {openPeres.has(pere)
                   ? <ChevronDown size={15} className="text-blue-500 flex-shrink-0" />
                   : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />}
                 <span className="font-semibold text-blue-700 text-sm">{pere}</span>
@@ -539,7 +579,7 @@ function VueParPere({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData:
                   </span>
                 </span>
               </button>
-              {openPere === pere && (
+              {openPeres.has(pere) && (
                 <div className="px-4 pb-3 flex flex-wrap gap-1.5">
                   {veaux
                     .slice()
@@ -590,6 +630,7 @@ function VueParPere({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData:
 export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData: GeneaEntry[] }) {
   const [search, setSearch] = useState("");
   const [forceOpen, setForceOpen] = useState<boolean | null>(null);
+  const [treeKey, setTreeKey] = useState(0);
   const [vue, setVue] = useState<"arbre" | "paysage" | "mere" | "pere" | "consang">("arbre");
 
   const highlight = search.trim().toLowerCase();
@@ -687,7 +728,7 @@ export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNo
 
         {/* Tout déplier / replier */}
         <button
-          onClick={() => setForceOpen((v) => (v === true ? null : true))}
+          onClick={() => { setForceOpen(true); setTreeKey((k) => k + 1); }}
           className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border shadow-sm transition-colors
             ${forceOpen === true ? "bg-emerald-600 text-white border-emerald-700" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
         >
@@ -695,7 +736,7 @@ export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNo
           Tout déplier
         </button>
         <button
-          onClick={() => setForceOpen((v) => (v === false ? null : false))}
+          onClick={() => { setForceOpen(false); setTreeKey((k) => k + 1); }}
           className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border shadow-sm transition-colors
             ${forceOpen === false ? "bg-gray-700 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
         >
@@ -723,7 +764,7 @@ export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNo
           </div>
 
           {/* Arbre — key change quand forceOpen change pour re-mount et appliquer defaultOpen */}
-          <div key={String(forceOpen)} className="bg-white rounded-2xl shadow-lg p-4 space-y-1 overflow-x-auto">
+          <div key={treeKey} className="bg-white rounded-2xl shadow-lg p-4 space-y-1 overflow-x-auto">
             {filteredRoots.length === 0 && (
               <p className="text-center text-gray-400 text-sm py-8">Aucun animal trouvé pour « {search} »</p>
             )}
