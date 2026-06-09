@@ -114,7 +114,11 @@ export default function VelageFormWrapper() {
         const err = await res.json();
         throw new Error(err.error ?? "Erreur");
       }
-      setMessage({ text: "Vélage enregistré !", ok: true });
+      const data = await res.json();
+      const txt = data._warning
+        ? `Vélage enregistré ⚠ ${data._warning}`
+        : "Vélage enregistré !";
+      setMessage({ text: txt, ok: true });
       setShowForm(false);
       resetForm();
     } catch (err) {
