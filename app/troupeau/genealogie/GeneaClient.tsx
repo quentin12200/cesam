@@ -1,9 +1,53 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
-import { ChevronRight, ChevronDown, Search, X, Expand, Minimize2 } from "lucide-react";
+import { ChevronRight, ChevronDown, Search, X, Expand, Minimize2, RefreshCw } from "lucide-react";
 import type { AnimalGeneaNode } from "./page";
+
+/* ─── Bouton import généalogie PDF ──────────────────── */
+function BoutonImportGenea() {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<null | { mere: { ok: number; ko: number }; pere: { ok: number }; veauxNonTrouves: number }>(null);
+
+  async function run() {
+    setLoading(true);
+    try {
+      const r = await fetch("/api/genealogie-import", { method: "POST" });
+      const data = await r.json();
+      setResult(data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-amber-800">Lier généalogie depuis PDFs (ZEUS / MICKEY / ULYSSE)</p>
+          <p className="text-xs text-amber-600 mt-0.5">Met à jour les liens mère→veau et père (172 entrées)</p>
+        </div>
+        <button
+          onClick={run}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-50 whitespace-nowrap"
+        >
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          {loading ? "En cours…" : "Importer"}
+        </button>
+      </div>
+      {result && (
+        <div className="text-xs text-amber-800 bg-amber-100 rounded-lg p-2 space-y-0.5">
+          <p>✓ Mères liées : <strong>{result.mere.ok}</strong> · Non trouvées : {result.mere.ko}</p>
+          <p>✓ Pères mis à jour : <strong>{result.pere.ok}</strong></p>
+          {result.veauxNonTrouves > 0 && <p className="text-amber-600">⚠ Veaux non trouvés en DB : {result.veauxNonTrouves}</p>}
+          <p className="text-amber-600 font-medium mt-1">Rafraîchis la page pour voir les changements dans l&apos;arbre.</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ─── Couleurs ──────────────────────────────────────── */
 function nodeStyle(node: AnimalGeneaNode) {
@@ -172,7 +216,11 @@ export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
 
   const filteredRoots = useMemo(() => {
     if (!highlight || highlight.length < 2) return roots;
-    return roots.filter((r) => nodeMatchesSearch(r, highlight));
+    function matchSearch(node: AnimalGeneaNode, q: string): boolean {
+      if (node.nutrav.toLowerCase().includes(q) || (node.nobovi ?? "").toLowerCase().includes(q)) return true;
+      return node.children.some((c) => matchSearch(c, q));
+    }
+    return roots.filter((r) => matchSearch(r, highlight));
   }, [roots, highlight]);
 
   // Stats
@@ -192,6 +240,9 @@ export default function GeneaClient({ roots }: { roots: AnimalGeneaNode[] }) {
 
   return (
     <div className="space-y-4">
+      {/* Import généalogie PDF */}
+      <BoutonImportGenea />
+
       {/* Stats globales */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
