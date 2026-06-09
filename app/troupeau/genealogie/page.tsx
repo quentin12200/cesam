@@ -2,6 +2,9 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, Network } from "lucide-react";
 import GeneaClient from "./GeneaClient";
+import { GENEA_DATA, type GeneaEntry } from "@/app/api/genealogie-import/data";
+
+export type { GeneaEntry };
 
 export interface AnimalGeneaNode {
   id: string;
@@ -123,7 +126,7 @@ export default async function GenealogiePage() {
           </div>
         </div>
 
-        <GeneaClient roots={roots} />
+        <GeneaClient roots={roots} geneaData={GENEA_DATA} />
       </div>
     </div>
   );
