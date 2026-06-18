@@ -12,57 +12,80 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function checkSession() {
-      // Vérifier session existante
+    async function init() {
+      // Session déjà active ?
       const sessionRes = await fetch("/api/auth/session").catch(() => null);
       if (sessionRes?.ok) { router.replace(redirect); return; }
 
-      // Vérifier si retour de redirection Google
+      // Retour d'une redirection Google ?
       try {
         const { getFirebaseApp } = await import("@/lib/firebase-client");
         const { getAuth, getRedirectResult, signOut } = await import("firebase/auth");
         const auth = getAuth(getFirebaseApp());
         const result = await getRedirectResult(auth);
-
         if (result?.user) {
-          const idToken = await result.user.getIdToken();
-          const res = await fetch("/api/auth/session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken }),
-          });
-          if (res.status === 403) {
-            setError("Accès non autorisé. Le propriétaire a été notifié.");
-            await signOut(auth);
-          } else if (res.ok) {
-            router.replace(redirect);
-            return;
-          } else {
-            setError("Erreur d'authentification. Réessayez.");
-          }
+          await handleUser(result.user, signOut.bind(null, auth));
+          return;
         }
       } catch (err) {
-        console.error("getRedirectResult error:", err);
+        console.warn("getRedirectResult:", err);
       }
 
       setLoading(false);
     }
-    checkSession();
-  }, [redirect, router]);
+    init();
+  }, [redirect, router]); // eslint-disable-line
+
+  async function handleUser(user: { getIdToken: () => Promise<string> }, signOutFn: () => Promise<void>) {
+    const idToken = await user.getIdToken();
+    const res = await fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+    if (res.status === 403) {
+      setError("Accès non autorisé. Le propriétaire a été notifié.");
+      await signOutFn();
+      setLoading(false);
+      return;
+    }
+    if (!res.ok) {
+      setError("Erreur serveur. Réessayez.");
+      setLoading(false);
+      return;
+    }
+    router.replace(redirect);
+  }
 
   async function handleGoogleLogin() {
     setLoading(true);
     setError(null);
     try {
       const { getFirebaseApp } = await import("@/lib/firebase-client");
-      const { getAuth, signInWithRedirect, GoogleAuthProvider } = await import("firebase/auth");
+      const { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut } = await import("firebase/auth");
       const auth = getAuth(getFirebaseApp());
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      await signInWithRedirect(auth, provider);
-      // La page va se recharger → le useEffect au retour gère la suite
+
+      try {
+        // Popup en priorité (instantané, pas de rechargement de page)
+        const result = await signInWithPopup(auth, provider);
+        await handleUser(result.user, signOut.bind(null, auth));
+      } catch (popupErr: unknown) {
+        const code = (popupErr as { code?: string }).code ?? "";
+        if (code === "auth/popup-blocked" || code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+          if (code === "auth/popup-closed-by-user") {
+            setLoading(false);
+            return;
+          }
+          // Popup bloqué → fallback redirect
+          await signInWithRedirect(auth, provider);
+        } else {
+          throw popupErr;
+        }
+      }
     } catch {
-      setError("Impossible de lancer la connexion Google. Réessayez.");
+      setError("Erreur de connexion Google. Réessayez.");
       setLoading(false);
     }
   }
