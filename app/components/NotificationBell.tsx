@@ -22,6 +22,7 @@ async function registerFcmToken(sw: ServiceWorkerRegistration) {
     const { getToken } = await import("firebase/messaging");
     const messaging = await getFirebaseMessaging();
     if (!messaging) return;
+    // Utilise le sw.js unifié (pas de SW séparé Firebase)
     const token = await getToken(messaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: sw });
     if (token) {
       await fetch("/api/fcm/subscribe", {
@@ -35,13 +36,12 @@ async function registerFcmToken(sw: ServiceWorkerRegistration) {
   }
 }
 
-async function unregisterFcmToken() {
+async function unregisterFcmToken(sw: ServiceWorkerRegistration) {
   try {
     const { getFirebaseMessaging } = await import("@/lib/firebase-client");
     const { getToken, deleteToken } = await import("firebase/messaging");
     const messaging = await getFirebaseMessaging();
     if (!messaging) return;
-    const sw = await navigator.serviceWorker.ready;
     const token = await getToken(messaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: sw }).catch(() => null);
     if (token) {
       await deleteToken(messaging);
@@ -92,7 +92,7 @@ export default function NotificationBell() {
           });
         }
         // Unsubscribe FCM
-        await unregisterFcmToken();
+        await unregisterFcmToken(reg);
         setSubscribed(false);
       } else {
         const permission = await Notification.requestPermission();
@@ -101,8 +101,8 @@ export default function NotificationBell() {
           return;
         }
 
-        // Register Firebase service worker
-        await navigator.serviceWorker.register("/firebase-messaging-sw.js", { scope: "/" });
+        // sw.js est le SW unifié (VAPID + FCM)
+        await navigator.serviceWorker.register("/sw.js", { scope: "/" });
         const swReg = await navigator.serviceWorker.ready;
 
         // Subscribe VAPID (legacy web push)

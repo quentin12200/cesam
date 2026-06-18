@@ -12,6 +12,7 @@ import ChecklistSection, {
 } from "@/app/components/ChecklistSection";
 import QuickSearch from "@/app/components/QuickSearch";
 import NotesTerrain from "@/app/components/NotesTerrain";
+import RapportGestationButton from "@/app/components/RapportGestationButton";
 import {
   Baby,
   Wifi,
@@ -364,6 +365,9 @@ export default async function Dashboard() {
             <Baby size={18} className="text-pink-500" />
             Reproduction &amp; Vélage
           </h3>
+          <div className="mb-3">
+            <RapportGestationButton />
+          </div>
           <div className="space-y-2">
             {data.vachesVidesEnRetard > 0 && (
               <Link
