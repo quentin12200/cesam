@@ -156,7 +156,7 @@ export function getEtatGestation(
   if (gestationEtat === "VERT") {
     if (dateVelagePrevue) {
       const diffJours = differenceInDays(dateVelagePrevue, now);
-      if (diffJours >= 0 && diffJours <= 30) return "ROSE";
+      if (diffJours <= 30) return "ROSE"; // imminente OU terme dépassé → ROSE dans les deux cas
     }
     return "VERT";
   }

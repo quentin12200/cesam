@@ -76,13 +76,13 @@ async function getDashboardData() {
     prisma.gestation.count({
       where: {
         etat: { in: ["VERT", "ROSE"] },
-        dateVelagePrevue: { gte: now, lte: sevenDaysLater },
+        dateVelagePrevue: { gte: addDays(now, -14), lte: sevenDaysLater },
       },
     }),
     prisma.gestation.count({
       where: {
         etat: { in: ["VERT", "ROSE"] },
-        dateVelagePrevue: { gte: now, lte: thirtyDaysLater },
+        dateVelagePrevue: { gte: addDays(now, -14), lte: thirtyDaysLater },
       },
     }),
     prisma.gestation.count({
@@ -164,7 +164,7 @@ async function getDashboardData() {
     prisma.gestation.findMany({
       where: {
         etat: { in: ["VERT", "ROSE"] },
-        dateVelagePrevue: { gte: now, lte: addDays(now, 23) },
+        dateVelagePrevue: { gte: addDays(now, -14), lte: addDays(now, 23) },
       },
       select: {
         dateVelagePrevue: true,
