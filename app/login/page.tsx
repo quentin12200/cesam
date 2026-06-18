@@ -22,7 +22,11 @@ function LoginContent() {
         const { getFirebaseApp } = await import("@/lib/firebase-client");
         const { getAuth, getRedirectResult, signOut } = await import("firebase/auth");
         const auth = getAuth(getFirebaseApp());
-        const result = await getRedirectResult(auth);
+        // Timeout 5s pour éviter le spinner infini si getRedirectResult ne répond pas
+        const result = await Promise.race([
+          getRedirectResult(auth),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        ]);
         if (result?.user) {
           await handleUser(result.user, signOut.bind(null, auth));
           return;
