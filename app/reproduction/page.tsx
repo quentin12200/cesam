@@ -669,7 +669,7 @@ function ReproductionContent() {
                   {gestationsActives.map((v) => {
                     const calving = new Date(v.dateVelagePrevue!);
                     const daysLeft = differenceInDays(calving, now);
-                    const rowBg = daysLeft <= 14 ? "bg-pink-50" : daysLeft <= 30 ? "bg-yellow-50" : "";
+                    const rowBg = daysLeft < 0 ? "bg-red-50" : daysLeft <= 14 ? "bg-pink-50" : daysLeft <= 30 ? "bg-yellow-50" : "";
                     return (
                       <tr key={v.id} className={rowBg}>
                         <td className="px-3 py-2">
@@ -687,8 +687,10 @@ function ReproductionContent() {
                           <div className="font-medium text-gray-800 text-sm">
                             {calving.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
                           </div>
-                          {daysLeft >= 0 && (
+                          {daysLeft >= 0 ? (
                             <div className="text-xs text-gray-400">J-{daysLeft}</div>
+                          ) : (
+                            <div className="text-xs font-bold text-red-600">+{Math.abs(daysLeft)}j dépassé</div>
                           )}
                         </td>
                         <td className="px-3 py-2 text-center text-gray-600 text-xs">{v.taureauNom ?? "IA"}</td>
