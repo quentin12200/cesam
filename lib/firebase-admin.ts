@@ -21,6 +21,8 @@ function getAdminApp(): App {
   return app;
 }
 
+export { getAdminApp };
+
 export function getAdminMessaging(): Messaging {
   return getMessaging(getAdminApp());
 }

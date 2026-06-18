@@ -8,6 +8,7 @@ import NotificationBell from "@/app/components/NotificationBell";
 import GlobalScanner from "@/app/components/GlobalScanner";
 import VoiceButton from "@/app/components/VoiceButton";
 import UndoProvider from "@/app/components/UndoProvider";
+import LogoutButton from "@/app/components/LogoutButton";
 import Image from "next/image";
 
 const geist = Geist({
@@ -54,6 +55,7 @@ export default function RootLayout({
               <GlobalScanner />
               <VoiceButton />
               <NotificationBell />
+              <LogoutButton />
             </div>
           </div>
           <TopNav />
