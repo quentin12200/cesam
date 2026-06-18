@@ -1,9 +1,23 @@
 import { NextResponse } from "next/server";
-import { getAdminApp } from "@/lib/firebase-admin";
-import { getAuth } from "firebase-admin/auth";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import { sendUnauthorizedAccessEmail } from "@/lib/gmail";
 
 const AUTHORIZED_EMAILS = ["leyrat.quentin@gmail.com", "gaec.cesam@gmail.com"];
+
+const FIREBASE_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "cesam-gaec-d781e";
+
+// Clés publiques Google pour les tokens Firebase
+const JWKS = createRemoteJWKSet(
+  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
+);
+
+async function verifyFirebaseToken(idToken: string) {
+  const { payload } = await jwtVerify(idToken, JWKS, {
+    issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
+    audience: FIREBASE_PROJECT_ID,
+  });
+  return payload;
+}
 
 export async function GET(request: Request) {
   const cookie = request.headers.get("cookie") ?? "";
@@ -17,12 +31,12 @@ export async function POST(request: Request) {
   if (!idToken) return NextResponse.json({ error: "token required" }, { status: 400 });
 
   try {
-    const decoded = await getAuth(getAdminApp()).verifyIdToken(idToken);
-    const email = decoded.email ?? "";
+    const payload = await verifyFirebaseToken(idToken);
+    const email = (payload.email as string | undefined) ?? "";
+    const name = (payload.name as string | undefined) ?? null;
 
     if (!AUTHORIZED_EMAILS.includes(email.toLowerCase())) {
-      // Fire-and-forget notification
-      sendUnauthorizedAccessEmail(email, decoded.name ?? null).catch(() => null);
+      sendUnauthorizedAccessEmail(email, name).catch(() => null);
       return NextResponse.json({ error: "unauthorized" }, { status: 403 });
     }
 
@@ -31,7 +45,7 @@ export async function POST(request: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30, // 30 jours
+      maxAge: 60 * 60 * 24 * 30,
       path: "/",
     });
     return response;
