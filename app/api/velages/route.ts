@@ -82,7 +82,6 @@ export async function POST(request: NextRequest) {
         pereNunati: pereNunati ?? null,
         jumeaux: isJumeaux,
         gestationId: derniereGestation?.id ?? null,
-        updatedAt: new Date(),
       },
     });
 
