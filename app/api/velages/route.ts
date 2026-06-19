@@ -70,6 +70,17 @@ export async function POST(request: NextRequest) {
     const pereNunati = derniereGestation?.saillie?.taureau?.nupere ?? null;
     const isJumeaux = qualificatif === "JUMEAUX";
 
+    // Vérifier que le veau n'est pas déjà lié à un autre vélage
+    if (veauId) {
+      const veauDejaLie = await prisma.velage.findUnique({ where: { veauId } });
+      if (veauDejaLie) {
+        return NextResponse.json(
+          { error: `Ce veau (${veauNutrav}) est déjà enregistré dans un vélage du ${new Date(veauDejaLie.date).toLocaleDateString("fr-FR")}` },
+          { status: 409 }
+        );
+      }
+    }
+
     const velage = await prisma.velage.create({
       data: {
         vacheId: vache.id,
