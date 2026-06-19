@@ -55,12 +55,11 @@ export async function POST(request: NextRequest) {
       veauId = veau.id;
     }
 
-    // Chercher la gestation active la plus récente
+    // Chercher la gestation ouverte la plus récente (même si déjà liée à un vélage orphelin)
     const derniereGestation = await prisma.gestation.findFirst({
       where: {
         saillie: { animalId: vache.id },
         etat: { in: ["VERT", "GRIS", "ROSE"] },
-        velage: null,
       },
       include: { saillie: { include: { taureau: true } } },
       orderBy: { createdAt: "desc" },
@@ -74,6 +73,14 @@ export async function POST(request: NextRequest) {
     if (veauId) {
       const veauDejaLie = await prisma.velage.findUnique({ where: { veauId } });
       if (veauDejaLie) {
+        // Si c'est le même vélage (même vache, même date) : probablement un doublon d'envoi
+        // Dans ce cas on clôture quand même la gestation si elle est encore ouverte
+        if (derniereGestation) {
+          await prisma.gestation.update({
+            where: { id: derniereGestation.id },
+            data: { etat: "VELAGE" },
+          });
+        }
         return NextResponse.json(
           { error: `Ce veau (${veauNutrav}) est déjà enregistré dans un vélage du ${new Date(veauDejaLie.date).toLocaleDateString("fr-FR")}` },
           { status: 409 }
@@ -81,36 +88,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const velage = await prisma.velage.create({
-      data: {
-        vacheId: vache.id,
-        veauId: veauId ?? null,
-        date: new Date(date),
-        qualificatif: qualificatif ?? "NORMAL",
-        sousType: sousType ?? null,
-        capteur: capteur ?? null,
-        pereNom: pereNom ?? null,
-        pereNunati: pereNunati ?? null,
-        jumeaux: isJumeaux,
-        gestationId: derniereGestation?.id ?? null,
-      },
-    });
+    // Transaction atomique : créer le vélage + clôturer la gestation + mettre à jour la vache
+    const [velage] = await prisma.$transaction([
+      prisma.velage.create({
+        data: {
+          vacheId: vache.id,
+          veauId: veauId ?? null,
+          date: new Date(date),
+          qualificatif: qualificatif ?? "NORMAL",
+          sousType: sousType ?? null,
+          capteur: capteur ?? null,
+          pereNom: pereNom ?? null,
+          pereNunati: pereNunati ?? null,
+          jumeaux: isJumeaux,
+          gestationId: derniereGestation?.id ?? null,
+        },
+      }),
+      ...(derniereGestation
+        ? [prisma.gestation.update({ where: { id: derniereGestation.id }, data: { etat: "VELAGE" } })]
+        : []),
+      prisma.animal.update({ where: { nutrav: vacheNutrav }, data: { tarieFaite: false } }),
+    ]);
 
-    // Clôturer la gestation
-    if (derniereGestation) {
-      await prisma.gestation.update({
-        where: { id: derniereGestation.id },
-        data: { etat: "VELAGE" },
-      });
-    }
-
-    // Au vêlage, la vache redevient non tarie
-    await prisma.animal.update({
-      where: { nutrav: vacheNutrav },
-      data: { tarieFaite: false },
-    });
-
-    // Libérer le capteur si utilisé
+    // Libérer le capteur si utilisé (hors transaction car updateMany non supporté)
     if (capteur) {
       await prisma.capteurVelage.updateMany({
         where: { numero: capteur },
