@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
+import { differenceInDays } from "date-fns";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import StatsClient from "./StatsClient";
@@ -39,6 +40,17 @@ export interface SortieDetail {
   animal: { nutrav: string; nobovi: string | null; sexbov: string };
 }
 
+export interface GestationRecord {
+  annee: number;
+  saison: "Printemps" | "Été" | "Automne" | "Hiver";
+  duree: number;
+  sexeVeau: "M" | "F" | null;
+  typeSaillie: "IA" | "TAUREAU";
+  ageMereAnnees: number;
+  mereNutrav: string;
+  mereNom: string | null;
+}
+
 export interface VenteHisto {
   id: string;
   annee: number;
@@ -54,6 +66,45 @@ export interface VenteHisto {
   date: string;
   total: number | null;
   notes: string | null;
+}
+
+function getSaison(date: Date): GestationRecord["saison"] {
+  const m = date.getMonth() + 1;
+  if (m >= 3 && m <= 5) return "Printemps";
+  if (m >= 6 && m <= 8) return "Été";
+  if (m >= 9 && m <= 11) return "Automne";
+  return "Hiver";
+}
+
+async function getGestationRecords(): Promise<GestationRecord[]> {
+  const velages = await prisma.velage.findMany({
+    where: { gestationId: { not: null } },
+    include: {
+      gestation: { include: { saillie: { include: { taureau: { select: { nopere: true } } } } } },
+      vache: { select: { danais: true, nobovi: true, nutrav: true } },
+      veau: { select: { sexbov: true } },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  const records: GestationRecord[] = [];
+  for (const v of velages) {
+    if (!v.gestation?.saillie) continue;
+    const duree = differenceInDays(v.date, v.gestation.saillie.date);
+    if (duree < 240 || duree > 320) continue;
+    const ageMereJours = differenceInDays(v.date, v.vache.danais);
+    records.push({
+      annee: v.date.getFullYear(),
+      saison: getSaison(v.date),
+      duree,
+      sexeVeau: (v.veau?.sexbov as "M" | "F" | null) ?? null,
+      typeSaillie: v.gestation.saillie.taureauId ? "TAUREAU" : "IA",
+      ageMereAnnees: Math.round((ageMereJours / 365) * 10) / 10,
+      mereNutrav: v.vache.nutrav,
+      mereNom: v.vache.nobovi,
+    });
+  }
+  return records;
 }
 
 async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: Record<number, SortieDetail[]>; ventesHisto: VenteHisto[] }> {
@@ -195,7 +246,10 @@ interface PageProps {
 
 export default async function FinancesStatsPage({ searchParams }: PageProps) {
   const sp = await searchParams;
-  const { stats, sortiesParAnnee, ventesHisto } = await getStatsPluri();
+  const [{ stats, sortiesParAnnee, ventesHisto }, gestationRecords] = await Promise.all([
+    getStatsPluri(),
+    getGestationRecords(),
+  ]);
   const anneeActive = sp.annee ? parseInt(sp.annee) : new Date().getFullYear();
 
   return (
@@ -208,7 +262,7 @@ export default async function FinancesStatsPage({ searchParams }: PageProps) {
           <h2 className="text-xl font-bold text-gray-800 flex-1">Statistiques pluriannuelles</h2>
           <span className="text-xs text-gray-400">{stats.length} année{stats.length > 1 ? "s" : ""}</span>
         </div>
-        <StatsClient stats={stats} sortiesParAnnee={sortiesParAnnee} anneeActive={anneeActive} ventesHisto={ventesHisto} />
+        <StatsClient stats={stats} sortiesParAnnee={sortiesParAnnee} anneeActive={anneeActive} ventesHisto={ventesHisto} gestationRecords={gestationRecords} />
       </div>
     </div>
   );
