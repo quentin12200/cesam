@@ -158,6 +158,14 @@ export default function VelageFormWrapper() {
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
 
+              {/* Message d'erreur visible dans le formulaire */}
+              {message && !message.ok && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800 flex items-start justify-between gap-2">
+                  <span>{message.text}</span>
+                  <button type="button" onClick={() => setMessage(null)} className="text-red-400 font-bold shrink-0">×</button>
+                </div>
+              )}
+
               {/* Vache */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">NUTRAV de la vache</label>
