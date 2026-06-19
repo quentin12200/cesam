@@ -56,6 +56,7 @@ function LineChartGesta({ parAnnee }: { parAnnee: { annee: number; moyenne: numb
   const cW = W - PAD.left - PAD.right;
   const cH = H - PAD.top - PAD.bottom;
   const vals = parAnnee.map((d) => d.moyenne).filter((v): v is number => v != null);
+  const [hovered, setHovered] = useState<{ x: number; label: string; val: string } | null>(null);
   if (vals.length < 2) return <p className="text-xs text-gray-400 text-center py-4">Pas assez de données pour un graphique</p>;
   const minV = Math.min(...vals) - 2;
   const maxV = Math.max(...vals) + 2;
@@ -63,7 +64,6 @@ function LineChartGesta({ parAnnee }: { parAnnee: { annee: number; moyenne: numb
   const n = parAnnee.length;
   const xPos = (i: number) => PAD.left + (i / Math.max(n - 1, 1)) * cW;
   const yPos = (v: number) => PAD.top + cH - ((v - minV) / range) * cH;
-  const [hovered, setHovered] = useState<{ x: number; label: string; val: string } | null>(null);
 
   const pts = parAnnee.map((d, i) => d.moyenne != null ? `${xPos(i)},${yPos(d.moyenne)}` : null).filter(Boolean);
   const path = pts.length > 1 ? `M ${pts.join(" L ")}` : null;
