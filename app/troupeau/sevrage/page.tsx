@@ -9,8 +9,8 @@ interface VeauSevre {
   nutrav: string;
   nobovi: string | null;
   danais: Date;
-  dateSevrage: Date;
-  ageSevrageJours: number;
+  dateSevrage: Date | null;
+  ageSevrageJours: number | null;
   mereNutrav: string | null;
   mereNobovi: string | null;
   mereTarieFaite: boolean;
@@ -18,8 +18,10 @@ interface VeauSevre {
 }
 
 async function getVeauxSevres(): Promise<VeauSevre[]> {
+  // On inclut aussi les veaux sevrés avant l'ajout de dateSevrage (historique) :
+  // leur date sera affichée comme "inconnue" plutôt que de les faire disparaître.
   const animaux = await prisma.animal.findMany({
-    where: { sevreFait: true, dateSevrage: { not: null } },
+    where: { sevreFait: true },
     select: {
       id: true,
       nutrav: true,
@@ -31,33 +33,42 @@ async function getVeauxSevres(): Promise<VeauSevre[]> {
           vache: { select: { nutrav: true, nobovi: true, tarieFaite: true, dateTarie: true } },
         },
       },
+      mere: { select: { nutrav: true, nobovi: true, tarieFaite: true, dateTarie: true } },
     },
-    orderBy: { dateSevrage: "desc" },
+    orderBy: [{ dateSevrage: { sort: "desc", nulls: "last" } }, { danais: "desc" }],
   });
 
-  return animaux.map((a) => ({
-    id: a.id,
-    nutrav: a.nutrav,
-    nobovi: a.nobovi,
-    danais: a.danais,
-    dateSevrage: a.dateSevrage as Date,
-    ageSevrageJours: differenceInDays(a.dateSevrage as Date, a.danais),
-    mereNutrav: a.velageVeau?.vache?.nutrav ?? null,
-    mereNobovi: a.velageVeau?.vache?.nobovi ?? null,
-    mereTarieFaite: a.velageVeau?.vache?.tarieFaite ?? false,
-    mereDateTarie: a.velageVeau?.vache?.dateTarie ?? null,
-  }));
+  return animaux.map((a) => {
+    const mere = a.velageVeau?.vache ?? a.mere ?? null;
+    return {
+      id: a.id,
+      nutrav: a.nutrav,
+      nobovi: a.nobovi,
+      danais: a.danais,
+      dateSevrage: a.dateSevrage,
+      ageSevrageJours: a.dateSevrage ? differenceInDays(a.dateSevrage, a.danais) : null,
+      mereNutrav: mere?.nutrav ?? null,
+      mereNobovi: mere?.nobovi ?? null,
+      mereTarieFaite: mere?.tarieFaite ?? false,
+      mereDateTarie: mere?.dateTarie ?? null,
+    };
+  });
 }
 
 export default async function SevragePage() {
   const veaux = await getVeauxSevres();
 
+  const avecAge = veaux.filter((v): v is VeauSevre & { ageSevrageJours: number } => v.ageSevrageJours !== null);
   const ageMoyenJours =
-    veaux.length > 0
-      ? Math.round(veaux.reduce((s, v) => s + v.ageSevrageJours, 0) / veaux.length)
+    avecAge.length > 0
+      ? Math.round(avecAge.reduce((s, v) => s + v.ageSevrageJours, 0) / avecAge.length)
       : null;
+  const dateInconnueCount = veaux.length - avecAge.length;
 
-  const recents = veaux.filter((v) => differenceInDays(new Date(), v.dateSevrage) <= 14);
+  const recents = veaux.filter(
+    (v): v is VeauSevre & { dateSevrage: Date } =>
+      v.dateSevrage !== null && differenceInDays(new Date(), v.dateSevrage) <= 14
+  );
 
   return (
     <div className="max-w-3xl mx-auto p-4 pb-24 space-y-6">
@@ -88,6 +99,12 @@ export default async function SevragePage() {
           <div className="text-xs text-gray-500 mt-1">âge moyen au sevrage</div>
         </div>
       </div>
+
+      {dateInconnueCount > 0 && (
+        <p className="text-xs text-gray-400 italic px-1">
+          {dateInconnueCount} sevrage{dateInconnueCount > 1 ? "s" : ""} antérieur{dateInconnueCount > 1 ? "s" : ""} à ce suivi, date exacte inconnue.
+        </p>
+      )}
 
       {veaux.length === 0 && (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">
@@ -180,10 +197,10 @@ export default async function SevragePage() {
                         )}
                       </td>
                       <td className="px-3 py-3 text-right text-gray-600 text-xs whitespace-nowrap">
-                        {formatDate(v.dateSevrage)}
+                        {v.dateSevrage ? formatDate(v.dateSevrage) : <span className="text-gray-400 italic">inconnue</span>}
                       </td>
                       <td className="px-3 py-3 text-right text-gray-600 text-xs whitespace-nowrap">
-                        {formatAge(v.danais, v.dateSevrage)}
+                        {v.dateSevrage ? formatAge(v.danais, v.dateSevrage) : <span className="text-gray-400">—</span>}
                       </td>
                       <td className="px-4 py-3 text-right text-xs whitespace-nowrap">
                         {v.mereTarieFaite ? (
