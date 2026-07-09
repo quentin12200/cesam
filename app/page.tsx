@@ -361,7 +361,7 @@ export default async function Dashboard() {
 
       {/* REPRODUCTION & VÉLAGE */}
       {hasRepro && (
-        <div id="print-repro-velage" data-print-section className="bg-white rounded-xl shadow p-4">
+        <div id="print-repro-velage" className="bg-white rounded-xl shadow p-4">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Baby size={18} className="text-pink-500" />
@@ -474,7 +474,7 @@ export default async function Dashboard() {
 
       {/* SANTÉ & VACCINS */}
       {hasSante && (
-        <div id="print-sante-vaccins" data-print-section className="bg-white rounded-xl shadow p-4">
+        <div id="print-sante-vaccins" className="bg-white rounded-xl shadow p-4">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Activity size={18} className="text-red-500" />
