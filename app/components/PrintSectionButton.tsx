@@ -15,21 +15,51 @@ export default function PrintSectionButton({
    * retourne une Promise, l'impression attend qu'elle se résolve. */
   beforePrint?: () => void | Promise<void>;
 }) {
-  async function handlePrint(e: React.MouseEvent) {
+  function handlePrint(e: React.MouseEvent) {
     e.stopPropagation();
-    if (beforePrint) await beforePrint();
-    document.querySelectorAll("[data-print-section]").forEach((el) => el.removeAttribute("data-print-active"));
-    document.getElementById(sectionId)?.setAttribute("data-print-active", "true");
-    document.body.classList.add("printing-single-section");
-    window.addEventListener(
-      "afterprint",
-      () => {
-        document.body.classList.remove("printing-single-section");
-        document.getElementById(sectionId)?.removeAttribute("data-print-active");
-      },
-      { once: true }
-    );
-    window.print();
+    // Ouvre la fenêtre d'impression tout de suite (de façon synchrone, dans le
+    // même geste utilisateur) : certains navigateurs mobiles bloquent le popup
+    // si window.open() est appelé après un await.
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    (async () => {
+      if (beforePrint) await beforePrint();
+
+      const el = document.getElementById(sectionId);
+      if (!el) {
+        printWindow.close();
+        return;
+      }
+
+      // Se contenter d'un @media print + display:none sur le reste de la page
+      // ne suffit pas de façon fiable sur tous les navigateurs mobiles : on
+      // isole donc le contenu de la section dans un document à part, avec les
+      // mêmes feuilles de style, pour n'imprimer que ça, quel que soit l'appareil.
+      const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+        .map((node) => node.outerHTML)
+        .join("\n");
+
+      printWindow.document.open();
+      printWindow.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${label ?? "Impression"}</title>
+${styles}
+<style>body { padding: 16px; background: #fff; }</style>
+</head>
+<body>${el.outerHTML}</body>
+</html>`);
+      printWindow.document.close();
+
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+      };
+      printWindow.onafterprint = () => printWindow.close();
+    })();
   }
 
   return (
