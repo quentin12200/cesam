@@ -14,21 +14,21 @@ interface VeauSevre {
   nutrav: string;
   nobovi: string | null;
   danais: Date;
-  dateSevrage: Date | null;
-  ageSevrageJours: number | null;
+  dateSevrage: Date;
+  ageSevrageJours: number;
   mereNutrav: string | null;
   mereNobovi: string | null;
 }
 
 async function getVeauxSevres(): Promise<VeauSevre[]> {
-  // On inclut aussi les veaux sevrés avant l'ajout de dateSevrage (historique) :
-  // leur date sera affichée comme "inconnue" plutôt que de les faire disparaître.
-  // En revanche, passé un an, ce ne sont plus des veaux mais des génisses/vaches :
-  // on les sort de ce suivi opérationnel (sinon la table finit par contenir tout
-  // le troupeau adulte, ce qui n'a plus d'intérêt).
+  // Seuls les sevrages avec une date connue sont listés (les sevrages
+  // antérieurs à ce suivi, sans date exacte, ne sont pas exploitables ici).
+  // Passé un an, ce ne sont plus des veaux mais des génisses/vaches : on les
+  // sort de ce suivi opérationnel (sinon la table finit par contenir tout le
+  // troupeau adulte, ce qui n'a plus d'intérêt).
   const unAn = subDays(new Date(), 365);
   const animaux = await prisma.animal.findMany({
-    where: { sevreFait: true, danais: { gte: unAn } },
+    where: { sevreFait: true, dateSevrage: { not: null }, danais: { gte: unAn } },
     select: {
       id: true,
       nutrav: true,
@@ -42,18 +42,19 @@ async function getVeauxSevres(): Promise<VeauSevre[]> {
       },
       mere: { select: { nutrav: true, nobovi: true } },
     },
-    orderBy: [{ dateSevrage: { sort: "desc", nulls: "last" } }, { danais: "desc" }],
+    orderBy: { dateSevrage: "desc" },
   });
 
   return animaux.map((a) => {
     const mere = a.velageVeau?.vache ?? a.mere ?? null;
+    const dateSevrage = a.dateSevrage as Date;
     return {
       id: a.id,
       nutrav: a.nutrav,
       nobovi: a.nobovi,
       danais: a.danais,
-      dateSevrage: a.dateSevrage,
-      ageSevrageJours: a.dateSevrage ? differenceInDays(a.dateSevrage, a.danais) : null,
+      dateSevrage,
+      ageSevrageJours: differenceInDays(dateSevrage, a.danais),
       mereNutrav: mere?.nutrav ?? null,
       mereNobovi: mere?.nobovi ?? null,
     };
@@ -63,17 +64,12 @@ async function getVeauxSevres(): Promise<VeauSevre[]> {
 export default async function SevragePage() {
   const veaux = await getVeauxSevres();
 
-  const avecAge = veaux.filter((v): v is VeauSevre & { ageSevrageJours: number } => v.ageSevrageJours !== null);
   const ageMoyenJours =
-    avecAge.length > 0
-      ? Math.round(avecAge.reduce((s, v) => s + v.ageSevrageJours, 0) / avecAge.length)
+    veaux.length > 0
+      ? Math.round(veaux.reduce((s, v) => s + v.ageSevrageJours, 0) / veaux.length)
       : null;
-  const dateInconnueCount = veaux.length - avecAge.length;
 
-  const recents = veaux.filter(
-    (v): v is VeauSevre & { dateSevrage: Date } =>
-      v.dateSevrage !== null && differenceInDays(new Date(), v.dateSevrage) <= 14
-  );
+  const recents = veaux.filter((v) => differenceInDays(new Date(), v.dateSevrage) <= 14);
 
   return (
     <div className="max-w-3xl mx-auto p-4 pb-24 space-y-6">
@@ -104,12 +100,6 @@ export default async function SevragePage() {
           <div className="text-xs text-gray-500 mt-1">âge moyen au sevrage</div>
         </div>
       </div>
-
-      {dateInconnueCount > 0 && (
-        <p className="text-xs text-gray-400 italic px-1">
-          {dateInconnueCount} sevrage{dateInconnueCount > 1 ? "s" : ""} antérieur{dateInconnueCount > 1 ? "s" : ""} à ce suivi, date exacte inconnue.
-        </p>
-      )}
 
       {veaux.length === 0 && (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">
@@ -194,10 +184,10 @@ export default async function SevragePage() {
                         )}
                       </td>
                       <td className="px-3 py-3 text-right text-gray-600 text-xs whitespace-nowrap">
-                        {v.dateSevrage ? formatDate(v.dateSevrage) : <span className="text-gray-400 italic">inconnue</span>}
+                        {formatDate(v.dateSevrage)}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-600 text-xs whitespace-nowrap">
-                        {v.dateSevrage ? formatAge(v.danais, v.dateSevrage) : <span className="text-gray-400">—</span>}
+                        {formatAge(v.danais, v.dateSevrage)}
                       </td>
                     </tr>
                   ))}
