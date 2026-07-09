@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import PrintSectionButton from "./PrintSectionButton";
 
 export interface ChecklistItem {
   nutrav: string;
@@ -181,6 +182,7 @@ export interface ChecklistSectionProps {
     items: SubItem[];
     actionLabel?: string;
   };
+  printSectionId?: string;
 }
 
 function SubActionButton({
@@ -230,6 +232,7 @@ export default function ChecklistSection({
   actionLabel,
   color,
   subSection,
+  printSectionId,
 }: ChecklistSectionProps) {
   const [items, setItems] = useState(initialItems);
   const [subItems, setSubItems] = useState(subSection?.items ?? []);
@@ -249,17 +252,34 @@ export default function ChecklistSection({
   }
 
   return (
-    <div className="bg-white rounded-xl shadow p-4">
+    <div
+      id={printSectionId}
+      data-print-section={printSectionId ? "" : undefined}
+      className="bg-white rounded-xl shadow p-4"
+    >
       <h3 className={`font-semibold mb-3 flex items-center justify-between ${c.header}`}>
         <div className="flex items-center gap-2">
           {icon}
           {title}
         </div>
-        {items.length > 0 && (
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.badge}`}>
-            {items.length}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {items.length > 0 && (
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.badge}`}>
+              {items.length}
+            </span>
+          )}
+          {printSectionId && (
+            <PrintSectionButton
+              sectionId={printSectionId}
+              label={title}
+              beforePrint={() => {
+                if (!subSection || subOpen) return;
+                setSubOpen(true);
+                return new Promise((resolve) => setTimeout(resolve, 50));
+              }}
+            />
+          )}
+        </div>
       </h3>
 
       {/* Swipe hint (shown only if items > 0) */}

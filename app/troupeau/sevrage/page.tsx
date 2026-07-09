@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, Scissors } from "lucide-react";
 import { formatAge, formatDate } from "@/lib/utils";
-import { differenceInDays } from "date-fns";
+import { differenceInDays, subDays } from "date-fns";
 
 // Page sans segment dynamique ni searchParams : sans cette directive, Next.js
 // la fige en HTML statique au moment du build et ne reflète plus les
@@ -18,15 +18,17 @@ interface VeauSevre {
   ageSevrageJours: number | null;
   mereNutrav: string | null;
   mereNobovi: string | null;
-  mereTarieFaite: boolean;
-  mereDateTarie: Date | null;
 }
 
 async function getVeauxSevres(): Promise<VeauSevre[]> {
   // On inclut aussi les veaux sevrés avant l'ajout de dateSevrage (historique) :
   // leur date sera affichée comme "inconnue" plutôt que de les faire disparaître.
+  // En revanche, passé un an, ce ne sont plus des veaux mais des génisses/vaches :
+  // on les sort de ce suivi opérationnel (sinon la table finit par contenir tout
+  // le troupeau adulte, ce qui n'a plus d'intérêt).
+  const unAn = subDays(new Date(), 365);
   const animaux = await prisma.animal.findMany({
-    where: { sevreFait: true },
+    where: { sevreFait: true, danais: { gte: unAn } },
     select: {
       id: true,
       nutrav: true,
@@ -35,10 +37,10 @@ async function getVeauxSevres(): Promise<VeauSevre[]> {
       dateSevrage: true,
       velageVeau: {
         select: {
-          vache: { select: { nutrav: true, nobovi: true, tarieFaite: true, dateTarie: true } },
+          vache: { select: { nutrav: true, nobovi: true } },
         },
       },
-      mere: { select: { nutrav: true, nobovi: true, tarieFaite: true, dateTarie: true } },
+      mere: { select: { nutrav: true, nobovi: true } },
     },
     orderBy: [{ dateSevrage: { sort: "desc", nulls: "last" } }, { danais: "desc" }],
   });
@@ -54,8 +56,6 @@ async function getVeauxSevres(): Promise<VeauSevre[]> {
       ageSevrageJours: a.dateSevrage ? differenceInDays(a.dateSevrage, a.danais) : null,
       mereNutrav: mere?.nutrav ?? null,
       mereNobovi: mere?.nobovi ?? null,
-      mereTarieFaite: mere?.tarieFaite ?? false,
-      mereDateTarie: mere?.dateTarie ?? null,
     };
   });
 }
@@ -87,7 +87,7 @@ export default async function SevragePage() {
             <Scissors size={20} className="text-orange-600" />
             Sevrages
           </h2>
-          <p className="text-xs text-gray-500 mt-0.5">Historique des veaux sevrés et de leur mère</p>
+          <p className="text-xs text-gray-500 mt-0.5">Veaux sevrés de moins d&apos;un an, avec leur mère</p>
         </div>
       </div>
 
@@ -148,13 +148,6 @@ export default async function SevragePage() {
                   ) : (
                     <span className="text-gray-400 text-xs">Mère inconnue</span>
                   )}
-                  <div className="text-xs mt-1">
-                    {v.mereTarieFaite ? (
-                      <span className="text-amber-700 font-medium">Tarie{v.mereDateTarie ? ` le ${formatDate(v.mereDateTarie)}` : ""}</span>
-                    ) : (
-                      <span className="text-gray-400">Non tarie</span>
-                    )}
-                  </div>
                 </div>
               </div>
             ))}
@@ -174,8 +167,7 @@ export default async function SevragePage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Veau</th>
                     <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Mère</th>
                     <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Date sevrage</th>
-                    <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Âge au sevrage</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Mère tarie</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Âge au sevrage</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -204,15 +196,8 @@ export default async function SevragePage() {
                       <td className="px-3 py-3 text-right text-gray-600 text-xs whitespace-nowrap">
                         {v.dateSevrage ? formatDate(v.dateSevrage) : <span className="text-gray-400 italic">inconnue</span>}
                       </td>
-                      <td className="px-3 py-3 text-right text-gray-600 text-xs whitespace-nowrap">
+                      <td className="px-4 py-3 text-right text-gray-600 text-xs whitespace-nowrap">
                         {v.dateSevrage ? formatAge(v.danais, v.dateSevrage) : <span className="text-gray-400">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right text-xs whitespace-nowrap">
-                        {v.mereTarieFaite ? (
-                          <span className="text-amber-700 font-medium">Oui</span>
-                        ) : (
-                          <span className="text-gray-400">Non</span>
-                        )}
                       </td>
                     </tr>
                   ))}

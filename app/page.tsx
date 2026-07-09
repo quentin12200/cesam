@@ -13,6 +13,7 @@ import ChecklistSection, {
 import QuickSearch from "@/app/components/QuickSearch";
 import NotesTerrain from "@/app/components/NotesTerrain";
 import RapportGestationButton from "@/app/components/RapportGestationButton";
+import PrintSectionButton from "@/app/components/PrintSectionButton";
 import {
   Baby,
   Wifi,
@@ -360,10 +361,13 @@ export default async function Dashboard() {
 
       {/* REPRODUCTION & VÉLAGE */}
       {hasRepro && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Baby size={18} className="text-pink-500" />
-            Reproduction &amp; Vélage
+        <div id="print-repro-velage" data-print-section className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Baby size={18} className="text-pink-500" />
+              Reproduction &amp; Vélage
+            </div>
+            <PrintSectionButton sectionId="print-repro-velage" label="Reproduction & Vélage" />
           </h3>
           <div className="mb-3">
             <RapportGestationButton />
@@ -470,10 +474,13 @@ export default async function Dashboard() {
 
       {/* SANTÉ & VACCINS */}
       {hasSante && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Activity size={18} className="text-red-500" />
-            Santé &amp; Vaccins
+        <div id="print-sante-vaccins" data-print-section className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity size={18} className="text-red-500" />
+              Santé &amp; Vaccins
+            </div>
+            <PrintSectionButton sectionId="print-sante-vaccins" label="Santé & Vaccins" />
           </h3>
           <div className="space-y-2">
             {data.evenementsSanitairesUrgents > 0 && (
@@ -547,6 +554,7 @@ export default async function Dashboard() {
         items={data.bouclageItems}
         actionLabel="Bouclé"
         color="orange"
+        printSectionId="print-veaux-boucler"
       />
 
       {/* CHECKLIST: Veaux à sevrer */}
@@ -561,6 +569,7 @@ export default async function Dashboard() {
             ? { title: "Presque sevrables (5–6 mois)", items: data.presqueSevrables, actionLabel: "Sevrer quand même" }
             : undefined
         }
+        printSectionId="print-veaux-sevrer"
       />
 
       {/* Accès rapide Pharmacie */}
@@ -574,7 +583,7 @@ export default async function Dashboard() {
       </Link>
 
       {/* Stats rapides */}
-      <Collapsible title="Stats rapides" defaultOpen={true}>
+      <Collapsible title="Stats rapides" defaultOpen={true} printSectionId="print-stats-rapides" printLabel="Stats rapides">
         <div className="grid grid-cols-2 gap-3">
           <div className="text-center p-3 bg-green-50 rounded-lg">
             <div className="text-2xl font-bold text-green-700">{data.pctPleine}%</div>
@@ -607,6 +616,8 @@ export default async function Dashboard() {
         badge={data.mortsCount > 0 ? `${data.mortsCount} décès` : "0 décès"}
         badgeColor={data.mortsCount > 0 ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"}
         defaultOpen={false}
+        printSectionId="print-mortalite"
+        printLabel={`Mortalité ${annee}`}
       >
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -655,6 +666,8 @@ export default async function Dashboard() {
         }
         count={data.nbVaches + data.nbGenissesBabies + data.nbGenissesMoyennes + data.nbGenissesGrandes + data.nbMales}
         defaultOpen={true}
+        printSectionId="print-composition-troupeau"
+        printLabel="Composition du troupeau"
       >
         <div className="space-y-1.5">
           {([
@@ -683,6 +696,8 @@ export default async function Dashboard() {
         badge={capteursActifs.length === 0 ? "Aucun actif" : `${capteursActifs.length} actif${capteursActifs.length > 1 ? "s" : ""}`}
         badgeColor={capteursActifs.length > 0 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}
         defaultOpen={false}
+        printSectionId="print-capteurs-velage"
+        printLabel="Capteurs vélage"
       >
         <div className="grid grid-cols-2 gap-2">
           {data.capteurs.map((capteur) => (
