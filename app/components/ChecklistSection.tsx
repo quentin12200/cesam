@@ -254,7 +254,6 @@ export default function ChecklistSection({
   return (
     <div
       id={printSectionId}
-      data-print-section={printSectionId ? "" : undefined}
       className="bg-white rounded-xl shadow p-4"
     >
       <h3 className={`font-semibold mb-3 flex items-center justify-between ${c.header}`}>
