@@ -275,7 +275,22 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 {(animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150 && (
                   <>
                     <div className="text-gray-500">Sevrage</div>
-                    <div><SevrageButton nutrav={animal.nutrav} sevreFait={animal.sevreFait} /></div>
+                    <div>
+                      <SevrageButton
+                        nutrav={animal.nutrav}
+                        sevreFait={animal.sevreFait}
+                        danais={animal.danais.toISOString()}
+                        dateSevrage={animal.dateSevrage?.toISOString() ?? null}
+                      />
+                    </div>
+                  </>
+                )}
+                {animal.sexbov === "F" && !animal.estGenisse && animal.tarieFaite && (
+                  <>
+                    <div className="text-gray-500">Tarissement</div>
+                    <div className="text-xs font-medium text-amber-700">
+                      Tarie{animal.dateTarie ? ` le ${formatDate(animal.dateTarie)}` : ""}
+                    </div>
                   </>
                 )}
                 {animal.groupe && (
