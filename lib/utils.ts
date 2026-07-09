@@ -103,16 +103,15 @@ export const CAUSES_MORTALITE_LABELS: Record<string, string> = {
   AUTRE: "Autre",
 };
 
-export function formatAge(danais: Date): string {
-  const now = new Date();
-  const totalMois = differenceInMonths(now, danais);
+export function formatAge(danais: Date, refDate: Date = new Date()): string {
+  const totalMois = differenceInMonths(refDate, danais);
   if (totalMois >= 24) {
     const ans = Math.floor(totalMois / 12);
     const moisRestants = totalMois % 12;
     if (moisRestants === 0) return `${ans} an${ans > 1 ? "s" : ""}`;
     return `${ans} an${ans > 1 ? "s" : ""} ${moisRestants} m`;
   }
-  const joursRestants = differenceInDays(now, addMonths(danais, totalMois));
+  const joursRestants = differenceInDays(refDate, addMonths(danais, totalMois));
   return `${totalMois} m ${joursRestants} j`;
 }
 

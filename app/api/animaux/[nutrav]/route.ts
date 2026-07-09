@@ -66,19 +66,21 @@ export async function PATCH(
   if ("notes"         in body) prevFields.notes         = animal.notes;
   if ("danais"        in body) prevFields.danais        = animal.danais;
   if ("boucleFaite"   in body) prevFields.boucleFaite   = animal.boucleFaite;
-  if ("sevreFait"     in body) prevFields.sevreFait     = animal.sevreFait;
-  if ("tarieFaite"    in body) prevFields.tarieFaite    = animal.tarieFaite;
+  if ("sevreFait"     in body) { prevFields.sevreFait = animal.sevreFait; prevFields.dateSevrage = animal.dateSevrage; }
+  if ("tarieFaite"    in body) { prevFields.tarieFaite = animal.tarieFaite; prevFields.dateTarie = animal.dateTarie; }
   if ("categorie"     in body) prevFields.categorie     = animal.categorie;
   if ("groupeId"      in body) prevFields.groupeId      = animal.groupeId;
   if ("aEchographier" in body) prevFields.aEchographier = animal.aEchographier;
 
-  // Read mère's tarieFaite BEFORE cascade update
+  // Read mère's tarie BEFORE cascade update
   let merePrevTarieFaite: boolean | undefined;
+  let merePrevDateTarie: Date | null | undefined;
   if (body.sevreFait === true) {
     const mereNutrav = animal.velageVeau?.vache?.nutrav;
     if (mereNutrav) {
-      const mere = await prisma.animal.findUnique({ where: { nutrav: mereNutrav }, select: { tarieFaite: true } });
+      const mere = await prisma.animal.findUnique({ where: { nutrav: mereNutrav }, select: { tarieFaite: true, dateTarie: true } });
       merePrevTarieFaite = mere?.tarieFaite;
+      merePrevDateTarie = mere?.dateTarie;
     }
   }
 
@@ -89,21 +91,27 @@ export async function PATCH(
   if ("notes"        in body) data.notes        = body.notes?.trim() || null;
   if ("danais"       in body) data.danais       = new Date(body.danais);
   if ("boucleFaite"  in body) data.boucleFaite  = body.boucleFaite;
-  if ("sevreFait"    in body) data.sevreFait    = body.sevreFait;
-  if ("tarieFaite"   in body) data.tarieFaite   = body.tarieFaite;
+  if ("sevreFait"    in body) {
+    data.sevreFait = body.sevreFait;
+    data.dateSevrage = body.sevreFait ? (body.dateSevrage ? new Date(body.dateSevrage) : new Date()) : null;
+  }
+  if ("tarieFaite"   in body) {
+    data.tarieFaite = body.tarieFaite;
+    data.dateTarie = body.tarieFaite ? new Date() : null;
+  }
   if ("categorie"    in body) data.categorie    = body.categorie ?? null;
   if ("groupeId"     in body) data.groupeId     = body.groupeId ?? null;
   if ("aEchographier" in body) data.aEchographier = Boolean(body.aEchographier);
 
   const updated = await prisma.animal.update({ where: { nutrav }, data });
 
-  // Cascade sevrage → mère devient tarie automatiquement
+  // Cascade sevrage → mère devient tarie automatiquement (même date que le sevrage du veau)
   if (body.sevreFait === true) {
     const mereNutrav = animal.velageVeau?.vache?.nutrav;
     if (mereNutrav) {
       await prisma.animal.update({
         where: { nutrav: mereNutrav },
-        data: { tarieFaite: true },
+        data: { tarieFaite: true, dateTarie: data.dateSevrage as Date },
       });
     }
   }
@@ -117,7 +125,7 @@ export async function PATCH(
     if (body.sevreFait === true) {
       const mereNutrav = animal.velageVeau?.vache?.nutrav;
       if (mereNutrav && merePrevTarieFaite !== undefined) {
-        revertSteps.push({ op: "update", model: "animal", where: { nutrav: mereNutrav }, data: { tarieFaite: merePrevTarieFaite } });
+        revertSteps.push({ op: "update", model: "animal", where: { nutrav: mereNutrav }, data: { tarieFaite: merePrevTarieFaite, dateTarie: merePrevDateTarie ?? null } });
       }
     }
     undoId = await logAction("PATCH_ANIMAL", desc, revertSteps as Parameters<typeof logAction>[2]);

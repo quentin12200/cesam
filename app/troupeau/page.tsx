@@ -11,7 +11,7 @@ import {
   type CategorieAnimal,
 } from "@/lib/utils";
 import Link from "next/link";
-import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid, Printer, TrendingUp, BarChart2, Network } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid, Printer, TrendingUp, BarChart2, Network, Scissors } from "lucide-react";
 import { addDays, differenceInMonths, subDays } from "date-fns";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
@@ -333,6 +333,14 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         >
           <Network size={16} className="text-emerald-700" />
           <span className="hidden sm:inline">Généalogie</span>
+        </Link>
+        <Link
+          href="/troupeau/sevrage"
+          className="flex items-center gap-1.5 px-3 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg shadow hover:bg-gray-50"
+          title="Historique des sevrages"
+        >
+          <Scissors size={16} className="text-orange-600" />
+          <span className="hidden sm:inline">Sevrages</span>
         </Link>
         {!showForm && (
           <Link
