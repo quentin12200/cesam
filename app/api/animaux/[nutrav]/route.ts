@@ -54,9 +54,16 @@ export async function PATCH(
 
   const animal = await prisma.animal.findUnique({
     where: { nutrav },
-    include: { velageVeau: { select: { vache: { select: { nutrav: true } } } } },
+    include: {
+      velageVeau: { select: { vache: { select: { nutrav: true } } } },
+      mere: { select: { nutrav: true } },
+    },
   });
   if (!animal) return NextResponse.json({ error: "Animal non trouvé" }, { status: 404 });
+
+  // La mère "officielle" est celle du vêlage enregistré ; à défaut (données
+  // historiques/importées sans vêlage), on retombe sur le lien de généalogie direct.
+  const mereNutrav = animal.velageVeau?.vache?.nutrav ?? animal.mere?.nutrav;
 
   // Capture previous values for undo
   const prevFields: Record<string, unknown> = {};
@@ -76,7 +83,6 @@ export async function PATCH(
   let merePrevTarieFaite: boolean | undefined;
   let merePrevDateTarie: Date | null | undefined;
   if (body.sevreFait === true) {
-    const mereNutrav = animal.velageVeau?.vache?.nutrav;
     if (mereNutrav) {
       const mere = await prisma.animal.findUnique({ where: { nutrav: mereNutrav }, select: { tarieFaite: true, dateTarie: true } });
       merePrevTarieFaite = mere?.tarieFaite;
@@ -107,7 +113,6 @@ export async function PATCH(
 
   // Cascade sevrage → mère devient tarie automatiquement (même date que le sevrage du veau)
   if (body.sevreFait === true) {
-    const mereNutrav = animal.velageVeau?.vache?.nutrav;
     if (mereNutrav) {
       await prisma.animal.update({
         where: { nutrav: mereNutrav },
@@ -123,7 +128,6 @@ export async function PATCH(
       { op: "update", model: "animal", where: { nutrav }, data: prevFields },
     ];
     if (body.sevreFait === true) {
-      const mereNutrav = animal.velageVeau?.vache?.nutrav;
       if (mereNutrav && merePrevTarieFaite !== undefined) {
         revertSteps.push({ op: "update", model: "animal", where: { nutrav: mereNutrav }, data: { tarieFaite: merePrevTarieFaite, dateTarie: merePrevDateTarie ?? null } });
       }
