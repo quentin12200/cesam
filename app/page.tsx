@@ -352,7 +352,7 @@ export default async function Dashboard() {
   const annee = new Date().getFullYear();
 
   return (
-    <div className="dashboard-content p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
+    <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
       <QuickSearch />
       <h2 className="text-xl font-bold text-gray-800 mt-2">Tableau de bord</h2>
 
@@ -361,7 +361,7 @@ export default async function Dashboard() {
 
       {/* REPRODUCTION & VÉLAGE */}
       {hasRepro && (
-        <div id="print-repro-velage" data-print-section className="bg-white rounded-xl shadow p-4">
+        <div id="print-repro-velage" className="bg-white rounded-xl shadow p-4">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Baby size={18} className="text-pink-500" />
@@ -474,7 +474,7 @@ export default async function Dashboard() {
 
       {/* SANTÉ & VACCINS */}
       {hasSante && (
-        <div id="print-sante-vaccins" data-print-section className="bg-white rounded-xl shadow p-4">
+        <div id="print-sante-vaccins" className="bg-white rounded-xl shadow p-4">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Activity size={18} className="text-red-500" />
