@@ -352,7 +352,7 @@ export default async function Dashboard() {
   const annee = new Date().getFullYear();
 
   return (
-    <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
+    <div className="dashboard-content p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
       <QuickSearch />
       <h2 className="text-xl font-bold text-gray-800 mt-2">Tableau de bord</h2>
 
