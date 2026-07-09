@@ -24,6 +24,7 @@ export default function Collapsible({
   return (
     <div
       id={printSectionId}
+      data-print-section={printSectionId ? "" : undefined}
       className={`bg-white rounded-xl shadow overflow-hidden ${className}`}
     >
       <div className="flex items-center gap-1 border-b border-gray-100">

@@ -2,6 +2,14 @@
 
 import { Printer } from "lucide-react";
 
+// Laisse le navigateur peindre les nouvelles règles CSS (classe + attribut
+// posés juste avant) avant de déclencher l'impression : sur certains
+// navigateurs mobiles, appeler print() dans la foulée capture encore l'état
+// précédent de la mise en page (aperçu vide ou page entière).
+function nextPaint(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+}
+
 export default function PrintSectionButton({
   sectionId,
   label,
@@ -15,51 +23,25 @@ export default function PrintSectionButton({
    * retourne une Promise, l'impression attend qu'elle se résolve. */
   beforePrint?: () => void | Promise<void>;
 }) {
-  function handlePrint(e: React.MouseEvent) {
+  async function handlePrint(e: React.MouseEvent) {
     e.stopPropagation();
-    // Ouvre la fenêtre d'impression tout de suite (de façon synchrone, dans le
-    // même geste utilisateur) : certains navigateurs mobiles bloquent le popup
-    // si window.open() est appelé après un await.
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
+    if (beforePrint) await beforePrint();
 
-    (async () => {
-      if (beforePrint) await beforePrint();
+    document.querySelectorAll("[data-print-section]").forEach((el) => el.removeAttribute("data-print-active"));
+    document.getElementById(sectionId)?.setAttribute("data-print-active", "true");
+    document.body.classList.add("printing-single-section");
 
-      const el = document.getElementById(sectionId);
-      if (!el) {
-        printWindow.close();
-        return;
-      }
+    await nextPaint();
 
-      // Se contenter d'un @media print + display:none sur le reste de la page
-      // ne suffit pas de façon fiable sur tous les navigateurs mobiles : on
-      // isole donc le contenu de la section dans un document à part, avec les
-      // mêmes feuilles de style, pour n'imprimer que ça, quel que soit l'appareil.
-      const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
-        .map((node) => node.outerHTML)
-        .join("\n");
-
-      printWindow.document.open();
-      printWindow.document.write(`<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${label ?? "Impression"}</title>
-${styles}
-<style>body { padding: 16px; background: #fff; }</style>
-</head>
-<body>${el.outerHTML}</body>
-</html>`);
-      printWindow.document.close();
-
-      printWindow.onload = () => {
-        printWindow.focus();
-        printWindow.print();
-      };
-      printWindow.onafterprint = () => printWindow.close();
-    })();
+    const cleanup = () => {
+      document.body.classList.remove("printing-single-section");
+      document.getElementById(sectionId)?.removeAttribute("data-print-active");
+    };
+    window.addEventListener("afterprint", cleanup, { once: true });
+    window.print();
+    // Filet de sécurité : "afterprint" n'est pas toujours déclenché de façon
+    // fiable sur les navigateurs mobiles (notamment en PWA installée).
+    setTimeout(cleanup, 3000);
   }
 
   return (
