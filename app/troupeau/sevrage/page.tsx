@@ -4,6 +4,11 @@ import { ArrowLeft, Scissors } from "lucide-react";
 import { formatAge, formatDate } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
 
+// Page sans segment dynamique ni searchParams : sans cette directive, Next.js
+// la fige en HTML statique au moment du build et ne reflète plus les
+// évolutions de la base tant qu'un nouveau déploiement n'a pas lieu.
+export const dynamic = "force-dynamic";
+
 interface VeauSevre {
   id: string;
   nutrav: string;
