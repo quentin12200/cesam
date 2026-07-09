@@ -1,0 +1,35 @@
+name: Backfill sevrage / tarissement (one-off)
+
+# Corrige les données existantes sur la base de production :
+#   - retrouve la date exacte des sevrages/tarissements déjà effectués,
+#     à partir du journal d'actions de l'application ;
+#   - corrige les vaches marquées "non tarie" à tort (plus de veau actif
+#     non sevré, mais tarieFaite jamais mis à jour faute de vêlage lié).
+#
+# Déclenchement manuel uniquement (bouton "Run workflow" dans l'onglet
+# Actions). Sans effet si relancé plusieurs fois : ne fait que compléter
+# des champs vides ou corriger des faux négatifs, jamais écraser une
+# valeur déjà correcte.
+#
+# Nécessite un secret de dépôt TURSO_AUTH_TOKEN (Settings > Secrets and
+# variables > Actions > New repository secret).
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: libsql://cesam-quentin12200.aws-eu-west-1.turso.io
+      TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npm run db:backfill-sevrage

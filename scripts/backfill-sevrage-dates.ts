@@ -2,15 +2,22 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import type { RevertStep } from "../lib/action-log";
 
-// Script à lancer une seule fois (manuellement) pour retrouver, à partir de
-// l'historique des actions (ActionLog), la date exacte des sevrages/tarissements
-// déjà effectués AVANT l'ajout des champs dateSevrage/dateTarie.
+// Script à lancer une seule fois (manuellement) pour :
+//  1. retrouver, à partir de l'historique des actions (ActionLog), la date
+//     exacte des sevrages/tarissements déjà effectués AVANT l'ajout des
+//     champs dateSevrage/dateTarie ;
+//  2. corriger les vaches marquées "non tarie" alors qu'elles n'ont plus
+//     aucun veau actif non sevré (la cascade sevrage→tarissement ne se
+//     déclenchait que via le vêlage enregistré ; les veaux liés uniquement
+//     par la généalogie directe — sans vêlage — ne mettaient pas à jour
+//     leur mère).
 //
 // Usage : npx ts-node --compiler-options '{"module":"CommonJS"}' scripts/backfill-sevrage-dates.ts
 // (nécessite DATABASE_URL / TURSO_AUTH_TOKEN comme pour le seed)
 //
-// Ne touche que les lignes où dateSevrage/dateTarie est encore NULL : sans effet
-// si relancé, et n'écrase jamais une date déjà connue.
+// Idempotent et non destructif : ne touche que les lignes où
+// dateSevrage/dateTarie est encore NULL, ou tarieFaite encore à false ;
+// n'écrase jamais une date ou un statut déjà connu.
 
 const DB_URL = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
 const AUTH_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -88,9 +95,52 @@ async function main() {
     tarieMiseAJour++;
   }
 
+  console.log("\n🔎 Vérification tarieFaite / réalité (veau actif non sevré) pour toutes les vaches...");
+
+  const vaches = await prisma.animal.findMany({
+    where: { sexbov: "F", estGenisse: false },
+    select: {
+      nutrav: true,
+      tarieFaite: true,
+      veaux: { select: { statut: true, sevreFait: true, dateSevrage: true } },
+      velagesVache: { select: { veau: { select: { statut: true, sevreFait: true, dateSevrage: true } } } },
+    },
+  });
+
+  let tarieCorrigees = 0;
+  for (const vache of vaches) {
+    if (vache.tarieFaite) continue; // on ne corrige que les faux négatifs (déjà "oui" : on ne touche pas)
+
+    const veauxVelage = vache.velagesVache
+      .map((v) => v.veau)
+      .filter((v): v is NonNullable<typeof v> => v !== null);
+    const tousLesVeaux = [...vache.veaux, ...veauxVelage];
+
+    if (tousLesVeaux.length === 0) continue; // jamais vêlé : pas de tarissement à déduire
+    const aUnVeauActifNonSevre = tousLesVeaux.some((v) => v.statut === "ACTIF" && !v.sevreFait);
+    if (aUnVeauActifNonSevre) continue; // encore en train d'allaiter : rien à corriger
+
+    const datesSevrageConnues = tousLesVeaux
+      .filter((v) => v.sevreFait && v.dateSevrage)
+      .map((v) => v.dateSevrage as Date);
+    const dateTarieDeduite =
+      datesSevrageConnues.length > 0
+        ? new Date(Math.max(...datesSevrageConnues.map((d) => d.getTime())))
+        : null;
+
+    await prisma.animal.update({
+      where: { nutrav: vache.nutrav },
+      data: { tarieFaite: true, dateTarie: dateTarieDeduite },
+    });
+    tarieCorrigees++;
+  }
+
+  console.log(`   ${tarieCorrigees} vache(s) recalculée(s) : tarieFaite corrigé à "oui" (plus aucun veau actif non sevré).`);
+
   console.log("\n📊 Résumé du backfill :");
   console.log(`   🍼 ${sevrageMisAJour} / ${veauxAMettreAJour.length} veau(x) sevré(s) complété(s) avec une date exacte`);
   console.log(`   🐄 ${tarieMiseAJour} / ${vachesAMettreAJour.length} vache(s) tarie(s) complétée(s) avec une date exacte`);
+  console.log(`   🩹 ${tarieCorrigees} vache(s) dont le statut "tarie" était incorrect et a été corrigé`);
   const restantsSevrage = veauxAMettreAJour.length - sevrageMisAJour;
   const restantsTarie = vachesAMettreAJour.length - tarieMiseAJour;
   if (restantsSevrage > 0 || restantsTarie > 0) {
