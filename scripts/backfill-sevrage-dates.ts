@@ -1,6 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
-import { createClient } from "@libsql/client";
 import type { RevertStep } from "../lib/action-log";
 
 // Script à lancer une seule fois (manuellement) pour retrouver, à partir de
@@ -16,11 +15,10 @@ import type { RevertStep } from "../lib/action-log";
 const DB_URL = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
 const AUTH_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
-const libsql = createClient({
+const adapter = new PrismaLibSql({
   url: DB_URL,
   ...(AUTH_TOKEN ? { authToken: AUTH_TOKEN } : {}),
 });
-const adapter = new PrismaLibSql(libsql);
 const prisma = new PrismaClient({ adapter } as Parameters<typeof PrismaClient>[0]);
 
 async function main() {
