@@ -116,7 +116,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
           animal.saillies[0]?.date ?? null,
           animal.saillies[0]?.gestation?.etat ?? null,
           animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
-          animal.velagesVache[0]?.date ?? null
+          animal.velagesVache[0]?.date ?? null,
+          animal.aEchographier
         )
       : null;
 

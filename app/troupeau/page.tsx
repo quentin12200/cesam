@@ -661,7 +661,8 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                     animal.saillies[0]?.date ?? null,
                     animal.saillies[0]?.gestation?.etat ?? null,
                     animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
-                    animal.velagesVache[0]?.date ?? null
+                    animal.velagesVache[0]?.date ?? null,
+                    animal.aEchographier
                   )
                 : null;
             const veau = animal.velagesVache[0]?.veau;
@@ -685,11 +686,6 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                         <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${catColor}`}>
                           {animal.sexbov === "F" ? "♀" : "♂"} {catLabel}
                         </span>
-                        {animal.aEchographier && (
-                          <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium">
-                            À écho
-                          </span>
-                        )}
                       </div>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {etat && (

@@ -98,7 +98,8 @@ export async function GET(request: NextRequest) {
         v.saillies[0]?.date ?? null,
         v.saillies[0]?.gestation?.etat ?? null,
         v.saillies[0]?.gestation?.dateVelagePrevue ?? null,
-        v.velagesVache[0]?.date ?? null
+        v.velagesVache[0]?.date ?? null,
+        v.aEchographier
       );
       if (etat === "JAUNE") aEchographier++;
       if (etat === "ROUGE") videsEnRetard++;

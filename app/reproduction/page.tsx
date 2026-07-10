@@ -381,7 +381,8 @@ function ReproductionContent() {
       v.derniereSaillie ? new Date(v.derniereSaillie) : null,
       v.gestationEtat,
       v.dateVelagePrevue ? new Date(v.dateVelagePrevue) : null,
-      v.dernierVelage ? new Date(v.dernierVelage) : null
+      v.dernierVelage ? new Date(v.dernierVelage) : null,
+      v.aEchographier
     ) as EtatGestation,
   }));
 
@@ -752,9 +753,6 @@ function ReproductionContent() {
                         )}
                         {vache.categorie === "A_ENGRAISSER" && (
                           <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">🥩 À engraisser</span>
-                        )}
-                        {vache.aEchographier && (
-                          <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium animate-pulse">📡 À écho</span>
                         )}
                         {vache.derniereSaillie && new Date(vache.derniereSaillie) > now && (
                           <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium animate-pulse">⚠️ Date saillie future</span>

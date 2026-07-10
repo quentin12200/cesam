@@ -279,9 +279,6 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                   buildFilterUrl={buildFilterUrl}
                 />
               </th>
-              <th className="px-3 py-2.5 text-center font-semibold whitespace-nowrap">
-                À écho
-              </th>
               <th className="px-3 py-2.5 text-left font-semibold">
                 <FilterDropdown
                   label="🐮 Allaitante"
@@ -325,7 +322,8 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                       animal.gestationVelagePrevue
                         ? new Date(animal.gestationVelagePrevue)
                         : null,
-                      animal.velageDate ? new Date(animal.velageDate) : null
+                      animal.velageDate ? new Date(animal.velageDate) : null,
+                      animal.aEchographier
                     )
                   : null;
 
@@ -368,15 +366,6 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                         className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${getBadgeClass(etat)}`}
                       >
                         {ETAT_LABEL[etat] ?? etat}
-                      </span>
-                    ) : (
-                      <span className="text-gray-200 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    {animal.aEchographier ? (
-                      <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium">
-                        Oui
                       </span>
                     ) : (
                       <span className="text-gray-200 text-xs">—</span>
