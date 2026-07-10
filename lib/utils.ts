@@ -144,7 +144,8 @@ export function getEtatGestation(
   derniereSaillie: Date | null,
   gestationEtat: string | null,
   dateVelagePrevue: Date | null,
-  dernierVelage: Date | null
+  dernierVelage: Date | null,
+  aEchographier: boolean = false
 ): EtatGestation {
   const now = new Date();
 
@@ -156,6 +157,13 @@ export function getEtatGestation(
     const joursDepuisVelage = differenceInDays(now, dernierVelage);
     return joursDepuisVelage <= 60 ? "REPOS" : "ROUGE";
   }
+
+  // Échographie de recontrôle demandée manuellement (ex: doute sur une
+  // gestation déjà confirmée) : passe dans la liste "à écho" comme une
+  // saillie classique en attente, sans jamais toucher à la saillie/
+  // gestation enregistrée — l'historique reste intact tant que le résultat
+  // de l'écho n'est pas saisi.
+  if (aEchographier) return "JAUNE";
 
   // Vide explicitement confirmé par écho ou annulation manuelle — priorité absolue
   if (gestationEtat === "ROUGE") return "ROUGE";

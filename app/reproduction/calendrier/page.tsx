@@ -77,6 +77,7 @@ export default async function CalendrierGestationPage() {
       nobovi: true,
       estGenisse: true,
       categorie: true,
+      aEchographier: true,
       saillies: {
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         take: 1,
@@ -102,7 +103,8 @@ export default async function CalendrierGestationPage() {
         saillie.date ? new Date(saillie.date) : null,
         saillie.gestation.etat,
         new Date(saillie.gestation.dateVelagePrevue),
-        v.velagesVache[0]?.date ? new Date(v.velagesVache[0].date) : null
+        v.velagesVache[0]?.date ? new Date(v.velagesVache[0].date) : null,
+        v.aEchographier
       ) as EtatGestation;
       if (etat !== "VERT" && etat !== "ROSE") return [];
       return [{

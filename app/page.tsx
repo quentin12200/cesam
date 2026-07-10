@@ -197,7 +197,8 @@ async function getDashboardData() {
       derniereSaillie,
       etatGestation,
       dateVelagePrevue,
-      dernierVelage
+      dernierVelage,
+      vache.aEchographier
     );
 
     if (etat === "VERT" || etat === "ROSE") vachesPleine++;
