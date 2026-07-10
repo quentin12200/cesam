@@ -182,7 +182,10 @@ export interface ChecklistSectionProps {
     items: SubItem[];
     actionLabel?: string;
   };
-  printSectionId?: string;
+  printKey?: string;
+  /** Rendu sur la page d'impression dédiée (voir PrintSectionButton) : la
+   * sous-section est ouverte d'office puisqu'il n'y a personne pour cliquer. */
+  printMode?: boolean;
 }
 
 function SubActionButton({
@@ -232,11 +235,12 @@ export default function ChecklistSection({
   actionLabel,
   color,
   subSection,
-  printSectionId,
+  printKey,
+  printMode = false,
 }: ChecklistSectionProps) {
   const [items, setItems] = useState(initialItems);
   const [subItems, setSubItems] = useState(subSection?.items ?? []);
-  const [subOpen, setSubOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(printMode);
   const c = COLOR_MAP[color];
 
   function handleDone(nutrav: string) {
@@ -252,10 +256,7 @@ export default function ChecklistSection({
   }
 
   return (
-    <div
-      id={printSectionId}
-      className="bg-white rounded-xl shadow p-4"
-    >
+    <div className="bg-white rounded-xl shadow p-4">
       <h3 className={`font-semibold mb-3 flex items-center justify-between ${c.header}`}>
         <div className="flex items-center gap-2">
           {icon}
@@ -267,17 +268,7 @@ export default function ChecklistSection({
               {items.length}
             </span>
           )}
-          {printSectionId && (
-            <PrintSectionButton
-              sectionId={printSectionId}
-              label={title}
-              beforePrint={() => {
-                if (!subSection || subOpen) return;
-                setSubOpen(true);
-                return new Promise((resolve) => setTimeout(resolve, 50));
-              }}
-            />
-          )}
+          {printKey && <PrintSectionButton printKey={printKey} />}
         </div>
       </h3>
 

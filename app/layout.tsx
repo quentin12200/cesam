@@ -39,7 +39,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className={`${geist.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-gray-100">
-        <header className="bg-green-700 text-white shadow-md sticky top-0 z-30">
+        <header className="print:hidden bg-green-700 text-white shadow-md sticky top-0 z-30">
           <div className="flex items-center justify-between px-4 py-2.5">
             <div className="flex items-center gap-2.5">
               <Image
