@@ -660,7 +660,6 @@ function ReproductionContent() {
                 <thead>
                   <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                     <th className="px-3 py-2 text-left font-semibold">Vache</th>
-                    <th className="px-3 py-2 text-center font-semibold">Statut</th>
                     <th className="px-3 py-2 text-center font-semibold">Terme</th>
                     <th className="px-3 py-2 text-center font-semibold">Père</th>
                     <th className="px-2 py-2 text-center font-semibold">Prog.</th>
@@ -678,11 +677,6 @@ function ReproductionContent() {
                             <span className="font-mono font-bold text-green-700 text-xs bg-green-50 px-1.5 py-0.5 rounded">{v.nutrav}</span>
                             <span className="text-gray-700 font-medium truncate max-w-[80px]">{v.nobovi ?? "Sans nom"}</span>
                           </Link>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${getBadgeClass(v.etat)}`}>
-                            {filterLabels[v.etat]}
-                          </span>
                         </td>
                         <td className="px-3 py-2 text-center">
                           <div className="font-medium text-gray-800 text-sm">
