@@ -11,7 +11,7 @@ import {
   type CategorieAnimal,
 } from "@/lib/utils";
 import Link from "next/link";
-import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid, Printer, TrendingUp, BarChart2, Network, Scissors } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid } from "lucide-react";
 import { addDays, differenceInMonths, subDays } from "date-fns";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
@@ -19,6 +19,7 @@ import GroupeCreateButton from "./GroupeCreateButton";
 import NutravBadge from "@/app/components/NutravBadge";
 import TroupeauScrollRestorer from "./TroupeauScrollRestorer";
 import TroupeauTableau, { type AnimalRow } from "./TroupeauTableau";
+import MoreMenu from "./MoreMenu";
 
 interface PageProps {
   searchParams: Promise<{
@@ -274,18 +275,6 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         </Link>
         <h2 className="text-xl font-bold text-gray-800 flex-1">Troupeau</h2>
         <Link
-          href={`/troupeau/impression?${new URLSearchParams(
-            Object.fromEntries(
-              Object.entries({ sexe, q, categorie, tarie, repro, sanitaire, groupe, tri })
-                .filter(([, v]) => v !== undefined && v !== null) as [string, string][]
-            )
-          ).toString()}`}
-          className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
-          title="Imprimer la liste filtrée"
-        >
-          <Printer size={16} />
-        </Link>
-        <Link
           href={buildUrl({ filtres: showFiltres ? undefined : "1" })}
           className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-medium transition-colors ${
             showFiltres || activeFiltersCount > 0
@@ -310,38 +299,14 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         >
           {vue === "tableau" ? <LayoutGrid size={16} /> : <Table2 size={16} />}
         </Link>
-        <Link
-          href="/troupeau/gmq"
-          className="flex items-center gap-1.5 px-3 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg shadow hover:bg-gray-50"
-          title="Performances GMQ"
-        >
-          <TrendingUp size={16} className="text-green-600" />
-          <span className="hidden sm:inline">GMQ</span>
-        </Link>
-        <Link
-          href="/troupeau/performances"
-          className="flex items-center gap-1.5 px-3 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg shadow hover:bg-gray-50"
-          title="Performances vaches (IVV + GMQ)"
-        >
-          <BarChart2 size={16} className="text-indigo-600" />
-          <span className="hidden sm:inline">Perfs</span>
-        </Link>
-        <Link
-          href="/troupeau/genealogie"
-          className="flex items-center gap-1.5 px-3 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg shadow hover:bg-gray-50"
-          title="Généalogie globale"
-        >
-          <Network size={16} className="text-emerald-700" />
-          <span className="hidden sm:inline">Généalogie</span>
-        </Link>
-        <Link
-          href="/troupeau/sevrage"
-          className="flex items-center gap-1.5 px-3 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg shadow hover:bg-gray-50"
-          title="Historique des sevrages"
-        >
-          <Scissors size={16} className="text-orange-600" />
-          <span className="hidden sm:inline">Sevrages</span>
-        </Link>
+        <MoreMenu
+          printHref={`/troupeau/impression?${new URLSearchParams(
+            Object.fromEntries(
+              Object.entries({ sexe, q, categorie, tarie, repro, sanitaire, groupe, tri })
+                .filter(([, v]) => v !== undefined && v !== null) as [string, string][]
+            )
+          ).toString()}`}
+        />
         {!showForm && (
           <Link
             href="/troupeau?nouveau=1"
