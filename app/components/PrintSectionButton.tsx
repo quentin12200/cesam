@@ -54,9 +54,11 @@ export default function PrintSectionButton({
     };
     window.addEventListener("afterprint", restore, { once: true });
     window.print();
-    // Filet de sécurité : "afterprint" n'est pas toujours déclenché de façon
-    // fiable sur les navigateurs mobiles.
-    setTimeout(restore, 3000);
+    // Filet de sécurité seulement (au cas où "afterprint" ne se déclenche
+    // jamais) : sur mobile, window.print() ne bloque pas l'exécution du JS et
+    // la génération de l'aperçu peut prendre plusieurs secondes — un délai
+    // trop court ici réaffiche tout AVANT que l'aperçu ne soit capturé.
+    setTimeout(restore, 120000);
   }
 
   return (
