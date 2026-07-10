@@ -12,20 +12,16 @@ interface Props {
   badgeColor?: string;
   children: React.ReactNode;
   className?: string;
-  printSectionId?: string;
-  printLabel?: string;
+  printKey?: string;
 }
 
 export default function Collapsible({
-  title, defaultOpen = true, count, badge, badgeColor, children, className = "", printSectionId, printLabel,
+  title, defaultOpen = true, count, badge, badgeColor, children, className = "", printKey,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div
-      id={printSectionId}
-      className={`bg-white rounded-xl shadow overflow-hidden ${className}`}
-    >
+    <div className={`bg-white rounded-xl shadow overflow-hidden ${className}`}>
       <div className="flex items-center gap-1 border-b border-gray-100">
         <button
           onClick={() => setOpen((o) => !o)}
@@ -50,19 +46,7 @@ export default function Collapsible({
             <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
           )}
         </button>
-        {printSectionId && (
-          <PrintSectionButton
-            sectionId={printSectionId}
-            label={printLabel}
-            className="mr-2"
-            beforePrint={() => {
-              if (open) return;
-              setOpen(true);
-              // laisse React rendre le contenu déplié avant l'impression
-              return new Promise((resolve) => setTimeout(resolve, 50));
-            }}
-          />
-        )}
+        {printKey && <PrintSectionButton printKey={printKey} className="mr-2" />}
       </div>
       {open && <div className="p-4">{children}</div>}
     </div>
