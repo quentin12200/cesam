@@ -273,7 +273,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
           <ArrowLeft size={18} />
         </Link>
-        <h2 className="text-xl font-bold text-gray-800 flex-1">Troupeau</h2>
+        <h2 className="text-xl font-bold text-gray-800 flex-1 min-w-0 truncate">Troupeau</h2>
         <Link
           href={buildUrl({ filtres: showFiltres ? undefined : "1" })}
           className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-medium transition-colors ${
@@ -283,7 +283,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
           }`}
         >
           <SlidersHorizontal size={16} />
-          Filtres
+          <span className="hidden sm:inline">Filtres</span>
           {activeFiltersCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
               {activeFiltersCount}
@@ -313,7 +313,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             className="flex items-center gap-1.5 bg-green-700 text-white text-sm font-medium px-3 py-2 rounded-lg shadow"
           >
             <Plus size={16} />
-            Ajouter
+            <span className="hidden sm:inline">Ajouter</span>
           </Link>
         )}
       </div>
