@@ -187,7 +187,7 @@ export function getBadgeClass(etat: EtatGestation): string {
   switch (etat) {
     case "VERT": return "bg-green-500 text-white";
     case "JAUNE": return "bg-yellow-400 text-black";
-    case "ROUGE": return "bg-blue-500 text-white";
+    case "ROUGE": return "bg-red-500 text-white";
     case "ROSE": return "bg-pink-400 text-white";
     case "GRIS": return "bg-gray-400 text-white";
     case "REPOS": return "bg-sky-400 text-white";
