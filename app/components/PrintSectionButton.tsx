@@ -18,7 +18,6 @@ export default function PrintSectionButton({
   return (
     <Link
       href={`/?imprimer=${printKey}`}
-      onClick={(e) => e.stopPropagation()}
       title="Imprimer cette section"
       aria-label="Imprimer cette section"
       className={`print:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0 ${className}`}
