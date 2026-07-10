@@ -2,20 +2,11 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, subMonths } from "date-fns";
-import { getEtatGestation, getBadgeClass, type EtatGestation } from "@/lib/utils";
+import { getEtatGestation, type EtatGestation } from "@/lib/utils";
 import Link from "next/link";
 import PrintButton from "./PrintButton";
 
 const DUREE_GESTATION = 285;
-
-const ETAT_LABEL: Record<string, string> = {
-  VERT: "Pleine",
-  ROSE: "Imminente",
-  JAUNE: "À écho",
-  GRIS: "Récente",
-  ROUGE: "Vide",
-  REPOS: "Repos",
-};
 
 function GestationCircle({ daysLeft }: { daysLeft: number }) {
   const progress = Math.min(100, Math.max(0, ((DUREE_GESTATION - daysLeft) / DUREE_GESTATION) * 100));
@@ -185,7 +176,6 @@ export default async function CalendrierGestationPage() {
                 <thead>
                   <tr className="bg-green-700 text-white text-xs uppercase tracking-wide">
                     <th className="px-3 py-2.5 text-left font-semibold">Vache</th>
-                    <th className="px-3 py-2.5 text-center font-semibold">Statut</th>
                     <th className="px-3 py-2.5 text-center font-semibold">Vêlage prévu</th>
                     <th className="px-3 py-2.5 text-center font-semibold">J-</th>
                     <th className="px-3 py-2.5 text-center font-semibold">Saillie</th>
@@ -212,11 +202,6 @@ export default async function CalendrierGestationPage() {
                               <span className="text-xs bg-orange-100 text-orange-700 px-1 py-0.5 rounded-full">🥩</span>
                             )}
                           </div>
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getBadgeClass(g.etat)}`}>
-                            {ETAT_LABEL[g.etat] ?? g.etat}
-                          </span>
                         </td>
                         <td className="px-3 py-2.5 text-center font-semibold text-gray-800">
                           {fmt(g.dateVelagePrevue)}
