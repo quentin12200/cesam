@@ -148,6 +148,15 @@ export function getEtatGestation(
 ): EtatGestation {
   const now = new Date();
 
+  // Vêlage plus récent que la saillie : la vache a déjà vêlé pour cette
+  // gestation — priorité absolue sur tout le reste (y compris un état VERT
+  // resté enregistré par erreur), pour ne jamais l'afficher comme pleine
+  // ou imminente après son terme.
+  if (derniereSaillie && dernierVelage && dernierVelage > derniereSaillie) {
+    const joursDepuisVelage = differenceInDays(now, dernierVelage);
+    return joursDepuisVelage <= 60 ? "REPOS" : "ROUGE";
+  }
+
   // Vide explicitement confirmé par écho ou annulation manuelle — priorité absolue
   if (gestationEtat === "ROUGE") return "ROUGE";
 
@@ -168,13 +177,6 @@ export function getEtatGestation(
       return "ROUGE";
     }
     return "ROUGE";
-  }
-
-  // Saillie enregistrée : si un vêlage est plus récent que la saillie,
-  // la vache a vêlé sans être resaillie depuis → repos ou vide
-  if (dernierVelage && dernierVelage > derniereSaillie) {
-    const joursDepuisVelage = differenceInDays(now, dernierVelage);
-    return joursDepuisVelage <= 60 ? "REPOS" : "ROUGE";
   }
 
   // Saillie enregistrée — calcul par délai
