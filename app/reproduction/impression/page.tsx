@@ -25,14 +25,7 @@ export default async function ImpressionVelagesPage({ searchParams }: PageProps)
   const gestationsRaw = await prisma.gestation.findMany({
     where: {
       dateVelagePrevue: { not: null },
-      OR: [
-        { etat: { in: ["VERT", "ROSE"] } },
-        {
-          velage: {
-            date: { gte: new Date(`${annee - 1}-08-01`) },
-          },
-        },
-      ],
+      etat: { in: ["VERT", "ROSE"] },
     },
     select: {
       dateVelagePrevue: true,
