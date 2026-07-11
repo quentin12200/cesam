@@ -94,3 +94,49 @@ export function groupRowsByAnimal(rows: CarnetSanitaireRow[]): { animalNutrav: s
   }
   return Array.from(groups.values()).sort((a, b) => a.animalNutrav.localeCompare(b.animalNutrav, undefined, { numeric: true }));
 }
+
+export interface EvenementCarnetRow {
+  id: string;
+  date: Date;
+  animalId: string;
+  animalNutrav: string;
+  animalNom: string | null;
+  categorie: string | null;
+  type: string;
+  moment: string | null;
+  description: string | null;
+  constatePar: string | null;
+  resolu: boolean;
+}
+
+export async function getEvenementsCarnetRows(): Promise<EvenementCarnetRow[]> {
+  const evenements = await prisma.evenementSanitaire.findMany({
+    include: { animal: { select: { id: true, nutrav: true, nobovi: true } } },
+    orderBy: { date: "asc" },
+  });
+
+  return evenements.map((e) => ({
+    id: e.id,
+    date: e.date,
+    animalId: e.animal.id,
+    animalNutrav: e.animal.nutrav,
+    animalNom: e.animal.nobovi,
+    categorie: e.categorie,
+    type: e.type,
+    moment: e.moment,
+    description: e.description,
+    constatePar: e.constatePar,
+    resolu: e.resolu,
+  }));
+}
+
+export function groupEvenementsByAnimal(rows: EvenementCarnetRow[]): { animalNutrav: string; animalNom: string | null; rows: EvenementCarnetRow[] }[] {
+  const groups = new Map<string, { animalNutrav: string; animalNom: string | null; rows: EvenementCarnetRow[] }>();
+  for (const row of rows) {
+    if (!groups.has(row.animalId)) {
+      groups.set(row.animalId, { animalNutrav: row.animalNutrav, animalNom: row.animalNom, rows: [] });
+    }
+    groups.get(row.animalId)!.rows.push(row);
+  }
+  return Array.from(groups.values()).sort((a, b) => a.animalNutrav.localeCompare(b.animalNutrav, undefined, { numeric: true }));
+}

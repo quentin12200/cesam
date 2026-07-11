@@ -42,6 +42,7 @@ import CategorieButton from "./CategorieButton";
 import EchoButton from "./EchoButton";
 import GroupeButton from "./GroupeButton";
 import TraitementsSection from "./TraitementsSection";
+import EvenementsSanitairesSection from "./EvenementsSanitairesSection";
 import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
 import LierVeauButton from "./LierVeauButton";
 
@@ -215,6 +216,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
       {/* Quick actions */}
       <QuickActionsBar
         animalId={animal.id}
+        nutrav={animal.nutrav}
         isFemelle={isFemelle}
         isActif={animal.statut === "ACTIF"}
       />
@@ -632,38 +634,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             />
 
             {/* Événements sanitaires */}
-            {animal.evenements.length > 0 && (
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <AlertCircle size={16} className="text-red-500" />
-                  Événements sanitaires ({animal.evenements.length})
-                </h3>
-                <div className="space-y-2">
-                  {animal.evenements.map((evt) => (
-                    <div key={evt.id} className="border border-gray-100 rounded-lg p-3 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{evt.type}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">{formatDate(evt.date)}</span>
-                          <span
-                            className={`text-xs px-1.5 py-0.5 rounded-full ${
-                              evt.resolu
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-600"
-                            }`}
-                          >
-                            {evt.resolu ? "Résolu" : "En cours"}
-                          </span>
-                        </div>
-                      </div>
-                      {evt.description && (
-                        <div className="text-xs text-gray-500 mt-1">{evt.description}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <EvenementsSanitairesSection evenements={animal.evenements} />
           </>
         )}
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Thermometer, Syringe, Stethoscope, X } from "lucide-react";
 
 interface Taureau {
@@ -12,25 +13,16 @@ interface Taureau {
 
 interface Props {
   animalId: string;
+  nutrav: string;
   isFemelle: boolean;
   isActif: boolean;
 }
 
-type Modal = "chaleur" | "saillie" | "traitement" | null;
+type Modal = "chaleur" | "saillie" | null;
 
 const today = new Date().toISOString().slice(0, 10);
 
-const TRAITEMENT_TYPES = [
-  "Antibiotique",
-  "Anti-inflammatoire",
-  "Antiparasitaire",
-  "Vitamines / Oligo-éléments",
-  "Bolus",
-  "Vaccination",
-  "Autre",
-];
-
-export default function QuickActionsBar({ animalId, isFemelle, isActif }: Props) {
+export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }: Props) {
   const router = useRouter();
   const [modal, setModal] = useState<Modal>(null);
   const [loading, setLoading] = useState(false);
@@ -44,11 +36,6 @@ export default function QuickActionsBar({ animalId, isFemelle, isActif }: Props)
   const [saillieDate, setSaillieDate] = useState(today);
   const [saillieType, setSaillieType] = useState<"IA" | "Naturelle">("IA");
   const [saillieTabId, setSaillieTabId] = useState("");
-
-  // Traitement state
-  const [traitDate, setTraitDate] = useState(today);
-  const [traitType, setTraitType] = useState(TRAITEMENT_TYPES[0]);
-  const [traitDesc, setTraitDesc] = useState("");
 
   const backdropRef = useRef<HTMLDivElement>(null);
 
@@ -66,9 +53,6 @@ export default function QuickActionsBar({ animalId, isFemelle, isActif }: Props)
     setSaillieDate(today);
     setSaillieType("IA");
     setSaillieTabId("");
-    setTraitDate(today);
-    setTraitType(TRAITEMENT_TYPES[0]);
-    setTraitDesc("");
     setModal(m);
   }
 
@@ -113,22 +97,6 @@ export default function QuickActionsBar({ animalId, isFemelle, isActif }: Props)
     }
   }
 
-  async function submitTraitement() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/evenements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ animalId, type: traitType, date: traitDate, description: traitDesc || null }),
-      });
-      if (!res.ok) throw new Error("Erreur");
-      close();
-      router.refresh();
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <>
       {/* Action buttons row */}
@@ -152,13 +120,13 @@ export default function QuickActionsBar({ animalId, isFemelle, isActif }: Props)
           </button>
         )}
         {isActif && (
-          <button
-            onClick={() => open("traitement")}
+          <Link
+            href={`/sanitaire/nouvel-evenement?animal=${encodeURIComponent(nutrav)}`}
             className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 active:scale-95 transition-all"
           >
             <Stethoscope size={15} />
-            Traitement
-          </button>
+            Événement sanitaire
+          </Link>
         )}
       </div>
 
@@ -277,59 +245,6 @@ export default function QuickActionsBar({ animalId, isFemelle, isActif }: Props)
               </>
             )}
 
-            {/* ── Traitement ── */}
-            {modal === "traitement" && (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <Stethoscope size={18} className="text-blue-600" />
-                    Traitement sanitaire
-                  </h3>
-                  <button onClick={close} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
-                    <select
-                      value={traitType}
-                      onChange={(e) => setTraitType(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                    >
-                      {TRAITEMENT_TYPES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
-                    <input
-                      type="date"
-                      value={traitDate}
-                      max={today}
-                      onChange={(e) => setTraitDate(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Description (optionnel)</label>
-                    <textarea
-                      value={traitDesc}
-                      onChange={(e) => setTraitDesc(e.target.value)}
-                      rows={2}
-                      placeholder="Produit, dose, remarques…"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
-                    />
-                  </div>
-                  <button
-                    onClick={submitTraitement}
-                    disabled={!traitDate || !traitType || loading}
-                    className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm disabled:opacity-50 active:scale-98 transition-all"
-                  >
-                    {loading ? "Enregistrement…" : "Enregistrer le traitement"}
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         </div>
       )}
