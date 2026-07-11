@@ -173,7 +173,7 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  <Th>Médicament</Th><Th>Début</Th><Th>Durée</Th><Th>Fin traitement</Th><Th>Fin attente viande</Th>
+                  <Th>Médicament</Th><Th>Début</Th><Th>Durée</Th><Th>Fin traitement</Th><Th>Fin attente viande</Th><Th>N° ordonnance</Th>
                 </tr>
               </thead>
               <tbody>
@@ -191,6 +191,7 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
                       <Td className={dateFinAttente && now < dateFinAttente ? "font-bold text-orange-700" : ""}>
                         {dateFinAttente ? fmt(dateFinAttente) : "Aucune"}
                       </Td>
+                      <Td>{t.ordonnanceNumero ?? "—"}</Td>
                     </tr>
                   );
                 })}
@@ -205,7 +206,7 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  <Th>Date</Th><Th>Médicament</Th><Th>Durée</Th><Th>Motif</Th>
+                  <Th>Date</Th><Th>Médicament</Th><Th>Durée</Th><Th>Motif</Th><Th>N° ordonnance</Th>
                 </tr>
               </thead>
               <tbody>
@@ -223,6 +224,7 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
                       <Td>{t.medicamentNom}</Td>
                       <Td>{t.dureeJours}j</Td>
                       <Td>{t.motif ?? "—"}</Td>
+                      <Td>{t.ordonnanceNumero ?? "—"}</Td>
                     </tr>
                   ))}
               </tbody>

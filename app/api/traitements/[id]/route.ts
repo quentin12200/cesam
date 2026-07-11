@@ -8,7 +8,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { statut, notes, dureeJours, veterinaire } = body;
+  const { statut, notes, dureeJours, veterinaire, ordonnanceNumero } = body;
 
   const prev = await prisma.traitement.findUnique({ where: { id } });
   if (!prev) return NextResponse.json({ error: "Non trouvé" }, { status: 404 });
@@ -18,6 +18,7 @@ export async function PATCH(
   if (notes !== undefined) prevFields.notes = prev.notes;
   if (dureeJours !== undefined) prevFields.dureeJours = prev.dureeJours;
   if (veterinaire !== undefined) prevFields.veterinaire = prev.veterinaire;
+  if (ordonnanceNumero !== undefined) prevFields.ordonnanceNumero = prev.ordonnanceNumero;
 
   try {
     const updated = await prisma.traitement.update({
@@ -27,6 +28,7 @@ export async function PATCH(
         ...(notes !== undefined && { notes }),
         ...(dureeJours !== undefined && { dureeJours }),
         ...(veterinaire !== undefined && { veterinaire }),
+        ...(ordonnanceNumero !== undefined && { ordonnanceNumero }),
       },
     });
 
