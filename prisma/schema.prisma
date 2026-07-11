@@ -161,6 +161,7 @@ model Vaccination {
   voie       String?
   dose       Float?
   statut     String    @default("FAIT")
+  ordonnanceNumero String?
   notes      String?
 
   createdAt  DateTime  @default(now())
