@@ -2,6 +2,14 @@
 
 import { useState, useRef } from "react";
 import { Plus } from "lucide-react";
+import { getMomentActuel } from "@/lib/evenements-sanitaires";
+
+const COMPLICATIONS = [
+  "Non-délivrance",
+  "Rétention placentaire",
+  "Retournement de matrice",
+  "Prolapsus vaginal",
+];
 
 type QualificatifPrincipal = "NORMAL" | "DIFFICILE" | "AVORTEMENT" | "MORT_NEE" | "JUMEAUX";
 
@@ -46,6 +54,7 @@ export default function VelageFormWrapper() {
   const [capteur, setCapteur] = useState<string>("");
   const [pereNom, setPereNom] = useState("");
   const [pereAutoFilled, setPereAutoFilled] = useState(false);
+  const [complications, setComplications] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const vacheDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,6 +62,14 @@ export default function VelageFormWrapper() {
   function handleQualificatifChange(q: QualificatifPrincipal) {
     setQualificatif(q);
     setSousType("");
+  }
+
+  function toggleComplication(c: string) {
+    setComplications((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c); else next.add(c);
+      return next;
+    });
   }
 
   async function fetchVacheInfo(nutrav: string) {
@@ -86,6 +103,7 @@ export default function VelageFormWrapper() {
     setVeauNutrav(""); setVeauSexe(""); setVeauNom("");
     setQualificatif("NORMAL"); setSousType("");
     setPereNom(""); setPereAutoFilled(false);
+    setComplications(new Set());
     setCapteur("");
     setDate(new Date().toISOString().split("T")[0]);
     setMessage(null);
@@ -115,6 +133,28 @@ export default function VelageFormWrapper() {
         throw new Error(err.error ?? "Erreur");
       }
       const data = await res.json();
+
+      const typesASignaler = new Set(complications);
+      if (sousType === "CESARIENNE") typesASignaler.add("Césarienne");
+      if (typesASignaler.size > 0 && data.vacheId) {
+        await Promise.all(
+          Array.from(typesASignaler).map((type) =>
+            fetch("/api/evenements/batch", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                animalIds: [data.vacheId],
+                date,
+                moment: getMomentActuel(),
+                categorie: "INTERVENTION",
+                type,
+                description: `Suite au vélage du ${new Date(date).toLocaleDateString("fr-FR")}`,
+              }),
+            }).catch(() => {})
+          )
+        );
+      }
+
       const txt = data._veauCree
         ? `Vélage enregistré ! Veau ${data._veauCree} créé dans le troupeau — pense à ajouter son N° national.`
         : "Vélage enregistré !";
@@ -281,6 +321,31 @@ export default function VelageFormWrapper() {
                   </div>
                 </div>
               )}
+
+              {/* Complications sanitaires */}
+              <div className="bg-red-50 rounded-xl p-4">
+                <label className="block text-sm font-semibold text-red-800 mb-2">Complications sanitaires (optionnel)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {COMPLICATIONS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => toggleComplication(c)}
+                      className={`py-2.5 rounded-lg text-sm border-2 transition-colors text-left px-3 ${
+                        complications.has(c)
+                          ? "border-red-500 bg-red-100 text-red-800 font-semibold"
+                          : "border-gray-200 text-gray-600 bg-white"
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-red-700 mt-2">
+                  Chaque complication cochée sera enregistrée comme événement sanitaire pour la vache.
+                  {sousType === "CESARIENNE" && " La césarienne sera signalée automatiquement."}
+                </p>
+              </div>
 
               {/* Père */}
               <div>
