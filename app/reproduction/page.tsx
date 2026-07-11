@@ -7,7 +7,7 @@ import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib
 import Link from "next/link";
 import {
   RefreshCw, CheckCircle, ArrowLeft, CalendarDays,
-  Settings, Printer, ChevronDown, ChevronRight, Users,
+  Settings, Printer, ChevronDown, ChevronRight, Users, Stethoscope,
 } from "lucide-react";
 import ReproScrollRestorer from "./ReproScrollRestorer";
 
@@ -600,7 +600,7 @@ function ReproductionContent() {
       </div>
 
       {/* Barre d'actions rapides */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         <button
           onClick={() => openChaleurForm()}
           className="flex flex-col items-center gap-1.5 py-3 bg-pink-600 text-white rounded-xl font-semibold text-sm shadow active:scale-95 transition-transform"
@@ -622,6 +622,13 @@ function ReproductionContent() {
           <Users size={22} />
           <span>Groupage</span>
         </button>
+        <Link
+          href="/sanitaire/nouvel-evenement"
+          className="flex flex-col items-center gap-1.5 py-3 bg-red-600 text-white rounded-xl font-semibold text-sm shadow active:scale-95 transition-transform"
+        >
+          <Stethoscope size={22} />
+          <span>Signaler</span>
+        </Link>
       </div>
 
       {/* Message de retour */}
