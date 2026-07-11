@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 import { getCarnetSanitaireRows, groupRowsByAnimal, type CarnetSanitaireRow } from "@/lib/carnet-sanitaire";
 import PrintButton from "@/app/components/PrintButton";
-import ImportOrdonnancesButton from "./ImportOrdonnancesButton";
+import ImportHistoriqueButton from "./ImportHistoriqueButton";
 
 interface PageProps {
   searchParams: Promise<{ order?: string }>;
@@ -60,7 +60,7 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
           Par animal
         </Link>
         <div className="ml-auto">
-          <ImportOrdonnancesButton />
+          <ImportHistoriqueButton />
         </div>
       </div>
 
