@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getVaccinsManquants, formatDate, formatAge, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
 import { differenceInDays, subDays } from "date-fns";
 import Link from "next/link";
-import { ArrowLeft, Settings, Printer, Building2 } from "lucide-react";
+import { ArrowLeft, Settings, Printer, Building2, BookOpen } from "lucide-react";
 import SanitaireClient, {
   type VeauItem,
   type CryptoItem,
@@ -228,6 +228,13 @@ export default async function SanitairePage() {
             title="Imprimer le carnet sanitaire"
           >
             <Printer size={18} />
+          </Link>
+          <Link
+            href="/sanitaire/carnet"
+            className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
+            title="Carnet sanitaire (contrôle)"
+          >
+            <BookOpen size={18} />
           </Link>
           <Link
             href="/config/protocoles"
