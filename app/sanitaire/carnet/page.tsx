@@ -4,8 +4,9 @@ import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
-import { getCarnetSanitaireRows, groupRowsByAnimal } from "@/lib/carnet-sanitaire";
+import { getCarnetSanitaireRows, groupRowsByAnimal, type CarnetSanitaireRow } from "@/lib/carnet-sanitaire";
 import PrintButton from "@/app/components/PrintButton";
+import ImportOrdonnancesButton from "./ImportOrdonnancesButton";
 
 interface PageProps {
   searchParams: Promise<{ order?: string }>;
@@ -24,7 +25,8 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
   const order = orderParam === "animal" ? "animal" : "chrono";
 
   const [rows, config] = await Promise.all([getCarnetSanitaireRows(), getExploitationConfig()]);
-  const printDate = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const now = new Date();
+  const printDate = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const groupes = order === "animal" ? groupRowsByAnimal(rows) : [];
 
   return (
@@ -44,45 +46,52 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <div className="px-2 flex gap-2 print:hidden">
+      <div className="px-4 flex flex-wrap items-center gap-2 print:hidden">
         <Link
           href="/sanitaire/carnet?order=chrono"
-          className={`text-sm px-3 py-1.5 rounded-lg ${order === "chrono" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-200"}`}
+          className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${order === "chrono" ? "bg-green-700 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}
         >
           Chronologique
         </Link>
         <Link
           href="/sanitaire/carnet?order=animal"
-          className={`text-sm px-3 py-1.5 rounded-lg ${order === "animal" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-200"}`}
+          className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${order === "animal" ? "bg-green-700 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}
         >
           Par animal
         </Link>
+        <div className="ml-auto">
+          <ImportOrdonnancesButton />
+        </div>
       </div>
 
       <div className="px-4 py-4 max-w-6xl mx-auto">
-        <div className="text-center mb-5 border-b border-gray-300 pb-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">{config?.raisonSociale ?? "GAEC Samuel & Céline"}</p>
-          <h1 className="text-2xl font-bold text-gray-900 mt-1">Carnet sanitaire</h1>
-          <p className="text-xs text-gray-500 mt-1">
-            {order === "chrono" ? "Ordre chronologique" : "Par animal"} — {rows.length} enregistrement{rows.length > 1 ? "s" : ""}
-          </p>
-          {config?.ipg && <p className="text-xs text-gray-400">IPG : {config.ipg}</p>}
-          {config?.veterinaireNom && <p className="text-xs text-gray-400">Vétérinaire : {config.veterinaireNom}</p>}
-          <p className="text-xs text-gray-300 mt-1">Édité le {printDate}</p>
+        <div className="mb-6 rounded-xl overflow-hidden shadow-sm border border-green-800 print:border-2">
+          <div className="bg-green-700 text-white px-6 py-5 text-center">
+            <p className="text-xs uppercase tracking-widest text-green-100">{config?.raisonSociale ?? "GAEC Samuel & Céline"}</p>
+            <h1 className="text-2xl font-bold mt-1">Carnet sanitaire</h1>
+            <p className="text-xs text-green-100 mt-1">
+              {order === "chrono" ? "Ordre chronologique" : "Par animal"} — {rows.length} enregistrement{rows.length > 1 ? "s" : ""}
+            </p>
+          </div>
+          <div className="bg-green-50 px-6 py-2 flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-green-900">
+            {config?.ipg && <span>IPG : {config.ipg}</span>}
+            {config?.veterinaireNom && <span>Vétérinaire : {config.veterinaireNom}</span>}
+            <span>Édité le {printDate}</span>
+          </div>
         </div>
 
         {rows.length === 0 ? (
           <div className="text-center py-10 text-gray-400 text-sm">Aucun enregistrement sanitaire</div>
         ) : order === "chrono" ? (
-          <CarnetTable rows={rows} showAnimal />
+          <CarnetTable rows={rows} showAnimal now={now} />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {groupes.map((g) => (
-              <section key={g.animalNutrav}>
-                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide border-b border-gray-300 pb-1 mb-2">
+              <section key={g.animalNutrav} className="rounded-lg overflow-hidden border border-gray-200">
+                <h2 className="text-sm font-bold text-white bg-gray-700 uppercase tracking-wide px-3 py-1.5">
                   {g.animalNutrav}{g.animalNom ? ` — ${g.animalNom}` : ""}
                 </h2>
-                <CarnetTable rows={g.rows} showAnimal={false} />
+                <CarnetTable rows={g.rows} showAnimal={false} now={now} />
               </section>
             ))}
           </div>
@@ -101,17 +110,26 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
           table { page-break-inside: auto; }
           tr { page-break-inside: avoid; }
           section { page-break-inside: avoid; }
+          .bg-green-700 { background-color: #15803d !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .bg-green-50 { background-color: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .bg-green-100 { background-color: #dcfce7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .bg-gray-700 { background-color: #374151 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .bg-gray-50 { background-color: #f9fafb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .bg-blue-50 { background-color: #eff6ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .bg-orange-100 { background-color: #ffedd5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .text-white { color: #fff !important; }
+          .text-green-100 { color: #dcfce7 !important; }
         }
       `}</style>
     </>
   );
 }
 
-function CarnetTable({ rows, showAnimal }: { rows: Awaited<ReturnType<typeof getCarnetSanitaireRows>>; showAnimal: boolean }) {
+function CarnetTable({ rows, showAnimal, now }: { rows: CarnetSanitaireRow[]; showAnimal: boolean; now: Date }) {
   return (
     <table className="w-full text-xs border-collapse mb-2">
       <thead>
-        <tr className="bg-gray-100">
+        <tr className="bg-green-700 text-white">
           <Th>Date</Th>
           {showAnimal && <Th>N° National</Th>}
           {showAnimal && <Th>N° Travail</Th>}
@@ -127,31 +145,36 @@ function CarnetTable({ rows, showAnimal }: { rows: Awaited<ReturnType<typeof get
         </tr>
       </thead>
       <tbody>
-        {rows.map((r) => (
-          <tr key={r.id} className="odd:bg-white even:bg-gray-50">
-            <Td>{formatDate(r.date)}</Td>
-            {showAnimal && <Td>{r.animalNational}</Td>}
-            {showAnimal && <Td>{r.animalNutrav}</Td>}
-            {showAnimal && <Td>{r.animalNom ?? "—"}</Td>}
-            <Td>{r.ordonnanceNumero ?? "—"}</Td>
-            <Td>{r.prescripteur ?? "—"}</Td>
-            <Td>{r.produit}</Td>
-            <Td>{r.dose || "—"}</Td>
-            <Td>{r.voie ?? "—"}</Td>
-            <Td>{r.motif ?? "—"}</Td>
-            <Td>{formatDate(r.dateRemiseLait)}</Td>
-            <Td>{formatDate(r.dateRemiseViande)}</Td>
-          </tr>
-        ))}
+        {rows.map((r) => {
+          const isVaccination = r.motif === "VACCINATION";
+          const laitEnAttente = r.dateRemiseLait ? now < r.dateRemiseLait : false;
+          const viandeEnAttente = r.dateRemiseViande ? now < r.dateRemiseViande : false;
+          return (
+            <tr key={r.id} className={isVaccination ? "odd:bg-white even:bg-blue-50" : "odd:bg-white even:bg-gray-50"}>
+              <Td>{formatDate(r.date)}</Td>
+              {showAnimal && <Td>{r.animalNational}</Td>}
+              {showAnimal && <Td>{r.animalNutrav}</Td>}
+              {showAnimal && <Td>{r.animalNom ?? "—"}</Td>}
+              <Td>{r.ordonnanceNumero ?? "—"}</Td>
+              <Td>{r.prescripteur ?? "—"}</Td>
+              <Td className="font-medium">{r.produit}</Td>
+              <Td>{r.dose || "—"}</Td>
+              <Td>{r.voie ?? "—"}</Td>
+              <Td>{r.motif ?? "—"}</Td>
+              <Td className={laitEnAttente ? "bg-orange-100 font-semibold text-orange-800" : ""}>{formatDate(r.dateRemiseLait)}</Td>
+              <Td className={viandeEnAttente ? "bg-orange-100 font-semibold text-orange-800" : ""}>{formatDate(r.dateRemiseViande)}</Td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
 }
 
 function Th({ children }: { children: React.ReactNode }) {
-  return <th className="border border-gray-300 px-2 py-1 text-left font-semibold">{children}</th>;
+  return <th className="border border-green-800 px-2 py-1.5 text-left font-semibold">{children}</th>;
 }
 
-function Td({ children }: { children: React.ReactNode }) {
-  return <td className="border border-gray-300 px-2 py-1">{children}</td>;
+function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`border border-gray-300 px-2 py-1 ${className}`}>{children}</td>;
 }
