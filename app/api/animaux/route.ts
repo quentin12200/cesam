@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
   const statut = searchParams.get("statut") ?? "ACTIF";
   const sexe = searchParams.get("sexe");
   const q = searchParams.get("q");
+  const groupeId = searchParams.get("groupeId");
   const page = parseInt(searchParams.get("page") ?? "1", 10);
   const limit = parseInt(searchParams.get("limit") ?? "30", 10);
 
@@ -15,6 +16,7 @@ export async function GET(request: NextRequest) {
 
   if (statut && (statut === "ACTIF" || statut === "SORTI")) where.statut = statut;
   if (sexe && (sexe === "F" || sexe === "M")) where.sexbov = sexe;
+  if (groupeId) where.groupeId = groupeId;
   if (q && q.trim()) {
     where.OR = [
       { nutrav: { contains: q.trim() } },

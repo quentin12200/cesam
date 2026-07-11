@@ -1,5 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getMessaging, Messaging, isSupported } from "firebase/messaging";
+import { getStorage, ref, uploadString, getDownloadURL, FirebaseStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -22,4 +23,17 @@ export async function getFirebaseMessaging(): Promise<Messaging | null> {
   const supported = await isSupported();
   if (!supported) return null;
   return getMessaging(getFirebaseApp());
+}
+
+let storage: FirebaseStorage | undefined;
+
+export function getFirebaseStorage(): FirebaseStorage {
+  if (!storage) storage = getStorage(getFirebaseApp());
+  return storage;
+}
+
+export async function uploadEvenementPhoto(dataUrl: string, path: string): Promise<string> {
+  const storageRef = ref(getFirebaseStorage(), path);
+  await uploadString(storageRef, dataUrl, "data_url");
+  return getDownloadURL(storageRef);
 }

@@ -4,7 +4,11 @@ import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
-import { getCarnetSanitaireRows, groupRowsByAnimal, type CarnetSanitaireRow } from "@/lib/carnet-sanitaire";
+import {
+  getCarnetSanitaireRows, groupRowsByAnimal, type CarnetSanitaireRow,
+  getEvenementsCarnetRows, groupEvenementsByAnimal, type EvenementCarnetRow,
+} from "@/lib/carnet-sanitaire";
+import { getCategorieLabel } from "@/lib/evenements-sanitaires";
 import PrintButton from "@/app/components/PrintButton";
 import ImportHistoriqueButton from "./ImportHistoriqueButton";
 
@@ -24,10 +28,15 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
   const { order: orderParam } = await searchParams;
   const order = orderParam === "animal" ? "animal" : "chrono";
 
-  const [rows, config] = await Promise.all([getCarnetSanitaireRows(), getExploitationConfig()]);
+  const [rows, evenements, config] = await Promise.all([
+    getCarnetSanitaireRows(),
+    getEvenementsCarnetRows(),
+    getExploitationConfig(),
+  ]);
   const now = new Date();
   const printDate = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const groupes = order === "animal" ? groupRowsByAnimal(rows) : [];
+  const groupesEvenements = order === "animal" ? groupEvenementsByAnimal(evenements) : [];
 
   return (
     <>
@@ -39,8 +48,16 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
           <a
             href={`/api/carnet-sanitaire?order=${order}`}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+            title="CSV traitements et vaccinations"
           >
             <Download size={14} /> CSV
+          </a>
+          <a
+            href={`/api/carnet-sanitaire/evenements?order=${order}`}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+            title="CSV événements sanitaires"
+          >
+            <Download size={14} /> CSV événements
           </a>
           <PrintButton />
         </div>
@@ -80,20 +97,33 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        {rows.length === 0 ? (
+        {rows.length === 0 && evenements.length === 0 ? (
           <div className="text-center py-10 text-gray-400 text-sm">Aucun enregistrement sanitaire</div>
         ) : order === "chrono" ? (
-          <CarnetTable rows={rows} showAnimal now={now} />
+          <>
+            {rows.length > 0 && <CarnetTable rows={rows} showAnimal now={now} />}
+            {evenements.length > 0 && (
+              <>
+                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide mt-6 mb-2">Événements sanitaires</h2>
+                <EvenementsTable rows={evenements} showAnimal />
+              </>
+            )}
+          </>
         ) : (
           <div className="space-y-5">
-            {groupes.map((g) => (
-              <section key={g.animalNutrav} className="rounded-lg overflow-hidden border border-gray-200">
-                <h2 className="text-sm font-bold text-white bg-gray-700 uppercase tracking-wide px-3 py-1.5">
-                  {g.animalNutrav}{g.animalNom ? ` — ${g.animalNom}` : ""}
-                </h2>
-                <CarnetTable rows={g.rows} showAnimal={false} now={now} />
-              </section>
-            ))}
+            {animauxUnion(groupes, groupesEvenements).map(({ animalNutrav, animalNom }) => {
+              const g = groupes.find((x) => x.animalNutrav === animalNutrav);
+              const ge = groupesEvenements.find((x) => x.animalNutrav === animalNutrav);
+              return (
+                <section key={animalNutrav} className="rounded-lg overflow-hidden border border-gray-200">
+                  <h2 className="text-sm font-bold text-white bg-gray-700 uppercase tracking-wide px-3 py-1.5">
+                    {animalNutrav}{animalNom ? ` — ${animalNom}` : ""}
+                  </h2>
+                  {g && <CarnetTable rows={g.rows} showAnimal={false} now={now} />}
+                  {ge && <EvenementsTable rows={ge.rows} showAnimal={false} />}
+                </section>
+              );
+            })}
           </div>
         )}
 
@@ -122,6 +152,50 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
         }
       `}</style>
     </>
+  );
+}
+
+function animauxUnion(
+  a: { animalNutrav: string; animalNom: string | null }[],
+  b: { animalNutrav: string; animalNom: string | null }[]
+): { animalNutrav: string; animalNom: string | null }[] {
+  const map = new Map<string, string | null>();
+  for (const x of [...a, ...b]) map.set(x.animalNutrav, x.animalNom);
+  return Array.from(map.entries())
+    .map(([animalNutrav, animalNom]) => ({ animalNutrav, animalNom }))
+    .sort((x, y) => x.animalNutrav.localeCompare(y.animalNutrav, undefined, { numeric: true }));
+}
+
+function EvenementsTable({ rows, showAnimal }: { rows: EvenementCarnetRow[]; showAnimal: boolean }) {
+  return (
+    <table className="w-full text-xs border-collapse mb-2">
+      <thead>
+        <tr className="bg-gray-700 text-white">
+          <Th>Date</Th>
+          {showAnimal && <Th>N° Travail</Th>}
+          {showAnimal && <Th>Nom</Th>}
+          <Th>Catégorie</Th>
+          <Th>Événement</Th>
+          <Th>Commentaire</Th>
+          <Th>Constaté par</Th>
+          <Th>Statut</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.id} className="odd:bg-white even:bg-gray-50">
+            <Td>{formatDate(r.date)}{r.moment ? ` (${r.moment})` : ""}</Td>
+            {showAnimal && <Td>{r.animalNutrav}</Td>}
+            {showAnimal && <Td>{r.animalNom ?? "—"}</Td>}
+            <Td>{getCategorieLabel(r.categorie)}</Td>
+            <Td className="font-medium">{r.type}</Td>
+            <Td>{r.description ?? "—"}</Td>
+            <Td>{r.constatePar ?? "—"}</Td>
+            <Td className={!r.resolu ? "font-semibold text-red-700" : ""}>{r.resolu ? "Résolu" : "En cours"}</Td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

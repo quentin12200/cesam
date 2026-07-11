@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getVaccinsManquants, formatDate, formatAge, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
 import { differenceInDays, subDays } from "date-fns";
 import Link from "next/link";
-import { ArrowLeft, Settings, Printer, Building2, BookOpen } from "lucide-react";
+import { ArrowLeft, Settings, Printer, Building2, BookOpen, Plus } from "lucide-react";
 import SanitaireClient, {
   type VeauItem,
   type CryptoItem,
@@ -252,6 +252,14 @@ export default async function SanitairePage() {
           </Link>
         </div>
       </div>
+
+      <Link
+        href="/sanitaire/nouvel-evenement"
+        className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl font-semibold shadow hover:bg-blue-700 transition-colors"
+      >
+        <Plus size={18} />
+        Nouvel événement sanitaire
+      </Link>
 
       <SanitaireClient
         veauxAVacciner={veauxAVacciner}

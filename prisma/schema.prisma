@@ -173,10 +173,13 @@ model EvenementSanitaire {
   id          String    @id @default(cuid())
   animalId    String
   animal      Animal    @relation(fields: [animalId], references: [id])
+  categorie   String?
   type        String
   date        DateTime
+  moment      String?
   description String?
   photos      String?
+  constatePar String?
   resolu      Boolean   @default(false)
   dateResolu  DateTime?
 
