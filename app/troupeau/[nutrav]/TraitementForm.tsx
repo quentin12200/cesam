@@ -29,6 +29,7 @@ interface ScanResult {
   dateDebut: string | null;
   veterinaire: string | null;
   motif: string | null;
+  ordonnanceNumero: string | null;
 }
 
 const today = new Date().toISOString().slice(0, 10);
@@ -47,6 +48,7 @@ export default function TraitementForm({ animalId, onClose, initialScan }: Props
   const [uniteDosage, setUniteDosage] = useState("ml");
   const [motif, setMotif] = useState("");
   const [veterinaire, setVeterinaire] = useState("");
+  const [ordonnanceNumero, setOrdonnanceNumero] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [scanning, setScanning] = useState(false);
@@ -93,6 +95,7 @@ export default function TraitementForm({ animalId, onClose, initialScan }: Props
     if (result.dateDebut) setDateDebut(result.dateDebut);
     if (result.veterinaire) setVeterinaire(result.veterinaire);
     if (result.motif) setMotif(result.motif);
+    if (result.ordonnanceNumero) setOrdonnanceNumero(result.ordonnanceNumero);
   }
 
   function onMedChange(id: string) {
@@ -128,6 +131,7 @@ export default function TraitementForm({ animalId, onClose, initialScan }: Props
     if (result.dateDebut) setDateDebut(result.dateDebut);
     if (result.veterinaire) setVeterinaire(result.veterinaire);
     if (result.motif) setMotif(result.motif);
+    if (result.ordonnanceNumero) setOrdonnanceNumero(result.ordonnanceNumero);
   }
 
   async function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -184,6 +188,7 @@ export default function TraitementForm({ animalId, onClose, initialScan }: Props
         uniteDosage: uniteDosage || null,
         motif: motif || null,
         veterinaire: veterinaire || null,
+        ordonnanceNumero: ordonnanceNumero || null,
       }),
     });
     setSaving(false);
@@ -291,10 +296,17 @@ export default function TraitementForm({ animalId, onClose, initialScan }: Props
           className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Pneumonie, diarrhée..." />
       </div>
 
-      <div>
-        <label className="text-xs text-gray-500 block mb-1">Vétérinaire</label>
-        <input value={veterinaire} onChange={(e) => setVeterinaire(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Nom du vétérinaire" />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Vétérinaire</label>
+          <input value={veterinaire} onChange={(e) => setVeterinaire(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Nom du vétérinaire" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">N° ordonnance</label>
+          <input value={ordonnanceNumero} onChange={(e) => setOrdonnanceNumero(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: O97734" />
+        </div>
       </div>
 
       <div className="flex gap-2 pt-1">

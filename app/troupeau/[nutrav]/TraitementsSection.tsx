@@ -19,6 +19,7 @@ interface TraitementRow {
   statut: string;
   delaiAttenteViandeJ: number | null;
   delaiAttenteLaitJ: number | null;
+  ordonnanceNumero: string | null;
 }
 
 interface ScanResult {
@@ -30,6 +31,7 @@ interface ScanResult {
   dateDebut: string | null;
   veterinaire: string | null;
   motif: string | null;
+  ordonnanceNumero: string | null;
 }
 
 interface Props {
@@ -140,6 +142,7 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
                     {t.motif && <div className="text-xs text-gray-500 mt-0.5">{t.motif}</div>}
                     <div className="text-xs text-gray-400 mt-1 flex flex-wrap gap-2">
                       <span>Du {formatDate(dateDebut)} — {t.dureeJours}j</span>
+                      {t.ordonnanceNumero && <span>N° ordonnance : {t.ordonnanceNumero}</span>}
                       {enCours && (
                         <span className="flex items-center gap-1 text-blue-600">
                           <Clock size={10} /> jusqu&apos;au {formatDate(dateFin)}

@@ -387,6 +387,7 @@ model Traitement {
   uniteDosage   String?
   motif         String?
   veterinaire   String?
+  ordonnanceNumero String?
   statut        String      @default("EN_COURS")
   notes         String?
   createdAt     DateTime    @default(now())

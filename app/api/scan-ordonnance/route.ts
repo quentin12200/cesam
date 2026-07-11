@@ -14,6 +14,7 @@ interface OrdonnanceResult {
   veterinaire: string | null;
   motif: string | null;
   delaiAttenteViandeJ: number | null;
+  ordonnanceNumero: string | null;
   raw: string;
 }
 
@@ -29,6 +30,7 @@ Voici les champs à extraire :
 - veterinaire: prénom et nom du vétérinaire prescripteur (string ou null)
 - motif: motif ou diagnostic mentionné (string ou null)
 - delaiAttenteViandeJ: délai d'attente viande en jours s'il est mentionné (number ou null)
+- ordonnanceNumero: numéro de l'ordonnance tel qu'imprimé sur le document (string ou null)
 
 Si une information n'est pas visible ou lisible, mets null.
 Réponds uniquement avec le JSON, pas d'explication.`;
@@ -111,6 +113,7 @@ export async function POST(req: NextRequest) {
       veterinaire: null,
       motif: null,
       delaiAttenteViandeJ: null,
+      ordonnanceNumero: null,
       raw,
     };
   }

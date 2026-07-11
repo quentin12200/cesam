@@ -13,6 +13,7 @@ interface ScanResult {
   dateDebut: string | null;
   veterinaire: string | null;
   motif: string | null;
+  ordonnanceNumero: string | null;
 }
 
 interface AnimalResult {
@@ -45,6 +46,7 @@ export default function GlobalScanner() {
   const [dateDebut, setDateDebut] = useState(today);
   const [veterinaire, setVeterinaire] = useState("");
   const [motif, setMotif] = useState("");
+  const [ordonnanceNumero, setOrdonnanceNumero] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -76,6 +78,7 @@ export default function GlobalScanner() {
       if (result.dateDebut) setDateDebut(result.dateDebut);
       if (result.veterinaire) setVeterinaire(result.veterinaire);
       if (result.motif) setMotif(result.motif);
+      if (result.ordonnanceNumero) setOrdonnanceNumero(result.ordonnanceNumero);
       setScanStatus("ok");
       setScanMsg("Ordonnance analysée — sélectionnez l'animal et vérifiez les champs");
     } catch (err) {
@@ -119,6 +122,7 @@ export default function GlobalScanner() {
         uniteDosage: uniteDosage || null,
         motif: motif || null,
         veterinaire: veterinaire || null,
+        ordonnanceNumero: ordonnanceNumero || null,
       }),
     });
     setSaving(false);
@@ -139,6 +143,7 @@ export default function GlobalScanner() {
     setDateDebut(today);
     setVeterinaire("");
     setMotif("");
+    setOrdonnanceNumero("");
     setScanStatus("idle");
     setScanMsg("");
   }
@@ -244,10 +249,17 @@ export default function GlobalScanner() {
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Vétérinaire</label>
-                <input value={veterinaire} onChange={(e) => setVeterinaire(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white text-gray-800" placeholder="Nom du vétérinaire" />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Vétérinaire</label>
+                  <input value={veterinaire} onChange={(e) => setVeterinaire(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white text-gray-800" placeholder="Nom du vétérinaire" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">N° ordonnance</label>
+                  <input value={ordonnanceNumero} onChange={(e) => setOrdonnanceNumero(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white text-gray-800" placeholder="Ex: O97734" />
+                </div>
               </div>
 
               <div>
