@@ -89,8 +89,8 @@ export async function POST() {
 
   const [animaux, existingTraitements, existingVaccinations] = await Promise.all([
     prisma.animal.findMany({ select: { id: true, nunati: true } }),
-    prisma.traitement.findMany({ select: { id: true, animalId: true, dateDebut: true, medicamentNom: true, ordonnanceNumero: true } }),
-    prisma.vaccination.findMany({ select: { id: true, animalId: true, date: true, vaccin: true, ordonnanceNumero: true } }),
+    prisma.traitement.findMany({ select: { id: true, animalId: true, dateDebut: true, medicamentNom: true, ordonnanceNumero: true, veterinaire: true } }),
+    prisma.vaccination.findMany({ select: { id: true, animalId: true, date: true, vaccin: true, ordonnanceNumero: true, veterinaire: true } }),
   ]);
   const animalByNational = new Map(animaux.map((a) => [digitsOnly(a.nunati), a.id]));
 
@@ -120,9 +120,12 @@ export async function POST() {
       );
       if (existing) {
         dejaPresent++;
-        if (row.ordonnanceNumero && !existing.ordonnanceNumero) {
-          await prisma.vaccination.update({ where: { id: existing.id }, data: { ordonnanceNumero: row.ordonnanceNumero } });
-          existing.ordonnanceNumero = row.ordonnanceNumero;
+        const patch: { ordonnanceNumero?: string; veterinaire?: string } = {};
+        if (row.ordonnanceNumero && !existing.ordonnanceNumero) patch.ordonnanceNumero = row.ordonnanceNumero;
+        if (row.prescripteur && !existing.veterinaire) patch.veterinaire = row.prescripteur;
+        if (Object.keys(patch).length > 0) {
+          await prisma.vaccination.update({ where: { id: existing.id }, data: patch });
+          Object.assign(existing, patch);
           ordonnanceCompletee++;
         }
         continue;
@@ -135,10 +138,10 @@ export async function POST() {
           voie: row.voie,
           dose: row.dose,
           ordonnanceNumero: row.ordonnanceNumero,
-          notes: row.prescripteur ? `Prescripteur : ${row.prescripteur}` : null,
+          veterinaire: row.prescripteur,
         },
       });
-      existingVaccinations.push({ id: created.id, animalId, date: row.dateDebut, vaccin: row.produit, ordonnanceNumero: row.ordonnanceNumero });
+      existingVaccinations.push({ id: created.id, animalId, date: row.dateDebut, vaccin: row.produit, ordonnanceNumero: row.ordonnanceNumero, veterinaire: row.prescripteur });
       vaccinationsCreees++;
     } else {
       const existing = existingTraitements.find((t) =>
@@ -146,9 +149,12 @@ export async function POST() {
       );
       if (existing) {
         dejaPresent++;
-        if (row.ordonnanceNumero && !existing.ordonnanceNumero) {
-          await prisma.traitement.update({ where: { id: existing.id }, data: { ordonnanceNumero: row.ordonnanceNumero } });
-          existing.ordonnanceNumero = row.ordonnanceNumero;
+        const patch: { ordonnanceNumero?: string; veterinaire?: string } = {};
+        if (row.ordonnanceNumero && !existing.ordonnanceNumero) patch.ordonnanceNumero = row.ordonnanceNumero;
+        if (row.prescripteur && !existing.veterinaire) patch.veterinaire = row.prescripteur;
+        if (Object.keys(patch).length > 0) {
+          await prisma.traitement.update({ where: { id: existing.id }, data: patch });
+          Object.assign(existing, patch);
           ordonnanceCompletee++;
         }
         continue;
@@ -169,7 +175,7 @@ export async function POST() {
           statut: "TERMINE",
         },
       });
-      existingTraitements.push({ id: created.id, animalId, dateDebut: row.dateDebut, medicamentNom: row.produit, ordonnanceNumero: row.ordonnanceNumero });
+      existingTraitements.push({ id: created.id, animalId, dateDebut: row.dateDebut, medicamentNom: row.produit, ordonnanceNumero: row.ordonnanceNumero, veterinaire: row.prescripteur });
       traitementsCrees++;
     }
   }

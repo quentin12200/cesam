@@ -162,6 +162,7 @@ model Vaccination {
   dose       Float?
   statut     String    @default("FAIT")
   ordonnanceNumero String?
+  veterinaire String?
   notes      String?
 
   createdAt  DateTime  @default(now())
