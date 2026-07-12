@@ -50,6 +50,15 @@ const STATUT_BADGE: Record<string, { label: string; classe: string }> = {
   A_VERIFIER: { label: "À vérifier", classe: "bg-orange-100 text-orange-700" },
   IMPORTE: { label: "Importé", classe: "bg-gray-100 text-gray-600" },
   VALIDE: { label: "Validé", classe: "bg-green-100 text-green-700" },
+  REJETE: { label: "Rejeté", classe: "bg-red-100 text-red-700" },
+  ARCHIVE: { label: "Archivé", classe: "bg-gray-100 text-gray-400" },
+};
+
+const DOSE_BASE_LABEL: Record<string, string> = {
+  ANIMAL: "/ animal",
+  KG: "/ kg",
+  "100KG": "/ 100 kg",
+  QUARTIER: "/ quartier",
 };
 
 const emptyPreco = {
@@ -243,6 +252,7 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
                 <option value="ANIMAL">par animal</option>
                 <option value="KG">par kg</option>
                 <option value="100KG">par 100 kg</option>
+                <option value="QUARTIER">par quartier</option>
               </select>
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -332,7 +342,7 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
                           <span className={`text-xs px-1.5 py-0.5 rounded-full ${badge.classe}`}>{badge.label}</span>
                         </div>
                         <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                          {p.dose != null && <span>{p.dose} {p.unite} {p.doseBase === "ANIMAL" ? "/ animal" : p.doseBase === "KG" ? "/ kg" : "/ 100 kg"}</span>}
+                          {p.dose != null && <span>{p.dose} {p.unite} {DOSE_BASE_LABEL[p.doseBase ?? ""] ?? ""}</span>}
                           {p.voie && <span>{p.voie}</span>}
                           {p.frequence && <span>{p.frequence}</span>}
                           {p.dureeValeur != null && <span>{p.dureeValeur} {p.dureeUnite === "48H" ? "× 48h" : "jour(s)"}</span>}
@@ -363,12 +373,26 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
                         </button>
                       </div>
                     </div>
-                    {p.statut !== "VALIDE" && (
-                      <button type="button" onClick={() => changerStatut(p.id, "VALIDE")}
-                        className="flex items-center gap-1 text-xs mt-2 px-2 py-1 rounded border border-green-200 text-green-700 bg-green-50 hover:bg-green-100">
-                        <ShieldCheck size={12} /> Marquer comme validé
-                      </button>
-                    )}
+                    <div className="flex gap-1.5 mt-2">
+                      {p.statut !== "VALIDE" && (
+                        <button type="button" onClick={() => changerStatut(p.id, "VALIDE")}
+                          className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-green-200 text-green-700 bg-green-50 hover:bg-green-100">
+                          <ShieldCheck size={12} /> Valider
+                        </button>
+                      )}
+                      {p.statut !== "REJETE" && (
+                        <button type="button" onClick={() => changerStatut(p.id, "REJETE")}
+                          className="text-xs px-2 py-1 rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100">
+                          Rejeter
+                        </button>
+                      )}
+                      {p.statut !== "ARCHIVE" && (
+                        <button type="button" onClick={() => changerStatut(p.id, "ARCHIVE")}
+                          className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 bg-gray-50 hover:bg-gray-100">
+                          Archiver
+                        </button>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
