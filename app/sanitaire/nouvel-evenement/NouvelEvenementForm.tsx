@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, X, Loader2, CheckCircle2, Search, Thermometer, ListChecks } from "lucide-react";
 import AnimalPicker, { type AnimalOption } from "./AnimalPicker";
@@ -31,7 +31,7 @@ interface EventTarget2 {
   nom: string | null;
 }
 
-type TargetMode = "animal" | "plusieurs" | "lot";
+type TargetMode = "animal" | "plusieurs";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -41,9 +41,6 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
   const [targetMode, setTargetMode] = useState<TargetMode>("animal");
   const [selectedAnimaux, setSelectedAnimaux] = useState<AnimalOption[]>([]);
   const [groupes, setGroupes] = useState<Groupe[]>([]);
-  const [selectedGroupeId, setSelectedGroupeId] = useState("");
-  const [lotAnimaux, setLotAnimaux] = useState<AnimalOption[]>([]);
-  const [lotDeplie, setLotDeplie] = useState(false);
   const [showPickerModal, setShowPickerModal] = useState(false);
 
   const [date, setDate] = useState(today);
@@ -87,13 +84,6 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
         if (exact) setSelectedAnimaux([{ id: exact.id, nutrav: exact.nutrav, nom: exact.nom }]);
       });
   }, [presetNutrav]);
-
-  useEffect(() => {
-    if (targetMode !== "lot" || !selectedGroupeId) { setLotAnimaux([]); return; }
-    fetch(`/api/animaux?groupeId=${selectedGroupeId}&limit=1000`)
-      .then((r) => r.json())
-      .then((data) => setLotAnimaux((data.animaux ?? []).map((a: { id: string; nutrav: string; nobovi: string | null }) => ({ id: a.id, nutrav: a.nutrav, nom: a.nobovi }))));
-  }, [targetMode, selectedGroupeId]);
 
   const resultatsRecherche = useMemo(() => searchTypesEvenement(query, catalogue).slice(0, 8), [query, catalogue]);
 
@@ -173,17 +163,12 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
     setPhotoPreview(null);
   }
 
-  const resolveAnimaux = useCallback((): AnimalOption[] => {
-    if (targetMode === "lot") return lotAnimaux;
-    return selectedAnimaux;
-  }, [targetMode, lotAnimaux, selectedAnimaux]);
-
   async function handleSubmit() {
     setError("");
     if (selectedTypes.length === 0) { setError("Sélectionne au moins un événement"); return; }
     if (!date) { setError("La date est requise"); return; }
 
-    const animaux = resolveAnimaux();
+    const animaux = selectedAnimaux;
     if (animaux.length === 0) { setError("Sélectionne au moins un animal"); return; }
 
     setSubmitting(true);
@@ -331,7 +316,7 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
       <div className="bg-white rounded-xl shadow p-4">
         <h3 className="font-semibold text-gray-800 mb-3">Animal(x) concerné(s)</h3>
         <div className="flex gap-2 mb-3">
-          {([["animal", "Un animal"], ["plusieurs", "Plusieurs animaux"], ["lot", "Un lot"]] as const).map(([mode, label]) => (
+          {([["animal", "Un animal"], ["plusieurs", "Plusieurs animaux"]] as const).map(([mode, label]) => (
             <button
               key={mode}
               type="button"
@@ -357,44 +342,10 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
               onClick={() => setShowPickerModal(true)}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100"
             >
-              <ListChecks size={13} /> Choisir dans le troupeau
+              <ListChecks size={13} /> Choisir dans le troupeau (par lot, sexe, catégorie…)
             </button>
             {selectedAnimaux.length > 0 && (
               <p className="text-xs text-gray-500">{selectedAnimaux.length} animal{selectedAnimaux.length > 1 ? "aux" : ""} sélectionné{selectedAnimaux.length > 1 ? "s" : ""}</p>
-            )}
-          </div>
-        )}
-
-        {targetMode === "lot" && (
-          <div>
-            <select
-              value={selectedGroupeId}
-              onChange={(e) => { setSelectedGroupeId(e.target.value); setLotDeplie(false); }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-            >
-              <option value="">— Choisir un lot —</option>
-              {groupes.map((g) => (
-                <option key={g.id} value={g.id}>{g.nom} ({g._count.animaux} animal{g._count.animaux > 1 ? "aux" : ""})</option>
-              ))}
-            </select>
-            {selectedGroupeId && (
-              <div className="mt-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">{lotAnimaux.length} animal{lotAnimaux.length > 1 ? "aux" : ""} dans ce lot</span>
-                  <button type="button" onClick={() => setLotDeplie((v) => !v)} className="text-xs text-blue-600 hover:underline">
-                    {lotDeplie ? "Masquer" : "Voir les animaux"}
-                  </button>
-                </div>
-                {lotDeplie && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {lotAnimaux.map((a) => (
-                      <span key={a.id} className="bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-2.5 py-1 text-xs">
-                        {a.nutrav}{a.nom ? ` — ${a.nom}` : ""}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
             )}
           </div>
         )}
