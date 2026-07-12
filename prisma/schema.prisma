@@ -179,14 +179,28 @@ model EvenementSanitaire {
   type        String
   date        DateTime
   moment      String?
+  temperature Float?
   description String?
   photos      String?
   constatePar String?
   resolu      Boolean   @default(false)
   dateResolu  DateTime?
 
+  symptomes   EvenementSymptome[]
+  traitements Traitement[]
+
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+}
+
+model EvenementSymptome {
+  id          String             @id @default(cuid())
+  evenementId String
+  evenement   EvenementSanitaire @relation(fields: [evenementId], references: [id])
+  libelle     String
+  groupe      String?
+
+  createdAt DateTime @default(now())
 }
 
 model Pesee {
@@ -372,6 +386,7 @@ model Medicament {
   delaiAttenteLaitJ   Int?
   prescriptionRequise Boolean      @default(false)
   actif               Boolean      @default(true)
+  temporaire          Boolean      @default(false)
   stockActuel         Float?
   stockUnite          String?
   stockSeuilAlert     Float?
@@ -384,19 +399,27 @@ model Traitement {
   id            String      @id @default(cuid())
   animalId      String
   animal        Animal      @relation(fields: [animalId], references: [id])
+  evenementId   String?
+  evenement     EvenementSanitaire? @relation(fields: [evenementId], references: [id])
   medicamentId  String?
   medicament    Medicament? @relation(fields: [medicamentId], references: [id])
   medicamentNom String
   dateDebut     DateTime
   dureeJours    Int         @default(1)
   voie          String?
+  frequence     String?
+  doseRecommandee Float?
   dose          Float?
   uniteDosage   String?
+  poidsUtilise  Float?
   motif         String?
   veterinaire   String?
   ordonnanceNumero String?
   ordonnanceId  String?
   ordonnance    Ordonnance? @relation(fields: [ordonnanceId], references: [id])
+  ordonnanceAAssocier Boolean @default(false)
+  delaiAttenteViandeJ Int?
+  delaiAttenteLaitJ   Int?
   statut        String      @default("EN_COURS")
   notes         String?
   createdAt     DateTime    @default(now())
@@ -404,16 +427,17 @@ model Traitement {
 }
 
 model ExploitationConfig {
-  id                 String   @id @default("singleton")
-  ipg                String?
-  raisonSociale      String?
-  adresse            String?
-  telephone          String?
-  veterinaireNom     String?
-  veterinaireAdresse String?
-  veterinaireTel     String?
-  ordonnancierNo     String?
-  updatedAt          DateTime @updatedAt
+  id                     String   @id @default("singleton")
+  ipg                    String?
+  raisonSociale          String?
+  adresse                String?
+  telephone              String?
+  veterinaireNom         String?
+  veterinaireAdresse     String?
+  veterinaireTel         String?
+  ordonnancierNo         String?
+  affichageDelaiAttente  String   @default("LES_DEUX")
+  updatedAt              DateTime @updatedAt
 }
 
 model Ordonnance {
@@ -425,7 +449,12 @@ model Ordonnance {
   dose           Float?
   uniteDosage    String?
   voie           String?
+  frequence      String?
   dureeJours     Int?
+  delaiAttenteViandeJ Int?
+  delaiAttenteLaitJ   Int?
+  precautions    String?
+  rappels        String?
   motif          String?
   animaux        String?
   statut         String   @default("VALIDE")

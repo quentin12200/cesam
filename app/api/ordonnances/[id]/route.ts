@@ -26,14 +26,15 @@ export async function PATCH(
   const body = await request.json();
   const {
     statut, notes, date, numero, veterinaireNom, medicamentNom,
-    dose, uniteDosage, voie, dureeJours, motif, animaux, photoUrl,
+    dose, uniteDosage, voie, frequence, dureeJours, motif, animaux, photoUrl,
+    delaiAttenteViandeJ, delaiAttenteLaitJ, precautions, rappels,
   } = body;
 
   const prev = await prisma.ordonnance.findUnique({ where: { id } });
   if (!prev) return NextResponse.json({ error: "Ordonnance non trouvée" }, { status: 404 });
 
   const prevFields: Record<string, unknown> = {};
-  for (const [key, val] of Object.entries({ statut, notes, date, numero, veterinaireNom, medicamentNom, dose, uniteDosage, voie, dureeJours, motif, animaux, photoUrl })) {
+  for (const [key, val] of Object.entries({ statut, notes, date, numero, veterinaireNom, medicamentNom, dose, uniteDosage, voie, frequence, dureeJours, motif, animaux, photoUrl, delaiAttenteViandeJ, delaiAttenteLaitJ, precautions, rappels })) {
     if (val !== undefined) prevFields[key] = (prev as unknown as Record<string, unknown>)[key];
   }
 
@@ -50,10 +51,15 @@ export async function PATCH(
         ...(dose !== undefined && { dose: dose != null ? Number(dose) : null }),
         ...(uniteDosage !== undefined && { uniteDosage: uniteDosage?.trim() || null }),
         ...(voie !== undefined && { voie: voie?.trim() || null }),
+        ...(frequence !== undefined && { frequence: frequence?.trim() || null }),
         ...(dureeJours !== undefined && { dureeJours: dureeJours != null ? Number(dureeJours) : null }),
         ...(motif !== undefined && { motif: motif?.trim() || null }),
         ...(animaux !== undefined && { animaux: animaux?.trim() || null }),
         ...(photoUrl !== undefined && { photoUrl }),
+        ...(delaiAttenteViandeJ !== undefined && { delaiAttenteViandeJ: delaiAttenteViandeJ != null ? Number(delaiAttenteViandeJ) : null }),
+        ...(delaiAttenteLaitJ !== undefined && { delaiAttenteLaitJ: delaiAttenteLaitJ != null ? Number(delaiAttenteLaitJ) : null }),
+        ...(precautions !== undefined && { precautions: precautions?.trim() || null }),
+        ...(rappels !== undefined && { rappels: rappels?.trim() || null }),
       },
     });
 

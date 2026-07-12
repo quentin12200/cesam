@@ -6,10 +6,23 @@ export type CategorieEvenementId =
   | "ANALYSE"
   | "AUTRE";
 
+export type GroupeEvenementId = "OBSERVE" | "IDENTIFIE";
+
+export interface GroupeEvenement {
+  id: GroupeEvenementId;
+  label: string;
+}
+
+export const GROUPES_EVENEMENT: GroupeEvenement[] = [
+  { id: "OBSERVE", label: "Ce que j'observe" },
+  { id: "IDENTIFIE", label: "Ce qui est identifié ou réalisé" },
+];
+
 export interface CategorieEvenement {
   id: CategorieEvenementId;
   label: string;
   couleur: string;
+  groupe: GroupeEvenementId;
   evenements: string[];
 }
 
@@ -18,6 +31,7 @@ export const CATEGORIES_EVENEMENT: CategorieEvenement[] = [
     id: "SYMPTOME",
     label: "Symptôme ou problème constaté",
     couleur: "orange",
+    groupe: "OBSERVE",
     evenements: [
       "Boiterie",
       "Diarrhée veau",
@@ -34,6 +48,7 @@ export const CATEGORIES_EVENEMENT: CategorieEvenement[] = [
     id: "MALADIE",
     label: "Maladie ou diagnostic identifié",
     couleur: "red",
+    groupe: "IDENTIFIE",
     evenements: [
       "Piroplasmose",
       "Coccidiose",
@@ -50,6 +65,7 @@ export const CATEGORIES_EVENEMENT: CategorieEvenement[] = [
     id: "PREVENTION",
     label: "Prévention",
     couleur: "green",
+    groupe: "IDENTIFIE",
     evenements: [
       "Vaccination",
       "Traitement antiparasitaire",
@@ -62,6 +78,7 @@ export const CATEGORIES_EVENEMENT: CategorieEvenement[] = [
     id: "INTERVENTION",
     label: "Intervention ou soin",
     couleur: "blue",
+    groupe: "IDENTIFIE",
     evenements: [
       "Parage",
       "Castration",
@@ -80,6 +97,7 @@ export const CATEGORIES_EVENEMENT: CategorieEvenement[] = [
     id: "ANALYSE",
     label: "Analyse ou contrôle sanitaire",
     couleur: "purple",
+    groupe: "IDENTIFIE",
     evenements: [
       "Analyse",
       "Prélèvement",
@@ -92,9 +110,14 @@ export const CATEGORIES_EVENEMENT: CategorieEvenement[] = [
     id: "AUTRE",
     label: "Autre événement",
     couleur: "gray",
+    groupe: "IDENTIFIE",
     evenements: [],
   },
 ];
+
+export function getCategoriesParGroupe(groupe: GroupeEvenementId): CategorieEvenement[] {
+  return CATEGORIES_EVENEMENT.filter((c) => c.groupe === groupe);
+}
 
 export function findCategorieByEvenement(type: string): CategorieEvenement | undefined {
   return CATEGORIES_EVENEMENT.find((c) => c.evenements.includes(type));

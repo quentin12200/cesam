@@ -6,11 +6,15 @@ export interface OrdonnanceExtracted {
   voie: string | null;
   dose: number | null;
   uniteDosage: string | null;
+  frequence: string | null;
   dureeJours: number | null;
   dateDebut: string | null;
   veterinaire: string | null;
   motif: string | null;
   delaiAttenteViandeJ: number | null;
+  delaiAttenteLaitJ: number | null;
+  precautions: string | null;
+  rappels: string | null;
   ordonnanceNumero: string | null;
   raw: string;
 }
@@ -50,8 +54,13 @@ export async function scanAndPersistOrdonnance(file: File): Promise<OrdonnanceSc
         dose: extracted.dose,
         uniteDosage: extracted.uniteDosage,
         voie: extracted.voie,
+        frequence: extracted.frequence,
         dureeJours: extracted.dureeJours,
         motif: extracted.motif,
+        delaiAttenteViandeJ: extracted.delaiAttenteViandeJ,
+        delaiAttenteLaitJ: extracted.delaiAttenteLaitJ,
+        precautions: extracted.precautions,
+        rappels: extracted.rappels,
         photoUrl,
       }),
     });
