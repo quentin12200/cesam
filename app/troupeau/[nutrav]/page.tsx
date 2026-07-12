@@ -41,8 +41,7 @@ import QuickActionsBar from "./QuickActionsBar";
 import CategorieButton from "./CategorieButton";
 import EchoButton from "./EchoButton";
 import GroupeButton from "./GroupeButton";
-import TraitementsSection from "./TraitementsSection";
-import EvenementsSanitairesSection from "./EvenementsSanitairesSection";
+import EvenementsSection from "./EvenementsSection";
 import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
 import LierVeauButton from "./LierVeauButton";
 
@@ -625,34 +624,10 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               </div>
             </div>
 
-            {/* Traitements */}
-            <TraitementsSection
+            {/* Événements (avec ou sans traitement) */}
+            <EvenementsSection
               animalId={animal.id}
               affichageDelaiAttente={affichageDelaiAttente}
-              traitements={animal.traitements.map((t) => ({
-                id: t.id,
-                medicamentNom: t.medicamentNom,
-                dateDebut: t.dateDebut.toISOString(),
-                dureeJours: t.dureeJours,
-                voie: t.voie,
-                frequence: t.frequence,
-                dose: t.dose,
-                doseRecommandee: t.doseRecommandee,
-                uniteDosage: t.uniteDosage,
-                poidsUtilise: t.poidsUtilise,
-                motif: t.motif,
-                veterinaire: t.veterinaire,
-                statut: t.statut,
-                delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
-                delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
-                ordonnanceNumero: t.ordonnanceNumero,
-                ordonnanceId: t.ordonnanceId,
-                ordonnanceAAssocier: t.ordonnanceAAssocier,
-              }))}
-            />
-
-            {/* Événements sanitaires */}
-            <EvenementsSanitairesSection
               evenements={animal.evenements.map((e) => ({
                 ...e,
                 symptomes: e.symptomes.map((s) => ({ id: s.id, libelle: s.libelle, typeEvenementId: s.typeEvenementId })),
@@ -663,7 +638,51 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   valeur: r.valeur,
                   questionType: r.question.type,
                 })),
+                traitements: animal.traitements
+                  .filter((t) => t.evenementId === e.id)
+                  .map((t) => ({
+                    id: t.id,
+                    medicamentNom: t.medicamentNom,
+                    dateDebut: t.dateDebut.toISOString(),
+                    dureeJours: t.dureeJours,
+                    voie: t.voie,
+                    frequence: t.frequence,
+                    dose: t.dose,
+                    doseRecommandee: t.doseRecommandee,
+                    uniteDosage: t.uniteDosage,
+                    poidsUtilise: t.poidsUtilise,
+                    motif: t.motif,
+                    veterinaire: t.veterinaire,
+                    statut: t.statut,
+                    delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
+                    delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
+                    ordonnanceNumero: t.ordonnanceNumero,
+                    ordonnanceId: t.ordonnanceId,
+                    ordonnanceAAssocier: t.ordonnanceAAssocier,
+                  })),
               }))}
+              traitementsOrphelins={animal.traitements
+                .filter((t) => !t.evenementId)
+                .map((t) => ({
+                  id: t.id,
+                  medicamentNom: t.medicamentNom,
+                  dateDebut: t.dateDebut.toISOString(),
+                  dureeJours: t.dureeJours,
+                  voie: t.voie,
+                  frequence: t.frequence,
+                  dose: t.dose,
+                  doseRecommandee: t.doseRecommandee,
+                  uniteDosage: t.uniteDosage,
+                  poidsUtilise: t.poidsUtilise,
+                  motif: t.motif,
+                  veterinaire: t.veterinaire,
+                  statut: t.statut,
+                  delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
+                  delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
+                  ordonnanceNumero: t.ordonnanceNumero,
+                  ordonnanceId: t.ordonnanceId,
+                  ordonnanceAAssocier: t.ordonnanceAAssocier,
+                }))}
             />
           </>
         )}

@@ -10,10 +10,9 @@ import {
 import Link from "next/link";
 import { differenceInDays } from "date-fns";
 import { getVaccinProtocolSteps, formatDateShort, type ProtocoleVaccinConfig } from "@/lib/utils";
-import { getAttenteInfo, doitAfficherViande, doitAfficherLait } from "@/lib/withdrawal";
 import VaccinationFormWrapper from "./VaccinationFormWrapper";
 import VaccineQuickButton from "./VaccineQuickButton";
-import TraitementsTab, { type TraitementItem } from "./TraitementsTab";
+import EvenementsTab, { type TraitementItem } from "./EvenementsTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -81,17 +80,7 @@ export interface EvenementItem {
   symptomes: string[];
   date: string;
   description: string | null;
-}
-
-export interface TraitementActifItem {
-  id: string;
-  animalNutrav: string;
-  animalNom: string | null;
-  medicamentNom: string;
-  dateDebut: string;
-  dureeJours: number;
-  delaiAttenteViandeJ: number | null;
-  delaiAttenteLaitJ: number | null;
+  resolu: boolean;
 }
 
 interface Props {
@@ -103,8 +92,7 @@ interface Props {
   vaccinationsRecentes: RecentItem[];
   protocoles: ProtocoleVaccinConfig[];
   evenements: EvenementItem[];
-  traitements: TraitementActifItem[];
-  traitementsDetail: TraitementItem[];
+  traitements: TraitementItem[];
   affichageDelaiAttente?: string;
 }
 
@@ -597,9 +585,9 @@ function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVacc
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes, protocoles, evenements, traitements, traitementsDetail, affichageDelaiAttente }: Props) {
+export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes, protocoles, evenements, traitements, affichageDelaiAttente }: Props) {
   const router = useRouter();
-  const [onglet, setOnglet] = useState<"evenements" | "traitements" | "vaccination" | "pharmacie" | "ordonnances">("evenements");
+  const [onglet, setOnglet] = useState<"evenements" | "vaccination" | "pharmacie" | "ordonnances">("evenements");
   const [vaccinTab, setVaccinTab] = useState<"urgent" | "veaux" | "vaches">("urgent");
   const [viewMode, setViewMode] = useState<"animal" | "traitement">("animal");
   const [sessionMode, setSessionMode] = useState(false);
@@ -709,10 +697,13 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
   return (
     <>
       {/* Navigation principale */}
-      <div className="grid grid-cols-5 gap-1 bg-white rounded-xl shadow overflow-hidden p-1">
+      <div className="grid grid-cols-4 gap-1 bg-white rounded-xl shadow overflow-hidden p-1">
         {([
-          { id: "evenements", label: "Événements", icon: "🏥", count: evenements.length, urgent: evenements.length > 0, href: null },
-          { id: "traitements", label: "Traitements", icon: "🩹", count: traitementsDetail.filter((t) => t.enCours || t.enAttente).length, urgent: false, href: null },
+          {
+            id: "evenements", label: "Événements", icon: "🏥",
+            count: evenements.filter((e) => !e.resolu).length + traitements.filter((t) => t.enCours || t.enAttente).length,
+            urgent: evenements.some((e) => !e.resolu), href: null,
+          },
           { id: "vaccination", label: "Vaccination", icon: "💉", count: urgents.length + cryptoRotavec.length + bolus.length, urgent: urgents.length > 0, href: null },
           { id: "pharmacie", label: "Pharmacie", icon: "💊", count: 0, urgent: false, href: "/pharmacie" },
           { id: "ordonnances", label: "Ordonnances", icon: "📋", count: 0, urgent: false, href: "/ordonnances" },
@@ -737,109 +728,8 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
         ))}
       </div>
 
-      {/* Onglet Événements & Soins */}
-      {onglet === "evenements" && (
-        <div className="space-y-4">
-          {evenements.length === 0 && traitements.length === 0 ? (
-            <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">
-              Aucun événement sanitaire ni traitement en cours
-            </div>
-          ) : null}
-
-          {evenements.length > 0 && (
-            <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-sm">
-                <AlertTriangle size={15} className="text-red-500" />
-                Événements non résolus ({evenements.length})
-              </h3>
-              <div className="space-y-2">
-                {evenements.map((e) => (
-                  <Link
-                    key={e.id}
-                    href={`/troupeau/${e.animalNutrav}?onglet=sante`}
-                    className="flex items-start gap-3 p-3 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{e.animalNutrav}</span>
-                        <span className="text-sm font-medium text-gray-800">{e.animalNom ?? ""}</span>
-                        <span className="text-xs font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
-                          {e.symptomes.length > 1 ? e.symptomes.join(" • ") : e.type}
-                        </span>
-                      </div>
-                      {e.description && (
-                        <p className="text-xs text-gray-600 mt-1 truncate">{e.description}</p>
-                      )}
-                    </div>
-                    <span className="text-xs text-gray-400 shrink-0">
-                      {new Date(e.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {traitements.length > 0 && (
-            <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-sm">
-                <Pill size={15} className="text-blue-500" />
-                Traitements en cours ({traitements.length})
-              </h3>
-              <div className="space-y-2">
-                {traitements.map((t) => {
-                  const debut = new Date(t.dateDebut);
-                  const fin = new Date(debut.getTime() + t.dureeJours * 86400000);
-                  const joursRestants = Math.ceil((fin.getTime() - Date.now()) / 86400000);
-                  return (
-                    <Link
-                      key={t.id}
-                      href={`/troupeau/${t.animalNutrav}?onglet=sante`}
-                      className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{t.animalNutrav}</span>
-                          <span className="text-sm font-medium text-gray-800">{t.animalNom ?? ""}</span>
-                        </div>
-                        <p className="text-xs text-blue-700 font-medium mt-1">{t.medicamentNom}</p>
-                        {(() => {
-                          const attente = getAttenteInfo(fin, t.delaiAttenteViandeJ, t.delaiAttenteLaitJ);
-                          const showViande = attente.enAttenteViande && doitAfficherViande(affichageDelaiAttente);
-                          const showLait = attente.enAttenteLait && doitAfficherLait(affichageDelaiAttente);
-                          if (!showViande && !showLait) return null;
-                          const jRestantViande = showViande && attente.dateFinAttenteViande
-                            ? Math.ceil((attente.dateFinAttenteViande.getTime() - Date.now()) / 86400000)
-                            : null;
-                          const jRestantLait = showLait && attente.dateFinAttenteLait
-                            ? Math.ceil((attente.dateFinAttenteLait.getTime() - Date.now()) / 86400000)
-                            : null;
-                          return (
-                            <p className="text-xs text-orange-700 font-medium mt-0.5">
-                              {jRestantViande != null && jRestantViande > 0 && `⏱ Attente viande : ${jRestantViande}j restant${jRestantViande > 1 ? "s" : ""}`}
-                              {jRestantViande != null && jRestantViande > 0 && jRestantLait != null && jRestantLait > 0 && " · "}
-                              {jRestantLait != null && jRestantLait > 0 && `⏱ Attente lait : ${jRestantLait}j restant${jRestantLait > 1 ? "s" : ""}`}
-                            </p>
-                          );
-                        })()}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className={`text-xs font-bold ${joursRestants <= 1 ? "text-red-600" : joursRestants <= 3 ? "text-orange-500" : "text-blue-600"}`}>
-                          {joursRestants > 0 ? `J+${joursRestants}` : "Terminé"}
-                        </div>
-                        <div className="text-xs text-gray-400">{t.dureeJours}j</div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Onglet Traitements — en cours / historique */}
-      {onglet === "traitements" && <TraitementsTab traitements={traitementsDetail} />}
+      {/* Onglet Événements — regroupe événements sanitaires et traitements (en cours / historique) */}
+      {onglet === "evenements" && <EvenementsTab evenements={evenements} traitements={traitements} />}
 
       {/* Onglet Vaccination — sous-navigation interne */}
       {onglet === "vaccination" && (
