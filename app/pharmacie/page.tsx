@@ -3,21 +3,11 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, Pill, Printer } from "lucide-react";
-import { addDays, differenceInDays } from "date-fns";
-import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
-import PharmacieClient, { type TraitementItem, type MedicamentItem } from "./PharmacieClient";
+import PharmacieClient, { type MedicamentItem } from "./PharmacieClient";
+import { type OrdonnanceItem } from "@/app/ordonnances/OrdonnancesClient";
 
 async function getData() {
-  const now = new Date();
-
-  const [traitements, medicaments] = await Promise.all([
-    prisma.traitement.findMany({
-      include: {
-        animal: { select: { id: true, nutrav: true, nobovi: true } },
-        medicament: { select: { id: true, nom: true, delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } },
-      },
-      orderBy: { dateDebut: "desc" },
-    }),
+  const [medicaments, ordonnancesRaw] = await Promise.all([
     prisma.medicament.findMany({
       orderBy: { nom: "asc" },
       select: {
@@ -36,56 +26,11 @@ async function getData() {
         },
       },
     }),
+    prisma.ordonnance.findMany({
+      orderBy: { date: "desc" },
+      take: 200,
+    }),
   ]);
-
-  const traitementsItems: TraitementItem[] = traitements.map((t) => {
-    const dateDebut = new Date(t.dateDebut);
-    const dateFin = addDays(dateDebut, t.dureeJours);
-    const attente = getAttenteInfoForTraitement(t, now);
-    const delaiViande = t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
-    const dateFinAttente = attente.dateFinAttenteViande;
-    const enCours = now < dateFin;
-    const enAttente = attente.enAttente;
-    const joursRestantsAttente = dateFinAttente ? differenceInDays(dateFinAttente, now) : null;
-
-    return {
-      id: t.id,
-      animalId: t.animal.id,
-      animalNutrav: t.animal.nutrav,
-      animalNom: t.animal.nobovi,
-      medicamentNom: t.medicamentNom,
-      medicamentId: t.medicamentId,
-      dateDebut: dateDebut.toISOString(),
-      dateFin: dateFin.toISOString(),
-      dureeJours: t.dureeJours,
-      voie: t.voie,
-      dose: t.dose,
-      uniteDosage: t.uniteDosage,
-      motif: t.motif,
-      veterinaire: t.veterinaire,
-      statut: t.statut,
-      notes: t.notes,
-      delaiAttenteViandeJ: delaiViande,
-      dateFinAttente: dateFinAttente?.toISOString() ?? null,
-      enCours,
-      enAttente,
-      joursRestantsAttente,
-    };
-  });
-
-  // Last 3 traitements per medicamentId
-  const recentByMed: Record<string, { date: string; animalNutrav: string; motif: string | null }[]> = {};
-  for (const t of traitements) {
-    if (!t.medicamentId) continue;
-    if (!recentByMed[t.medicamentId]) recentByMed[t.medicamentId] = [];
-    if (recentByMed[t.medicamentId].length < 3) {
-      recentByMed[t.medicamentId].push({
-        date: t.dateDebut.toISOString(),
-        animalNutrav: t.animal.nutrav,
-        motif: t.motif,
-      });
-    }
-  }
 
   const medicamentItems: MedicamentItem[] = medicaments.map((m) => ({
     id: m.id,
@@ -105,14 +50,30 @@ async function getData() {
     stockUnite: m.stockUnite,
     stockSeuilAlert: m.stockSeuilAlert,
     preconisations: m.preconisations,
-    recentTraitements: recentByMed[m.id] ?? [],
   }));
 
-  return { traitementsItems, medicamentItems };
+  const ordonnanceItems: OrdonnanceItem[] = ordonnancesRaw.map((o) => ({
+    id: o.id,
+    date: o.date.toISOString(),
+    numero: o.numero,
+    veterinaireNom: o.veterinaireNom,
+    medicamentNom: o.medicamentNom,
+    dose: o.dose,
+    uniteDosage: o.uniteDosage,
+    voie: o.voie,
+    dureeJours: o.dureeJours,
+    motif: o.motif,
+    animaux: o.animaux,
+    statut: o.statut,
+    notes: o.notes,
+    photoUrl: o.photoUrl,
+  }));
+
+  return { medicamentItems, ordonnanceItems };
 }
 
 export default async function PharmaciePage() {
-  const { traitementsItems, medicamentItems } = await getData();
+  const { medicamentItems, ordonnanceItems } = await getData();
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
@@ -133,7 +94,7 @@ export default async function PharmaciePage() {
         </Link>
       </div>
 
-      <PharmacieClient traitements={traitementsItems} medicaments={medicamentItems} />
+      <PharmacieClient medicaments={medicamentItems} ordonnances={ordonnanceItems} />
     </div>
   );
 }
