@@ -9,7 +9,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { nom, dci, categorie, voie, dosagePourKg, uniteDosage, delaiAttenteViandeJ, prescriptionRequise } = body;
+  const { nom, dci, categorie, voie, dosagePourKg, uniteDosage, delaiAttenteViandeJ, delaiAttenteLaitJ, prescriptionRequise, temporaire } = body;
   if (!nom?.trim()) {
     return NextResponse.json({ error: "nom requis" }, { status: 400 });
   }
@@ -23,7 +23,9 @@ export async function POST(request: NextRequest) {
         dosagePourKg: dosagePourKg ?? null,
         uniteDosage: uniteDosage?.trim() || "ml",
         delaiAttenteViandeJ: delaiAttenteViandeJ ?? null,
+        delaiAttenteLaitJ: delaiAttenteLaitJ ?? null,
         prescriptionRequise: prescriptionRequise ?? false,
+        temporaire: temporaire ?? false,
         actif: true,
       },
     });

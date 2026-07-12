@@ -9,11 +9,15 @@ interface OrdonnanceResult {
   voie: string | null;
   dose: number | null;
   uniteDosage: string | null;
+  frequence: string | null;
   dureeJours: number | null;
   dateDebut: string | null;
   veterinaire: string | null;
   motif: string | null;
   delaiAttenteViandeJ: number | null;
+  delaiAttenteLaitJ: number | null;
+  precautions: string | null;
+  rappels: string | null;
   ordonnanceNumero: string | null;
   raw: string;
 }
@@ -25,11 +29,15 @@ Voici les champs à extraire :
 - voie: voie d'administration abrégée (ex: "IM", "SC", "IV", "PO", "cutanée", etc.) (string ou null)
 - dose: dose numérique (nombre uniquement, pas l'unité) (number ou null)
 - uniteDosage: unité de la dose (ex: "ml", "mg", "g", "cp") (string ou null)
+- frequence: fréquence d'administration (ex: "1 fois/jour", "2 fois/jour") (string ou null)
 - dureeJours: durée totale du traitement en jours (number ou null)
 - dateDebut: date de prescription au format YYYY-MM-DD (string ou null)
 - veterinaire: prénom et nom du vétérinaire prescripteur (string ou null)
 - motif: motif ou diagnostic mentionné (string ou null)
 - delaiAttenteViandeJ: délai d'attente viande en jours s'il est mentionné (number ou null)
+- delaiAttenteLaitJ: délai d'attente lait en jours s'il est mentionné (number ou null)
+- precautions: précautions d'emploi mentionnées (string ou null)
+- rappels: rappels ou administrations de suivi prévus (string ou null)
 - ordonnanceNumero: numéro de l'ordonnance tel qu'imprimé sur le document (string ou null)
 
 Si une information n'est pas visible ou lisible, mets null.
@@ -108,11 +116,15 @@ export async function POST(req: NextRequest) {
       voie: null,
       dose: null,
       uniteDosage: null,
+      frequence: null,
       dureeJours: null,
       dateDebut: null,
       veterinaire: null,
       motif: null,
       delaiAttenteViandeJ: null,
+      delaiAttenteLaitJ: null,
+      precautions: null,
+      rappels: null,
       ordonnanceNumero: null,
       raw,
     };
