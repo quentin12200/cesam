@@ -2,38 +2,19 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
-import { differenceInDays } from "date-fns";
-import { Baby, ArrowLeft } from "lucide-react";
+import { CalendarDays, ArrowLeft, Printer } from "lucide-react";
 import Link from "next/link";
 import VelageFormWrapper from "./VelageFormWrapper";
 import CapteurManager from "./CapteurManager";
+import { getGestationCalendar } from "@/lib/gestation-calendar";
+import { GestationCalendarTable } from "@/app/components/GestationCalendarTable";
 
 async function getVelageData() {
   const now = new Date();
-  const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  // Garder les vaches dont le terme est dépassé mais pas encore vêlées (jusqu'à 30j de retard)
-  const past30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [capteurs, gestationsPrevues, velagesRecents] = await Promise.all([
+  const [capteurs, gestationCalendar, velagesRecents] = await Promise.all([
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
-    prisma.gestation.findMany({
-      where: {
-        etat: { in: ["VERT", "ROSE"] },
-        dateVelagePrevue: {
-          gte: past30Days,
-          lte: in30Days,
-        },
-        velage: null, // pas encore vêlé
-      },
-      include: {
-        saillie: {
-          include: {
-            animal: { select: { id: true, nutrav: true, nobovi: true, danais: true } },
-          },
-        },
-      },
-      orderBy: { dateVelagePrevue: "asc" },
-    }),
+    getGestationCalendar(),
     prisma.velage.findMany({
       where: {
         date: {
@@ -49,11 +30,11 @@ async function getVelageData() {
     }),
   ]);
 
-  return { capteurs, gestationsPrevues, velagesRecents };
+  return { capteurs, gestationCalendar, velagesRecents };
 }
 
 export default async function VelagePage() {
-  const { capteurs, gestationsPrevues, velagesRecents } = await getVelageData();
+  const { capteurs, gestationCalendar, velagesRecents } = await getVelageData();
   const now = new Date();
 
   return (
@@ -63,6 +44,25 @@ export default async function VelagePage() {
           <ArrowLeft size={18} />
         </Link>
         <h2 className="text-xl font-bold text-gray-800">Vélage</h2>
+      </div>
+
+      {/* Calendrier de gestation */}
+      <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+          <CalendarDays size={18} className="text-green-700" />
+          <h3 className="font-semibold text-gray-800 flex-1">
+            Calendrier de gestation ({gestationCalendar.length})
+          </h3>
+          <Link
+            href="/reproduction/calendrier"
+            target="_blank"
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-green-700 transition-colors px-2 py-1 rounded border border-gray-200 hover:border-green-300"
+          >
+            <Printer size={13} />
+            Imprimer
+          </Link>
+        </div>
+        <GestationCalendarTable rows={gestationCalendar} now={now} />
       </div>
 
       {/* Capteurs — composant interactif */}
@@ -75,81 +75,6 @@ export default async function VelagePage() {
 
       {/* Formulaire vélage rapide */}
       <VelageFormWrapper />
-
-      {/* Vélages prévus dans 30 jours */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Baby size={16} className="text-pink-500" />
-          Vélages à surveiller ({gestationsPrevues.length})
-        </h3>
-        {gestationsPrevues.length === 0 ? (
-          <div className="text-center text-gray-400 py-6 text-sm">Aucun vélage prévu dans les 30 prochains jours</div>
-        ) : (
-          <div className="space-y-2">
-            {gestationsPrevues.map((gestation) => {
-              const animal = gestation.saillie.animal;
-              const jours = gestation.dateVelagePrevue
-                ? differenceInDays(new Date(gestation.dateVelagePrevue), now)
-                : null;
-              const depasse = jours !== null && jours < 0;
-              const urgent = jours !== null && jours >= 0 && jours <= 7;
-              const tres_urgent = jours !== null && jours >= 0 && jours <= 2;
-
-              return (
-                <div
-                  key={gestation.id}
-                  className={`rounded-lg p-3 border ${
-                    depasse
-                      ? "bg-red-100 border-red-500"
-                      : tres_urgent
-                      ? "bg-red-50 border-red-300"
-                      : urgent
-                      ? "bg-orange-50 border-orange-200"
-                      : "bg-pink-50 border-pink-100"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{animal.nutrav}</span>
-                        <span className="text-sm font-medium text-gray-800">{animal.nobovi ?? "Sans nom"}</span>
-                      </div>
-                      {gestation.dateVelagePrevue && (
-                        <div className="text-sm font-semibold mt-1 text-gray-700">
-                          Terme : {formatDate(gestation.dateVelagePrevue)}
-                        </div>
-                      )}
-                      {depasse && (
-                        <div className="text-xs text-red-700 font-semibold mt-0.5">
-                          ⚠️ Terme dépassé — surveiller de près
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      {jours !== null && (
-                        <div className={`text-lg font-bold ${depasse ? "text-red-700" : tres_urgent ? "text-red-600" : urgent ? "text-orange-600" : "text-pink-600"}`}>
-                          {depasse ? `+${Math.abs(jours)}j` : `J-${jours}`}
-                        </div>
-                      )}
-                      <div className={`text-xs font-bold px-2 py-0.5 rounded-full mt-1 ${
-                        depasse
-                          ? "bg-red-600 text-white animate-pulse"
-                          : tres_urgent
-                          ? "bg-red-500 text-white"
-                          : urgent
-                          ? "bg-orange-400 text-white"
-                          : "bg-pink-400 text-white"
-                      }`}>
-                        {depasse ? "DÉPASSÉ" : tres_urgent ? "IMMINENT" : urgent ? "BIENTÔT" : "PRÉVU"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* Vélages récents */}
       {velagesRecents.length > 0 && (

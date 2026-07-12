@@ -6,8 +6,8 @@ import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib/utils";
 import Link from "next/link";
 import {
-  RefreshCw, CheckCircle, ArrowLeft, CalendarDays,
-  Settings, Printer, ChevronDown, ChevronRight, Users, Stethoscope,
+  RefreshCw, CheckCircle, ArrowLeft,
+  Settings, Printer, Users, Stethoscope, Baby,
 } from "lucide-react";
 import ReproScrollRestorer from "./ReproScrollRestorer";
 
@@ -239,30 +239,6 @@ function TaureauSearch({
   );
 }
 
-// ── SVG camembert ─────────────────────────────────────────────────────────
-function GestationCircle({ daysLeft }: { daysLeft: number }) {
-  const progress = Math.min(100, Math.max(0, ((DUREE_GESTATION - daysLeft) / DUREE_GESTATION) * 100));
-  const r = 12;
-  const circ = 2 * Math.PI * r;
-  const dash = (progress / 100) * circ;
-  const color = progress >= 90 ? "#ef4444" : progress >= 75 ? "#f97316" : "#22c55e";
-  return (
-    <svg width="32" height="32" viewBox="0 0 32 32" className="inline-block">
-      <circle cx="16" cy="16" r={r} fill="none" stroke="#e5e7eb" strokeWidth="4" />
-      <circle
-        cx="16" cy="16" r={r}
-        fill="none" stroke={color} strokeWidth="4"
-        strokeDasharray={`${dash} ${circ}`}
-        strokeLinecap="round"
-        style={{ transform: "rotate(-90deg)", transformOrigin: "16px 16px" }}
-      />
-      <text x="16" y="20" textAnchor="middle" fontSize="7" fontWeight="bold" fill={color}>
-        {Math.round(progress)}%
-      </text>
-    </svg>
-  );
-}
-
 // ── Contenu principal ──────────────────────────────────────────────────────
 function ReproductionContent() {
   const [vaches, setVaches] = useState<VacheRepro[]>([]);
@@ -275,7 +251,6 @@ function ReproductionContent() {
   const [message, setMessage] = useState<string | null>(null);
   const [confirmVideId, setConfirmVideId] = useState<string | null>(null);
   const [confirmDeleteSaillieId, setConfirmDeleteSaillieId] = useState<string | null>(null);
-  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // ── Saillie form state ──
   const [showSaillieForm, setShowSaillieForm] = useState(false);
@@ -389,10 +364,6 @@ function ReproductionContent() {
   const filtered = filterEtat === "TOUS" ? vachesAvecEtat : vachesAvecEtat.filter((v) => v.etat === filterEtat);
   const counts: Record<EtatGestation, number> = { GRIS: 0, JAUNE: 0, VERT: 0, ROUGE: 0, ROSE: 0, REPOS: 0 };
   vachesAvecEtat.forEach((v) => counts[v.etat]++);
-
-  const gestationsActives = vachesAvecEtat
-    .filter((v) => (v.etat === "VERT" || v.etat === "ROSE") && v.dateVelagePrevue)
-    .sort((a, b) => new Date(a.dateVelagePrevue!).getTime() - new Date(b.dateVelagePrevue!).getTime());
 
   const farmBulls = taureaux.filter((t) => t.present);
   const iaBulls = taureaux.filter((t) => !t.present);
@@ -639,75 +610,15 @@ function ReproductionContent() {
         </div>
       )}
 
-      {/* Calendrier de gestation — collapsible */}
-      {gestationsActives.length > 0 && (
-        <div className="bg-white rounded-xl shadow overflow-hidden">
-          <button
-            onClick={() => setCalendarOpen((o) => !o)}
-            className="w-full flex items-center gap-2 px-4 py-3 border-b border-gray-100 text-left"
-          >
-            <CalendarDays size={18} className="text-green-700" />
-            <span className="font-semibold text-gray-800 flex-1">Calendrier de gestation</span>
-            <span className="text-xs text-gray-400">{gestationsActives.length} vache{gestationsActives.length > 1 ? "s" : ""}</span>
-            {calendarOpen ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
-          </button>
-          {calendarOpen && (
-            <div className="overflow-x-auto">
-              <div className="flex justify-end px-3 py-2 border-b border-gray-100">
-                <Link
-                  href="/reproduction/calendrier"
-                  target="_blank"
-                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-green-700 transition-colors px-2 py-1 rounded border border-gray-200 hover:border-green-300"
-                >
-                  <Printer size={13} />
-                  Imprimer le calendrier
-                </Link>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                    <th className="px-3 py-2 text-left font-semibold">Vache</th>
-                    <th className="px-3 py-2 text-center font-semibold">Terme</th>
-                    <th className="px-3 py-2 text-center font-semibold">Père</th>
-                    <th className="px-2 py-2 text-center font-semibold">Prog.</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {gestationsActives.map((v) => {
-                    const calving = new Date(v.dateVelagePrevue!);
-                    const daysLeft = differenceInDays(calving, now);
-                    const rowBg = daysLeft < 0 ? "bg-red-50" : daysLeft <= 14 ? "bg-pink-50" : daysLeft <= 30 ? "bg-yellow-50" : "";
-                    return (
-                      <tr key={v.id} className={rowBg}>
-                        <td className="px-3 py-2">
-                          <Link href={`/troupeau/${v.nutrav}`} className="flex items-center gap-1.5">
-                            <span className="font-mono font-bold text-green-700 text-xs bg-green-50 px-1.5 py-0.5 rounded">{v.nutrav}</span>
-                            <span className="text-gray-700 font-medium truncate max-w-[80px]">{v.nobovi ?? "Sans nom"}</span>
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <div className="font-medium text-gray-800 text-sm">
-                            {calving.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
-                          </div>
-                          {daysLeft >= 0 ? (
-                            <div className="text-xs text-gray-400">J-{daysLeft}</div>
-                          ) : (
-                            <div className="text-xs font-bold text-red-600">+{Math.abs(daysLeft)}j dépassé</div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-center text-gray-600 text-xs">{v.taureauNom ?? "IA"}</td>
-                        <td className="px-2 py-2 text-center">
-                          <GestationCircle daysLeft={daysLeft} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Le calendrier de gestation détaillé vit maintenant sur la page Vélage */}
+      <Link
+        href="/velage"
+        className="flex items-center gap-2 bg-white rounded-xl shadow px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+      >
+        <Baby size={18} className="text-pink-500" />
+        <span className="flex-1 font-medium">Voir le calendrier de gestation et enregistrer un vélage</span>
+        <span className="text-gray-400">→</span>
+      </Link>
 
       {/* Filtres */}
       <div className="bg-white rounded-xl shadow p-2 flex gap-1 overflow-x-auto">
