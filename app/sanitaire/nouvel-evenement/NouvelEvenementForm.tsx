@@ -2,18 +2,14 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, X, Loader2, CheckCircle2, ChevronLeft, Search, Thermometer } from "lucide-react";
+import { Camera, X, Loader2, CheckCircle2, Search, Thermometer, ListChecks } from "lucide-react";
 import AnimalPicker, { type AnimalOption } from "./AnimalPicker";
+import AnimalMultiEntry from "./AnimalMultiEntry";
+import AnimalPickerModal from "./AnimalPickerModal";
+import QuestionPanel, { type QuestionTemplateData } from "./QuestionPanel";
 import TraitementApresEvenementForm from "./TraitementApresEvenementForm";
-import {
-  CATEGORIES_EVENEMENT,
-  GROUPES_EVENEMENT,
-  getCategoriesParGroupe,
-  getMomentActuel,
-  findCategorieByEvenement,
-  type CategorieEvenementId,
-  type GroupeEvenementId,
-} from "@/lib/evenements-sanitaires";
+import { getMomentActuel } from "@/lib/evenements-sanitaires";
+import { searchTypesEvenement, normalizeSearch, type RecherchableTypeEvenement } from "@/lib/fuzzy-search";
 import { fileToResizedDataUrl } from "@/lib/image-client";
 import { uploadEvenementPhoto } from "@/lib/firebase-client";
 
@@ -23,10 +19,9 @@ interface Groupe {
   _count: { animaux: number };
 }
 
-interface SymptomeSel {
-  libelle: string;
-  categorieId: CategorieEvenementId;
-  groupe: GroupeEvenementId;
+interface TypeSelectionne {
+  id: string;
+  nom: string;
 }
 
 interface EventTarget2 {
@@ -48,17 +43,20 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
   const [groupes, setGroupes] = useState<Groupe[]>([]);
   const [selectedGroupeId, setSelectedGroupeId] = useState("");
   const [lotAnimaux, setLotAnimaux] = useState<AnimalOption[]>([]);
+  const [lotDeplie, setLotDeplie] = useState(false);
+  const [showPickerModal, setShowPickerModal] = useState(false);
 
   const [date, setDate] = useState(today);
   const [moment, setMoment] = useState<"Matin" | "Soir">(getMomentActuel());
 
-  const [symptomesSel, setSymptomesSel] = useState<SymptomeSel[]>([]);
-  const [groupeActif, setGroupeActif] = useState<GroupeEvenementId>("OBSERVE");
-  const [categorieActiveId, setCategorieActiveId] = useState<CategorieEvenementId | null>(null);
-  const [autreOuvert, setAutreOuvert] = useState(false);
-  const [autreTexte, setAutreTexte] = useState("");
-  const [rechercheType, setRechercheType] = useState("");
-  const [recents, setRecents] = useState<{ libelle: string; groupe: string | null }[]>([]);
+  const [catalogue, setCatalogue] = useState<RecherchableTypeEvenement[]>([]);
+  const [recents, setRecents] = useState<{ libelle: string; typeEvenementId: string | null }[]>([]);
+  const [query, setQuery] = useState("");
+  const [selectedTypes, setSelectedTypes] = useState<TypeSelectionne[]>([]);
+  const [questionsByType, setQuestionsByType] = useState<Record<string, QuestionTemplateData[]>>({});
+  const [answers, setAnswers] = useState<Record<string, Record<string, unknown>>>({});
+  const [panelOuvert, setPanelOuvert] = useState<string | null>(null);
+  const [ajoutLibreEnCours, setAjoutLibreEnCours] = useState(false);
 
   const [temperature, setTemperature] = useState("");
 
@@ -76,6 +74,7 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
 
   useEffect(() => {
     fetch("/api/groupes").then((r) => r.json()).then(setGroupes);
+    fetch("/api/event-types").then((r) => r.json()).then(setCatalogue);
     fetch("/api/evenements/symptomes-recents").then((r) => r.json()).then(setRecents).catch(() => {});
   }, []);
 
@@ -96,40 +95,68 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
       .then((data) => setLotAnimaux((data.animaux ?? []).map((a: { id: string; nutrav: string; nobovi: string | null }) => ({ id: a.id, nutrav: a.nutrav, nom: a.nobovi }))));
   }, [targetMode, selectedGroupeId]);
 
-  const evenementsAplatis = useMemo(
-    () => CATEGORIES_EVENEMENT.flatMap((c) => c.evenements.map((e) => ({ evenement: e, categorie: c }))),
-    []
-  );
+  const resultatsRecherche = useMemo(() => searchTypesEvenement(query, catalogue).slice(0, 8), [query, catalogue]);
 
-  const resultatsRecherche = useMemo(() => {
-    const q = rechercheType.trim().toLowerCase();
-    if (!q) return [];
-    return evenementsAplatis.filter((r) => r.evenement.toLowerCase().includes(q));
-  }, [rechercheType, evenementsAplatis]);
+  const suggestions = useMemo(() => {
+    return recents
+      .map((r) => {
+        const type = r.typeEvenementId ? catalogue.find((c) => c.id === r.typeEvenementId) : undefined;
+        return type ? { id: type.id, nom: type.nom } : { id: `libre-${r.libelle}`, nom: r.libelle };
+      })
+      .filter((t, i, arr) => arr.findIndex((x) => x.nom === t.nom) === i)
+      .slice(0, 8);
+  }, [recents, catalogue]);
 
-  const categorieActive = CATEGORIES_EVENEMENT.find((c) => c.id === categorieActiveId);
-  const aFievre = symptomesSel.some((s) => s.libelle.toLowerCase().includes("fièvre"));
+  const aFievre = selectedTypes.some((t) => normalizeSearch(t.nom) === "fievre");
 
-  function isSelected(libelle: string) {
-    return symptomesSel.some((s) => s.libelle === libelle);
+  async function fetchQuestions(typeId: string) {
+    if (questionsByType[typeId] || typeId.startsWith("libre-")) return;
+    const res = await fetch(`/api/event-types/${typeId}/questions`);
+    const data: QuestionTemplateData[] = await res.json();
+    setQuestionsByType((prev) => ({ ...prev, [typeId]: data }));
   }
 
-  function toggleSymptome(libelle: string, categorieId: CategorieEvenementId, groupe: GroupeEvenementId) {
-    setSymptomesSel((prev) => {
-      if (prev.some((s) => s.libelle === libelle)) return prev.filter((s) => s.libelle !== libelle);
-      return [...prev, { libelle, categorieId, groupe }];
+  function ajouterType(t: TypeSelectionne) {
+    if (selectedTypes.some((s) => s.id === t.id)) return;
+    setSelectedTypes((prev) => [...prev, t]);
+    setQuery("");
+    fetchQuestions(t.id);
+  }
+
+  function retirerType(id: string) {
+    setSelectedTypes((prev) => prev.filter((t) => t.id !== id));
+    setAnswers((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
     });
+    if (panelOuvert === id) setPanelOuvert(null);
   }
 
-  function retirerSymptome(libelle: string) {
-    setSymptomesSel((prev) => prev.filter((s) => s.libelle !== libelle));
+  async function ajouterTypeLibre(nom: string) {
+    const texte = nom.trim();
+    if (!texte) return;
+    setAjoutLibreEnCours(true);
+    try {
+      const res = await fetch("/api/event-types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nom: texte }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data._reused) setCatalogue((prev) => [...prev, { id: data.id, nom: data.nom, synonymes: null }]);
+      ajouterType({ id: data.id, nom: data.nom });
+    } finally {
+      setAjoutLibreEnCours(false);
+    }
   }
 
-  function validerAutre() {
-    if (!autreTexte.trim()) return;
-    toggleSymptome(autreTexte.trim(), categorieActive?.id ?? "AUTRE", groupeActif);
-    setAutreTexte("");
-    setAutreOuvert(false);
+  function setAnswer(typeId: string, questionId: string, valeur: unknown) {
+    setAnswers((prev) => ({
+      ...prev,
+      [typeId]: { ...(prev[typeId] ?? {}), [questionId]: valeur },
+    }));
   }
 
   async function handlePhotoPick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -153,7 +180,7 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
 
   async function handleSubmit() {
     setError("");
-    if (symptomesSel.length === 0) { setError("Choisis au moins un symptôme ou événement"); return; }
+    if (selectedTypes.length === 0) { setError("Sélectionne au moins un événement"); return; }
     if (!date) { setError("La date est requise"); return; }
 
     const animaux = resolveAnimaux();
@@ -172,7 +199,18 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
         }
       }
 
-      const premier = symptomesSel[0];
+      const premier = selectedTypes[0];
+      const reponses: { questionId: string; valeur: string; libelleEnregistre: string }[] = [];
+      for (const t of selectedTypes) {
+        const qs = questionsByType[t.id] ?? [];
+        const a = answers[t.id] ?? {};
+        for (const q of qs) {
+          const v = a[q.id];
+          if (v === undefined || v === null || v === "") continue;
+          reponses.push({ questionId: q.id, valeur: JSON.stringify(v), libelleEnregistre: q.label });
+        }
+      }
+
       const res = await fetch("/api/evenements/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -180,9 +218,9 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
           animalIds: animaux.map((a) => a.id),
           date,
           moment,
-          categorie: premier.categorieId,
-          type: premier.libelle,
-          symptomes: symptomesSel.map((s) => ({ libelle: s.libelle, groupe: s.groupe })),
+          type: premier.nom,
+          symptomes: selectedTypes.map((t) => ({ libelle: t.nom, typeEvenementId: t.id.startsWith("libre-") ? null : t.id })),
+          reponses,
           temperature: temperature !== "" ? Number(temperature) : null,
           description: description || null,
           photos: photoUrl,
@@ -213,8 +251,9 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
   function nouveauEvenement() {
     setResult(null);
     setAjouterTraitement(null);
-    setSymptomesSel([]);
-    setCategorieActiveId(null);
+    setSelectedTypes([]);
+    setAnswers({});
+    setPanelOuvert(null);
     setTemperature("");
     setDescription("");
     setPhotoFile(null);
@@ -227,7 +266,7 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
       return (
         <TraitementApresEvenementForm
           targets={result.targets}
-          symptomesLibelles={symptomesSel.map((s) => s.libelle)}
+          symptomesLibelles={selectedTypes.map((t) => t.nom)}
           dateDebut={date}
           onDone={() => router.push("/sanitaire")}
           onSkip={() => setAjouterTraitement(null)}
@@ -279,6 +318,15 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
 
   return (
     <div className="space-y-4">
+      {showPickerModal && (
+        <AnimalPickerModal
+          selected={selectedAnimaux}
+          onChange={setSelectedAnimaux}
+          onClose={() => setShowPickerModal(false)}
+          groupes={groupes.map((g) => ({ id: g.id, nom: g.nom }))}
+        />
+      )}
+
       {/* Animal(s) concerné(s) */}
       <div className="bg-white rounded-xl shadow p-4">
         <h3 className="font-semibold text-gray-800 mb-3">Animal(x) concerné(s)</h3>
@@ -297,13 +345,31 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
           ))}
         </div>
 
-        {targetMode !== "lot" ? (
-          <AnimalPicker selected={selectedAnimaux} onChange={setSelectedAnimaux} multiple={targetMode === "plusieurs"} />
-        ) : (
+        {targetMode === "animal" && (
+          <AnimalPicker selected={selectedAnimaux} onChange={setSelectedAnimaux} multiple={false} />
+        )}
+
+        {targetMode === "plusieurs" && (
+          <div className="space-y-2">
+            <AnimalMultiEntry selected={selectedAnimaux} onChange={setSelectedAnimaux} />
+            <button
+              type="button"
+              onClick={() => setShowPickerModal(true)}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100"
+            >
+              <ListChecks size={13} /> Choisir dans le troupeau
+            </button>
+            {selectedAnimaux.length > 0 && (
+              <p className="text-xs text-gray-500">{selectedAnimaux.length} animal{selectedAnimaux.length > 1 ? "aux" : ""} sélectionné{selectedAnimaux.length > 1 ? "s" : ""}</p>
+            )}
+          </div>
+        )}
+
+        {targetMode === "lot" && (
           <div>
             <select
               value={selectedGroupeId}
-              onChange={(e) => setSelectedGroupeId(e.target.value)}
+              onChange={(e) => { setSelectedGroupeId(e.target.value); setLotDeplie(false); }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
             >
               <option value="">— Choisir un lot —</option>
@@ -311,13 +377,23 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
                 <option key={g.id} value={g.id}>{g.nom} ({g._count.animaux} animal{g._count.animaux > 1 ? "aux" : ""})</option>
               ))}
             </select>
-            {lotAnimaux.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {lotAnimaux.map((a) => (
-                  <span key={a.id} className="bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-2.5 py-1 text-xs">
-                    {a.nutrav}{a.nom ? ` — ${a.nom}` : ""}
-                  </span>
-                ))}
+            {selectedGroupeId && (
+              <div className="mt-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">{lotAnimaux.length} animal{lotAnimaux.length > 1 ? "aux" : ""} dans ce lot</span>
+                  <button type="button" onClick={() => setLotDeplie((v) => !v)} className="text-xs text-blue-600 hover:underline">
+                    {lotDeplie ? "Masquer" : "Voir les animaux"}
+                  </button>
+                </div>
+                {lotDeplie && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {lotAnimaux.map((a) => (
+                      <span key={a.id} className="bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-2.5 py-1 text-xs">
+                        {a.nutrav}{a.nom ? ` — ${a.nom}` : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -353,16 +429,16 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
         </div>
       </div>
 
-      {/* Symptômes / événements */}
+      {/* Que se passe-t-il ? */}
       <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">Ce que j&apos;observe ou constate</h3>
+        <h3 className="font-semibold text-gray-800 mb-3">Que se passe-t-il ?</h3>
 
-        {symptomesSel.length > 0 && (
+        {selectedTypes.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
-            {symptomesSel.map((s) => (
-              <span key={s.libelle} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-800 rounded-full pl-2.5 pr-1 py-1 text-xs font-medium">
-                {s.libelle}
-                <button type="button" onClick={() => retirerSymptome(s.libelle)} className="hover:bg-blue-100 rounded-full p-0.5">
+            {selectedTypes.map((t) => (
+              <span key={t.id} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-800 rounded-full pl-2.5 pr-1 py-1 text-xs font-medium">
+                {t.nom}
+                <button type="button" onClick={() => retirerType(t.id)} className="hover:bg-blue-100 rounded-full p-0.5">
                   <X size={11} />
                 </button>
               </span>
@@ -374,126 +450,73 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
           <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2">
             <Search size={15} className="text-gray-400 mr-2 shrink-0" />
             <input
-              value={rechercheType}
-              onChange={(e) => setRechercheType(e.target.value)}
-              placeholder="Rechercher un symptôme, une maladie, un soin…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && resultatsRecherche.length > 0) { e.preventDefault(); ajouterType({ id: resultatsRecherche[0].item.id, nom: resultatsRecherche[0].item.nom }); } }}
+              placeholder="Rechercher un symptôme, une maladie, un soin ou une intervention…"
               className="w-full text-sm outline-none"
             />
           </div>
-          {resultatsRecherche.length > 0 && (
-            <div className="absolute top-full left-0 right-0 bg-white border rounded-lg shadow-lg mt-1 z-10 max-h-56 overflow-y-auto">
+          {query.trim() && (
+            <div className="absolute top-full left-0 right-0 bg-white border rounded-lg shadow-lg mt-1 z-10 max-h-64 overflow-y-auto">
               {resultatsRecherche.map((r) => (
                 <button
-                  key={r.evenement}
+                  key={r.item.id}
                   type="button"
-                  onClick={() => { toggleSymptome(r.evenement, r.categorie.id, r.categorie.groupe); setRechercheType(""); }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
+                  onClick={() => ajouterType({ id: r.item.id, nom: r.item.nom })}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
                 >
-                  <span>{isSelected(r.evenement) ? "✓ " : ""}{r.evenement}</span>
-                  <span className="text-xs text-gray-400">{r.categorie.label}</span>
+                  {r.item.nom}
                 </button>
               ))}
+              {resultatsRecherche.length === 0 && (
+                <div className="px-3 py-2 text-sm text-gray-500">Aucun résultat pour « {query} »</div>
+              )}
+              <button
+                type="button"
+                disabled={ajoutLibreEnCours}
+                onClick={() => ajouterTypeLibre(query)}
+                className="w-full text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 border-t border-gray-100 disabled:opacity-50"
+              >
+                {ajoutLibreEnCours ? "Ajout…" : `+ Ajouter « ${query.trim()} » comme nouvel événement`}
+              </button>
             </div>
           )}
         </div>
 
-        {!rechercheType && recents.length > 0 && (
-          <div className="mb-3">
+        {!query.trim() && suggestions.length > 0 && (
+          <div className="mb-1">
             <p className="text-xs text-gray-400 mb-1.5">Récemment utilisés</p>
             <div className="flex flex-wrap gap-2">
-              {recents.map((r) => {
-                const cat = findCategorieByEvenement(r.libelle);
-                const groupe = (cat?.groupe ?? (r.groupe as GroupeEvenementId) ?? "OBSERVE") as GroupeEvenementId;
-                return (
-                  <button
-                    key={r.libelle}
-                    type="button"
-                    onClick={() => toggleSymptome(r.libelle, cat?.id ?? "AUTRE", groupe)}
-                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                      isSelected(r.libelle) ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-700 border-gray-300 hover:border-blue-400"
-                    }`}
-                  >
-                    {r.libelle}
-                  </button>
-                );
-              })}
+              {suggestions.map((s) => (
+                <button
+                  key={s.nom}
+                  type="button"
+                  onClick={() => ajouterType(s)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                    selectedTypes.some((t) => t.nom === s.nom) ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-700 border-gray-300 hover:border-blue-400"
+                  }`}
+                >
+                  {s.nom}
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        {!rechercheType && (
-          <>
-            <div className="flex gap-2 mb-3">
-              {GROUPES_EVENEMENT.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => { setGroupeActif(g.id); setCategorieActiveId(null); }}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    groupeActif === g.id ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-700 border-gray-300"
-                  }`}
-                >
-                  {g.label}
-                </button>
-              ))}
-            </div>
-
-            {!categorieActive ? (
-              <div className="grid grid-cols-2 gap-2">
-                {getCategoriesParGroupe(groupeActif).map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setCategorieActiveId(c.id)}
-                    className="text-left px-3 py-2.5 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-sm font-medium text-gray-700"
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div>
-                <button type="button" onClick={() => setCategorieActiveId(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 mb-2">
-                  <ChevronLeft size={14} /> Catégories
-                </button>
-                <p className="text-xs text-gray-400 mb-2">{categorieActive.label}</p>
-                <div className="flex flex-wrap gap-2">
-                  {categorieActive.evenements.map((e) => (
-                    <button
-                      key={e}
-                      type="button"
-                      onClick={() => toggleSymptome(e, categorieActive.id, categorieActive.groupe)}
-                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                        isSelected(e) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
-                      }`}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setAutreOuvert(true)}
-                    className="px-3 py-1.5 rounded-full text-sm border border-dashed border-gray-400 text-gray-600 hover:border-blue-400"
-                  >
-                    Autre (préciser)…
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {autreOuvert && (
-          <div className="flex gap-2 mt-3">
-            <input
-              value={autreTexte}
-              onChange={(e) => setAutreTexte(e.target.value)}
-              placeholder="Intitulé de l'événement"
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
-            <button type="button" onClick={validerAutre} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
-              OK
-            </button>
+        {selectedTypes.length > 0 && (
+          <div className="space-y-2 mt-3">
+            {selectedTypes.map((t) => (
+              <QuestionPanel
+                key={t.id}
+                typeNom={t.nom}
+                questions={questionsByType[t.id] ?? []}
+                answers={answers[t.id] ?? {}}
+                onAnswerChange={(qId, v) => setAnswer(t.id, qId, v)}
+                open={panelOuvert === t.id}
+                onToggle={() => setPanelOuvert((prev) => (prev === t.id ? null : t.id))}
+              />
+            ))}
           </div>
         )}
 

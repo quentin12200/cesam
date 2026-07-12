@@ -99,6 +99,8 @@ export interface EvenementCarnetRow {
   animalNom: string | null;
   categorie: string | null;
   type: string;
+  symptomes: string[];
+  temperature: number | null;
   moment: string | null;
   description: string | null;
   constatePar: string | null;
@@ -107,7 +109,10 @@ export interface EvenementCarnetRow {
 
 export async function getEvenementsCarnetRows(): Promise<EvenementCarnetRow[]> {
   const evenements = await prisma.evenementSanitaire.findMany({
-    include: { animal: { select: { id: true, nutrav: true, nobovi: true } } },
+    include: {
+      animal: { select: { id: true, nutrav: true, nobovi: true } },
+      symptomes: { select: { libelle: true } },
+    },
     orderBy: { date: "asc" },
   });
 
@@ -119,6 +124,8 @@ export async function getEvenementsCarnetRows(): Promise<EvenementCarnetRow[]> {
     animalNom: e.animal.nobovi,
     categorie: e.categorie,
     type: e.type,
+    symptomes: e.symptomes.map((s) => s.libelle),
+    temperature: e.temperature,
     moment: e.moment,
     description: e.description,
     constatePar: e.constatePar,

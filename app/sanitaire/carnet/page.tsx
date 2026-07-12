@@ -188,7 +188,10 @@ function EvenementsTable({ rows, showAnimal }: { rows: EvenementCarnetRow[]; sho
             {showAnimal && <Td>{r.animalNutrav}</Td>}
             {showAnimal && <Td>{r.animalNom ?? "—"}</Td>}
             <Td>{getCategorieLabel(r.categorie)}</Td>
-            <Td className="font-medium">{r.type}</Td>
+            <Td className="font-medium">
+              {r.symptomes.length > 1 ? r.symptomes.join(" • ") : r.type}
+              {r.temperature != null ? ` (${r.temperature}°C)` : ""}
+            </Td>
             <Td>{r.description ?? "—"}</Td>
             <Td>{r.constatePar ?? "—"}</Td>
             <Td className={!r.resolu ? "font-semibold text-red-700" : ""}>{r.resolu ? "Résolu" : "En cours"}</Td>

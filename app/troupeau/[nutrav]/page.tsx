@@ -86,7 +86,7 @@ async function getAnimal(nutrav: string) {
         orderBy: { danais: "desc" },
       },
       vaccinations: { orderBy: { date: "asc" } },
-      evenements: { orderBy: { date: "desc" }, include: { symptomes: true } },
+      evenements: { orderBy: { date: "desc" }, include: { symptomes: true, reponses: { include: { question: true } } } },
       traitements: {
         orderBy: { dateDebut: "desc" },
         take: 10,
@@ -656,6 +656,12 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               evenements={animal.evenements.map((e) => ({
                 ...e,
                 symptomes: e.symptomes.map((s) => ({ libelle: s.libelle })),
+                reponses: e.reponses.map((r) => ({
+                  id: r.id,
+                  libelleEnregistre: r.libelleEnregistre,
+                  valeur: r.valeur,
+                  questionType: r.question.type,
+                })),
               }))}
             />
           </>

@@ -5,15 +5,28 @@ import { logAction } from "@/lib/action-log";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { animalIds, nutravs, date, moment, categorie, type, symptomes, temperature, description, photos, constatePar } = body;
+    const { animalIds, nutravs, date, moment, categorie, type, symptomes, reponses, temperature, description, photos, constatePar } = body;
 
     if (!type?.trim() || !date) {
       return NextResponse.json({ error: "type et date requis" }, { status: 400 });
     }
 
-    const symptomesList: { libelle: string; groupe?: string | null }[] = Array.isArray(symptomes)
-      ? symptomes.filter((s: { libelle?: string }) => s?.libelle?.trim()).map((s: { libelle: string; groupe?: string | null }) => ({ libelle: s.libelle.trim(), groupe: s.groupe ?? null }))
+    const symptomesList: { libelle: string; typeEvenementId?: string | null }[] = Array.isArray(symptomes)
+      ? symptomes
+          .filter((s: { libelle?: string }) => s?.libelle?.trim())
+          .map((s: { libelle: string; typeEvenementId?: string | null }) => ({ libelle: s.libelle.trim(), typeEvenementId: s.typeEvenementId ?? null }))
       : [];
+
+    const reponsesList: { questionId: string; valeur: string; libelleEnregistre: string }[] = Array.isArray(reponses)
+      ? reponses.filter((r: { questionId?: string; valeur?: unknown }) => r?.questionId && r.valeur !== undefined)
+      : [];
+
+    let resolvedCategorie: string | null = categorie ?? null;
+    const premierTypeId = symptomesList[0]?.typeEvenementId;
+    if (!resolvedCategorie && premierTypeId) {
+      const premierType = await prisma.typeEvenement.findUnique({ where: { id: premierTypeId }, select: { categorie: true } });
+      resolvedCategorie = premierType?.categorie ?? null;
+    }
 
     let ids: string[] = Array.isArray(animalIds) ? animalIds : [];
     if (ids.length === 0 && Array.isArray(nutravs) && nutravs.length > 0) {
@@ -36,7 +49,7 @@ export async function POST(request: NextRequest) {
         prisma.evenementSanitaire.create({
           data: {
             animalId,
-            categorie: categorie ?? null,
+            categorie: resolvedCategorie,
             type: type.trim(),
             date: resolvedDate,
             moment: moment ?? null,
@@ -46,7 +59,10 @@ export async function POST(request: NextRequest) {
             constatePar: constatePar?.trim() || null,
             updatedAt: now,
             ...(symptomesList.length > 0
-              ? { symptomes: { create: symptomesList.map((s) => ({ libelle: s.libelle, groupe: s.groupe ?? null })) } }
+              ? { symptomes: { create: symptomesList.map((s) => ({ libelle: s.libelle, typeEvenementId: s.typeEvenementId ?? null })) } }
+              : {}),
+            ...(reponsesList.length > 0
+              ? { reponses: { create: reponsesList.map((r) => ({ questionId: r.questionId, valeur: r.valeur, libelleEnregistre: r.libelleEnregistre })) } }
               : {}),
           },
         })

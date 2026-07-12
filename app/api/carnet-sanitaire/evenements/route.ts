@@ -17,7 +17,8 @@ function toCsvRow(r: EvenementCarnetRow): string {
     r.animalNutrav,
     r.animalNom ?? "",
     getCategorieLabel(r.categorie),
-    r.type,
+    r.symptomes.length > 1 ? r.symptomes.join(" • ") : r.type,
+    r.temperature != null ? String(r.temperature) : "",
     r.description ?? "",
     r.constatePar ?? "",
     r.resolu ? "Résolu" : "En cours",
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     : rows;
 
   const header = [
-    "Date", "Moment", "N° Travail", "Nom", "Catégorie", "Événement", "Commentaire", "Constaté par", "Statut",
+    "Date", "Moment", "N° Travail", "Nom", "Catégorie", "Événement", "Température", "Commentaire", "Constaté par", "Statut",
   ].map(csvEscape).join(";");
 
   const csv = "﻿" + [header, ...orderedRows.map(toCsvRow)].join("\r\n");

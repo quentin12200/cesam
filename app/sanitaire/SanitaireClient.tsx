@@ -77,6 +77,7 @@ export interface EvenementItem {
   animalNutrav: string;
   animalNom: string | null;
   type: string;
+  symptomes: string[];
   date: string;
   description: string | null;
 }
@@ -759,7 +760,9 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{e.animalNutrav}</span>
                         <span className="text-sm font-medium text-gray-800">{e.animalNom ?? ""}</span>
-                        <span className="text-xs font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded">{e.type}</span>
+                        <span className="text-xs font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
+                          {e.symptomes.length > 1 ? e.symptomes.join(" • ") : e.type}
+                        </span>
                       </div>
                       {e.description && (
                         <p className="text-xs text-gray-600 mt-1 truncate">{e.description}</p>
