@@ -9,8 +9,8 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
   const {
-    nom, dci, categorie, voie, dosagePourKg, uniteDosage,
-    delaiAttenteViandeJ, prescriptionRequise, actif,
+    nom, dci, forme, categorie, voie, dosagePourKg, uniteDosage,
+    delaiAttenteViandeJ, prescriptionRequise, actif, commentaire,
     stockActuel, stockUnite, stockSeuilAlert,
   } = body;
 
@@ -20,6 +20,7 @@ export async function PATCH(
   const prevFields: Record<string, unknown> = {};
   if (nom !== undefined) prevFields.nom = prev.nom;
   if (dci !== undefined) prevFields.dci = prev.dci;
+  if (forme !== undefined) prevFields.forme = prev.forme;
   if (categorie !== undefined) prevFields.categorie = prev.categorie;
   if (voie !== undefined) prevFields.voie = prev.voie;
   if (dosagePourKg !== undefined) prevFields.dosagePourKg = prev.dosagePourKg;
@@ -27,6 +28,7 @@ export async function PATCH(
   if (delaiAttenteViandeJ !== undefined) prevFields.delaiAttenteViandeJ = prev.delaiAttenteViandeJ;
   if (prescriptionRequise !== undefined) prevFields.prescriptionRequise = prev.prescriptionRequise;
   if (actif !== undefined) prevFields.actif = prev.actif;
+  if (commentaire !== undefined) prevFields.commentaire = prev.commentaire;
   if (stockActuel !== undefined) prevFields.stockActuel = prev.stockActuel;
   if (stockUnite !== undefined) prevFields.stockUnite = prev.stockUnite;
   if (stockSeuilAlert !== undefined) prevFields.stockSeuilAlert = prev.stockSeuilAlert;
@@ -37,6 +39,7 @@ export async function PATCH(
       data: {
         ...(nom !== undefined && { nom: nom.trim().toUpperCase() }),
         ...(dci !== undefined && { dci: dci?.trim() || null }),
+        ...(forme !== undefined && { forme: forme?.trim() || null }),
         ...(categorie !== undefined && { categorie }),
         ...(voie !== undefined && { voie: voie?.trim() || null }),
         ...(dosagePourKg !== undefined && { dosagePourKg }),
@@ -44,6 +47,7 @@ export async function PATCH(
         ...(delaiAttenteViandeJ !== undefined && { delaiAttenteViandeJ }),
         ...(prescriptionRequise !== undefined && { prescriptionRequise }),
         ...(actif !== undefined && { actif }),
+        ...(commentaire !== undefined && { commentaire: commentaire?.trim() || null }),
         ...(stockActuel !== undefined && { stockActuel: stockActuel != null ? Number(stockActuel) : null }),
         ...(stockUnite !== undefined && { stockUnite: stockUnite?.trim() || null }),
         ...(stockSeuilAlert !== undefined && { stockSeuilAlert: stockSeuilAlert != null ? Number(stockSeuilAlert) : null }),

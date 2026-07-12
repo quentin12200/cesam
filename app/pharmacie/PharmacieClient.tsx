@@ -247,6 +247,9 @@ function MedicamentCard({ med }: { med: MedicamentItem }) {
             <StockBadge stock={med.stockActuel} seuil={med.stockSeuilAlert} unite={med.stockUnite} />
           </div>
           {med.dci && <div className="text-xs text-gray-500 mt-0.5">{med.dci}</div>}
+          <Link href={`/pharmacie/${med.id}`} className="text-xs text-blue-600 hover:underline mt-0.5 inline-block">
+            Fiche & préconisations →
+          </Link>
 
           {editing ? (
             <div className="mt-2 space-y-2">
