@@ -32,8 +32,10 @@ export function getFirebaseStorage(): FirebaseStorage {
   return storage;
 }
 
-export async function uploadEvenementPhoto(dataUrl: string, path: string): Promise<string> {
+export async function uploadDataUrlToStorage(dataUrl: string, path: string): Promise<string> {
   const storageRef = ref(getFirebaseStorage(), path);
   await uploadString(storageRef, dataUrl, "data_url");
   return getDownloadURL(storageRef);
 }
+
+export const uploadEvenementPhoto = uploadDataUrlToStorage;

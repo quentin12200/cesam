@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { animalId, medicamentId, medicamentNom, dateDebut, dureeJours, voie, dose, uniteDosage, motif, veterinaire, ordonnanceNumero, notes } = body;
+  const { animalId, medicamentId, medicamentNom, dateDebut, dureeJours, voie, dose, uniteDosage, motif, veterinaire, ordonnanceNumero, ordonnanceId, notes } = body;
 
   if (!animalId || !medicamentNom?.trim() || !dateDebut) {
     return NextResponse.json({ error: "animalId, medicamentNom et dateDebut requis" }, { status: 400 });
@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       motif: motif?.trim() || null,
       veterinaire: veterinaire?.trim() || null,
       ordonnanceNumero: ordonnanceNumero?.trim() || null,
+      ordonnanceId: ordonnanceId ?? null,
       notes: notes?.trim() || null,
       statut: "EN_COURS",
     },

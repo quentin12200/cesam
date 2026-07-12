@@ -2,7 +2,9 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ScanLine, Loader2, Archive, Trash2, FileText, Save, X } from "lucide-react";
+import Link from "next/link";
+import { Plus, ScanLine, Loader2, Archive, FileText, Save, X, Camera } from "lucide-react";
+import { scanAndPersistOrdonnance, type OrdonnanceExtracted } from "@/lib/scan-ordonnance-client";
 
 export interface OrdonnanceItem {
   id: string;
@@ -18,31 +20,23 @@ export interface OrdonnanceItem {
   animaux: string | null;
   statut: string;
   notes: string | null;
-}
-
-interface ScanResult {
-  medicamentNom: string | null;
-  voie: string | null;
-  dose: number | null;
-  uniteDosage: string | null;
-  dureeJours: number | null;
-  dateDebut: string | null;
-  veterinaire: string | null;
-  motif: string | null;
+  photoUrl: string | null;
 }
 
 function OrdonnanceForm({
   onClose,
   initial,
+  existingId,
 }: {
   onClose: () => void;
-  initial?: Partial<ScanResult>;
+  initial?: Partial<OrdonnanceExtracted>;
+  existingId?: string | null;
 }) {
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
 
   const [date, setDate] = useState(initial?.dateDebut?.slice(0, 10) ?? today);
-  const [numero, setNumero] = useState("");
+  const [numero, setNumero] = useState(initial?.ordonnanceNumero ?? "");
   const [veterinaireNom, setVeterinaireNom] = useState(initial?.veterinaire ?? "");
   const [medicamentNom, setMedicamentNom] = useState(initial?.medicamentNom ?? "");
   const [dose, setDose] = useState(initial?.dose != null ? String(initial.dose) : "");
@@ -56,22 +50,31 @@ function OrdonnanceForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    await fetch("/api/ordonnances", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        date,
-        numero: numero || null,
-        veterinaireNom: veterinaireNom || null,
-        medicamentNom,
-        dose: dose !== "" ? Number(dose) : null,
-        uniteDosage: uniteDosage || null,
-        voie: voie || null,
-        dureeJours: dureeJours !== "" ? Number(dureeJours) : null,
-        motif: motif || null,
-        animaux: animaux || null,
-      }),
-    });
+    const payload = {
+      date,
+      numero: numero || null,
+      veterinaireNom: veterinaireNom || null,
+      medicamentNom,
+      dose: dose !== "" ? Number(dose) : null,
+      uniteDosage: uniteDosage || null,
+      voie: voie || null,
+      dureeJours: dureeJours !== "" ? Number(dureeJours) : null,
+      motif: motif || null,
+      animaux: animaux || null,
+    };
+    if (existingId) {
+      await fetch(`/api/ordonnances/${existingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await fetch("/api/ordonnances", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
     setSaving(false);
     onClose();
     router.refresh();
@@ -184,7 +187,7 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
   return (
     <div className={`bg-white rounded-xl shadow border p-4 ${ord.statut === "ARCHIVE" ? "opacity-60" : ""}`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
+        <Link href={`/ordonnances/${ord.id}`} className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded font-bold text-gray-700">
               {dateStr}
@@ -192,6 +195,11 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
             {ord.numero && (
               <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
                 n°{ord.numero}
+              </span>
+            )}
+            {ord.photoUrl && (
+              <span className="flex items-center gap-1 text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200">
+                <Camera size={11} /> Document
               </span>
             )}
             {ord.statut === "ARCHIVE" && (
@@ -219,7 +227,7 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
           {ord.animaux && (
             <div className="text-xs text-gray-400 mt-0.5">Animaux : {ord.animaux}</div>
           )}
-        </div>
+        </Link>
 
         <button
           onClick={archive}
@@ -234,19 +242,11 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
   );
 }
 
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function OrdonnancesClient({ ordonnances }: { ordonnances: OrdonnanceItem[] }) {
   const [showForm, setShowForm] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [pendingScan, setPendingScan] = useState<ScanResult | undefined>();
+  const [pendingScan, setPendingScan] = useState<OrdonnanceExtracted | undefined>();
+  const [pendingOrdonnanceId, setPendingOrdonnanceId] = useState<string | null>(null);
   const [showArchives, setShowArchives] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -256,18 +256,10 @@ export default function OrdonnancesClient({ ordonnances }: { ordonnances: Ordonn
     e.target.value = "";
     setScanning(true);
     try {
-      const base64 = await fileToBase64(file);
-      const mimeType = file.type || "image/jpeg";
-      const res = await fetch("/api/scan-ordonnance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64, mimeType }),
-      });
-      if (res.ok) {
-        const result: ScanResult = await res.json();
-        setPendingScan(result);
-        setShowForm(true);
-      }
+      const { ordonnanceId, extracted } = await scanAndPersistOrdonnance(file);
+      setPendingScan(extracted);
+      setPendingOrdonnanceId(ordonnanceId);
+      setShowForm(true);
     } finally {
       setScanning(false);
     }
@@ -289,7 +281,7 @@ export default function OrdonnancesClient({ ordonnances }: { ordonnances: Ordonn
           {scanning ? "Scan…" : "Scanner ordonnance"}
         </button>
         <button
-          onClick={() => { setShowForm((v) => !v); setPendingScan(undefined); }}
+          onClick={() => { setShowForm((v) => !v); setPendingScan(undefined); setPendingOrdonnanceId(null); }}
           className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-sm"
         >
           <Plus size={15} /> Nouvelle
@@ -300,7 +292,8 @@ export default function OrdonnancesClient({ ordonnances }: { ordonnances: Ordonn
       {showForm && (
         <OrdonnanceForm
           initial={pendingScan}
-          onClose={() => { setShowForm(false); setPendingScan(undefined); }}
+          existingId={pendingOrdonnanceId}
+          onClose={() => { setShowForm(false); setPendingScan(undefined); setPendingOrdonnanceId(null); }}
         />
       )}
 

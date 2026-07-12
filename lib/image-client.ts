@@ -1,3 +1,17 @@
+export function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Lecture du fichier échouée"));
+    reader.readAsDataURL(file);
+  });
+}
+
+export function fileToDocumentDataUrl(file: File, maxDim = 1600, quality = 0.8): Promise<string> {
+  if (!file.type.startsWith("image/")) return fileToDataUrl(file);
+  return fileToResizedDataUrl(file, maxDim, quality);
+}
+
 export function fileToResizedDataUrl(file: File, maxDim = 1280, quality = 0.75): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

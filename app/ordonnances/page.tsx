@@ -24,6 +24,7 @@ async function getOrdonnances(): Promise<OrdonnanceItem[]> {
     animaux: o.animaux,
     statut: o.statut,
     notes: o.notes,
+    photoUrl: o.photoUrl,
   }));
 }
 

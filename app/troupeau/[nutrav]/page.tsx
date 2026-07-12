@@ -630,6 +630,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 delaiAttenteViandeJ: t.medicament?.delaiAttenteViandeJ ?? null,
                 delaiAttenteLaitJ: t.medicament?.delaiAttenteLaitJ ?? null,
                 ordonnanceNumero: t.ordonnanceNumero,
+                ordonnanceId: t.ordonnanceId,
               }))}
             />
 

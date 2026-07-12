@@ -4,8 +4,10 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Pill, Plus, Clock, CheckCircle2, AlertTriangle, ScanLine, Loader2 } from "lucide-react";
 import { addDays } from "date-fns";
+import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import TraitementForm from "./TraitementForm";
+import { scanAndPersistOrdonnance } from "@/lib/scan-ordonnance-client";
 
 interface TraitementRow {
   id: string;
@@ -20,6 +22,7 @@ interface TraitementRow {
   delaiAttenteViandeJ: number | null;
   delaiAttenteLaitJ: number | null;
   ordonnanceNumero: string | null;
+  ordonnanceId: string | null;
 }
 
 interface ScanResult {
@@ -43,6 +46,7 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [pendingScan, setPendingScan] = useState<ScanResult | undefined>();
+  const [pendingOrdonnanceId, setPendingOrdonnanceId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const now = new Date();
@@ -53,19 +57,9 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
     e.target.value = "";
     setScanning(true);
     try {
-      const base64 = await fileToBase64(file);
-      const mimeType = file.type || "image/jpeg";
-      const res = await fetch("/api/scan-ordonnance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64, mimeType }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Erreur serveur");
-      }
-      const result: ScanResult = await res.json();
-      setPendingScan(result);
+      const { ordonnanceId, extracted } = await scanAndPersistOrdonnance(file);
+      setPendingScan(extracted);
+      setPendingOrdonnanceId(ordonnanceId);
       setShowForm(true);
     } finally {
       setScanning(false);
@@ -103,14 +97,21 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
             {scanning ? "Scan..." : "Scanner"}
           </button>
           <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFilePick} />
-          <button onClick={() => { setShowForm((v) => !v); setPendingScan(undefined); }}
+          <button onClick={() => { setShowForm((v) => !v); setPendingScan(undefined); setPendingOrdonnanceId(null); }}
             className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
             <Plus size={13} /> Nouveau
           </button>
         </div>
       </div>
 
-      {showForm && <TraitementForm animalId={animalId} onClose={() => { setShowForm(false); setPendingScan(undefined); }} initialScan={pendingScan} />}
+      {showForm && (
+        <TraitementForm
+          animalId={animalId}
+          onClose={() => { setShowForm(false); setPendingScan(undefined); setPendingOrdonnanceId(null); }}
+          initialScan={pendingScan}
+          initialOrdonnanceId={pendingOrdonnanceId}
+        />
+      )}
 
       {traitements.length === 0 && !showForm ? (
         <div className="text-center py-6 text-gray-400 text-sm">Aucun traitement enregistré</div>
@@ -142,7 +143,15 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
                     {t.motif && <div className="text-xs text-gray-500 mt-0.5">{t.motif}</div>}
                     <div className="text-xs text-gray-400 mt-1 flex flex-wrap gap-2">
                       <span>Du {formatDate(dateDebut)} — {t.dureeJours}j</span>
-                      {t.ordonnanceNumero && <span>N° ordonnance : {t.ordonnanceNumero}</span>}
+                      {t.ordonnanceNumero && (
+                        t.ordonnanceId ? (
+                          <Link href={`/ordonnances/${t.ordonnanceId}`} className="text-blue-600 hover:underline">
+                            N° ordonnance : {t.ordonnanceNumero}
+                          </Link>
+                        ) : (
+                          <span>N° ordonnance : {t.ordonnanceNumero}</span>
+                        )
+                      )}
                       {enCours && (
                         <span className="flex items-center gap-1 text-blue-600">
                           <Clock size={10} /> jusqu&apos;au {formatDate(dateFin)}
@@ -179,16 +188,4 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
       )}
     </div>
   );
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(",")[1]);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
