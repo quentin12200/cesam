@@ -204,7 +204,7 @@ export default function TraitementApresEvenementForm({ targets, symptomesLibelle
 
   const dateFin = useMemo(() => {
     try {
-      return addDays(new Date(dateDebutTraitement), (Number(dureeJours) || 1) - 1);
+      return addDays(new Date(dateDebutTraitement), Number(dureeJours) || 1);
     } catch {
       return new Date(dateDebutTraitement);
     }

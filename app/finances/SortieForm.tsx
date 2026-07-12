@@ -2,7 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 import { CAUSES_MORTALITE, CAUSES_MORTALITE_LABELS } from "@/lib/utils";
+
+interface AttenteInfo {
+  enAttente: boolean;
+  enAttenteViande: boolean;
+  enAttenteLait: boolean;
+  dateFinAttenteViande: string | null;
+  dateFinAttenteLait: string | null;
+  medicamentNom: string | null;
+}
 
 interface Animal {
   id: string;
@@ -41,6 +51,17 @@ export default function SortieForm({ animaux, annee }: Props) {
   const [causeMortalite, setCauseMortalite] = useState("");
   const [causeMortaliteCustom, setCauseMortaliteCustom] = useState("");
   const [causesPersonnalisees, setCausesPersonnalisees] = useState<string[]>([]);
+  const [attenteInfo, setAttenteInfo] = useState<AttenteInfo | null>(null);
+  const [confirmeAttente, setConfirmeAttente] = useState(false);
+
+  useEffect(() => {
+    setConfirmeAttente(false);
+    if (!animalId) { setAttenteInfo(null); return; }
+    fetch(`/api/traitements/attente?animalId=${animalId}`)
+      .then((r) => r.json())
+      .then(setAttenteInfo)
+      .catch(() => setAttenteInfo(null));
+  }, [animalId]);
 
   useEffect(() => {
     if (type !== "MORT") return;
@@ -78,6 +99,10 @@ export default function SortieForm({ animaux, annee }: Props) {
       setError("La cause de mortalité est obligatoire");
       return;
     }
+    if (type === "BOUCHERIE" && attenteInfo?.enAttenteViande && !confirmeAttente) {
+      setError("Cet animal est encore en délai d'attente viande — coche la case de confirmation pour valider quand même");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -100,6 +125,7 @@ export default function SortieForm({ animaux, annee }: Props) {
                 ? causeMortaliteCustom.trim()
                 : causeMortalite || null)
             : null,
+          confirmeAttente,
         }),
       });
       if (!res.ok) {
@@ -142,6 +168,27 @@ export default function SortieForm({ animaux, annee }: Props) {
           ))}
         </select>
       </div>
+
+      {attenteInfo?.enAttente && (
+        <div className="bg-orange-50 border border-orange-300 rounded-lg p-3 text-sm">
+          <div className="flex items-start gap-2 text-orange-800 font-medium">
+            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+            <span>
+              Cet animal est encore en délai d&apos;attente
+              {attenteInfo.enAttenteViande && attenteInfo.dateFinAttenteViande && ` viande jusqu'au ${new Date(attenteInfo.dateFinAttenteViande).toLocaleDateString("fr-FR")}`}
+              {attenteInfo.enAttenteViande && attenteInfo.enAttenteLait ? " et" : ""}
+              {attenteInfo.enAttenteLait && attenteInfo.dateFinAttenteLait && ` lait jusqu'au ${new Date(attenteInfo.dateFinAttenteLait).toLocaleDateString("fr-FR")}`}
+              {attenteInfo.medicamentNom && ` (${attenteInfo.medicamentNom})`}.
+            </span>
+          </div>
+          {type === "BOUCHERIE" && attenteInfo.enAttenteViande && (
+            <label className="flex items-start gap-2 mt-2 text-orange-900">
+              <input type="checkbox" checked={confirmeAttente} onChange={(e) => setConfirmeAttente(e.target.checked)} className="mt-0.5" />
+              <span className="text-xs">Je confirme être informé du délai d&apos;attente et je valide quand même cette sortie boucherie.</span>
+            </label>
+          )}
+        </div>
+      )}
 
       {/* Type */}
       <div>

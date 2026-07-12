@@ -61,8 +61,8 @@ export default async function SanitaireImpressionPage() {
     dureeJours: t.dureeJours,
     motif: t.motif,
     statut: t.statut,
-    delaiAttenteViandeJ: t.medicament?.delaiAttenteViandeJ ?? null,
-    delaiAttenteLaitJ: t.medicament?.delaiAttenteLaitJ ?? null,
+    delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
+    delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
   }));
 
   return (

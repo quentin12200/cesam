@@ -203,16 +203,28 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     medicamentNom: t.medicamentNom,
     dateDebut: t.dateDebut.toISOString(),
     dureeJours: t.dureeJours,
-    delaiAttenteViandeJ: t.medicament?.delaiAttenteViandeJ ?? null,
-    delaiAttenteLaitJ: t.medicament?.delaiAttenteLaitJ ?? null,
+    delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
+    delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
   }));
 
   return { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements };
 }
 
+async function getAffichageDelaiAttente(): Promise<string> {
+  try {
+    const config = await prisma.exploitationConfig.findUnique({ where: { id: "singleton" } });
+    return config?.affichageDelaiAttente ?? "LES_DEUX";
+  } catch {
+    return "LES_DEUX";
+  }
+}
+
 export default async function SanitairePage() {
   const protocoles = await getProtocoles();
-  const { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements } = await getSanitaireData(protocoles);
+  const [{ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements }, affichageDelaiAttente] = await Promise.all([
+    getSanitaireData(protocoles),
+    getAffichageDelaiAttente(),
+  ]);
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
@@ -271,6 +283,7 @@ export default async function SanitairePage() {
         protocoles={protocoles}
         evenements={evenements}
         traitements={traitements}
+        affichageDelaiAttente={affichageDelaiAttente}
       />
     </div>
   );

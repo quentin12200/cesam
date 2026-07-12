@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { getVaccinProtocolSteps, formatAgeCompact, type ProtocoleVaccinConfig } from "@/lib/utils";
 import { addDays } from "date-fns";
+import { getAttenteInfo } from "@/lib/withdrawal";
 
 interface AnimalRow {
   id: string;
@@ -285,9 +286,10 @@ export default function ImpressionClient({
                 {traitements.map((t, i) => {
                   const debut = new Date(t.dateDebut);
                   const fin = addDays(debut, t.dureeJours);
-                  const finAttente = t.delaiAttenteViandeJ != null ? addDays(fin, t.delaiAttenteViandeJ + 1) : null;
+                  const attente = getAttenteInfo(fin, t.delaiAttenteViandeJ, t.delaiAttenteLaitJ, now);
+                  const finAttente = attente.dateFinAttenteViande;
                   const enCours = now < fin && t.statut === "EN_COURS";
-                  const enAttente = finAttente != null ? now < finAttente : false;
+                  const enAttente = attente.enAttente;
 
                   return (
                     <tr key={t.id} className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50"} ${enCours ? "bg-blue-50" : enAttente ? "bg-orange-50" : ""}`}>

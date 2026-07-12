@@ -31,6 +31,7 @@ export interface AnimalRow {
   veauNutrav: string | null;
   veauStatut: string | null;
   veauSevreFait: boolean | null;
+  enAttente: boolean;
 }
 
 interface Props {
@@ -359,6 +360,11 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                     >
                       {animal.sexbov === "F" ? "♀" : "♂"} {catLabel}
                     </span>
+                    {animal.enAttente && (
+                      <span className="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700" title="Délai d'attente en cours">
+                        ⏱
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2.5">
                     {etat ? (
