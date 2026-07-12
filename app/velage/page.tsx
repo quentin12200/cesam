@@ -7,7 +7,7 @@ import Link from "next/link";
 import VelageFormWrapper from "./VelageFormWrapper";
 import CapteurManager from "./CapteurManager";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
-import { GestationCalendarTable } from "@/app/components/GestationCalendarTable";
+import GestationCalendarSection from "@/app/components/GestationCalendarSection";
 
 async function getVelageData() {
   const now = new Date();
@@ -62,7 +62,7 @@ export default async function VelagePage() {
             Imprimer
           </Link>
         </div>
-        <GestationCalendarTable rows={gestationCalendar} now={now} />
+        <GestationCalendarSection rows={gestationCalendar} now={now} />
       </div>
 
       {/* Capteurs — composant interactif */}
