@@ -56,3 +56,34 @@ export async function PATCH(
     return NextResponse.json({ error: "Événement non trouvé" }, { status: 404 });
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  const evenement = await prisma.evenementSanitaire.findUnique({
+    where: { id },
+    include: { animal: { select: { nutrav: true, nobovi: true } } },
+  });
+  if (!evenement) return NextResponse.json({ error: "Non trouvé" }, { status: 404 });
+
+  // Un traitement peut avoir été créé depuis cet événement : on garde le traitement,
+  // on détache seulement le lien (evenementId n'a pas de contrainte d'intégrité en SQLite ici).
+  await prisma.traitement.updateMany({ where: { evenementId: id }, data: { evenementId: null } });
+  await prisma.evenementSanitaire.delete({ where: { id } });
+
+  const desc = `Événement "${evenement.type}" retiré de ${evenement.animal.nobovi ?? evenement.animal.nutrav}`;
+  let undoId = "";
+  try {
+    undoId = await logAction("DELETE_EVENEMENT_SANITAIRE", desc, { op: "create", model: "evenementSanitaire", data: {
+      animalId: evenement.animalId, categorie: evenement.categorie, type: evenement.type, date: evenement.date,
+      moment: evenement.moment, temperature: evenement.temperature, description: evenement.description,
+      photos: evenement.photos, constatePar: evenement.constatePar, resolu: evenement.resolu,
+      dateResolu: evenement.dateResolu, updatedAt: new Date(),
+    } });
+  } catch {}
+
+  return NextResponse.json({ ok: true, _undoId: undoId, _undoDesc: desc });
+}

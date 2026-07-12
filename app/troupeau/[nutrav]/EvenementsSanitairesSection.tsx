@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CheckCircle2, ChevronDown, Pencil } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, Pencil, Settings2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { getCategorieLabel } from "@/lib/evenements-sanitaires";
+import EvenementEditPanel from "./EvenementEditPanel";
 
 export interface ReponseRow {
   id: string;
+  questionId: string;
   libelleEnregistre: string;
   valeur: string;
   questionType: string;
@@ -24,7 +26,7 @@ export interface EvenementRow {
   photos: string | null;
   constatePar: string | null;
   resolu: boolean;
-  symptomes: { libelle: string }[];
+  symptomes: { id: string; libelle: string; typeEvenementId: string | null }[];
   reponses: ReponseRow[];
 }
 
@@ -45,6 +47,7 @@ export default function EvenementsSanitairesSection({ evenements }: { evenements
   const [detailsOuverts, setDetailsOuverts] = useState<Set<string>>(new Set());
   const [editTempId, setEditTempId] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState("");
+  const [editionOuverte, setEditionOuverte] = useState<string | null>(null);
 
   async function toggleResolu(evt: EvenementRow) {
     setLoadingId(evt.id);
@@ -180,14 +183,33 @@ export default function EvenementsSanitairesSection({ evenements }: { evenements
                 </div>
               )}
 
-              <button
-                onClick={() => toggleResolu(evt)}
-                disabled={loadingId === evt.id}
-                className="mt-2 flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-              >
-                <CheckCircle2 size={12} />
-                {evt.resolu ? "Marquer non résolu" : "Marquer résolu"}
-              </button>
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  onClick={() => toggleResolu(evt)}
+                  disabled={loadingId === evt.id}
+                  className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <CheckCircle2 size={12} />
+                  {evt.resolu ? "Marquer non résolu" : "Marquer résolu"}
+                </button>
+                <button
+                  onClick={() => setEditionOuverte((prev) => (prev === evt.id ? null : evt.id))}
+                  className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50"
+                >
+                  <Settings2 size={12} />
+                  {editionOuverte === evt.id ? "Fermer" : "Modifier"}
+                </button>
+              </div>
+
+              {editionOuverte === evt.id && (
+                <EvenementEditPanel
+                  evenementId={evt.id}
+                  symptomes={evt.symptomes}
+                  reponses={evt.reponses.map((r) => ({ questionId: r.questionId, valeur: r.valeur }))}
+                  onClose={() => setEditionOuverte(null)}
+                  onChanged={() => router.refresh()}
+                />
+              )}
             </div>
           );
         })}
