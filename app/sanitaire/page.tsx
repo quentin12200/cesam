@@ -13,9 +13,8 @@ import SanitaireClient, {
   type RecentItem,
   type VeauProtocolItem,
   type EvenementItem,
-  type TraitementActifItem,
 } from "./SanitaireClient";
-import { type TraitementItem } from "./TraitementsTab";
+import { type TraitementItem } from "./EvenementsTab";
 
 async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
   try {
@@ -30,7 +29,7 @@ async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
 async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
   const now = new Date();
 
-  const [animaux, vaccinationsRecentes, vachesAvecGestation, evenementsRaw, traitementsRaw, traitementsDetailRaw] = await Promise.all([
+  const [animaux, vaccinationsRecentes, vachesAvecGestation, evenementsRaw, traitementsRaw] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
       include: { vaccinations: { select: { id: true, vaccin: true, date: true } } },
@@ -50,19 +49,9 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
       },
     }),
     prisma.evenementSanitaire.findMany({
-      where: { resolu: false },
       include: { animal: { select: { nutrav: true, nobovi: true } }, symptomes: { select: { libelle: true } } },
       orderBy: { date: "desc" },
-      take: 50,
-    }),
-    prisma.traitement.findMany({
-      where: { statut: "EN_COURS" },
-      include: {
-        animal: { select: { nutrav: true, nobovi: true } },
-        medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } },
-      },
-      orderBy: { dateDebut: "desc" },
-      take: 50,
+      take: 100,
     }),
     prisma.traitement.findMany({
       include: {
@@ -205,20 +194,10 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     symptomes: e.symptomes.map((s) => s.libelle),
     date: e.date.toISOString(),
     description: e.description,
+    resolu: e.resolu,
   }));
 
-  const traitements: TraitementActifItem[] = traitementsRaw.map((t) => ({
-    id: t.id,
-    animalNutrav: t.animal.nutrav,
-    animalNom: t.animal.nobovi,
-    medicamentNom: t.medicamentNom,
-    dateDebut: t.dateDebut.toISOString(),
-    dureeJours: t.dureeJours,
-    delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
-    delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
-  }));
-
-  const traitementsDetail: TraitementItem[] = traitementsDetailRaw.map((t) => {
+  const traitements: TraitementItem[] = traitementsRaw.map((t) => {
     const dateDebut = new Date(t.dateDebut);
     const dateFin = addDays(dateDebut, t.dureeJours);
     const attente = getAttenteInfoForTraitement(t, now);
@@ -252,7 +231,7 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     };
   });
 
-  return { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements, traitementsDetail };
+  return { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements };
 }
 
 async function getAffichageDelaiAttente(): Promise<string> {
@@ -266,7 +245,7 @@ async function getAffichageDelaiAttente(): Promise<string> {
 
 export default async function SanitairePage() {
   const protocoles = await getProtocoles();
-  const [{ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements, traitementsDetail }, affichageDelaiAttente] = await Promise.all([
+  const [{ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements }, affichageDelaiAttente] = await Promise.all([
     getSanitaireData(protocoles),
     getAffichageDelaiAttente(),
   ]);
@@ -328,7 +307,6 @@ export default async function SanitairePage() {
         protocoles={protocoles}
         evenements={evenements}
         traitements={traitements}
-        traitementsDetail={traitementsDetail}
         affichageDelaiAttente={affichageDelaiAttente}
       />
     </div>
