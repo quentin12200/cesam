@@ -434,6 +434,7 @@ model Medicament {
   id                  String       @id @default(cuid())
   nom                 String       @unique
   dci                 String?
+  forme               String?
   categorie           String       @default("AUTRE")
   voie                String?
   dosagePourKg        Float?
@@ -443,12 +444,47 @@ model Medicament {
   prescriptionRequise Boolean      @default(false)
   actif               Boolean      @default(true)
   temporaire          Boolean      @default(false)
+  commentaire         String?
   stockActuel         Float?
   stockUnite          String?
   stockSeuilAlert     Float?
   traitements         Traitement[]
+  preconisations      Preconisation[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
+}
+
+/// Une ou plusieurs préconisations par médicament (dose/voie/délais selon
+/// l'indication). Référentiel à nettoyer et vérifier — n'alimente PAS
+/// automatiquement la suggestion de traitement tant que statut != "VALIDE".
+model Preconisation {
+  id           String     @id @default(cuid())
+  medicamentId String
+  medicament   Medicament @relation(fields: [medicamentId], references: [id], onDelete: Cascade)
+
+  indicationMotif  String?
+  categorieAnimaux String?
+  agePoidsConcerne String?
+
+  dose                  Float?
+  unite                 String?
+  doseBase              String?
+  voie                  String?
+  frequence             String?
+  dureeValeur           Int?
+  dureeUnite            String?
+  nombreAdministrations Int?
+
+  precautions             String?
+  delaiAttenteViandeJ     Int?
+  delaiAttenteLaitTraites Int?
+
+  source                  String?
+  statut                  String  @default("A_VERIFIER")
+  commentaireVerification String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Traitement {
