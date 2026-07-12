@@ -709,14 +709,14 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
       {/* Navigation principale — 4 boutons */}
       <div className="grid grid-cols-4 gap-1 bg-white rounded-xl shadow overflow-hidden p-1">
         {([
-          { id: "evenements", label: "Événements", icon: "🏥", count: evenements.length + traitements.length, urgent: evenements.length > 0 },
-          { id: "vaccination", label: "Vaccination", icon: "💉", count: urgents.length + cryptoRotavec.length + bolus.length, urgent: urgents.length > 0 },
-          { id: "pharmacie", label: "Pharmacie", icon: "💊", count: 0, urgent: false },
-          { id: "ordonnances", label: "Ordonnances", icon: "📋", count: 0, urgent: false },
+          { id: "evenements", label: "Événements", icon: "🏥", count: evenements.length + traitements.length, urgent: evenements.length > 0, href: null },
+          { id: "vaccination", label: "Vaccination", icon: "💉", count: urgents.length + cryptoRotavec.length + bolus.length, urgent: urgents.length > 0, href: null },
+          { id: "pharmacie", label: "Pharmacie", icon: "💊", count: 0, urgent: false, href: "/pharmacie" },
+          { id: "ordonnances", label: "Ordonnances", icon: "📋", count: 0, urgent: false, href: "/ordonnances" },
         ] as const).map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setOnglet(tab.id)}
+            onClick={() => (tab.href ? router.push(tab.href) : setOnglet(tab.id))}
             className={`py-2.5 px-1 rounded-lg text-center transition-colors ${
               onglet === tab.id
                 ? "bg-green-700 text-white"
@@ -875,33 +875,6 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
         </>
       )}
 
-      {/* Onglet Pharmacie — navigation */}
-      {onglet === "pharmacie" && (
-        <div className="bg-white rounded-xl shadow p-6 text-center space-y-4">
-          <div className="text-4xl">💊</div>
-          <p className="text-gray-600 text-sm">Gérer les médicaments, stocks et traitements</p>
-          <Link
-            href="/pharmacie"
-            className="inline-block px-6 py-3 bg-green-700 text-white font-semibold rounded-xl text-sm hover:bg-green-800 transition-colors"
-          >
-            Ouvrir la Pharmacie →
-          </Link>
-        </div>
-      )}
-
-      {/* Onglet Ordonnances */}
-      {onglet === "ordonnances" && (
-        <div className="bg-white rounded-xl shadow p-6 text-center space-y-4">
-          <div className="text-4xl">📋</div>
-          <p className="text-gray-600 text-sm">Numérisation et suivi des prescriptions vétérinaires</p>
-          <Link
-            href="/ordonnances"
-            className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl text-sm hover:bg-blue-700 transition-colors"
-          >
-            Ouvrir les ordonnances →
-          </Link>
-        </div>
-      )}
 
       {/* Onglet vaccination urgent — contenu existant */}
       {onglet === "vaccination" && vaccinTab === "urgent" && (
