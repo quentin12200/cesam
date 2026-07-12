@@ -49,7 +49,7 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     }),
     prisma.evenementSanitaire.findMany({
       where: { resolu: false },
-      include: { animal: { select: { nutrav: true, nobovi: true } } },
+      include: { animal: { select: { nutrav: true, nobovi: true } }, symptomes: { select: { libelle: true } } },
       orderBy: { date: "desc" },
       take: 50,
     }),
@@ -192,6 +192,7 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     animalNutrav: e.animal.nutrav,
     animalNom: e.animal.nobovi,
     type: e.type,
+    symptomes: e.symptomes.map((s) => s.libelle),
     date: e.date.toISOString(),
     description: e.description,
   }));

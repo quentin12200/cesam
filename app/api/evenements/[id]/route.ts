@@ -8,7 +8,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { date, moment, categorie, type, description, photos, constatePar, resolu } = body;
+  const { date, moment, categorie, type, temperature, description, photos, constatePar, resolu } = body;
 
   const prev = await prisma.evenementSanitaire.findUnique({ where: { id } });
   if (!prev) return NextResponse.json({ error: "Non trouvé" }, { status: 404 });
@@ -18,6 +18,7 @@ export async function PATCH(
   if (moment !== undefined) prevFields.moment = prev.moment;
   if (categorie !== undefined) prevFields.categorie = prev.categorie;
   if (type !== undefined) prevFields.type = prev.type;
+  if (temperature !== undefined) prevFields.temperature = prev.temperature;
   if (description !== undefined) prevFields.description = prev.description;
   if (photos !== undefined) prevFields.photos = prev.photos;
   if (constatePar !== undefined) prevFields.constatePar = prev.constatePar;
@@ -34,6 +35,7 @@ export async function PATCH(
         ...(moment !== undefined && { moment }),
         ...(categorie !== undefined && { categorie }),
         ...(type !== undefined && { type: type.trim() }),
+        ...(temperature !== undefined && { temperature: temperature != null && temperature !== "" ? Number(temperature) : null }),
         ...(description !== undefined && { description: description?.trim() || null }),
         ...(photos !== undefined && { photos }),
         ...(constatePar !== undefined && { constatePar: constatePar?.trim() || null }),

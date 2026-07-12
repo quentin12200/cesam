@@ -188,19 +188,75 @@ model EvenementSanitaire {
 
   symptomes   EvenementSymptome[]
   traitements Traitement[]
+  reponses    QuestionReponse[]
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 }
 
 model EvenementSymptome {
-  id          String             @id @default(cuid())
-  evenementId String
-  evenement   EvenementSanitaire @relation(fields: [evenementId], references: [id])
-  libelle     String
-  groupe      String?
+  id              String             @id @default(cuid())
+  evenementId     String
+  evenement       EvenementSanitaire @relation(fields: [evenementId], references: [id], onDelete: Cascade)
+  typeEvenementId String?
+  typeEvenement   TypeEvenement?     @relation(fields: [typeEvenementId], references: [id])
+  libelle         String
+  groupe          String?
 
   createdAt DateTime @default(now())
+}
+
+/// Catalogue des types d'événements sanitaires recherchables (avec synonymes),
+/// remplace les deux blocs figés "Ce que j'observe" / "Ce qui est identifié".
+/// categorie sert uniquement au classement interne / statistiques.
+model TypeEvenement {
+  id        String   @id @default(cuid())
+  nom       String   @unique
+  synonymes String?
+  categorie String   @default("AUTRE")
+  actif     Boolean  @default(true)
+
+  questions QuestionTemplate[]
+  symptomes EvenementSymptome[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Bibliothèque de questions facultatives associées à un type d'événement,
+/// modifiable sans casser les réponses déjà enregistrées (stored_label snapshot).
+model QuestionTemplate {
+  id                 String        @id @default(cuid())
+  typeEvenementId    String
+  typeEvenement      TypeEvenement @relation(fields: [typeEvenementId], references: [id], onDelete: Cascade)
+  label              String
+  type               String
+  options            String?
+  unite              String?
+  obligatoire        Boolean       @default(false)
+  ordre              Int           @default(0)
+  conditionAffichage String?
+  actif              Boolean       @default(true)
+
+  reponses QuestionReponse[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model QuestionReponse {
+  id                String             @id @default(cuid())
+  evenementId       String
+  evenement         EvenementSanitaire @relation(fields: [evenementId], references: [id], onDelete: Cascade)
+  questionId        String
+  question          QuestionTemplate   @relation(fields: [questionId], references: [id])
+  libelleEnregistre String
+  valeur            String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([evenementId, questionId])
 }
 
 model Pesee {
