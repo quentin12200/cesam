@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
     const dateMaxVelle = new Date(now); dateMaxVelle.setDate(dateMaxVelle.getDate() - 351);
 
     const [vachesAvecSaillies, animaux, velagesSemaine, veauxABoucler, genissesArapatrier,
-           surveillanceActive, cryptoRotavecCount, bolusCount, chaleurJ19Raw, vellesUrgentes] =
+           surveillanceActive, cryptoRotavecCount, bolusCount, chaleurJ19Raw, vellesUrgentes,
+           traitementsEnCoursRaw, ordonnancesAAssocierCount, medicamentsRaw] =
       await Promise.all([
         prisma.animal.findMany({
           where: { statut: "ACTIF", sexbov: "F", estGenisse: false, OR: [{ categorie: null }, { categorie: { not: "ENGRAISSEMENT" } }] },
@@ -89,7 +90,28 @@ export async function GET(request: NextRequest) {
           where: { statut: "ACTIF", categorie: "VELLE", danais: { gte: dateMinVelle, lte: dateMaxVelle } },
           select: { nutrav: true, nobovi: true, danais: true },
         }),
+        // Traitements en cours dont la durée prévue est dépassée (à clôturer ou prolonger)
+        prisma.traitement.findMany({
+          where: { statut: "EN_COURS" },
+          select: { dateDebut: true, dureeJours: true },
+        }),
+        // Traitements avec une ordonnance encore à associer
+        prisma.traitement.count({
+          where: { ordonnanceAAssocier: true, ordonnanceId: null },
+        }),
+        // Médicaments dont le stock est sous le seuil d'alerte
+        prisma.medicament.findMany({
+          where: { actif: true, stockActuel: { not: null }, stockSeuilAlert: { not: null } },
+          select: { stockActuel: true, stockSeuilAlert: true },
+        }),
       ]);
+
+    const traitementsEnRetard = traitementsEnCoursRaw.filter(
+      (t) => addDays(t.dateDebut, t.dureeJours) < now
+    ).length;
+    const medicamentsStockBasCount = medicamentsRaw.filter(
+      (m) => m.stockActuel != null && m.stockSeuilAlert != null && m.stockActuel <= m.stockSeuilAlert
+    ).length;
 
     let aEchographier = 0;
     let videsEnRetard = 0;
@@ -147,6 +169,12 @@ export async function GET(request: NextRequest) {
       items.push(`${bolusCount} bolus pré-vélage`);
     if (chaleurJ19.length > 0)
       items.push(`${chaleurJ19.length} vache${chaleurJ19.length > 1 ? "s" : ""} à surveiller retour chaleur (J+19)`);
+    if (traitementsEnRetard > 0)
+      items.push(`${traitementsEnRetard} traitement${traitementsEnRetard > 1 ? "s" : ""} en retard à clôturer`);
+    if (ordonnancesAAssocierCount > 0)
+      items.push(`${ordonnancesAAssocierCount} ordonnance${ordonnancesAAssocierCount > 1 ? "s" : ""} à associer`);
+    if (medicamentsStockBasCount > 0)
+      items.push(`${medicamentsStockBasCount} médicament${medicamentsStockBasCount > 1 ? "s" : ""} en stock bas`);
     if (vellesUrgentes.length > 0) {
       const noms = vellesUrgentes.map((v) => v.nobovi ?? v.nutrav).join(", ");
       items.unshift(`🚨 ${vellesUrgentes.length} velle${vellesUrgentes.length > 1 ? "s" : ""} à vendre rapidement (bientôt 1 an) : ${noms}`);
