@@ -655,9 +655,10 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             <EvenementsSanitairesSection
               evenements={animal.evenements.map((e) => ({
                 ...e,
-                symptomes: e.symptomes.map((s) => ({ libelle: s.libelle })),
+                symptomes: e.symptomes.map((s) => ({ id: s.id, libelle: s.libelle, typeEvenementId: s.typeEvenementId })),
                 reponses: e.reponses.map((r) => ({
                   id: r.id,
+                  questionId: r.questionId,
                   libelleEnregistre: r.libelleEnregistre,
                   valeur: r.valeur,
                   questionType: r.question.type,
