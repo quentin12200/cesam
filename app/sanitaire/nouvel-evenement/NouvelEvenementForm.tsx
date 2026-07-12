@@ -35,7 +35,7 @@ type TargetMode = "animal" | "plusieurs";
 
 const today = new Date().toISOString().slice(0, 10);
 
-export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: string }) {
+export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }: { presetNutrav?: string; presetMedicamentId?: string }) {
   const router = useRouter();
 
   const [targetMode, setTargetMode] = useState<TargetMode>("animal");
@@ -225,6 +225,7 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
         .map((a) => ({ animalId: a.id, evenementId: evenementsByAnimal.get(a.id)!, nutrav: a.nutrav, nom: a.nom }));
 
       setResult({ count: data.count, warning: photoWarning, targets });
+      if (presetMedicamentId) setAjouterTraitement(true);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur lors de l'enregistrement");
@@ -253,6 +254,7 @@ export default function NouvelEvenementForm({ presetNutrav }: { presetNutrav?: s
           targets={result.targets}
           symptomesLibelles={selectedTypes.map((t) => t.nom)}
           dateDebut={date}
+          presetMedicamentId={presetMedicamentId}
           onDone={() => router.push("/sanitaire")}
           onSkip={() => setAjouterTraitement(null)}
         />

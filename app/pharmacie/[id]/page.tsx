@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Pill } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import MedicamentDetailClient from "./MedicamentDetailClient";
+import MedicamentFicheClient from "./MedicamentFicheClient";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -13,12 +13,38 @@ interface PageProps {
 export default async function MedicamentDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  const medicament = await prisma.medicament.findUnique({
-    where: { id },
-    include: { preconisations: { orderBy: { createdAt: "asc" } } },
-  });
+  const [medicament, traitements] = await Promise.all([
+    prisma.medicament.findUnique({
+      where: { id },
+      include: {
+        preconisations: { orderBy: { createdAt: "asc" } },
+        termes: { orderBy: { ordre: "asc" } },
+      },
+    }),
+    prisma.traitement.findMany({
+      where: { medicamentId: id },
+      include: {
+        animal: { select: { nutrav: true, nobovi: true } },
+        ordonnance: { select: { id: true, numero: true, date: true, veterinaireNom: true, statut: true } },
+      },
+      orderBy: { dateDebut: "desc" },
+    }),
+  ]);
 
   if (!medicament) notFound();
+
+  const ordonnancesMap = new Map<string, { id: string; numero: string | null; date: string; veterinaireNom: string | null; statut: string }>();
+  for (const t of traitements) {
+    if (t.ordonnance && !ordonnancesMap.has(t.ordonnance.id)) {
+      ordonnancesMap.set(t.ordonnance.id, {
+        id: t.ordonnance.id,
+        numero: t.ordonnance.numero,
+        date: t.ordonnance.date.toISOString(),
+        veterinaireNom: t.ordonnance.veterinaireNom,
+        statut: t.ordonnance.statut,
+      });
+    }
+  }
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl mx-auto pb-24">
@@ -32,7 +58,7 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <MedicamentDetailClient
+      <MedicamentFicheClient
         medicament={{
           id: medicament.id,
           nom: medicament.nom,
@@ -42,7 +68,14 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
           voie: medicament.voie,
           prescriptionRequise: medicament.prescriptionRequise,
           actif: medicament.actif,
+          favori: medicament.favori,
+          actions: medicament.actions,
           commentaire: medicament.commentaire,
+          delaiAttenteViandeJ: medicament.delaiAttenteViandeJ,
+          stockActuel: medicament.stockActuel,
+          stockUnite: medicament.stockUnite,
+          stockSeuilAlert: medicament.stockSeuilAlert,
+          delaiAttenteLaitJ: medicament.delaiAttenteLaitJ,
         }}
         preconisations={medicament.preconisations.map((p) => ({
           id: p.id,
@@ -63,6 +96,19 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
           source: p.source,
           statut: p.statut,
           commentaireVerification: p.commentaireVerification,
+        }))}
+        termes={medicament.termes.map((t) => ({ id: t.id, terme: t.terme, explication: t.explication }))}
+        ordonnances={Array.from(ordonnancesMap.values())}
+        historique={traitements.map((t) => ({
+          id: t.id,
+          animalNutrav: t.animal.nutrav,
+          animalNom: t.animal.nobovi,
+          dateDebut: t.dateDebut.toISOString(),
+          dose: t.dose,
+          uniteDosage: t.uniteDosage,
+          voie: t.voie,
+          motif: t.motif,
+          statut: t.statut,
         }))}
       />
     </div>

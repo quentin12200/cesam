@@ -448,10 +448,31 @@ model Medicament {
   stockActuel         Float?
   stockUnite          String?
   stockSeuilAlert     Float?
+  favori              Boolean      @default(false)
+  /// Actions simples pour l'affichage répertoire (ex: "Douleur,Inflammation,Fièvre")
+  actions             String?
   traitements         Traitement[]
   preconisations      Preconisation[]
+  termes              MedicamentTerme[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
+}
+
+/// Glossaire "En savoir +" associé à un médicament : termes techniques
+/// employés dans ses préconisations, avec une explication en langage clair.
+model MedicamentTerme {
+  id           String     @id @default(cuid())
+  medicamentId String
+  medicament   Medicament @relation(fields: [medicamentId], references: [id], onDelete: Cascade)
+
+  terme       String
+  explication String
+  ordre       Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([medicamentId])
 }
 
 /// Une ou plusieurs préconisations par médicament (dose/voie/délais selon

@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Pill, FlaskConical, History, CheckCircle2, AlertTriangle, Clock, Pencil, Save, X, Plus } from "lucide-react";
+import {
+  Star, ChevronDown, Search, Plus, Save, X, CheckCircle2, History, AlertTriangle, Clock, Stethoscope,
+} from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { normalizeSearch } from "@/lib/fuzzy-search";
+import { CATEGORIES_MEDICAMENT, getCategorieMedicament, formatVoie, formatDoseBase, formatStatutConsultation } from "@/lib/medicament-categories";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -32,6 +36,17 @@ export interface TraitementItem {
   joursRestantsAttente: number | null;
 }
 
+export interface PreconisationSummary {
+  id: string;
+  indicationMotif: string | null;
+  categorieAnimaux: string | null;
+  dose: number | null;
+  unite: string | null;
+  doseBase: string | null;
+  voie: string | null;
+  statut: string;
+}
+
 export interface MedicamentItem {
   id: string;
   nom: string;
@@ -41,11 +56,15 @@ export interface MedicamentItem {
   dosagePourKg: number | null;
   uniteDosage: string | null;
   delaiAttenteViandeJ: number | null;
+  delaiAttenteLaitJ: number | null;
   prescriptionRequise: boolean;
   actif: boolean;
+  favori: boolean;
+  actions: string | null;
   stockActuel: number | null;
   stockUnite: string | null;
   stockSeuilAlert: number | null;
+  preconisations: PreconisationSummary[];
   recentTraitements: { date: string; animalNutrav: string; motif: string | null }[];
 }
 
@@ -53,26 +72,6 @@ interface Props {
   traitements: TraitementItem[];
   medicaments: MedicamentItem[];
 }
-
-// ── Category labels ────────────────────────────────────────────────────────────
-
-const CAT_LABELS: Record<string, string> = {
-  ANTIBIOTIQUE: "Antibiotique",
-  ANTIDOULEUR: "Antidouleur / AINS",
-  ANTIPARASITAIRE: "Antiparasitaire",
-  CORTICOIDE: "Corticoïde",
-  VITAMINES: "Vitamines / Oligo",
-  AUTRE: "Autre",
-};
-
-const CAT_COLORS: Record<string, string> = {
-  ANTIBIOTIQUE: "bg-red-100 text-red-700",
-  ANTIDOULEUR: "bg-orange-100 text-orange-700",
-  ANTIPARASITAIRE: "bg-green-100 text-green-700",
-  CORTICOIDE: "bg-purple-100 text-purple-700",
-  VITAMINES: "bg-blue-100 text-blue-700",
-  AUTRE: "bg-gray-100 text-gray-600",
-};
 
 // ── Add Médicament form ────────────────────────────────────────────────────────
 
@@ -118,17 +117,17 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
             className="w-full border rounded-lg px-3 py-2 text-sm uppercase" placeholder="ex: METACAM" />
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">DCI (générique)</label>
+          <label className="text-xs text-gray-500 block mb-1">Substance active (DCI)</label>
           <input value={dci} onChange={(e) => setDci(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ex: Méloxicam" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Catégorie</label>
+          <label className="text-xs text-gray-500 block mb-1">Catégorie principale</label>
           <select value={categorie} onChange={(e) => setCategorie(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm">
-            {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {CATEGORIES_MEDICAMENT.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
           </select>
         </div>
         <div>
@@ -152,7 +151,7 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
       <div>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={rx} onChange={(e) => setRx(e.target.checked)} className="w-4 h-4" />
-          <span className="text-sm">Prescription requise</span>
+          <span className="text-sm">Ordonnance requise</span>
         </label>
       </div>
       <div className="flex gap-2 pt-1">
@@ -168,56 +167,25 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-// ── Médicament card ────────────────────────────────────────────────────────────
+// ── Ligne annuaire (compacte, extensible) ──────────────────────────────────────
 
-function StockBadge({ stock, seuil, unite }: { stock: number | null; seuil: number | null; unite: string | null }) {
-  if (stock == null) return null;
-  const low = seuil != null && stock <= seuil;
-  return (
-    <span className={`text-xs font-medium px-1.5 py-0.5 rounded border ${
-      low ? "bg-red-50 text-red-700 border-red-200" : "bg-green-50 text-green-700 border-green-200"
-    }`}>
-      {stock} {unite ?? "u"}
-      {low && " ⚠"}
-    </span>
-  );
-}
-
-function MedicamentCard({ med }: { med: MedicamentItem }) {
-  const [editing, setEditing] = useState(false);
-  const [delai, setDelai] = useState(String(med.delaiAttenteViandeJ ?? ""));
-  const [voie, setVoie] = useState(med.voie ?? "");
-  const [stock, setStock] = useState(med.stockActuel != null ? String(med.stockActuel) : "");
-  const [stockUnite, setStockUnite] = useState(med.stockUnite ?? "");
-  const [stockSeuil, setStockSeuil] = useState(med.stockSeuilAlert != null ? String(med.stockSeuilAlert) : "");
-  const [saving, setSaving] = useState(false);
-  const [showRecent, setShowRecent] = useState(false);
+function MedicamentRow({ med, expanded, onToggle }: { med: MedicamentItem; expanded: boolean; onToggle: () => void }) {
   const router = useRouter();
+  const [favBusy, setFavBusy] = useState(false);
+  const cat = getCategorieMedicament(med.categorie);
+  const actionsList = med.actions ? med.actions.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const voieTexte = formatVoie(med.voie);
+  const stockBas = med.stockSeuilAlert != null && med.stockActuel != null && med.stockActuel <= med.stockSeuilAlert;
 
-  async function toggleActif() {
+  async function toggleFavori(e: React.MouseEvent) {
+    e.stopPropagation();
+    setFavBusy(true);
     await fetch(`/api/medicaments/${med.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ actif: !med.actif }),
+      body: JSON.stringify({ favori: !med.favori }),
     });
-    router.refresh();
-  }
-
-  async function save() {
-    setSaving(true);
-    await fetch(`/api/medicaments/${med.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        voie: voie || null,
-        delaiAttenteViandeJ: delai !== "" ? Number(delai) : null,
-        stockActuel: stock !== "" ? Number(stock) : null,
-        stockUnite: stockUnite || null,
-        stockSeuilAlert: stockSeuil !== "" ? Number(stockSeuil) : null,
-      }),
-    });
-    setSaving(false);
-    setEditing(false);
+    setFavBusy(false);
     router.refresh();
   }
 
@@ -233,128 +201,197 @@ function MedicamentCard({ med }: { med: MedicamentItem }) {
   }
 
   return (
-    <div className={`bg-white rounded-xl shadow border p-3 ${!med.actif ? "opacity-50" : ""}`}>
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-xs font-bold text-gray-800">{med.nom}</span>
-            <span className={`text-xs px-1.5 py-0.5 rounded ${CAT_COLORS[med.categorie] ?? "bg-gray-100"}`}>
-              {CAT_LABELS[med.categorie] ?? med.categorie}
-            </span>
-            {med.prescriptionRequise && (
-              <span className="text-xs bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-200">Rx</span>
-            )}
-            <StockBadge stock={med.stockActuel} seuil={med.stockSeuilAlert} unite={med.stockUnite} />
-          </div>
-          {med.dci && <div className="text-xs text-gray-500 mt-0.5">{med.dci}</div>}
-          <Link href={`/pharmacie/${med.id}`} className="text-xs text-blue-600 hover:underline mt-0.5 inline-block">
-            Fiche & préconisations →
-          </Link>
+    <div className={`bg-white rounded-xl shadow border overflow-hidden ${!med.actif ? "opacity-50" : ""}`}>
+      <button type="button" onClick={onToggle} className="w-full flex items-center gap-2 px-3 py-2.5 text-left">
+        <button type="button" onClick={toggleFavori} disabled={favBusy} className="shrink-0" aria-label="Favori">
+          <Star size={17} className={med.favori ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} />
+        </button>
+        <span className="font-mono text-sm font-bold text-gray-800 shrink-0">{med.nom}</span>
+        <span className="text-xs px-1.5 py-0.5 rounded-full font-medium shrink-0" style={{ background: cat.bg, color: cat.text }}>
+          {cat.label}
+        </span>
+        {med.dci && <span className="text-xs text-gray-500 truncate min-w-0 flex-1 hidden sm:inline">{med.dci}</span>}
+        {med.prescriptionRequise && (
+          <span className="text-xs text-red-600 font-medium shrink-0 hidden md:inline">Ordonnance requise</span>
+        )}
+        <span className="ml-auto flex items-center gap-1 text-xs text-gray-400 shrink-0">
+          Voir plus <ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </span>
+      </button>
 
-          {editing ? (
-            <div className="mt-2 space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div>
-                  <label className="text-xs text-gray-400">Voie</label>
-                  <input value={voie} onChange={(e) => setVoie(e.target.value)}
-                    className="block w-24 border rounded px-2 py-1 text-xs mt-0.5" placeholder="IM/SC..." />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400">Délai viande (j)</label>
-                  <input type="number" min={0} value={delai} onChange={(e) => setDelai(e.target.value)}
-                    className="block w-20 border rounded px-2 py-1 text-xs mt-0.5" />
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div>
-                  <label className="text-xs text-gray-400">Stock actuel</label>
-                  <input type="number" min={0} step="0.5" value={stock} onChange={(e) => setStock(e.target.value)}
-                    className="block w-20 border rounded px-2 py-1 text-xs mt-0.5" placeholder="0" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400">Unité</label>
-                  <input value={stockUnite} onChange={(e) => setStockUnite(e.target.value)}
-                    className="block w-20 border rounded px-2 py-1 text-xs mt-0.5" placeholder="flacon" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400">Seuil alerte</label>
-                  <input type="number" min={0} step="0.5" value={stockSeuil} onChange={(e) => setStockSeuil(e.target.value)}
-                    className="block w-20 border rounded px-2 py-1 text-xs mt-0.5" placeholder="1" />
-                </div>
-              </div>
-              <div className="flex gap-1">
-                <button onClick={save} disabled={saving}
-                  className="p-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50">
-                  <Save size={12} />
-                </button>
-                <button onClick={() => setEditing(false)} className="p-1.5 border rounded text-gray-500 hover:bg-gray-50">
-                  <X size={12} />
-                </button>
+      {expanded && (
+        <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/60 space-y-3 text-sm">
+          {med.dci && <p className="text-xs text-gray-500 sm:hidden">{med.dci}</p>}
+          {med.prescriptionRequise && <p className="text-xs text-red-600 font-medium md:hidden">Ordonnance requise</p>}
+
+          {actionsList.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-500 mb-1">Actions</div>
+              <div className="flex flex-wrap gap-1.5">
+                {actionsList.map((a) => (
+                  <span key={a} className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">{a}</span>
+                ))}
               </div>
             </div>
-          ) : (
-            <>
-              <div className="text-xs text-gray-500 mt-0.5 flex gap-3">
-                {med.voie && <span>{med.voie}</span>}
-                {med.delaiAttenteViandeJ != null && (
-                  <span className={med.delaiAttenteViandeJ > 0 ? "text-orange-600 font-medium" : "text-green-600"}>
-                    Attente viande : {med.delaiAttenteViandeJ === 0 ? "aucune" : `${med.delaiAttenteViandeJ}j`}
-                  </span>
-                )}
+          )}
+
+          {med.preconisations.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-500 mb-1">Principales préconisations</div>
+              <div className="space-y-1">
+                {med.preconisations.map((p) => (
+                  <div key={p.id} className="text-xs text-gray-600 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="font-medium text-gray-700">{p.indicationMotif || "Sans indication précisée"}</span>
+                    {p.dose != null && <span>{p.dose} {p.unite} {formatDoseBase(p.doseBase)}</span>}
+                    {p.voie && <span>{formatVoie(p.voie)}</span>}
+                    <span className="text-gray-400">({formatStatutConsultation(p.statut)})</span>
+                  </div>
+                ))}
               </div>
-
-              {/* Stock quick-adjust */}
-              {med.stockActuel != null && (
-                <div className="flex items-center gap-1 mt-1.5">
-                  <button onClick={() => adjustStock(-1)}
-                    className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-gray-600 hover:bg-gray-200 text-sm font-bold">−</button>
-                  <span className="text-xs text-gray-600 min-w-[40px] text-center">{med.stockActuel} {med.stockUnite ?? "u"}</span>
-                  <button onClick={() => adjustStock(1)}
-                    className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-gray-600 hover:bg-gray-200 text-sm font-bold">+</button>
-                </div>
-              )}
-
-              {/* Dernières prescriptions */}
-              {med.recentTraitements.length > 0 && (
-                <div className="mt-2">
-                  <button onClick={() => setShowRecent((v) => !v)}
-                    className="text-xs text-gray-400 hover:text-gray-600">
-                    {showRecent ? "▲" : "▼"} {med.recentTraitements.length} prescription{med.recentTraitements.length > 1 ? "s" : ""} récente{med.recentTraitements.length > 1 ? "s" : ""}
-                  </button>
-                  {showRecent && (
-                    <div className="mt-1 space-y-0.5">
-                      {med.recentTraitements.map((t, i) => (
-                        <div key={i} className="text-xs text-gray-500 flex gap-2">
-                          <span className="font-mono bg-gray-100 px-1 rounded">{t.animalNutrav}</span>
-                          <span>{new Date(t.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>
-                          {t.motif && <span className="text-gray-400 truncate">{t.motif}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
+            </div>
           )}
-        </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          {!editing && (
-            <button onClick={() => setEditing(true)} className="p-1.5 text-gray-400 hover:text-gray-700 border border-transparent hover:border-gray-200 rounded">
-              <Pencil size={13} />
-            </button>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+            {voieTexte && <span><span className="text-gray-400">Voie :</span> {voieTexte}</span>}
+            {med.delaiAttenteViandeJ != null && (
+              <span className={med.delaiAttenteViandeJ > 0 ? "text-orange-600 font-medium" : "text-green-600"}>
+                Délai viande : {med.delaiAttenteViandeJ === 0 ? "aucun" : `${med.delaiAttenteViandeJ} j`}
+              </span>
+            )}
+            {med.delaiAttenteLaitJ != null && (
+              <span className={med.delaiAttenteLaitJ > 0 ? "text-orange-600 font-medium" : "text-green-600"}>
+                Délai lait : {med.delaiAttenteLaitJ === 0 ? "aucun" : `${med.delaiAttenteLaitJ} j`}
+              </span>
+            )}
+          </div>
+
+          {med.stockActuel != null && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">Stock :</span>
+              <button type="button" onClick={() => adjustStock(-1)}
+                className="w-6 h-6 flex items-center justify-center bg-white border rounded text-gray-600 hover:bg-gray-100 text-sm font-bold">−</button>
+              <span className={`text-xs min-w-[48px] text-center ${stockBas ? "text-red-600 font-semibold" : "text-gray-600"}`}>
+                {med.stockActuel} {med.stockUnite ?? "u"}{stockBas && " ⚠"}
+              </span>
+              <button type="button" onClick={() => adjustStock(1)}
+                className="w-6 h-6 flex items-center justify-center bg-white border rounded text-gray-600 hover:bg-gray-100 text-sm font-bold">+</button>
+            </div>
           )}
-          <button onClick={toggleActif}
-            className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${med.actif ? "bg-green-500" : "bg-gray-300"}`}>
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${med.actif ? "translate-x-5" : ""}`} />
-          </button>
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Link href={`/pharmacie/${med.id}`}
+              className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-white">
+              Consulter la fiche complète
+            </Link>
+            <Link href={`/sanitaire/nouvel-evenement?medicament=${med.id}`}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <Stethoscope size={12} /> Créer un événement sanitaire avec ce médicament
+            </Link>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
-// ── En cours tab ──────────────────────────────────────────────────────────────
+// ── Répertoire ──────────────────────────────────────────────────────────────────
+
+type Mode = "alpha" | "favoris" | "categorie";
+
+function Repertoire({ medicaments }: { medicaments: MedicamentItem[] }) {
+  const [search, setSearch] = useState("");
+  const [mode, setMode] = useState<Mode>("alpha");
+  const [catFilter, setCatFilter] = useState("");
+  const [showAddMed, setShowAddMed] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = normalizeSearch(search.trim());
+    return medicaments.filter((m) => {
+      if (catFilter && m.categorie !== catFilter) return false;
+      if (mode === "favoris" && !m.favori) return false;
+      if (!q) return true;
+      return normalizeSearch(`${m.nom} ${m.dci ?? ""}`).includes(q);
+    });
+  }, [medicaments, search, mode, catFilter]);
+
+  return (
+    <div className="space-y-3">
+      {/* Barre supérieure */}
+      <div className="bg-white rounded-xl shadow p-3 space-y-2.5">
+        <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2">
+          <Search size={15} className="text-gray-400 mr-2 shrink-0" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un médicament, une substance active…" className="w-full text-sm outline-none" />
+          {search && (
+            <button type="button" onClick={() => setSearch("")} className="text-gray-400 hover:text-gray-600">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg text-xs">
+            {([["alpha", "A → Z"], ["favoris", "★ Favoris"], ["categorie", "Catégories"]] as const).map(([m, label]) => (
+              <button key={m} type="button" onClick={() => setMode(m)}
+                className={`px-2.5 py-1.5 rounded-md font-medium transition-colors ${mode === m ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
+            className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white text-gray-600">
+            <option value="">Toutes catégories</option>
+            {CATEGORIES_MEDICAMENT.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+          </select>
+
+          <button type="button" onClick={() => setShowAddMed((v) => !v)}
+            className="ml-auto flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">
+            <Plus size={13} /> Ajouter un médicament
+          </button>
+        </div>
+      </div>
+
+      {showAddMed && <AddMedicamentForm onDone={() => setShowAddMed(false)} />}
+
+      {filtered.length === 0 && (
+        <div className="text-center py-12 text-gray-400 text-sm">Aucun médicament ne correspond à la recherche</div>
+      )}
+
+      {mode === "categorie" ? (
+        <div className="space-y-4">
+          {CATEGORIES_MEDICAMENT.filter((c) => !catFilter || c.code === catFilter).map((c) => {
+            const meds = filtered.filter((m) => m.categorie === c.code).sort((a, b) => a.nom.localeCompare(b.nom));
+            if (meds.length === 0) return null;
+            return (
+              <div key={c.code}>
+                <div className="text-xs font-semibold px-2 py-1 rounded mb-2 inline-block" style={{ background: c.bg, color: c.text }}>
+                  {c.label}
+                </div>
+                <div className="space-y-2">
+                  {meds.map((m) => (
+                    <MedicamentRow key={m.id} med={m} expanded={expandedId === m.id}
+                      onToggle={() => setExpandedId((id) => (id === m.id ? null : m.id))} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {[...filtered].sort((a, b) => a.nom.localeCompare(b.nom)).map((m) => (
+            <MedicamentRow key={m.id} med={m} expanded={expandedId === m.id}
+              onToggle={() => setExpandedId((id) => (id === m.id ? null : m.id))} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Suivi des traitements (en cours + historique) ───────────────────────────────
 
 function EnCoursTab({ traitements, onRefresh }: { traitements: TraitementItem[]; onRefresh: () => void }) {
   const actifs = traitements.filter((t) => t.enCours || t.enAttente);
@@ -434,8 +471,6 @@ function EnCoursTab({ traitements, onRefresh }: { traitements: TraitementItem[];
   );
 }
 
-// ── Historique tab ────────────────────────────────────────────────────────────
-
 function HistoriqueTab({ traitements }: { traitements: TraitementItem[] }) {
   const termines = traitements.filter((t) => !t.enCours && !t.enAttente);
 
@@ -468,76 +503,70 @@ function HistoriqueTab({ traitements }: { traitements: TraitementItem[] }) {
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
-
-export default function PharmacieClient({ traitements, medicaments }: Props) {
-  const [onglet, setOnglet] = useState<"encours" | "medicaments" | "historique">("encours");
-  const [showAddMed, setShowAddMed] = useState(false);
+function Suivi({ traitements }: { traitements: TraitementItem[] }) {
+  const [onglet, setOnglet] = useState<"encours" | "historique">("encours");
   const [, forceRefresh] = useState(0);
 
   const enCoursCount = traitements.filter((t) => t.enCours || t.enAttente).length;
   const attenteCount = traitements.filter((t) => t.enAttente && t.joursRestantsAttente && t.joursRestantsAttente > 0).length;
 
-  const tabs = [
-    { id: "encours" as const, label: "En cours", count: enCoursCount, alert: attenteCount > 0 },
-    { id: "medicaments" as const, label: "Médicaments", count: medicaments.filter((m) => m.actif).length },
-    { id: "historique" as const, label: "Historique", count: traitements.filter((t) => !t.enCours && !t.enAttente).length },
-  ];
-
   return (
     <div>
-      {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-4">
-        {tabs.map((tab) => (
-          <button key={tab.id} onClick={() => setOnglet(tab.id)}
+        {([
+          ["encours", "En cours", enCoursCount, attenteCount > 0],
+          ["historique", "Historique", traitements.filter((t) => !t.enCours && !t.enAttente).length, false],
+        ] as const).map(([id, label, count, alert]) => (
+          <button key={id} onClick={() => setOnglet(id)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-sm font-medium transition-colors ${
-              onglet === tab.id ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
+              onglet === id ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}>
-            {tab.label}
-            {tab.count > 0 && (
+            {label}
+            {count > 0 && (
               <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                tab.alert ? "bg-orange-500 text-white" :
-                onglet === tab.id ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-600"
+                alert ? "bg-orange-500 text-white" : onglet === id ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-600"
               }`}>
-                {tab.count}
+                {count}
               </span>
             )}
           </button>
         ))}
       </div>
 
-      {onglet === "encours" && (
-        <EnCoursTab traitements={traitements} onRefresh={() => forceRefresh((n) => n + 1)} />
-      )}
-
-      {onglet === "medicaments" && (
-        <div className="space-y-3">
-          {!showAddMed && (
-            <button onClick={() => setShowAddMed(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-colors">
-              <Plus size={16} /> Ajouter un médicament
-            </button>
-          )}
-          {showAddMed && <AddMedicamentForm onDone={() => setShowAddMed(false)} />}
-
-          {Object.entries(CAT_LABELS).map(([cat]) => {
-            const meds = medicaments.filter((m) => m.categorie === cat);
-            if (meds.length === 0) return null;
-            return (
-              <div key={cat}>
-                <div className={`text-xs font-semibold px-2 py-1 rounded mb-2 inline-block ${CAT_COLORS[cat] ?? "bg-gray-100"}`}>
-                  {CAT_LABELS[cat]}
-                </div>
-                <div className="space-y-2">
-                  {meds.map((m) => <MedicamentCard key={m.id} med={m} />)}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
+      {onglet === "encours" && <EnCoursTab traitements={traitements} onRefresh={() => forceRefresh((n) => n + 1)} />}
       {onglet === "historique" && <HistoriqueTab traitements={traitements} />}
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export default function PharmacieClient({ traitements, medicaments }: Props) {
+  const [vue, setVue] = useState<"repertoire" | "suivi">("repertoire");
+  const enCoursCount = traitements.filter((t) => t.enCours || t.enAttente).length;
+
+  return (
+    <div>
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-4">
+        {([
+          ["repertoire", "Répertoire", medicaments.filter((m) => m.actif).length],
+          ["suivi", "Suivi des traitements", enCoursCount],
+        ] as const).map(([id, label, count]) => (
+          <button key={id} onClick={() => setVue(id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-sm font-medium transition-colors ${
+              vue === id ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
+            }`}>
+            {label}
+            {count > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${vue === id ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-600"}`}>
+                {count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {vue === "repertoire" ? <Repertoire medicaments={medicaments} /> : <Suivi traitements={traitements} />}
     </div>
   );
 }

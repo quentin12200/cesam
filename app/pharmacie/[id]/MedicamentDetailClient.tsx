@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save, CheckCircle2, Plus, Trash2, Pencil, AlertTriangle, ShieldCheck } from "lucide-react";
+import { CATEGORIES_MEDICAMENT } from "@/lib/medicament-categories";
 
 interface MedicamentData {
   id: string;
@@ -14,6 +15,9 @@ interface MedicamentData {
   prescriptionRequise: boolean;
   actif: boolean;
   commentaire: string | null;
+  stockActuel?: number | null;
+  stockUnite?: string | null;
+  stockSeuilAlert?: number | null;
 }
 
 interface PreconisationData {
@@ -36,15 +40,6 @@ interface PreconisationData {
   statut: string;
   commentaireVerification: string | null;
 }
-
-const CAT_LABELS: Record<string, string> = {
-  ANTIBIOTIQUE: "Antibiotique",
-  ANTIDOULEUR: "Antidouleur / AINS",
-  ANTIPARASITAIRE: "Antiparasitaire",
-  CORTICOIDE: "Corticoïde",
-  VITAMINES: "Vitamines / Oligo",
-  AUTRE: "Autre",
-};
 
 const STATUT_BADGE: Record<string, { label: string; classe: string }> = {
   A_VERIFIER: { label: "À vérifier", classe: "bg-orange-100 text-orange-700" },
@@ -79,6 +74,9 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
     prescriptionRequise: medicament.prescriptionRequise,
     actif: medicament.actif,
     commentaire: medicament.commentaire ?? "",
+    stockActuel: medicament.stockActuel != null ? String(medicament.stockActuel) : "",
+    stockUnite: medicament.stockUnite ?? "",
+    stockSeuilAlert: medicament.stockSeuilAlert != null ? String(medicament.stockSeuilAlert) : "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -102,6 +100,9 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
         prescriptionRequise: form.prescriptionRequise,
         actif: form.actif,
         commentaire: form.commentaire || null,
+        stockActuel: form.stockActuel !== "" ? Number(form.stockActuel) : null,
+        stockUnite: form.stockUnite || null,
+        stockSeuilAlert: form.stockSeuilAlert !== "" ? Number(form.stockSeuilAlert) : null,
       }),
     });
     setSaving(false);
@@ -189,7 +190,7 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
             <label className="text-xs text-gray-500 block mb-1">Catégorie</label>
             <select value={form.categorie} onChange={(e) => setForm((f) => ({ ...f, categorie: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-              {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              {CATEGORIES_MEDICAMENT.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
             </select>
           </div>
           <div>
@@ -212,6 +213,23 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
           <label className="text-xs text-gray-500 block mb-1">Commentaire général</label>
           <textarea value={form.commentaire} onChange={(e) => setForm((f) => ({ ...f, commentaire: e.target.value }))}
             rows={2} className="w-full border rounded-lg px-3 py-2 text-sm resize-none" />
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Stock actuel</label>
+            <input type="number" min={0} step="0.5" value={form.stockActuel} onChange={(e) => setForm((f) => ({ ...f, stockActuel: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Unité</label>
+            <input value={form.stockUnite} onChange={(e) => setForm((f) => ({ ...f, stockUnite: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="flacon" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Seuil alerte</label>
+            <input type="number" min={0} step="0.5" value={form.stockSeuilAlert} onChange={(e) => setForm((f) => ({ ...f, stockSeuilAlert: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="1" />
+          </div>
         </div>
         <button type="submit" disabled={saving}
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">

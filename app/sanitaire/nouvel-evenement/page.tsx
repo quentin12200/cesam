@@ -5,11 +5,11 @@ import { ArrowLeft } from "lucide-react";
 import NouvelEvenementForm from "./NouvelEvenementForm";
 
 interface PageProps {
-  searchParams: Promise<{ animal?: string }>;
+  searchParams: Promise<{ animal?: string; medicament?: string }>;
 }
 
 export default async function NouvelEvenementPage({ searchParams }: PageProps) {
-  const { animal } = await searchParams;
+  const { animal, medicament } = await searchParams;
 
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto space-y-4">
@@ -20,7 +20,7 @@ export default async function NouvelEvenementPage({ searchParams }: PageProps) {
         <h2 className="text-xl font-bold text-gray-800">Nouvel événement sanitaire</h2>
       </div>
 
-      <NouvelEvenementForm presetNutrav={animal} />
+      <NouvelEvenementForm presetNutrav={animal} presetMedicamentId={medicament} />
     </div>
   );
 }

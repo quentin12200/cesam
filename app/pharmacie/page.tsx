@@ -22,9 +22,18 @@ async function getData() {
       orderBy: { nom: "asc" },
       select: {
         id: true, nom: true, dci: true, categorie: true, voie: true,
-        dosagePourKg: true, uniteDosage: true, delaiAttenteViandeJ: true,
-        prescriptionRequise: true, actif: true,
+        dosagePourKg: true, uniteDosage: true, delaiAttenteViandeJ: true, delaiAttenteLaitJ: true,
+        prescriptionRequise: true, actif: true, favori: true, actions: true,
         stockActuel: true, stockUnite: true, stockSeuilAlert: true,
+        preconisations: {
+          where: { statut: { not: "REJETE" } },
+          orderBy: [{ statut: "asc" }, { createdAt: "asc" }],
+          take: 3,
+          select: {
+            id: true, indicationMotif: true, categorieAnimaux: true,
+            dose: true, unite: true, doseBase: true, voie: true, statut: true,
+          },
+        },
       },
     }),
   ]);
@@ -87,11 +96,15 @@ async function getData() {
     dosagePourKg: m.dosagePourKg,
     uniteDosage: m.uniteDosage,
     delaiAttenteViandeJ: m.delaiAttenteViandeJ,
+    delaiAttenteLaitJ: m.delaiAttenteLaitJ,
     prescriptionRequise: m.prescriptionRequise,
     actif: m.actif,
+    favori: m.favori,
+    actions: m.actions,
     stockActuel: m.stockActuel,
     stockUnite: m.stockUnite,
     stockSeuilAlert: m.stockSeuilAlert,
+    preconisations: m.preconisations,
     recentTraitements: recentByMed[m.id] ?? [],
   }));
 

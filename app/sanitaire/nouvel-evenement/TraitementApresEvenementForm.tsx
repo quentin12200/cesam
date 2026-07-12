@@ -44,17 +44,35 @@ interface Ordonnance {
   statut: string;
 }
 
+interface Preconisation {
+  id: string;
+  indicationMotif: string | null;
+  categorieAnimaux: string | null;
+  agePoidsConcerne: string | null;
+  dose: number | null;
+  unite: string | null;
+  doseBase: string | null;
+  voie: string | null;
+  frequence: string | null;
+  dureeValeur: number | null;
+  dureeUnite: string | null;
+  delaiAttenteViandeJ: number | null;
+  delaiAttenteLaitTraites: number | null;
+  statut: string;
+}
+
 interface Props {
   targets: Target[];
   symptomesLibelles: string[];
   dateDebut: string;
+  presetMedicamentId?: string;
   onDone: () => void;
   onSkip: () => void;
 }
 
 type Step = "form" | "preview";
 
-export default function TraitementApresEvenementForm({ targets, symptomesLibelles, dateDebut, onDone, onSkip }: Props) {
+export default function TraitementApresEvenementForm({ targets, symptomesLibelles, dateDebut, presetMedicamentId, onDone, onSkip }: Props) {
   const [step, setStep] = useState<Step>("form");
   const [traitementsEnregistres, setTraitementsEnregistres] = useState(0);
 
@@ -68,6 +86,9 @@ export default function TraitementApresEvenementForm({ targets, symptomesLibelle
   const [ordonnancesMatch, setOrdonnancesMatch] = useState<Ordonnance[]>([]);
   const [ordonnanceChoisie, setOrdonnanceChoisie] = useState<Ordonnance | null>(null);
   const [ordonnanceAAssocier, setOrdonnanceAAssocier] = useState(false);
+
+  const [preconisations, setPreconisations] = useState<Preconisation[]>([]);
+  const [preconisationChoisieId, setPreconisationChoisieId] = useState<string | null>(null);
 
   const [dateDebutTraitement, setDateDebutTraitement] = useState(dateDebut);
   const [dureeJours, setDureeJours] = useState("3");
@@ -123,7 +144,36 @@ export default function TraitementApresEvenementForm({ targets, symptomesLibelle
     setRechercheMed("");
     setOrdonnanceChoisie(null);
     setOrdonnanceAAssocier(false);
+    setPreconisationChoisieId(null);
   }, []);
+
+  // Preselection depuis la fiche médicament (bouton "Créer un événement sanitaire avec ce médicament")
+  useEffect(() => {
+    if (!presetMedicamentId || medicamentId || medicaments.length === 0) return;
+    const m = medicaments.find((med) => med.id === presetMedicamentId);
+    if (m) choisirMedicament(m);
+  }, [presetMedicamentId, medicaments, medicamentId, choisirMedicament]);
+
+  // Préconisations du médicament choisi, pour sélectionner la posologie applicable
+  useEffect(() => {
+    if (!medicamentId) { setPreconisations([]); setPreconisationChoisieId(null); return; }
+    fetch(`/api/preconisations?medicamentId=${medicamentId}`)
+      .then((r) => r.json())
+      .then((data: Preconisation[]) => setPreconisations(data.filter((p) => p.statut !== "REJETE")))
+      .catch(() => setPreconisations([]));
+  }, [medicamentId]);
+
+  function choisirPreconisation(p: Preconisation | null) {
+    setPreconisationChoisieId(p?.id ?? null);
+    if (!p) return;
+    if (p.dose != null) setDose(String(p.dose));
+    if (p.unite) setUniteDosage(p.unite);
+    if (p.voie) setVoie(p.voie);
+    if (p.frequence) setFrequence(p.frequence);
+    if (p.dureeValeur != null) setDureeJours(String(p.dureeValeur));
+    if (p.delaiAttenteViandeJ != null) setDelaiAttenteViandeJ(String(p.delaiAttenteViandeJ));
+    if (p.delaiAttenteLaitTraites != null) setDelaiAttenteLaitJ(String(p.delaiAttenteLaitTraites));
+  }
 
   // Recherche des ordonnances existantes pour le médicament choisi
   useEffect(() => {
@@ -310,6 +360,9 @@ export default function TraitementApresEvenementForm({ targets, symptomesLibelle
           <p><span className="text-gray-500">Médicament :</span> <span className="font-medium">{effectiveNom}</span>{modeTemporaire && <span className="ml-1 text-xs text-orange-600">(temporaire)</span>}</p>
           <p><span className="text-gray-500">Voie / fréquence :</span> {voie || "—"} {frequence ? `· ${frequence}` : ""}</p>
           <p><span className="text-gray-500">Du :</span> {dateDebutTraitement} <span className="text-gray-500">pendant</span> {dureeJours} j</p>
+          {preconisationChoisieId && (
+            <p><span className="text-gray-500">Préconisation :</span> {preconisations.find((p) => p.id === preconisationChoisieId)?.indicationMotif || "Sans indication précisée"}</p>
+          )}
           <p><span className="text-gray-500">Ordonnance :</span> {ordonnanceChoisie ? `${ordonnanceChoisie.numero ?? "n° inconnu"} — ${ordonnanceChoisie.veterinaireNom ?? "prescripteur inconnu"}` : ordonnanceAAssocier ? "à associer plus tard" : "aucune"}</p>
           {(delaiAttenteViandeJ || delaiAttenteLaitJ) && (
             <p>
@@ -427,6 +480,24 @@ export default function TraitementApresEvenementForm({ targets, symptomesLibelle
           </>
         )}
       </div>
+
+      {preconisations.length > 0 && (
+        <div>
+          <p className="text-xs text-gray-500 mb-1.5">Préconisation applicable</p>
+          <div className="space-y-1.5">
+            {preconisations.map((p) => (
+              <button key={p.id} type="button"
+                onClick={() => choisirPreconisation(preconisationChoisieId === p.id ? null : p)}
+                className={`w-full text-left px-3 py-2 rounded-lg border text-xs ${preconisationChoisieId === p.id ? "bg-blue-50 border-blue-300" : "bg-white border-gray-200 hover:border-blue-300"}`}>
+                <span className="font-medium">{p.indicationMotif || "Sans indication précisée"}</span>
+                {p.dose != null && <span> — {p.dose} {p.unite}</span>}
+                {p.voie && <span> · {p.voie}</span>}
+                {p.categorieAnimaux && <span> · {p.categorieAnimaux}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {ordonnancesMatch.length > 0 && (
         <div>
