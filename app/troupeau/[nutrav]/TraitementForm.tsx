@@ -46,12 +46,14 @@ export default function TraitementForm({ animalId, onClose, initialScan, initial
   const [dateDebut, setDateDebut] = useState(today);
   const [dureeJours, setDureeJours] = useState("3");
   const [voie, setVoie] = useState("");
+  const [frequence, setFrequence] = useState("");
   const [dose, setDose] = useState("");
   const [uniteDosage, setUniteDosage] = useState("ml");
   const [motif, setMotif] = useState("");
   const [veterinaire, setVeterinaire] = useState("");
   const [ordonnanceNumero, setOrdonnanceNumero] = useState("");
   const [ordonnanceId, setOrdonnanceId] = useState<string | null>(initialOrdonnanceId ?? null);
+  const [ordonnanceAAssocier, setOrdonnanceAAssocier] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [scanning, setScanning] = useState(false);
@@ -174,12 +176,14 @@ export default function TraitementForm({ animalId, onClose, initialScan, initial
         dateDebut,
         dureeJours: Number(dureeJours) || 1,
         voie: voie || null,
+        frequence: frequence || null,
         dose: dose !== "" ? Number(dose) : null,
         uniteDosage: uniteDosage || null,
         motif: motif || null,
         veterinaire: veterinaire || null,
         ordonnanceNumero: ordonnanceNumero || null,
         ordonnanceId,
+        ordonnanceAAssocier: !ordonnanceNumero && !ordonnanceId ? ordonnanceAAssocier : false,
       }),
     });
     setSaving(false);
@@ -263,11 +267,16 @@ export default function TraitementForm({ animalId, onClose, initialScan, initial
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Voie</label>
           <input value={voie} onChange={(e) => setVoie(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="IM/SC..." />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Fréquence</label>
+          <input value={frequence} onChange={(e) => setFrequence(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="1x/jour" />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Dose</label>
@@ -299,6 +308,13 @@ export default function TraitementForm({ animalId, onClose, initialScan, initial
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: O97734" />
         </div>
       </div>
+
+      {!ordonnanceNumero && !ordonnanceId && (
+        <label className="flex items-center gap-2 text-xs text-gray-500">
+          <input type="checkbox" checked={ordonnanceAAssocier} onChange={(e) => setOrdonnanceAAssocier(e.target.checked)} />
+          Ordonnance à associer plus tard
+        </label>
+      )}
 
       <div className="flex gap-2 pt-1">
         <button type="submit" disabled={saving || !effectiveNom.trim()}

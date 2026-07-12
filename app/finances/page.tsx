@@ -494,6 +494,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                             prixPrevuHT: sortie.prixPrevuHT,
                             notes: sortie.notes,
                             causeMortalite: sortie.causeMortalite,
+                            animalId: sortie.animalId,
                             animal: { nutrav: sortie.animal.nutrav, nobovi: sortie.animal.nobovi },
                           }} />
                           <AnnulerSortieButton sortieId={sortie.id} nutrav={sortie.animal.nutrav} />
