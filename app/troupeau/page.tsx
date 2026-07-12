@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid } from "lucide-react";
 import { addDays, differenceInMonths, subDays } from "date-fns";
+import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
 import GroupeCreateButton from "./GroupeCreateButton";
@@ -184,6 +185,16 @@ async function getAnimaux(params: {
           select: {
             date: true,
             veau: { select: { nutrav: true, statut: true, sevreFait: true } },
+          },
+        },
+        traitements: {
+          where: { dateDebut: { gte: subDays(now, 90) } },
+          select: {
+            dateDebut: true,
+            dureeJours: true,
+            delaiAttenteViandeJ: true,
+            delaiAttenteLaitJ: true,
+            medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } },
           },
         },
       },
@@ -644,6 +655,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               veauNutrav: a.velagesVache[0]?.veau?.nutrav ?? null,
               veauStatut: a.velagesVache[0]?.veau?.statut ?? null,
               veauSevreFait: a.velagesVache[0]?.veau?.sevreFait ?? null,
+              enAttente: a.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente),
             }))}
             groupes={groupes}
           />
@@ -666,6 +678,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                   )
                 : null;
             const veau = animal.velagesVache[0]?.veau;
+            const enAttente = animal.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente);
 
             return (
               <Link
@@ -688,6 +701,11 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {enAttente && (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700" title="Délai d'attente en cours">
+                            ⏱ Attente
+                          </span>
+                        )}
                         {etat && (
                           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getBadgeClass(etat)}`}>
                             {etat === "VERT" ? "Pleine"

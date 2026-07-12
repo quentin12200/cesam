@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { addDays } from "date-fns";
+import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 
 export interface CarnetSanitaireRow {
   id: string;
@@ -36,13 +36,9 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
   const rows: CarnetSanitaireRow[] = [];
 
   for (const t of traitements) {
-    const dateFinTraitement = addDays(t.dateDebut, t.dureeJours);
-    const dateRemiseViande = t.medicament?.delaiAttenteViandeJ != null
-      ? addDays(dateFinTraitement, t.medicament.delaiAttenteViandeJ + 1)
-      : null;
-    const dateRemiseLait = t.medicament?.delaiAttenteLaitJ != null
-      ? addDays(dateFinTraitement, t.medicament.delaiAttenteLaitJ)
-      : null;
+    const attente = getAttenteInfoForTraitement(t);
+    const dateRemiseViande = attente.dateFinAttenteViande;
+    const dateRemiseLait = attente.dateFinAttenteLait;
     rows.push({
       id: t.id,
       date: t.dateDebut,

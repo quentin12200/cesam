@@ -6,6 +6,7 @@ import { Pill, Plus, Clock, CheckCircle2, AlertTriangle, ScanLine, Loader2 } fro
 import { addDays } from "date-fns";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
+import { getAttenteInfo, doitAfficherViande, doitAfficherLait } from "@/lib/withdrawal";
 import TraitementForm from "./TraitementForm";
 import { scanAndPersistOrdonnance } from "@/lib/scan-ordonnance-client";
 
@@ -15,14 +16,19 @@ interface TraitementRow {
   dateDebut: string;
   dureeJours: number;
   voie: string | null;
+  frequence: string | null;
   dose: number | null;
+  doseRecommandee: number | null;
   uniteDosage: string | null;
+  poidsUtilise: number | null;
   motif: string | null;
+  veterinaire: string | null;
   statut: string;
   delaiAttenteViandeJ: number | null;
   delaiAttenteLaitJ: number | null;
   ordonnanceNumero: string | null;
   ordonnanceId: string | null;
+  ordonnanceAAssocier: boolean;
 }
 
 interface ScanResult {
@@ -40,9 +46,10 @@ interface ScanResult {
 interface Props {
   animalId: string;
   traitements: TraitementRow[];
+  affichageDelaiAttente?: string;
 }
 
-export default function TraitementsSection({ animalId, traitements }: Props) {
+export default function TraitementsSection({ animalId, traitements, affichageDelaiAttente }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [pendingScan, setPendingScan] = useState<ScanResult | undefined>();
@@ -121,11 +128,11 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
             const dateDebut = new Date(t.dateDebut);
             const dateFin = addDays(dateDebut, t.dureeJours);
             const enCours = now < dateFin && t.statut === "EN_COURS";
-            const dateFinAttenteViande = t.delaiAttenteViandeJ != null ? addDays(dateFin, t.delaiAttenteViandeJ + 1) : null;
-            const dateFinAttenteLait = t.delaiAttenteLaitJ != null ? addDays(dateFin, t.delaiAttenteLaitJ) : null;
-            const dateFinAttente = dateFinAttenteViande;
-            const enAttente = dateFinAttente ? now < dateFinAttente : false;
-            const enAttenteLait = dateFinAttenteLait ? now < dateFinAttenteLait : false;
+            const attente = getAttenteInfo(dateFin, t.delaiAttenteViandeJ, t.delaiAttenteLaitJ, now);
+            const dateFinAttenteViande = attente.dateFinAttenteViande;
+            const dateFinAttenteLait = attente.dateFinAttenteLait;
+            const enAttente = attente.enAttenteViande && doitAfficherViande(affichageDelaiAttente);
+            const enAttenteLait = attente.enAttenteLait && doitAfficherLait(affichageDelaiAttente);
 
             return (
               <div key={t.id} className={`border rounded-lg p-3 text-sm ${
@@ -136,13 +143,20 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-gray-800">{t.medicamentNom}</span>
                       {t.voie && <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{t.voie}</span>}
+                      {t.frequence && <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{t.frequence}</span>}
                       {t.dose != null && (
-                        <span className="text-xs text-gray-500">{t.dose} {t.uniteDosage ?? "ml"}</span>
+                        <span className="text-xs text-gray-500">
+                          {t.dose} {t.uniteDosage ?? "ml"}
+                          {t.doseRecommandee != null && t.doseRecommandee !== t.dose && (
+                            <span className="text-gray-400"> (reco. {t.doseRecommandee})</span>
+                          )}
+                        </span>
                       )}
                     </div>
                     {t.motif && <div className="text-xs text-gray-500 mt-0.5">{t.motif}</div>}
                     <div className="text-xs text-gray-400 mt-1 flex flex-wrap gap-2">
                       <span>Du {formatDate(dateDebut)} — {t.dureeJours}j</span>
+                      {t.veterinaire && <span>Vét. {t.veterinaire}</span>}
                       {t.ordonnanceNumero && (
                         t.ordonnanceId ? (
                           <Link href={`/ordonnances/${t.ordonnanceId}`} className="text-blue-600 hover:underline">
@@ -151,6 +165,11 @@ export default function TraitementsSection({ animalId, traitements }: Props) {
                         ) : (
                           <span>N° ordonnance : {t.ordonnanceNumero}</span>
                         )
+                      )}
+                      {!t.ordonnanceNumero && t.ordonnanceAAssocier && (
+                        <span className="flex items-center gap-1 text-orange-600 font-medium">
+                          <AlertTriangle size={10} /> Ordonnance à associer
+                        </span>
                       )}
                       {enCours && (
                         <span className="flex items-center gap-1 text-blue-600">

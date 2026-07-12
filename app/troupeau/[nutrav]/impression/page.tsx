@@ -5,6 +5,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, addDays } from "date-fns";
 import { formatAge, formatDate, isMheVendable, getVaccinProtocolSteps, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
+import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import PrintButton from "@/app/components/PrintButton";
 
 interface PageProps {
@@ -24,10 +25,10 @@ async function getAnimal(nutrav: string) {
       taureau: { select: { nupere: true, nopere: true } },
       groupe: { select: { nom: true } },
       vaccinations: { orderBy: { date: "asc" } },
-      evenements: { orderBy: { date: "desc" } },
+      evenements: { orderBy: { date: "desc" }, include: { symptomes: true } },
       traitements: {
         orderBy: { dateDebut: "desc" },
-        include: { medicament: { select: { delaiAttenteViandeJ: true } } },
+        include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
       },
       pesees: { orderBy: { date: "asc" } },
       velagesVache: {
@@ -74,10 +75,8 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
 
   const traitementsActifs = animal.traitements.filter((t) => {
     const dateFin = addDays(new Date(t.dateDebut), t.dureeJours);
-    const dateFinAttente = t.medicament?.delaiAttenteViandeJ
-      ? addDays(dateFin, t.medicament.delaiAttenteViandeJ)
-      : dateFin;
-    return now < dateFinAttente;
+    const attente = getAttenteInfoForTraitement(t, now);
+    return now < dateFin || attente.enAttente;
   });
 
   return (
@@ -173,23 +172,24 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  <Th>Médicament</Th><Th>Début</Th><Th>Durée</Th><Th>Fin traitement</Th><Th>Fin attente viande</Th><Th>N° ordonnance</Th>
+                  <Th>Médicament</Th><Th>Début</Th><Th>Durée</Th><Th>Fin traitement</Th><Th>Fin attente viande</Th><Th>Fin attente lait</Th><Th>N° ordonnance</Th>
                 </tr>
               </thead>
               <tbody>
                 {traitementsActifs.map((t) => {
                   const dateFin = addDays(new Date(t.dateDebut), t.dureeJours);
-                  const dateFinAttente = t.medicament?.delaiAttenteViandeJ
-                    ? addDays(dateFin, t.medicament.delaiAttenteViandeJ)
-                    : null;
+                  const attente = getAttenteInfoForTraitement(t, now);
                   return (
                     <tr key={t.id} className="odd:bg-white even:bg-gray-50">
                       <Td>{t.medicamentNom}</Td>
                       <Td>{fmt(t.dateDebut)}</Td>
                       <Td>{t.dureeJours}j</Td>
                       <Td>{fmt(dateFin)}</Td>
-                      <Td className={dateFinAttente && now < dateFinAttente ? "font-bold text-orange-700" : ""}>
-                        {dateFinAttente ? fmt(dateFinAttente) : "Aucune"}
+                      <Td className={attente.enAttenteViande ? "font-bold text-orange-700" : ""}>
+                        {attente.dateFinAttenteViande ? fmt(attente.dateFinAttenteViande) : "Aucune"}
+                      </Td>
+                      <Td className={attente.enAttenteLait ? "font-bold text-orange-700" : ""}>
+                        {attente.dateFinAttenteLait ? fmt(attente.dateFinAttenteLait) : "Aucune"}
                       </Td>
                       <Td>{t.ordonnanceNumero ?? "—"}</Td>
                     </tr>
@@ -213,10 +213,8 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
                 {animal.traitements
                   .filter((t) => {
                     const dateFin = addDays(new Date(t.dateDebut), t.dureeJours);
-                    const dateFinAttente = t.medicament?.delaiAttenteViandeJ
-                      ? addDays(dateFin, t.medicament.delaiAttenteViandeJ)
-                      : dateFin;
-                    return now >= dateFinAttente;
+                    const attente = getAttenteInfoForTraitement(t, now);
+                    return now >= dateFin && !attente.enAttente;
                   })
                   .map((t) => (
                     <tr key={t.id} className="odd:bg-white even:bg-gray-50">
@@ -320,7 +318,7 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  <Th>Date</Th><Th>Type</Th><Th>Description</Th><Th>Statut</Th>
+                  <Th>Date</Th><Th>Type</Th><Th>Symptômes</Th><Th>Temp.</Th><Th>Description</Th><Th>Statut</Th>
                 </tr>
               </thead>
               <tbody>
@@ -328,6 +326,8 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
                   <tr key={e.id} className="odd:bg-white even:bg-gray-50">
                     <Td>{fmt(e.date)}</Td>
                     <Td>{e.type}</Td>
+                    <Td>{e.symptomes.length > 0 ? e.symptomes.map((s) => s.libelle).join(", ") : "—"}</Td>
+                    <Td>{e.temperature != null ? `${e.temperature}°C` : "—"}</Td>
                     <Td>{e.description ?? "—"}</Td>
                     <Td>{e.resolu ? "Résolu" : "En cours"}</Td>
                   </tr>

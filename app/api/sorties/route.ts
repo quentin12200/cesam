@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest) {
       dateDebutEngr,
       notes,
       causeMortalite,
+      confirmeAttente,
     } = body;
 
     if (!animalId || !date || !type) {
@@ -64,6 +67,20 @@ export async function POST(request: NextRequest) {
       where: { id: animalId },
       select: { nutrav: true, nobovi: true },
     });
+
+    if (type === "BOUCHERIE" && !confirmeAttente) {
+      const traitementsRecents = await prisma.traitement.findMany({
+        where: { animalId, dateDebut: { gte: subDays(new Date(), 90) } },
+        include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
+      });
+      const enAttente = traitementsRecents.some((t) => getAttenteInfoForTraitement(t).enAttenteViande);
+      if (enAttente) {
+        return NextResponse.json(
+          { error: "Cet animal est encore en délai d'attente viande. Confirme la sortie depuis le formulaire pour valider quand même." },
+          { status: 409 }
+        );
+      }
+    }
 
     const prixPrevuHT =
       prixKilo && poids ? Math.round(prixKilo * poids * 100) / 100 : null;

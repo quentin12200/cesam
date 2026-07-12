@@ -12,10 +12,12 @@ export interface EvenementRow {
   categorie: string | null;
   date: Date;
   moment: string | null;
+  temperature: number | null;
   description: string | null;
   photos: string | null;
   constatePar: string | null;
   resolu: boolean;
+  symptomes: { libelle: string }[];
 }
 
 export default function EvenementsSanitairesSection({ evenements }: { evenements: EvenementRow[] }) {
@@ -56,7 +58,21 @@ export default function EvenementsSanitairesSection({ evenements }: { evenements
                       {getCategorieLabel(evt.categorie)}
                     </span>
                   )}
+                  {evt.temperature != null && (
+                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-full">
+                      {evt.temperature}°C
+                    </span>
+                  )}
                 </div>
+                {evt.symptomes.length > 1 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {evt.symptomes.map((s) => (
+                      <span key={s.libelle} className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full">
+                        {s.libelle}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="text-xs text-gray-500 mt-0.5">
                   {formatDate(evt.date)}{evt.moment ? ` — ${evt.moment}` : ""}
                   {evt.constatePar ? ` · Constaté par ${evt.constatePar}` : ""}

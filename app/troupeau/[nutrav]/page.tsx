@@ -65,6 +65,15 @@ async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
   return DEFAULT_PROTOCOLES;
 }
 
+async function getAffichageDelaiAttente(): Promise<string> {
+  try {
+    const config = await prisma.exploitationConfig.findUnique({ where: { id: "singleton" } });
+    return config?.affichageDelaiAttente ?? "LES_DEUX";
+  } catch {
+    return "LES_DEUX";
+  }
+}
+
 async function getAnimal(nutrav: string) {
   return prisma.animal.findUnique({
     where: { nutrav },
@@ -77,7 +86,7 @@ async function getAnimal(nutrav: string) {
         orderBy: { danais: "desc" },
       },
       vaccinations: { orderBy: { date: "asc" } },
-      evenements: { orderBy: { date: "desc" } },
+      evenements: { orderBy: { date: "desc" }, include: { symptomes: true } },
       traitements: {
         orderBy: { dateDebut: "desc" },
         take: 10,
@@ -107,7 +116,9 @@ async function getAnimal(nutrav: string) {
 export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const { nutrav } = await params;
   const { onglet = "identite" } = await searchParams;
-  const [animal, groupes, protocoles] = await Promise.all([getAnimal(nutrav), getGroupes(), getProtocoles()]);
+  const [animal, groupes, protocoles, affichageDelaiAttente] = await Promise.all([
+    getAnimal(nutrav), getGroupes(), getProtocoles(), getAffichageDelaiAttente(),
+  ]);
 
   if (!animal) notFound();
 
@@ -617,25 +628,36 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             {/* Traitements */}
             <TraitementsSection
               animalId={animal.id}
+              affichageDelaiAttente={affichageDelaiAttente}
               traitements={animal.traitements.map((t) => ({
                 id: t.id,
                 medicamentNom: t.medicamentNom,
                 dateDebut: t.dateDebut.toISOString(),
                 dureeJours: t.dureeJours,
                 voie: t.voie,
+                frequence: t.frequence,
                 dose: t.dose,
+                doseRecommandee: t.doseRecommandee,
                 uniteDosage: t.uniteDosage,
+                poidsUtilise: t.poidsUtilise,
                 motif: t.motif,
+                veterinaire: t.veterinaire,
                 statut: t.statut,
-                delaiAttenteViandeJ: t.medicament?.delaiAttenteViandeJ ?? null,
-                delaiAttenteLaitJ: t.medicament?.delaiAttenteLaitJ ?? null,
+                delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
+                delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
                 ordonnanceNumero: t.ordonnanceNumero,
                 ordonnanceId: t.ordonnanceId,
+                ordonnanceAAssocier: t.ordonnanceAAssocier,
               }))}
             />
 
             {/* Événements sanitaires */}
-            <EvenementsSanitairesSection evenements={animal.evenements} />
+            <EvenementsSanitairesSection
+              evenements={animal.evenements.map((e) => ({
+                ...e,
+                symptomes: e.symptomes.map((s) => ({ libelle: s.libelle })),
+              }))}
+            />
           </>
         )}
 

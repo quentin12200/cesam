@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { differenceInDays } from "date-fns";
 import { getVaccinProtocolSteps, formatDateShort, type ProtocoleVaccinConfig } from "@/lib/utils";
+import { getAttenteInfo, doitAfficherViande, doitAfficherLait } from "@/lib/withdrawal";
 import VaccinationFormWrapper from "./VaccinationFormWrapper";
 import VaccineQuickButton from "./VaccineQuickButton";
 
@@ -101,6 +102,7 @@ interface Props {
   protocoles: ProtocoleVaccinConfig[];
   evenements: EvenementItem[];
   traitements: TraitementActifItem[];
+  affichageDelaiAttente?: string;
 }
 
 // ── Statut vaccinal global pour un veau ───────────────────────────────────────
@@ -592,7 +594,7 @@ function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVacc
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes, protocoles, evenements, traitements }: Props) {
+export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes, protocoles, evenements, traitements, affichageDelaiAttente }: Props) {
   const router = useRouter();
   const [onglet, setOnglet] = useState<"evenements" | "vaccination" | "pharmacie" | "ordonnances">("evenements");
   const [vaccinTab, setVaccinTab] = useState<"urgent" | "veaux" | "vaches">("urgent");
@@ -795,16 +797,24 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
                           <span className="text-sm font-medium text-gray-800">{t.animalNom ?? ""}</span>
                         </div>
                         <p className="text-xs text-blue-700 font-medium mt-1">{t.medicamentNom}</p>
-                        {t.delaiAttenteViandeJ != null && (() => {
-                          const dateFin = new Date(new Date(t.dateDebut).getTime() + t.dureeJours * 86400000);
-                          const dateRetrait = new Date(dateFin.getTime() + (t.delaiAttenteViandeJ + 1) * 86400000);
-                          const jRestant = Math.ceil((dateRetrait.getTime() - Date.now()) / 86400000);
-                          if (jRestant > 0) return (
+                        {(() => {
+                          const attente = getAttenteInfo(fin, t.delaiAttenteViandeJ, t.delaiAttenteLaitJ);
+                          const showViande = attente.enAttenteViande && doitAfficherViande(affichageDelaiAttente);
+                          const showLait = attente.enAttenteLait && doitAfficherLait(affichageDelaiAttente);
+                          if (!showViande && !showLait) return null;
+                          const jRestantViande = showViande && attente.dateFinAttenteViande
+                            ? Math.ceil((attente.dateFinAttenteViande.getTime() - Date.now()) / 86400000)
+                            : null;
+                          const jRestantLait = showLait && attente.dateFinAttenteLait
+                            ? Math.ceil((attente.dateFinAttenteLait.getTime() - Date.now()) / 86400000)
+                            : null;
+                          return (
                             <p className="text-xs text-orange-700 font-medium mt-0.5">
-                              ⏱ Attente viande : {jRestant}j restant{jRestant > 1 ? "s" : ""}
+                              {jRestantViande != null && jRestantViande > 0 && `⏱ Attente viande : ${jRestantViande}j restant${jRestantViande > 1 ? "s" : ""}`}
+                              {jRestantViande != null && jRestantViande > 0 && jRestantLait != null && jRestantLait > 0 && " · "}
+                              {jRestantLait != null && jRestantLait > 0 && `⏱ Attente lait : ${jRestantLait}j restant${jRestantLait > 1 ? "s" : ""}`}
                             </p>
                           );
-                          return null;
                         })()}
                       </div>
                       <div className="text-right shrink-0">

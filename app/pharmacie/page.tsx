@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, Pill, Printer } from "lucide-react";
 import { addDays, differenceInDays } from "date-fns";
+import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import PharmacieClient, { type TraitementItem, type MedicamentItem } from "./PharmacieClient";
 
 async function getData() {
@@ -13,7 +14,7 @@ async function getData() {
     prisma.traitement.findMany({
       include: {
         animal: { select: { id: true, nutrav: true, nobovi: true } },
-        medicament: { select: { id: true, nom: true, delaiAttenteViandeJ: true } },
+        medicament: { select: { id: true, nom: true, delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } },
       },
       orderBy: { dateDebut: "desc" },
     }),
@@ -31,10 +32,11 @@ async function getData() {
   const traitementsItems: TraitementItem[] = traitements.map((t) => {
     const dateDebut = new Date(t.dateDebut);
     const dateFin = addDays(dateDebut, t.dureeJours);
-    const delaiViande = t.medicament?.delaiAttenteViandeJ ?? null;
-    const dateFinAttente = delaiViande != null ? addDays(dateFin, delaiViande) : null;
+    const attente = getAttenteInfoForTraitement(t, now);
+    const delaiViande = t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
+    const dateFinAttente = attente.dateFinAttenteViande;
     const enCours = now < dateFin;
-    const enAttente = dateFinAttente != null ? now < dateFinAttente : false;
+    const enAttente = attente.enAttente;
     const joursRestantsAttente = dateFinAttente ? differenceInDays(dateFinAttente, now) : null;
 
     return {

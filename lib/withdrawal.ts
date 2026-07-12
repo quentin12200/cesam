@@ -1,10 +1,17 @@
 import { addDays } from "date-fns";
 
 /**
- * Formule canonique du délai d'attente : point de départ = dernière administration
- * réellement réalisée (fin de traitement), +1 jour pour la viande (le jour de la
- * dernière administration compte comme jour 0), sans +1 pour le lait (convention
- * déjà en usage dans le carnet sanitaire).
+ * Fin de traitement = date de début + durée en jours (convention utilisée dans
+ * toute l'application, y compris le carnet sanitaire).
+ */
+export function getDateFinTraitement(dateDebut: Date, dureeJours: number): Date {
+  return addDays(dateDebut, dureeJours);
+}
+
+/**
+ * Formule canonique du délai d'attente : point de départ = fin de traitement,
+ * +1 jour pour la viande (convention déjà en usage dans le carnet sanitaire),
+ * sans +1 pour le lait.
  */
 export function getDateFinAttenteViande(dateFin: Date, delaiAttenteViandeJ: number | null | undefined): Date | null {
   if (delaiAttenteViandeJ == null) return null;
@@ -46,6 +53,25 @@ export function getAttenteInfo(
     enAttenteLait,
     enAttente: enAttenteViande || enAttenteLait,
   };
+}
+
+export interface TraitementDelaiInput {
+  dateDebut: Date;
+  dureeJours: number;
+  delaiAttenteViandeJ?: number | null;
+  delaiAttenteLaitJ?: number | null;
+  medicament?: { delaiAttenteViandeJ?: number | null; delaiAttenteLaitJ?: number | null } | null;
+}
+
+/**
+ * Le délai propre au traitement prime (il a pu être ajusté ou prescrit
+ * spécifiquement) ; à défaut on retombe sur celui du médicament catalogué.
+ */
+export function getAttenteInfoForTraitement(t: TraitementDelaiInput, now: Date = new Date()): AttenteInfo {
+  const dateFin = getDateFinTraitement(new Date(t.dateDebut), t.dureeJours);
+  const delaiViande = t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
+  const delaiLait = t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null;
+  return getAttenteInfo(dateFin, delaiViande, delaiLait, now);
 }
 
 export type AffichageDelaiAttente = "VIANDE" | "LAIT" | "LES_DEUX";

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { addDays, differenceInDays } from "date-fns";
+import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import PrintButton from "@/app/components/PrintButton";
 
 function fmt(d: Date | string | null | undefined) {
@@ -17,7 +18,7 @@ export default async function PharmacieImpressionPage() {
   const traitements = await prisma.traitement.findMany({
     include: {
       animal: { select: { nutrav: true, nobovi: true } },
-      medicament: { select: { delaiAttenteViandeJ: true } },
+      medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } },
     },
     orderBy: { dateDebut: "desc" },
   });
@@ -25,11 +26,12 @@ export default async function PharmacieImpressionPage() {
   const actifs = traitements
     .map((t) => {
       const dateFin = addDays(new Date(t.dateDebut), t.dureeJours);
-      const delaiViande = t.medicament?.delaiAttenteViandeJ ?? null;
-      const dateFinAttente = delaiViande != null ? addDays(dateFin, delaiViande) : dateFin;
+      const attente = getAttenteInfoForTraitement(t, now);
+      const delaiViande = t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
+      const dateFinAttente = attente.dateFinAttenteViande ?? dateFin;
       const enCours = now < dateFin;
-      const enAttente = now < dateFinAttente;
-      return { ...t, dateFin, dateFinAttente, enCours, enAttente, joursRestants: differenceInDays(dateFinAttente, now) };
+      const enAttente = enCours || attente.enAttenteViande;
+      return { ...t, dateFin, dateFinAttente, delaiViande, enCours, enAttente, joursRestants: differenceInDays(dateFinAttente, now) };
     })
     .filter((t) => t.enCours || t.enAttente)
     .sort((a, b) => a.joursRestants - b.joursRestants);
@@ -77,7 +79,7 @@ export default async function PharmacieImpressionPage() {
                     {t.enCours && <span className="ml-1 text-xs text-blue-600">(en cours)</span>}
                   </td>
                   <td className={`border border-gray-300 px-3 py-1.5 text-center font-bold ${t.joursRestants > 0 ? "text-orange-700" : "text-green-700"}`}>
-                    {t.medicament?.delaiAttenteViandeJ != null ? (
+                    {t.delaiViande != null ? (
                       <>
                         {fmt(t.dateFinAttente)}
                         {t.joursRestants > 0 && <span className="block text-xs">J-{t.joursRestants}</span>}
