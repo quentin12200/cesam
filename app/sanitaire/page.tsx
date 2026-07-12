@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { getVaccinsManquants, formatDate, formatAge, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
-import { differenceInDays, subDays } from "date-fns";
+import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { differenceInDays, subDays, addDays } from "date-fns";
 import Link from "next/link";
 import { ArrowLeft, Settings, Printer, Building2, BookOpen, Plus } from "lucide-react";
 import SanitaireClient, {
@@ -14,6 +15,7 @@ import SanitaireClient, {
   type EvenementItem,
   type TraitementActifItem,
 } from "./SanitaireClient";
+import { type TraitementItem } from "./TraitementsTab";
 
 async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
   try {
@@ -28,7 +30,7 @@ async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
 async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
   const now = new Date();
 
-  const [animaux, vaccinationsRecentes, vachesAvecGestation, evenementsRaw, traitementsRaw] = await Promise.all([
+  const [animaux, vaccinationsRecentes, vachesAvecGestation, evenementsRaw, traitementsRaw, traitementsDetailRaw] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
       include: { vaccinations: { select: { id: true, vaccin: true, date: true } } },
@@ -61,6 +63,14 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
       },
       orderBy: { dateDebut: "desc" },
       take: 50,
+    }),
+    prisma.traitement.findMany({
+      include: {
+        animal: { select: { nutrav: true, nobovi: true } },
+        medicament: { select: { id: true, delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } },
+      },
+      orderBy: { dateDebut: "desc" },
+      take: 100,
     }),
   ]);
 
@@ -208,7 +218,41 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
   }));
 
-  return { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements };
+  const traitementsDetail: TraitementItem[] = traitementsDetailRaw.map((t) => {
+    const dateDebut = new Date(t.dateDebut);
+    const dateFin = addDays(dateDebut, t.dureeJours);
+    const attente = getAttenteInfoForTraitement(t, now);
+    const delaiViande = t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
+    const dateFinAttente = attente.dateFinAttenteViande;
+    const enCours = now < dateFin;
+    const enAttente = attente.enAttente;
+    const joursRestantsAttente = dateFinAttente ? differenceInDays(dateFinAttente, now) : null;
+
+    return {
+      id: t.id,
+      animalNutrav: t.animal.nutrav,
+      animalNom: t.animal.nobovi,
+      medicamentNom: t.medicamentNom,
+      medicamentId: t.medicamentId,
+      dateDebut: dateDebut.toISOString(),
+      dateFin: dateFin.toISOString(),
+      dureeJours: t.dureeJours,
+      voie: t.voie,
+      dose: t.dose,
+      uniteDosage: t.uniteDosage,
+      motif: t.motif,
+      veterinaire: t.veterinaire,
+      statut: t.statut,
+      notes: t.notes,
+      delaiAttenteViandeJ: delaiViande,
+      dateFinAttente: dateFinAttente?.toISOString() ?? null,
+      enCours,
+      enAttente,
+      joursRestantsAttente,
+    };
+  });
+
+  return { veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements, traitementsDetail };
 }
 
 async function getAffichageDelaiAttente(): Promise<string> {
@@ -222,7 +266,7 @@ async function getAffichageDelaiAttente(): Promise<string> {
 
 export default async function SanitairePage() {
   const protocoles = await getProtocoles();
-  const [{ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements }, affichageDelaiAttente] = await Promise.all([
+  const [{ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, recentes, evenements, traitements, traitementsDetail }, affichageDelaiAttente] = await Promise.all([
     getSanitaireData(protocoles),
     getAffichageDelaiAttente(),
   ]);
@@ -284,6 +328,7 @@ export default async function SanitairePage() {
         protocoles={protocoles}
         evenements={evenements}
         traitements={traitements}
+        traitementsDetail={traitementsDetail}
         affichageDelaiAttente={affichageDelaiAttente}
       />
     </div>
