@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Pencil } from "lucide-react";
+import { X, Pencil, AlertTriangle } from "lucide-react";
 import { CAUSES_MORTALITE, CAUSES_MORTALITE_LABELS } from "@/lib/utils";
 
 interface Sortie {
@@ -18,7 +18,17 @@ interface Sortie {
   prixPrevuHT: number | null;
   notes: string | null;
   causeMortalite: string | null;
+  animalId: string;
   animal: { nutrav: string; nobovi: string | null };
+}
+
+interface AttenteInfo {
+  enAttente: boolean;
+  enAttenteViande: boolean;
+  enAttenteLait: boolean;
+  dateFinAttenteViande: string | null;
+  dateFinAttenteLait: string | null;
+  medicamentNom: string | null;
 }
 
 const TYPE_OPTIONS = [
@@ -44,6 +54,17 @@ export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
   const [prixDefinitifHT, setPrixDefinitifHT] = useState(sortie.prixDefinitifHT?.toString() ?? "");
   const [notes, setNotes] = useState(sortie.notes ?? "");
   const [causeMortalite, setCauseMortalite] = useState(sortie.causeMortalite ?? "");
+  const [attenteInfo, setAttenteInfo] = useState<AttenteInfo | null>(null);
+  const [confirmeAttente, setConfirmeAttente] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch(`/api/traitements/attente?animalId=${sortie.animalId}`)
+      .then((r) => r.json())
+      .then(setAttenteInfo)
+      .catch(() => setAttenteInfo(null));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const hasFinancials = type === "ELEVAGE" || type === "BOUCHERIE";
 
@@ -57,6 +78,10 @@ export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (type === "BOUCHERIE" && attenteInfo?.enAttenteViande && !confirmeAttente) {
+      setError("Cet animal est encore en délai d'attente viande — coche la case de confirmation pour valider quand même");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -74,6 +99,7 @@ export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
           prixDefinitifHT: prixDefinitifHT ? parseFloat(prixDefinitifHT) : null,
           notes: notes || null,
           causeMortalite: type === "MORT" ? causeMortalite || null : null,
+          confirmeAttente,
         }),
       });
       if (!res.ok) {
@@ -121,6 +147,27 @@ export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
                   {error}
+                </div>
+              )}
+
+              {attenteInfo?.enAttente && (
+                <div className="bg-orange-50 border border-orange-300 rounded-lg p-3 text-sm">
+                  <div className="flex items-start gap-2 text-orange-800 font-medium">
+                    <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                    <span>
+                      Cet animal est encore en délai d&apos;attente
+                      {attenteInfo.enAttenteViande && attenteInfo.dateFinAttenteViande && ` viande jusqu'au ${new Date(attenteInfo.dateFinAttenteViande).toLocaleDateString("fr-FR")}`}
+                      {attenteInfo.enAttenteViande && attenteInfo.enAttenteLait ? " et" : ""}
+                      {attenteInfo.enAttenteLait && attenteInfo.dateFinAttenteLait && ` lait jusqu'au ${new Date(attenteInfo.dateFinAttenteLait).toLocaleDateString("fr-FR")}`}
+                      {attenteInfo.medicamentNom && ` (${attenteInfo.medicamentNom})`}.
+                    </span>
+                  </div>
+                  {type === "BOUCHERIE" && attenteInfo.enAttenteViande && (
+                    <label className="flex items-start gap-2 mt-2 text-orange-900">
+                      <input type="checkbox" checked={confirmeAttente} onChange={(e) => setConfirmeAttente(e.target.checked)} className="mt-0.5" />
+                      <span className="text-xs">Je confirme être informé du délai d&apos;attente et je valide quand même cette sortie boucherie.</span>
+                    </label>
+                  )}
                 </div>
               )}
 

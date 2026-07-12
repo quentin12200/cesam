@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 
 export async function PATCH(
   req: NextRequest,
@@ -9,10 +11,25 @@ export async function PATCH(
   const { id } = await params;
   try {
     const body = await req.json();
-    const { date, type, acheteur, poids, poidsVif, rendementCarcasse, prixKilo, prixDefinitifHT, notes, causeMortalite } = body;
+    const { date, type, acheteur, poids, poidsVif, rendementCarcasse, prixKilo, prixDefinitifHT, notes, causeMortalite, confirmeAttente } = body;
 
     const sortie = await prisma.sortie.findUnique({ where: { id } });
     if (!sortie) return NextResponse.json({ error: "Sortie introuvable" }, { status: 404 });
+
+    const typeFinal = type ?? sortie.type;
+    if (typeFinal === "BOUCHERIE" && !confirmeAttente) {
+      const traitementsRecents = await prisma.traitement.findMany({
+        where: { animalId: sortie.animalId, dateDebut: { gte: subDays(new Date(), 90) } },
+        include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
+      });
+      const enAttente = traitementsRecents.some((t) => getAttenteInfoForTraitement(t).enAttenteViande);
+      if (enAttente) {
+        return NextResponse.json(
+          { error: "Cet animal est encore en délai d'attente viande. Confirme la sortie depuis le formulaire pour valider quand même." },
+          { status: 409 }
+        );
+      }
+    }
 
     const updated = await prisma.sortie.update({
       where: { id },
