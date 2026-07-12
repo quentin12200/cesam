@@ -3,18 +3,7 @@
 import { useState, useRef } from "react";
 import { ScanLine, Loader2, X, Save, CheckCircle2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-
-interface ScanResult {
-  medicamentNom: string | null;
-  voie: string | null;
-  dose: number | null;
-  uniteDosage: string | null;
-  dureeJours: number | null;
-  dateDebut: string | null;
-  veterinaire: string | null;
-  motif: string | null;
-  ordonnanceNumero: string | null;
-}
+import { scanAndPersistOrdonnance } from "@/lib/scan-ordonnance-client";
 
 interface AnimalResult {
   id: string;
@@ -47,6 +36,7 @@ export default function GlobalScanner() {
   const [veterinaire, setVeterinaire] = useState("");
   const [motif, setMotif] = useState("");
   const [ordonnanceNumero, setOrdonnanceNumero] = useState("");
+  const [ordonnanceId, setOrdonnanceId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -58,18 +48,7 @@ export default function GlobalScanner() {
     setScanMsg("");
 
     try {
-      const base64 = await fileToBase64(file);
-      const mimeType = file.type || "image/jpeg";
-      const res = await fetch("/api/scan-ordonnance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64, mimeType }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Erreur serveur");
-      }
-      const result: ScanResult = await res.json();
+      const { ordonnanceId: newOrdonnanceId, extracted: result } = await scanAndPersistOrdonnance(file);
       if (result.medicamentNom) setMedicamentNom(result.medicamentNom);
       if (result.voie) setVoie(result.voie);
       if (result.dose != null) setDose(String(result.dose));
@@ -79,6 +58,7 @@ export default function GlobalScanner() {
       if (result.veterinaire) setVeterinaire(result.veterinaire);
       if (result.motif) setMotif(result.motif);
       if (result.ordonnanceNumero) setOrdonnanceNumero(result.ordonnanceNumero);
+      setOrdonnanceId(newOrdonnanceId);
       setScanStatus("ok");
       setScanMsg("Ordonnance analysée — sélectionnez l'animal et vérifiez les champs");
     } catch (err) {
@@ -123,6 +103,7 @@ export default function GlobalScanner() {
         motif: motif || null,
         veterinaire: veterinaire || null,
         ordonnanceNumero: ordonnanceNumero || null,
+        ordonnanceId,
       }),
     });
     setSaving(false);
@@ -144,6 +125,7 @@ export default function GlobalScanner() {
     setVeterinaire("");
     setMotif("");
     setOrdonnanceNumero("");
+    setOrdonnanceId(null);
     setScanStatus("idle");
     setScanMsg("");
   }
@@ -288,13 +270,4 @@ export default function GlobalScanner() {
       )}
     </>
   );
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }

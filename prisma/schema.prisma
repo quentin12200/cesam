@@ -162,6 +162,8 @@ model Vaccination {
   dose       Float?
   statut     String    @default("FAIT")
   ordonnanceNumero String?
+  ordonnanceId String?
+  ordonnance Ordonnance? @relation(fields: [ordonnanceId], references: [id])
   veterinaire String?
   notes      String?
 
@@ -393,6 +395,8 @@ model Traitement {
   motif         String?
   veterinaire   String?
   ordonnanceNumero String?
+  ordonnanceId  String?
+  ordonnance    Ordonnance? @relation(fields: [ordonnanceId], references: [id])
   statut        String      @default("EN_COURS")
   notes         String?
   createdAt     DateTime    @default(now())
@@ -426,6 +430,9 @@ model Ordonnance {
   animaux        String?
   statut         String   @default("VALIDE")
   notes          String?
+  photoUrl       String?
+  traitements    Traitement[]
+  vaccinations   Vaccination[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

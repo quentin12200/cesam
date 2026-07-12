@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Save, X, ScanLine, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { scanAndPersistOrdonnance } from "@/lib/scan-ordonnance-client";
 
 interface Medicament {
   id: string;
@@ -18,6 +19,7 @@ interface Props {
   animalId: string;
   onClose: () => void;
   initialScan?: ScanResult;
+  initialOrdonnanceId?: string | null;
 }
 
 interface ScanResult {
@@ -34,7 +36,7 @@ interface ScanResult {
 
 const today = new Date().toISOString().slice(0, 10);
 
-export default function TraitementForm({ animalId, onClose, initialScan }: Props) {
+export default function TraitementForm({ animalId, onClose, initialScan, initialOrdonnanceId }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -49,6 +51,7 @@ export default function TraitementForm({ animalId, onClose, initialScan }: Props
   const [motif, setMotif] = useState("");
   const [veterinaire, setVeterinaire] = useState("");
   const [ordonnanceNumero, setOrdonnanceNumero] = useState("");
+  const [ordonnanceId, setOrdonnanceId] = useState<string | null>(initialOrdonnanceId ?? null);
   const [saving, setSaving] = useState(false);
 
   const [scanning, setScanning] = useState(false);
@@ -144,22 +147,9 @@ export default function TraitementForm({ animalId, onClose, initialScan }: Props
     setScanMsg("");
 
     try {
-      const base64 = await fileToBase64(file);
-      const mimeType = file.type || "image/jpeg";
-
-      const res = await fetch("/api/scan-ordonnance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64, mimeType }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Erreur serveur");
-      }
-
-      const result: ScanResult = await res.json();
-      applyScanned(result);
+      const { ordonnanceId: newOrdonnanceId, extracted } = await scanAndPersistOrdonnance(file);
+      applyScanned(extracted);
+      setOrdonnanceId(newOrdonnanceId);
       setScanStatus("ok");
       setScanMsg("Ordonnance analysée — vérifiez les champs ci-dessous");
     } catch (err) {
@@ -189,6 +179,7 @@ export default function TraitementForm({ animalId, onClose, initialScan }: Props
         motif: motif || null,
         veterinaire: veterinaire || null,
         ordonnanceNumero: ordonnanceNumero || null,
+        ordonnanceId,
       }),
     });
     setSaving(false);
@@ -321,17 +312,4 @@ export default function TraitementForm({ animalId, onClose, initialScan }: Props
       </div>
     </form>
   );
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Strip the data:...;base64, prefix
-      resolve(result.split(",")[1]);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
