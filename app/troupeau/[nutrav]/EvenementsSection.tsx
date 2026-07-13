@@ -10,6 +10,7 @@ import { getAttenteInfo, doitAfficherViande, doitAfficherLait } from "@/lib/with
 import { getCategorieLabel } from "@/lib/evenements-sanitaires";
 import EvenementEditPanel from "./EvenementEditPanel";
 import TraitementForm from "./TraitementForm";
+import TraitementEditForm from "./TraitementEditForm";
 import { scanAndPersistOrdonnance } from "@/lib/scan-ordonnance-client";
 import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 
@@ -87,6 +88,8 @@ function TraitementCard({ t, affichageDelaiAttente, onTerminer, nested }: {
   onTerminer: (id: string) => void;
   nested?: boolean;
 }) {
+  const router = useRouter();
+  const [editionOuverte, setEditionOuverte] = useState(false);
   const now = new Date();
   const dateDebut = new Date(t.dateDebut);
   const dateFin = addDays(dateDebut, t.dureeJours);
@@ -171,9 +174,24 @@ function TraitementCard({ t, affichageDelaiAttente, onTerminer, nested }: {
               Terminer
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setEditionOuverte((ouverte) => !ouverte)}
+            title="Modifier les informations du traitement"
+            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+          >
+            <Pencil size={13} />
+          </button>
           <ConfirmDeleteButton url={`/api/traitements/${t.id}`} confirmMessage="Confirmer la suppression de ce traitement ?" />
         </div>
       </div>
+      {editionOuverte && (
+        <TraitementEditForm
+          traitement={t}
+          onClose={() => setEditionOuverte(false)}
+          onSaved={() => router.refresh()}
+        />
+      )}
     </div>
   );
 }
