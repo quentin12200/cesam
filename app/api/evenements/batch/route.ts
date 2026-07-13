@@ -5,7 +5,7 @@ import { logAction } from "@/lib/action-log";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { animalIds, nutravs, date, moment, categorie, type, symptomes, reponses, temperature, description, photos, constatePar } = body;
+    const { animalIds, nutravs, date, moment, categorie, type, symptomes, reponses, temperature, description, photos, constatePar, traitements } = body;
 
     if (!type?.trim() || !date) {
       return NextResponse.json({ error: "type et date requis" }, { status: 400 });
@@ -69,19 +69,76 @@ export async function POST(request: NextRequest) {
       )
     );
 
-    const desc = `Événement sanitaire "${type.trim()}" enregistré pour ${evenements.length} animal(s)`;
+    // Traitement(s) optionnel(s), créés dans la même opération que l'événement :
+    // un traitement s'applique à tous les animaux ciblés, lié à l'événement propre à chacun.
+    interface TraitementDraft {
+      medicamentId?: string | null;
+      medicamentNom: string;
+      voie?: string | null;
+      executant?: string | null;
+      dose?: number | null;
+      doseParAnimal?: Record<string, number | null>;
+      uniteDosage?: string | null;
+      frequence?: string | null;
+      dureeJours?: number | null;
+      motif?: string | null;
+      delaiAttenteViandeJ?: number | null;
+      delaiAttenteLaitJ?: number | null;
+    }
+    const traitementsList: TraitementDraft[] = Array.isArray(traitements)
+      ? traitements.filter((t: TraitementDraft) => t?.medicamentNom?.trim())
+      : [];
+
+    let traitementsCrees: { id: string }[] = [];
+    if (traitementsList.length > 0) {
+      const parAnimal = new Map(evenements.map((e) => [e.animalId, e.id]));
+      traitementsCrees = await Promise.all(
+        traitementsList.flatMap((t) =>
+          ids.map((animalId) =>
+            prisma.traitement.create({
+              data: {
+                animalId,
+                evenementId: parAnimal.get(animalId) ?? null,
+                medicamentId: t.medicamentId || null,
+                medicamentNom: t.medicamentNom.trim(),
+                dateDebut: resolvedDate,
+                dureeJours: t.dureeJours ?? 1,
+                voie: t.voie || null,
+                frequence: t.frequence || null,
+                dose: t.doseParAnimal?.[animalId] ?? t.dose ?? null,
+                uniteDosage: t.uniteDosage || null,
+                motif: t.motif || null,
+                executant: t.executant || null,
+                moment: moment ?? null,
+                delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? null,
+                delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? null,
+                statut: "EN_COURS",
+              },
+              select: { id: true },
+            })
+          )
+        )
+      );
+    }
+
+    const desc = `Événement sanitaire "${type.trim()}" enregistré pour ${evenements.length} animal(s)`
+      + (traitementsCrees.length > 0 ? ` avec ${traitementsCrees.length} traitement(s)` : "");
     let undoId = "";
     try {
       undoId = await logAction(
         "BATCH_EVENEMENT_SANITAIRE",
         desc,
-        evenements.map((e) => ({ op: "delete" as const, model: "evenementSanitaire", id: e.id }))
+        [
+          ...evenements.map((e) => ({ op: "delete" as const, model: "evenementSanitaire", id: e.id })),
+          ...traitementsCrees.map((t) => ({ op: "delete" as const, model: "traitement", id: t.id })),
+        ]
       );
     } catch {}
 
     return NextResponse.json({
       count: evenements.length,
       evenements: evenements.map((e) => ({ id: e.id, animalId: e.animalId })),
+      traitementsCount: traitementsCrees.length,
       _undoId: undoId,
       _undoDesc: desc,
     }, { status: 201 });

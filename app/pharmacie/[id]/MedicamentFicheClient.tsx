@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Star, Pencil, ChevronDown, ChevronUp, Stethoscope, ArrowLeft } from "lucide-react";
+import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 import {
   getCategorieMedicament,
   formatVoie,
@@ -259,6 +260,7 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
               {h.motif && <span className="text-gray-400 ml-1.5">— {h.motif}</span>}
             </span>
             <span className="text-xs text-gray-400 shrink-0">{new Date(h.dateDebut).toLocaleDateString("fr-FR")}</span>
+            <ConfirmDeleteButton url={`/api/traitements/${h.id}`} confirmMessage="Confirmer la suppression de ce traitement ?" />
           </div>
         ))}
       </div>

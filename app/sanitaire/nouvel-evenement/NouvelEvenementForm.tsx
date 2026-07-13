@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, X, Loader2, CheckCircle2, Search, Thermometer, ListChecks } from "lucide-react";
+import { Camera, X, Loader2, CheckCircle2, Search, Thermometer, ListChecks, Plus, Syringe } from "lucide-react";
 import AnimalPicker, { type AnimalOption } from "./AnimalPicker";
 import AnimalMultiEntry from "./AnimalMultiEntry";
 import AnimalPickerModal from "./AnimalPickerModal";
 import QuestionPanel, { type QuestionTemplateData } from "./QuestionPanel";
-import TraitementApresEvenementForm from "./TraitementApresEvenementForm";
+import TraitementDraftRow, { type TraitementDraft } from "./TraitementDraftRow";
+import { type MedicamentOption } from "./MedicamentPicker";
+import { type Intervenant } from "./ExecutantSelect";
 import { getMomentActuel } from "@/lib/evenements-sanitaires";
 import { searchTypesEvenement, normalizeSearch, type RecherchableTypeEvenement } from "@/lib/fuzzy-search";
 import { fileToResizedDataUrl } from "@/lib/image-client";
@@ -24,16 +26,13 @@ interface TypeSelectionne {
   nom: string;
 }
 
-interface EventTarget2 {
-  animalId: string;
-  evenementId: string;
-  nutrav: string;
-  nom: string | null;
-}
-
 type TargetMode = "animal" | "plusieurs";
 
 const today = new Date().toISOString().slice(0, 10);
+
+function nouveauDraft(): TraitementDraft {
+  return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", executant: "", dose: "", uniteDosage: "ml", motif: "" };
+}
 
 export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }: { presetNutrav?: string; presetMedicamentId?: string }) {
   const router = useRouter();
@@ -64,15 +63,21 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [medicaments, setMedicaments] = useState<MedicamentOption[]>([]);
+  const [intervenants, setIntervenants] = useState<Intervenant[]>([]);
+  const [traitementActif, setTraitementActif] = useState(false);
+  const [traitementsDrafts, setTraitementsDrafts] = useState<TraitementDraft[]>([nouveauDraft()]);
+
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ count: number; warning: string; targets: EventTarget2[] } | null>(null);
-  const [ajouterTraitement, setAjouterTraitement] = useState<boolean | null>(null);
+  const [result, setResult] = useState<{ count: number; warning: string } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetch("/api/groupes").then((r) => r.json()).then(setGroupes);
     fetch("/api/event-types").then((r) => r.json()).then(setCatalogue);
     fetch("/api/evenements/symptomes-recents").then((r) => r.json()).then(setRecents).catch(() => {});
+    fetch("/api/medicaments").then((r) => r.json()).then((data: (MedicamentOption & { actif: boolean })[]) => setMedicaments(data.filter((m) => m.actif)));
+    fetch("/api/intervenants").then((r) => r.json()).then(setIntervenants).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -84,6 +89,18 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
         if (exact) setSelectedAnimaux([{ id: exact.id, nutrav: exact.nutrav, nom: exact.nom }]);
       });
   }, [presetNutrav]);
+
+  useEffect(() => {
+    if (!presetMedicamentId || medicaments.length === 0) return;
+    const m = medicaments.find((med) => med.id === presetMedicamentId);
+    if (!m) return;
+    setTraitementActif(true);
+    setTraitementsDrafts((prev) => {
+      if (prev.some((d) => d.medicament?.id === m.id)) return prev;
+      const [first, ...rest] = prev;
+      return [{ ...first, medicament: m, voie: m.voie ?? first.voie }, ...rest];
+    });
+  }, [presetMedicamentId, medicaments]);
 
   const resultatsRecherche = useMemo(() => searchTypesEvenement(query, catalogue).slice(0, 8), [query, catalogue]);
 
@@ -163,6 +180,8 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
     setPhotoPreview(null);
   }
 
+  const draftsValides = traitementActif ? traitementsDrafts.filter((d) => d.medicament) : [];
+
   async function handleSubmit() {
     setError("");
     if (selectedTypes.length === 0) { setError("Sélectionne au moins un événement"); return; }
@@ -170,6 +189,12 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
 
     const animaux = selectedAnimaux;
     if (animaux.length === 0) { setError("Sélectionne au moins un animal"); return; }
+
+    if (traitementActif) {
+      if (draftsValides.length === 0) { setError("Choisis au moins un médicament, ou désactive l'ajout de traitement"); return; }
+      const incomplet = draftsValides.find((d) => !d.voie || !d.executant);
+      if (incomplet) { setError(`Pour ${incomplet.medicament?.nom}, indique la voie d'administration et l'exécutant(e)`); return; }
+    }
 
     setSubmitting(true);
     try {
@@ -210,6 +235,17 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
           description: description || null,
           photos: photoUrl,
           constatePar: constatePar || null,
+          traitements: draftsValides.map((d) => ({
+            medicamentId: d.medicament!.id,
+            medicamentNom: d.medicament!.nom,
+            voie: d.voie || null,
+            executant: d.executant || null,
+            dose: d.dose !== "" ? Number(d.dose) : null,
+            uniteDosage: d.uniteDosage || null,
+            motif: d.motif || null,
+            delaiAttenteViandeJ: d.medicament!.delaiAttenteViandeJ ?? null,
+            delaiAttenteLaitJ: d.medicament!.delaiAttenteLaitJ ?? null,
+          })),
         }),
       });
       if (!res.ok) {
@@ -217,15 +253,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
         throw new Error(err.error ?? "Erreur serveur");
       }
       const data = await res.json();
-      const evenementsByAnimal = new Map<string, string>(
-        (data.evenements ?? []).map((e: { id: string; animalId: string }) => [e.animalId, e.id])
-      );
-      const targets: EventTarget2[] = animaux
-        .filter((a) => evenementsByAnimal.has(a.id))
-        .map((a) => ({ animalId: a.id, evenementId: evenementsByAnimal.get(a.id)!, nutrav: a.nutrav, nom: a.nom }));
-
-      setResult({ count: data.count, warning: photoWarning, targets });
-      if (presetMedicamentId) setAjouterTraitement(true);
+      setResult({ count: data.count, warning: photoWarning });
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur lors de l'enregistrement");
@@ -236,7 +264,6 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
 
   function nouveauEvenement() {
     setResult(null);
-    setAjouterTraitement(null);
     setSelectedTypes([]);
     setAnswers({});
     setPanelOuvert(null);
@@ -244,23 +271,12 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
     setDescription("");
     setPhotoFile(null);
     setPhotoPreview(null);
+    setTraitementActif(false);
+    setTraitementsDrafts([nouveauDraft()]);
     if (!presetNutrav) setSelectedAnimaux([]);
   }
 
   if (result) {
-    if (ajouterTraitement === true) {
-      return (
-        <TraitementApresEvenementForm
-          targets={result.targets}
-          symptomesLibelles={selectedTypes.map((t) => t.nom)}
-          dateDebut={date}
-          presetMedicamentId={presetMedicamentId}
-          onDone={() => router.push("/sanitaire")}
-          onSkip={() => setAjouterTraitement(null)}
-        />
-      );
-    }
-
     return (
       <div className="bg-white rounded-xl shadow p-6 text-center space-y-3">
         <CheckCircle2 size={40} className="text-green-600 mx-auto" />
@@ -268,28 +284,6 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
           Événement enregistré pour {result.count} animal{result.count > 1 ? "aux" : ""}
         </p>
         {result.warning && <p className="text-xs text-orange-600">{result.warning}</p>}
-
-        {ajouterTraitement === null && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-left">
-            <p className="text-sm font-medium text-blue-900 mb-2">Ajouter un traitement pour cet événement ?</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setAjouterTraitement(true)}
-                className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium"
-              >
-                Oui
-              </button>
-              <button
-                type="button"
-                onClick={() => setAjouterTraitement(false)}
-                className="flex-1 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium"
-              >
-                Non
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="flex gap-2 justify-center pt-2">
           <button onClick={nouveauEvenement} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
@@ -538,6 +532,38 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
             <option value="Céline" />
           </datalist>
         </div>
+      </div>
+
+      {/* Traitement (optionnel) */}
+      <div className="bg-white rounded-xl shadow p-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={traitementActif}
+            onChange={(e) => setTraitementActif(e.target.checked)} className="w-4 h-4" />
+          <span className="font-semibold text-gray-800 flex items-center gap-1.5">
+            <Syringe size={15} className="text-blue-500" /> Ajouter un traitement
+          </span>
+        </label>
+
+        {traitementActif && (
+          <div className="mt-3 space-y-2.5">
+            {traitementsDrafts.map((d) => (
+              <TraitementDraftRow
+                key={d.key}
+                draft={d}
+                medicaments={medicaments}
+                intervenants={intervenants}
+                removable={traitementsDrafts.length > 1}
+                onChange={(next) => setTraitementsDrafts((prev) => prev.map((x) => (x.key === d.key ? next : x)))}
+                onRemove={() => setTraitementsDrafts((prev) => prev.filter((x) => x.key !== d.key))}
+                onIntervenantAdded={(i) => setIntervenants((prev) => (prev.some((x) => x.id === i.id) ? prev : [...prev, i].sort((a, b) => a.nom.localeCompare(b.nom))))}
+              />
+            ))}
+            <button type="button" onClick={() => setTraitementsDrafts((prev) => [...prev, nouveauDraft()])}
+              className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">
+              <Plus size={13} /> Ajouter un autre médicament
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (

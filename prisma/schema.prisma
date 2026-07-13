@@ -527,6 +527,8 @@ model Traitement {
   poidsUtilise  Float?
   motif         String?
   veterinaire   String?
+  executant     String?
+  moment        String?
   ordonnanceNumero String?
   ordonnanceId  String?
   ordonnance    Ordonnance? @relation(fields: [ordonnanceId], references: [id])
@@ -551,6 +553,14 @@ model ExploitationConfig {
   ordonnancierNo         String?
   affichageDelaiAttente  String   @default("LES_DEUX")
   updatedAt              DateTime @updatedAt
+}
+
+/// Liste mémorisée des personnes pouvant administrer un traitement
+/// (exécutant·e), pour peupler le menu déroulant du même nom sans ressaisie.
+model Intervenant {
+  id        String   @id @default(cuid())
+  nom       String   @unique
+  createdAt DateTime @default(now())
 }
 
 model Ordonnance {
