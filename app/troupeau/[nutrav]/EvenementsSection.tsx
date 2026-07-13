@@ -171,7 +171,8 @@ function TraitementCard({ t, affichageDelaiAttente, onTerminer, nested }: {
   );
 }
 
-function EvenementCard({ evt, affichageDelaiAttente, onTerminer }: {
+function EvenementCard({ animalId, evt, affichageDelaiAttente, onTerminer }: {
+  animalId: string;
   evt: EvenementRow;
   affichageDelaiAttente?: string;
   onTerminer: (id: string) => void;
@@ -182,6 +183,7 @@ function EvenementCard({ evt, affichageDelaiAttente, onTerminer }: {
   const [editTemp, setEditTemp] = useState(false);
   const [tempValue, setTempValue] = useState(evt.temperature != null ? String(evt.temperature) : "");
   const [editionOuverte, setEditionOuverte] = useState(false);
+  const [ajoutTraitementOuvert, setAjoutTraitementOuvert] = useState(false);
 
   async function toggleResolu() {
     setLoading(true);
@@ -304,7 +306,7 @@ function EvenementCard({ evt, affichageDelaiAttente, onTerminer }: {
         </div>
       )}
 
-      <div className="flex items-center gap-2 mt-2">
+      <div className="flex flex-wrap items-center gap-2 mt-2">
         <button
           onClick={toggleResolu}
           disabled={loading}
@@ -314,6 +316,13 @@ function EvenementCard({ evt, affichageDelaiAttente, onTerminer }: {
           {evt.resolu ? "Marquer non résolu" : "Marquer résolu"}
         </button>
         <button
+          onClick={() => setAjoutTraitementOuvert((v) => !v)}
+          className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
+        >
+          <Pill size={12} />
+          {ajoutTraitementOuvert ? "Fermer" : "Médicament"}
+        </button>
+        <button
           onClick={() => setEditionOuverte((v) => !v)}
           className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50"
         >
@@ -321,6 +330,16 @@ function EvenementCard({ evt, affichageDelaiAttente, onTerminer }: {
           {editionOuverte ? "Fermer" : "Modifier"}
         </button>
       </div>
+
+      {ajoutTraitementOuvert && (
+        <div className="mt-2">
+          <TraitementForm
+            animalId={animalId}
+            evenementId={evt.id}
+            onClose={() => setAjoutTraitementOuvert(false)}
+          />
+        </div>
+      )}
 
       {editionOuverte && (
         <EvenementEditPanel
@@ -427,7 +446,7 @@ export default function EvenementsSection({ animalId, evenements, traitementsOrp
         <div className="space-y-2 mt-2">
           {items.map((item) =>
             item.kind === "evenement" ? (
-              <EvenementCard key={`e-${item.evt.id}`} evt={item.evt} affichageDelaiAttente={affichageDelaiAttente} onTerminer={terminer} />
+              <EvenementCard key={`e-${item.evt.id}`} animalId={animalId} evt={item.evt} affichageDelaiAttente={affichageDelaiAttente} onTerminer={terminer} />
             ) : (
               <TraitementCard key={`t-${item.t.id}`} t={item.t} affichageDelaiAttente={affichageDelaiAttente} onTerminer={terminer} />
             )
