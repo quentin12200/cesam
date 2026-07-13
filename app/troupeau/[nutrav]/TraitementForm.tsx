@@ -17,6 +17,7 @@ interface Medicament {
 
 interface Props {
   animalId: string;
+  evenementId?: string;
   onClose: () => void;
   initialScan?: ScanResult;
   initialOrdonnanceId?: string | null;
@@ -36,7 +37,7 @@ interface ScanResult {
 
 const today = new Date().toISOString().slice(0, 10);
 
-export default function TraitementForm({ animalId, onClose, initialScan, initialOrdonnanceId }: Props) {
+export default function TraitementForm({ animalId, evenementId, onClose, initialScan, initialOrdonnanceId }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -171,6 +172,7 @@ export default function TraitementForm({ animalId, onClose, initialScan, initial
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         animalId,
+        evenementId: evenementId ?? null,
         medicamentId: medicamentId || null,
         medicamentNom: effectiveNom,
         dateDebut,
@@ -194,7 +196,9 @@ export default function TraitementForm({ animalId, onClose, initialScan, initial
   return (
     <form onSubmit={submit} className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-blue-800">Nouveau traitement</span>
+        <span className="text-sm font-semibold text-blue-800">
+          {evenementId ? "Ajouter un médicament à l’événement" : "Nouveau traitement"}
+        </span>
         <div className="flex items-center gap-2">
           {/* Scanner button */}
           <button
