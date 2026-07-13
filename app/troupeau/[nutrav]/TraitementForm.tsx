@@ -45,6 +45,8 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
   const [voie, setVoie] = useState("");
   const [frequence, setFrequence] = useState("");
   const [dose, setDose] = useState("");
+  const [doseRecommandee, setDoseRecommandee] = useState<number | null>(null);
+  const [doseBase, setDoseBase] = useState("");
   const [uniteDosage, setUniteDosage] = useState("ml");
   const [motif, setMotif] = useState("");
   const [delaiAttenteViandeJ, setDelaiAttenteViandeJ] = useState<number | null>(null);
@@ -113,6 +115,9 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
           ? String(medicament.dosagePourKg)
           : ""
     );
+    const doseProposee = preconisation?.dose ?? medicament.dosagePourKg ?? null;
+    setDoseRecommandee(doseProposee);
+    setDoseBase(preconisation?.doseBase ?? (medicament.dosagePourKg != null ? "KG" : ""));
     setUniteDosage(preconisation?.unite ?? medicament.uniteDosage ?? "ml");
     setDureeJours(preconisation ? convertirDureeEnJours(preconisation) : "3");
     setMotif(preconisation?.indicationMotif ?? "");
@@ -225,6 +230,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         voie: voie || null,
         frequence: frequence || null,
         dose: dose !== "" ? Number(dose) : null,
+        doseRecommandee,
         uniteDosage: uniteDosage || null,
         motif: motif || null,
         veterinaire: veterinaire || null,
@@ -296,6 +302,8 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
             if (value) {
               setMedicamentId("");
               setPreconisationChargee(false);
+              setDoseRecommandee(null);
+              setDoseBase("");
             }
           }}
         />
@@ -329,7 +337,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Voie</label>
           <input value={voie} onChange={(e) => setVoie(e.target.value)}
@@ -341,7 +349,14 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="1x/jour" />
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Dose</label>
+          <label className="text-xs text-gray-500 block mb-1">
+            Dose
+            {doseBase && (
+              <span className="ml-1 text-blue-600">
+                {doseBase === "ANIMAL" ? "par animal" : doseBase === "KG" ? "par kg" : doseBase === "100KG" ? "par 100 kg" : doseBase === "QUARTIER" ? "par quartier" : doseBase}
+              </span>
+            )}
+          </label>
           <input type="number" min={0} step="0.1" value={dose} onChange={(e) => setDose(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm" />
         </div>
