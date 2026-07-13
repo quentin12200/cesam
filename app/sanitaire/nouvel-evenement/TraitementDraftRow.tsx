@@ -79,6 +79,9 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
           <label className="text-xs text-gray-500 block mb-1">Voie d&apos;administration *</label>
           <select value={draft.voie} onChange={(e) => set("voie", e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
             <option value="">Sélectionner…</option>
+            {draft.voie && !VOIES_ADMINISTRATION.some((voie) => voie.code === draft.voie) && (
+              <option value={draft.voie}>{draft.voie}</option>
+            )}
             {VOIES_ADMINISTRATION.map((v) => <option key={v.code} value={v.code}>{v.label}</option>)}
           </select>
         </div>
