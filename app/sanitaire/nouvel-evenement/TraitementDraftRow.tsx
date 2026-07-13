@@ -31,10 +31,32 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
   }
 
   function choisirMedicament(m: MedicamentOption | null) {
+    if (!m) {
+      onChange({ ...draft, medicament: null });
+      return;
+    }
+
+    const rang: Record<string, number> = { VALIDE: 0, A_VERIFIER: 1, IMPORTE: 2 };
+    const preconisation = [...(m.preconisations ?? [])]
+      .sort((a, b) => (rang[a.statut] ?? 9) - (rang[b.statut] ?? 9))[0];
+
+    const voieProposee = preconisation?.voie ?? m.voie ?? "";
+    const voieNormalisee = VOIES_ADMINISTRATION.find(
+      (voie) => voie.code === voieProposee.toUpperCase()
+    )?.code ?? voieProposee;
+
     onChange({
       ...draft,
       medicament: m,
-      voie: m?.voie ? (VOIES_ADMINISTRATION.find((v) => v.code === m.voie?.toUpperCase())?.code ?? draft.voie) : draft.voie,
+      voie: voieNormalisee || draft.voie,
+      dose:
+        preconisation?.dose != null
+          ? String(preconisation.dose)
+          : m.dosagePourKg != null
+            ? String(m.dosagePourKg)
+            : draft.dose,
+      uniteDosage: preconisation?.unite ?? m.uniteDosage ?? draft.uniteDosage,
+      motif: preconisation?.indicationMotif ?? draft.motif,
     });
   }
 
