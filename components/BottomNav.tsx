@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, RefreshCw, Shield, Baby, Euro } from "lucide-react";
+import { Home, RefreshCw, Stethoscope, Baby, Euro } from "lucide-react";
 import CowIcon from "@/components/CowIcon";
 
 const navItems = [
   { href: "/", label: "Accueil", icon: Home },
   { href: "/troupeau", label: "Troupeau", icon: CowIcon, restore: true },
   { href: "/reproduction", label: "Repro", icon: RefreshCw },
-  { href: "/sanitaire", label: "Sanitaire", icon: Shield },
+  { href: "/sanitaire", label: "Sanitaire", icon: Stethoscope },
   { href: "/velage", label: "Vélage", icon: Baby },
   { href: "/finances", label: "Finances", icon: Euro },
 ];
