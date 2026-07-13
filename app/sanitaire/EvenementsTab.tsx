@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, History, AlertTriangle, AlertCircle, Clock, Pill } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 
 export interface EvenementItem {
   id: string;
@@ -42,13 +43,12 @@ export interface TraitementItem {
 
 function EvenementRow({ e, muted }: { e: EvenementItem; muted?: boolean }) {
   return (
-    <Link
-      href={`/troupeau/${e.animalNutrav}?onglet=sante`}
+    <div
       className={`flex items-start gap-3 p-3 border rounded-lg transition-colors ${
         muted ? "bg-gray-50 border-gray-100 opacity-75 hover:bg-gray-100" : "bg-red-50 border-red-100 hover:bg-red-100"
       }`}
     >
-      <div className="flex-1 min-w-0">
+      <Link href={`/troupeau/${e.animalNutrav}?onglet=sante`} className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{e.animalNutrav}</span>
           <span className="text-sm font-medium text-gray-800">{e.animalNom ?? ""}</span>
@@ -59,11 +59,14 @@ function EvenementRow({ e, muted }: { e: EvenementItem; muted?: boolean }) {
         {e.description && (
           <p className="text-xs text-gray-600 mt-1 truncate">{e.description}</p>
         )}
+      </Link>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-xs text-gray-400">
+          {new Date(e.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+        </span>
+        <ConfirmDeleteButton url={`/api/evenements/${e.id}`} />
       </div>
-      <span className="text-xs text-gray-400 shrink-0">
-        {new Date(e.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
-      </span>
-    </Link>
+    </div>
   );
 }
 
@@ -108,12 +111,15 @@ function TraitementRow({ t, onTerminer }: { t: TraitementItem; onTerminer: (id: 
           {t.veterinaire && <div className="text-xs text-gray-400 mt-1">Vét. : {t.veterinaire}</div>}
         </div>
 
-        {t.statut === "EN_COURS" && (
-          <button onClick={() => onTerminer(t.id)}
-            className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100">
-            <CheckCircle2 size={13} /> Terminer
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {t.statut === "EN_COURS" && (
+            <button onClick={() => onTerminer(t.id)}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100">
+              <CheckCircle2 size={13} /> Terminer
+            </button>
+          )}
+          <ConfirmDeleteButton url={`/api/traitements/${t.id}`} confirmMessage="Confirmer la suppression de ce traitement ?" />
+        </div>
       </div>
     </div>
   );
@@ -130,6 +136,7 @@ function TraitementRowMuted({ t }: { t: TraitementItem }) {
         {t.animalNom && <span className="text-sm font-medium text-gray-700">{t.animalNom}</span>}
         <span className="text-sm text-gray-600">{t.medicamentNom}</span>
         <span className="ml-auto text-xs text-gray-400">{formatDate(new Date(t.dateDebut))}</span>
+        <ConfirmDeleteButton url={`/api/traitements/${t.id}`} confirmMessage="Confirmer la suppression de ce traitement ?" />
       </div>
       {t.motif && <div className="text-xs text-gray-400 mt-0.5">{t.motif}</div>}
     </div>

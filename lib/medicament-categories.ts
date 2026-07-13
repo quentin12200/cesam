@@ -49,7 +49,22 @@ const VOIE_LABELS: Record<string, string> = {
   INTRAVEINEUSE: "Intraveineuse",
   "SOUS-CUTANEE": "Sous-cutanée",
   "SOUS CUTANEE": "Sous-cutanée",
+  NASALE: "Nasale",
+  POUR_ON: "Pour-on",
+  "POUR-ON": "Pour-on",
+  AUTRE: "Autre",
 };
+
+/** Voies d'administration proposées à la sélection (menu déroulant), code + libellé. */
+export const VOIES_ADMINISTRATION: { code: string; label: string }[] = [
+  { code: "PO", label: "Orale" },
+  { code: "SC", label: "Sous-cutanée" },
+  { code: "IM", label: "Intramusculaire" },
+  { code: "IV", label: "Intraveineuse" },
+  { code: "NASALE", label: "Nasale" },
+  { code: "POUR_ON", label: "Pour-on" },
+  { code: "AUTRE", label: "Autre" },
+];
 
 /** Convertit un code ou texte libre de voie d'administration en mot clair. */
 export function formatVoie(voie: string | null | undefined): string | null {

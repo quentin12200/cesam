@@ -11,6 +11,7 @@ import { getCategorieLabel } from "@/lib/evenements-sanitaires";
 import EvenementEditPanel from "./EvenementEditPanel";
 import TraitementForm from "./TraitementForm";
 import { scanAndPersistOrdonnance } from "@/lib/scan-ordonnance-client";
+import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 
 export interface TraitementRow {
   id: string;
@@ -156,12 +157,15 @@ function TraitementCard({ t, affichageDelaiAttente, onTerminer, nested }: {
             )}
           </div>
         </div>
-        {t.statut === "EN_COURS" && (
-          <button onClick={() => onTerminer(t.id)}
-            className="shrink-0 text-xs px-2 py-1 text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100">
-            Terminer
-          </button>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {t.statut === "EN_COURS" && (
+            <button onClick={() => onTerminer(t.id)}
+              className="text-xs px-2 py-1 text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100">
+              Terminer
+            </button>
+          )}
+          <ConfirmDeleteButton url={`/api/traitements/${t.id}`} confirmMessage="Confirmer la suppression de ce traitement ?" />
+        </div>
       </div>
     </div>
   );
@@ -249,13 +253,16 @@ function EvenementCard({ evt, affichageDelaiAttente, onTerminer }: {
             {evt.constatePar ? ` · Constaté par ${evt.constatePar}` : ""}
           </div>
         </div>
-        <span
-          className={`shrink-0 text-xs px-1.5 py-0.5 rounded-full ${
-            evt.resolu ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
-          }`}
-        >
-          {evt.resolu ? "Résolu" : "En cours"}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span
+            className={`text-xs px-1.5 py-0.5 rounded-full ${
+              evt.resolu ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
+            }`}
+          >
+            {evt.resolu ? "Résolu" : "En cours"}
+          </span>
+          <ConfirmDeleteButton url={`/api/evenements/${evt.id}`} />
+        </div>
       </div>
 
       {evt.description && (

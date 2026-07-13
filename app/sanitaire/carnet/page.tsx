@@ -10,6 +10,7 @@ import {
 } from "@/lib/carnet-sanitaire";
 import { getCategorieLabel } from "@/lib/evenements-sanitaires";
 import PrintButton from "@/app/components/PrintButton";
+import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 import ImportHistoriqueButton from "./ImportHistoriqueButton";
 
 interface PageProps {
@@ -179,6 +180,7 @@ function EvenementsTable({ rows, showAnimal }: { rows: EvenementCarnetRow[]; sho
           <Th>Commentaire</Th>
           <Th>Constaté par</Th>
           <Th>Statut</Th>
+          <Th className="print:hidden"></Th>
         </tr>
       </thead>
       <tbody>
@@ -195,6 +197,9 @@ function EvenementsTable({ rows, showAnimal }: { rows: EvenementCarnetRow[]; sho
             <Td>{r.description ?? "—"}</Td>
             <Td>{r.constatePar ?? "—"}</Td>
             <Td className={!r.resolu ? "font-semibold text-red-700" : ""}>{r.resolu ? "Résolu" : "En cours"}</Td>
+            <Td className="print:hidden">
+              <ConfirmDeleteButton url={`/api/evenements/${r.id}`} />
+            </Td>
           </tr>
         ))}
       </tbody>
@@ -248,8 +253,8 @@ function CarnetTable({ rows, showAnimal, now }: { rows: CarnetSanitaireRow[]; sh
   );
 }
 
-function Th({ children }: { children: React.ReactNode }) {
-  return <th className="border border-green-800 px-2 py-1.5 text-left font-semibold">{children}</th>;
+function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
+  return <th className={`border border-green-800 px-2 py-1.5 text-left font-semibold ${className}`}>{children}</th>;
 }
 
 function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
