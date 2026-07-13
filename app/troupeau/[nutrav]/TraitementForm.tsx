@@ -4,16 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Save, X, ScanLine, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { scanAndPersistOrdonnance } from "@/lib/scan-ordonnance-client";
+import MedicamentPicker, {
+  type MedicamentOption,
+  type PreconisationOption,
+} from "@/app/sanitaire/nouvel-evenement/MedicamentPicker";
 
-interface Medicament {
-  id: string;
-  nom: string;
-  dci: string | null;
-  voie: string | null;
-  dosagePourKg: number | null;
-  uniteDosage: string | null;
-  delaiAttenteViandeJ: number | null;
-}
+type Medicament = MedicamentOption;
 
 interface Props {
   animalId: string;
@@ -51,6 +47,9 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
   const [dose, setDose] = useState("");
   const [uniteDosage, setUniteDosage] = useState("ml");
   const [motif, setMotif] = useState("");
+  const [delaiAttenteViandeJ, setDelaiAttenteViandeJ] = useState<number | null>(null);
+  const [delaiAttenteLaitJ, setDelaiAttenteLaitJ] = useState<number | null>(null);
+  const [preconisationChargee, setPreconisationChargee] = useState(false);
   const [veterinaire, setVeterinaire] = useState("");
   const [ordonnanceNumero, setOrdonnanceNumero] = useState("");
   const [ordonnanceId, setOrdonnanceId] = useState<string | null>(initialOrdonnanceId ?? null);
@@ -78,6 +77,63 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
 
   const selectedMed = medicaments.find((m) => m.id === medicamentId);
 
+  function preconisationPrioritaire(medicament: Medicament): PreconisationOption | null {
+    const rang: Record<string, number> = { VALIDE: 0, A_VERIFIER: 1, IMPORTE: 2 };
+    return [...(medicament.preconisations ?? [])]
+      .sort((a, b) => (rang[a.statut] ?? 9) - (rang[b.statut] ?? 9))[0] ?? null;
+  }
+
+  function convertirDureeEnJours(preconisation: PreconisationOption): string {
+    if (preconisation.dureeValeur == null) return "3";
+    const valeur = preconisation.dureeValeur;
+    switch (preconisation.dureeUnite) {
+      case "HEURE":
+        return String(Math.max(1, Math.ceil(valeur / 24)));
+      case "48H":
+        return String(valeur * 2);
+      case "SEMAINE":
+        return String(valeur * 7);
+      case "MOIS":
+        return String(valeur * 30);
+      default:
+        return String(valeur);
+    }
+  }
+
+  function appliquerMedicament(medicament: Medicament) {
+    const preconisation = preconisationPrioritaire(medicament);
+    setMedicamentId(medicament.id);
+    setMedicamentNomLibre("");
+    setVoie(preconisation?.voie ?? medicament.voie ?? "");
+    setFrequence(preconisation?.frequence ?? "");
+    setDose(
+      preconisation?.dose != null
+        ? String(preconisation.dose)
+        : medicament.dosagePourKg != null
+          ? String(medicament.dosagePourKg)
+          : ""
+    );
+    setUniteDosage(preconisation?.unite ?? medicament.uniteDosage ?? "ml");
+    setDureeJours(preconisation ? convertirDureeEnJours(preconisation) : "3");
+    setMotif(preconisation?.indicationMotif ?? "");
+    setDelaiAttenteViandeJ(
+      preconisation?.delaiAttenteViandeJ ?? medicament.delaiAttenteViandeJ ?? null
+    );
+    setDelaiAttenteLaitJ(
+      preconisation?.delaiAttenteLaitTraites ?? medicament.delaiAttenteLaitJ ?? null
+    );
+    setPreconisationChargee(Boolean(preconisation));
+  }
+
+  function choisirMedicament(medicament: Medicament | null) {
+    if (medicament) {
+      appliquerMedicament(medicament);
+      return;
+    }
+    setMedicamentId("");
+    setPreconisationChargee(false);
+  }
+
   function applyScannedWithMeds(meds: Medicament[], result: ScanResult) {
     if (result.medicamentNom) {
       const match = meds.find(
@@ -86,9 +142,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
           result.medicamentNom!.toLowerCase().includes(m.nom.toLowerCase())
       );
       if (match) {
-        setMedicamentId(match.id);
-        setVoie(match.voie ?? "");
-        setUniteDosage(match.uniteDosage ?? "ml");
+        appliquerMedicament(match);
       } else {
         setMedicamentId("");
         setMedicamentNomLibre(result.medicamentNom);
@@ -104,15 +158,6 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
     if (result.ordonnanceNumero) setOrdonnanceNumero(result.ordonnanceNumero);
   }
 
-  function onMedChange(id: string) {
-    setMedicamentId(id);
-    const med = medicaments.find((m) => m.id === id);
-    if (med) {
-      setVoie(med.voie ?? "");
-      setUniteDosage(med.uniteDosage ?? "ml");
-    }
-  }
-
   const effectiveNom = medicamentId ? (selectedMed?.nom ?? "") : medicamentNomLibre;
 
   function applyScanned(result: ScanResult) {
@@ -124,7 +169,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
           result.medicamentNom!.toLowerCase().includes(m.nom.toLowerCase())
       );
       if (match) {
-        onMedChange(match.id);
+        appliquerMedicament(match);
       } else {
         setMedicamentId("");
         setMedicamentNomLibre(result.medicamentNom);
@@ -186,6 +231,8 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         ordonnanceNumero: ordonnanceNumero || null,
         ordonnanceId,
         ordonnanceAAssocier: !ordonnanceNumero && !ordonnanceId ? ordonnanceAAssocier : false,
+        delaiAttenteViandeJ,
+        delaiAttenteLaitJ,
       }),
     });
     setSaving(false);
@@ -238,23 +285,34 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
 
       <div>
         <label className="text-xs text-gray-500 block mb-1">Médicament *</label>
-        <select value={medicamentId} onChange={(e) => onMedChange(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-          <option value="">— Saisie libre —</option>
-          {medicaments.map((m) => (
-            <option key={m.id} value={m.id}>{m.nom}{m.dci ? ` (${m.dci})` : ""}</option>
-          ))}
-        </select>
-        {!medicamentId && (
-          <input className="mt-1.5 w-full border rounded-lg px-3 py-2 text-sm"
-            placeholder="Nom du médicament" value={medicamentNomLibre}
-            onChange={(e) => setMedicamentNomLibre(e.target.value)} />
-        )}
+        <MedicamentPicker
+          medicaments={medicaments}
+          value={selectedMed ?? null}
+          onChange={choisirMedicament}
+          allowFreeText
+          freeText={medicamentNomLibre}
+          onFreeTextChange={(value) => {
+            setMedicamentNomLibre(value);
+            if (value) {
+              setMedicamentId("");
+              setPreconisationChargee(false);
+            }
+          }}
+        />
       </div>
 
-      {selectedMed?.delaiAttenteViandeJ != null && selectedMed.delaiAttenteViandeJ > 0 && (
+      {preconisationChargee && (
+        <div className="flex items-center gap-2 text-xs bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-green-800">
+          <CheckCircle2 size={13} />
+          Préconisation chargée automatiquement. Tous les champs restent modifiables.
+        </div>
+      )}
+
+      {(delaiAttenteViandeJ != null || delaiAttenteLaitJ != null) && (
         <div className="text-xs bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-orange-700">
-          ⚠ Délai d&apos;attente viande : {selectedMed.delaiAttenteViandeJ} jours après la fin du traitement
+          {delaiAttenteViandeJ != null && <>Attente viande : {delaiAttenteViandeJ} jour(s)</>}
+          {delaiAttenteViandeJ != null && delaiAttenteLaitJ != null && <span> · </span>}
+          {delaiAttenteLaitJ != null && <>Attente lait : {delaiAttenteLaitJ} traite(s)</>}
         </div>
       )}
 
