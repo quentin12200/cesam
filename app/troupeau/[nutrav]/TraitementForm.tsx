@@ -136,6 +136,17 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
       return;
     }
     setMedicamentId("");
+    setMedicamentNomLibre("");
+    setVoie("");
+    setFrequence("");
+    setDose("");
+    setDoseRecommandee(null);
+    setDoseBase("");
+    setUniteDosage("ml");
+    setDureeJours("3");
+    setMotif("");
+    setDelaiAttenteViandeJ(null);
+    setDelaiAttenteLaitJ(null);
     setPreconisationChargee(false);
   }
 
