@@ -98,14 +98,21 @@ function TraitementCard({ t, affichageDelaiAttente, onTerminer, nested }: {
   const enAttenteLait = attente.enAttenteLait && doitAfficherLait(affichageDelaiAttente);
 
   return (
-    <div className={`border rounded-lg p-3 text-sm ${nested ? "bg-white" : ""} ${
+    <div className={`border rounded-lg p-3 text-sm ${
+      nested ? "bg-white" : "border-l-4 border-l-blue-400"
+    } ${
       enCours ? "border-blue-200 bg-blue-50" : enAttente ? "border-orange-200 bg-orange-50" : "border-gray-100"
     }`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            {nested && <Pill size={12} className="text-blue-400 shrink-0" />}
+            <Pill size={12} className="text-blue-500 shrink-0" />
             <span className="font-medium text-gray-800">{t.medicamentNom}</span>
+            {!nested && (
+              <span className="text-[10px] font-medium bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                Sans événement associé
+              </span>
+            )}
             {t.voie && <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{t.voie}</span>}
             {t.frequence && <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{t.frequence}</span>}
             {t.dose != null && (
@@ -215,7 +222,9 @@ function EvenementCard({ animalId, evt, affichageDelaiAttente, onTerminer }: {
   }
 
   return (
-    <div className="border border-gray-100 rounded-lg p-3 text-sm">
+    <div className={`border rounded-lg p-3 text-sm border-l-4 ${
+      evt.resolu ? "border-green-200 border-l-green-400" : "border-red-200 border-l-red-400"
+    }`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -299,14 +308,20 @@ function EvenementCard({ animalId, evt, affichageDelaiAttente, onTerminer }: {
       )}
 
       {evt.traitements.length > 0 && (
-        <div className="mt-2 space-y-1.5">
-          {evt.traitements.map((t) => (
-            <TraitementCard key={t.id} t={t} affichageDelaiAttente={affichageDelaiAttente} onTerminer={onTerminer} nested />
-          ))}
+        <div className="mt-3 pt-3 border-t border-blue-100">
+          <div className="flex items-center gap-1.5 mb-2 text-xs font-semibold text-blue-700">
+            <Pill size={13} />
+            Traitements associés ({evt.traitements.length})
+          </div>
+          <div className="space-y-1.5">
+            {evt.traitements.map((t) => (
+              <TraitementCard key={t.id} t={t} affichageDelaiAttente={affichageDelaiAttente} onTerminer={onTerminer} nested />
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 mt-2">
+      <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-gray-100">
         <button
           onClick={toggleResolu}
           disabled={loading}
