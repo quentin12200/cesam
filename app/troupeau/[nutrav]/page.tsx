@@ -255,72 +255,100 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
         {onglet === "identite" && (
           <>
             {/* Identité */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <CowIcon size={16} className="text-green-700" />
-                Identité
-              </h3>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div className="text-gray-500">N° Travail</div>
-                <div className="font-mono font-bold text-base">{animal.nutrav}</div>
-                <div className="text-gray-500">N° Nat</div>
-                <div className="font-mono text-xs break-all">{animal.nunati}</div>
-                <div className="text-gray-500">Nom</div>
-                <div className="font-medium">{animal.nobovi ?? <span className="text-gray-400 italic">—</span>}</div>
-                <div className="text-gray-500">Naissance</div>
-                <div>{formatDate(animal.danais)}</div>
-                <div className="text-gray-500">Âge</div>
-                <div className="font-semibold">{formatAge(animal.danais)}</div>
-                <div className="text-gray-500">Catégorie</div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getCategorieColor(getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie))}`}>
-                    {animal.sexbov === "F" ? "♀" : "♂"} {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
-                  </span>
-                  {!animal.categorie && <span className="text-xs text-gray-400 italic">auto</span>}
+            <div className="bg-white rounded-xl shadow overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <CowIcon size={16} className="text-green-700" />
+                  Identité
+                </h3>
+                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                  animal.statut === "ACTIF"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-600"
+                }`}>
+                  {animal.statut === "ACTIF" ? "Animal actif" : animal.statut}
+                </span>
+              </div>
+
+              <dl className="grid grid-cols-2 sm:grid-cols-3">
+                <div className="p-3 bg-green-50/60 border-b border-r border-gray-100">
+                  <dt className="text-[11px] font-medium text-gray-500 uppercase">N° de travail</dt>
+                  <dd className="mt-1 font-mono font-bold text-xl text-green-800">{animal.nutrav}</dd>
                 </div>
-                {!animal.boucleFaite && (
-                  <>
-                    <div className="text-gray-500">Boucle</div>
-                    <div className="text-orange-600 font-medium text-xs">⚠ Non bouclé</div>
-                  </>
-                )}
-                {/* Sevrage — visible pour les veaux/génisses jeunes */}
-                {(animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150 && (
-                  <>
-                    <div className="text-gray-500">Sevrage</div>
-                    <div>
+                <div className="p-3 border-b sm:border-r border-gray-100">
+                  <dt className="text-[11px] font-medium text-gray-500 uppercase">Nom usuel</dt>
+                  <dd className="mt-1 font-semibold text-base text-gray-900">
+                    {animal.nobovi ?? <span className="text-gray-400 font-normal">Sans nom</span>}
+                  </dd>
+                </div>
+                <div className="col-span-2 sm:col-span-1 p-3 border-b border-gray-100">
+                  <dt className="text-[11px] font-medium text-gray-500 uppercase">N° national</dt>
+                  <dd className="mt-1 font-mono text-sm font-medium text-gray-800 break-all">{animal.nunati}</dd>
+                </div>
+
+                <div className="p-3 border-b border-r border-gray-100">
+                  <dt className="text-[11px] font-medium text-gray-500 uppercase">Naissance</dt>
+                  <dd className="mt-1 text-sm font-medium text-gray-800">{formatDate(animal.danais)}</dd>
+                </div>
+                <div className="p-3 border-b sm:border-r border-gray-100">
+                  <dt className="text-[11px] font-medium text-gray-500 uppercase">Âge</dt>
+                  <dd className="mt-1 text-sm font-semibold text-gray-800">{formatAge(animal.danais)}</dd>
+                </div>
+                <div className="col-span-2 sm:col-span-1 p-3 border-b border-gray-100">
+                  <dt className="text-[11px] font-medium text-gray-500 uppercase">Catégorie</dt>
+                  <dd className="mt-1 flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${getCategorieColor(getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie))}`}>
+                      {animal.sexbov === "F" ? "♀" : "♂"} {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
+                    </span>
+                    {!animal.categorie && <span className="text-[11px] text-gray-400">Calculée automatiquement</span>}
+                  </dd>
+                </div>
+
+                <div className="col-span-2 sm:col-span-3 p-3">
+                  <dt className="text-[11px] font-medium text-gray-500 uppercase">Groupe</dt>
+                  <dd className="mt-1 text-sm font-semibold text-gray-800">
+                    {animal.groupe?.nom ?? <span className="text-gray-400 font-normal">Aucun groupe</span>}
+                  </dd>
+                </div>
+              </dl>
+
+              {(!animal.boucleFaite ||
+                ((animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150) ||
+                (animal.sexbov === "F" && !animal.estGenisse && animal.tarieFaite)) && (
+                <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                  <div className="text-[11px] font-medium text-gray-500 uppercase mb-2">Suivi</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {!animal.boucleFaite && (
+                      <span className="text-xs font-medium text-orange-700 bg-orange-100 px-2 py-1 rounded-full">
+                        Boucle à poser
+                      </span>
+                    )}
+                    {(animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150 && (
                       <SevrageButton
                         nutrav={animal.nutrav}
                         sevreFait={animal.sevreFait}
                         danais={animal.danais.toISOString()}
                         dateSevrage={animal.dateSevrage?.toISOString() ?? null}
                       />
-                    </div>
-                  </>
-                )}
-                {animal.sexbov === "F" && !animal.estGenisse && animal.tarieFaite && (
-                  <>
-                    <div className="text-gray-500">Tarissement</div>
-                    <div className="text-xs font-medium text-amber-700">
-                      Tarie{animal.dateTarie ? ` le ${formatDate(animal.dateTarie)}` : ""}
-                    </div>
-                  </>
-                )}
-                {animal.groupe && (
-                  <>
-                    <div className="text-gray-500">Groupe</div>
-                    <div className="text-sm text-gray-800 font-medium">{animal.groupe.nom}</div>
-                  </>
-                )}
-              </div>
-              {animal.notes && (
-                <div className="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-600 italic">
-                  {animal.notes}
+                    )}
+                    {animal.sexbov === "F" && !animal.estGenisse && animal.tarieFaite && (
+                      <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-1 rounded-full">
+                        Tarie{animal.dateTarie ? ` le ${formatDate(animal.dateTarie)}` : ""}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
-              {/* Actions rapides catégorie / écho */}
+
+              {animal.notes && (
+                <div className="border-t border-gray-100 px-4 py-3">
+                  <div className="text-[11px] font-medium text-gray-500 uppercase mb-1">Notes</div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{animal.notes}</p>
+                </div>
+              )}
+
               {animal.statut === "ACTIF" && (
-                <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-2">
+                <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 flex flex-wrap gap-2">
                   <CategorieButton
                     nutrav={animal.nutrav}
                     sexbov={animal.sexbov}
