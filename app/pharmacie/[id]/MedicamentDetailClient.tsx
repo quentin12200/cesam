@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save, CheckCircle2, Plus, Trash2, Pencil, AlertTriangle, ShieldCheck } from "lucide-react";
 import { CATEGORIES_MEDICAMENT } from "@/lib/medicament-categories";
+import PreconisationFields, { VoieSelect } from "./PreconisationFields";
 
 interface MedicamentData {
   id: string;
@@ -56,6 +57,14 @@ const DOSE_BASE_LABEL: Record<string, string> = {
   QUARTIER: "/ quartier",
 };
 
+const DUREE_UNITE_LABEL: Record<string, string> = {
+  JOUR: "jour(s)",
+  HEURE: "heure(s)",
+  "48H": "période(s) de 48 h",
+  SEMAINE: "semaine(s)",
+  MOIS: "mois",
+};
+
 const emptyPreco = {
   indicationMotif: "", categorieAnimaux: "", agePoidsConcerne: "",
   dose: "", unite: "ml", doseBase: "ANIMAL", voie: "", frequence: "",
@@ -84,7 +93,10 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Record<string, string>>({});
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
-  const [nouvelleForm, setNouvelleForm] = useState(emptyPreco);
+  const [nouvelleForm, setNouvelleForm] = useState({
+    ...emptyPreco,
+    voie: medicament.voie ?? "",
+  });
 
   async function saveFiche(e: React.FormEvent) {
     e.preventDefault();
@@ -163,7 +175,7 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...nouvelleForm, medicamentId: medicament.id, statut: "A_VERIFIER", source: "Saisie manuelle" }),
     });
-    setNouvelleForm(emptyPreco);
+    setNouvelleForm({ ...emptyPreco, voie: medicament.voie ?? "" });
     setAjoutOuvert(false);
     router.refresh();
   }
@@ -193,11 +205,11 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
               {CATEGORIES_MEDICAMENT.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
             </select>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Voie usuelle</label>
-            <input value={form.voie} onChange={(e) => setForm((f) => ({ ...f, voie: e.target.value }))}
-              className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="IM, SC, VO..." />
-          </div>
+          <VoieSelect
+            label="Voie usuelle"
+            value={form.voie}
+            onChange={(value) => setForm((f) => ({ ...f, voie: value }))}
+          />
         </div>
         <div className="flex gap-4">
           <label className="flex items-center gap-1.5 text-sm text-gray-600">
@@ -250,45 +262,12 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
 
         {ajoutOuvert && (
           <form onSubmit={ajouter} className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
-            <input value={nouvelleForm.indicationMotif} onChange={(e) => setNouvelleForm((f) => ({ ...f, indicationMotif: e.target.value }))}
-              placeholder="Indication / motif" className="w-full border rounded-lg px-2.5 py-1.5 text-sm" />
-            <div className="grid grid-cols-3 gap-2">
-              <input value={nouvelleForm.categorieAnimaux} onChange={(e) => setNouvelleForm((f) => ({ ...f, categorieAnimaux: e.target.value }))}
-                placeholder="Catégorie animaux" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-              <input value={nouvelleForm.agePoidsConcerne} onChange={(e) => setNouvelleForm((f) => ({ ...f, agePoidsConcerne: e.target.value }))}
-                placeholder="Âge / poids" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-              <input value={nouvelleForm.voie} onChange={(e) => setNouvelleForm((f) => ({ ...f, voie: e.target.value }))}
-                placeholder="Voie" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <input type="number" step="0.1" value={nouvelleForm.dose} onChange={(e) => setNouvelleForm((f) => ({ ...f, dose: e.target.value }))}
-                placeholder="Dose" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-              <input value={nouvelleForm.unite} onChange={(e) => setNouvelleForm((f) => ({ ...f, unite: e.target.value }))}
-                placeholder="Unité (ml...)" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-              <select value={nouvelleForm.doseBase} onChange={(e) => setNouvelleForm((f) => ({ ...f, doseBase: e.target.value }))}
-                className="border rounded-lg px-2.5 py-1.5 text-sm bg-white">
-                <option value="ANIMAL">par animal</option>
-                <option value="KG">par kg</option>
-                <option value="100KG">par 100 kg</option>
-                <option value="QUARTIER">par quartier</option>
-              </select>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <input value={nouvelleForm.frequence} onChange={(e) => setNouvelleForm((f) => ({ ...f, frequence: e.target.value }))}
-                placeholder="Fréquence" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-              <input type="number" value={nouvelleForm.dureeValeur} onChange={(e) => setNouvelleForm((f) => ({ ...f, dureeValeur: e.target.value }))}
-                placeholder="Durée" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-              <input type="number" value={nouvelleForm.nombreAdministrations} onChange={(e) => setNouvelleForm((f) => ({ ...f, nombreAdministrations: e.target.value }))}
-                placeholder="Nb administrations" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <input type="number" value={nouvelleForm.delaiAttenteViandeJ} onChange={(e) => setNouvelleForm((f) => ({ ...f, delaiAttenteViandeJ: e.target.value }))}
-                placeholder="Délai attente viande (j)" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-              <input type="number" value={nouvelleForm.delaiAttenteLaitTraites} onChange={(e) => setNouvelleForm((f) => ({ ...f, delaiAttenteLaitTraites: e.target.value }))}
-                placeholder="Délai attente lait (traites)" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-            </div>
-            <textarea value={nouvelleForm.precautions} onChange={(e) => setNouvelleForm((f) => ({ ...f, precautions: e.target.value }))}
-              placeholder="Précautions particulières" rows={2} className="w-full border rounded-lg px-2.5 py-1.5 text-sm resize-none" />
+            <PreconisationFields
+              form={nouvelleForm}
+              onChange={(field, value) =>
+                setNouvelleForm((current) => ({ ...current, [field]: value }))
+              }
+            />
             <div className="flex gap-2">
               <button type="submit" className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg">Enregistrer</button>
               <button type="button" onClick={() => setAjoutOuvert(false)} className="px-3 py-1.5 text-xs text-gray-500 border rounded-lg">Annuler</button>
@@ -308,44 +287,13 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
               <div key={p.id} className={`border rounded-lg p-3 text-sm ${p.statut === "A_VERIFIER" ? "border-orange-200 bg-orange-50/40" : "border-gray-100"}`}>
                 {enEdition ? (
                   <div className="space-y-2">
-                    <input value={editForm.indicationMotif} onChange={(e) => setEditForm((f) => ({ ...f, indicationMotif: e.target.value }))}
-                      placeholder="Indication / motif" className="w-full border rounded-lg px-2.5 py-1.5 text-sm" />
-                    <div className="grid grid-cols-3 gap-2">
-                      <input value={editForm.categorieAnimaux} onChange={(e) => setEditForm((f) => ({ ...f, categorieAnimaux: e.target.value }))}
-                        placeholder="Catégorie animaux" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-                      <input value={editForm.agePoidsConcerne} onChange={(e) => setEditForm((f) => ({ ...f, agePoidsConcerne: e.target.value }))}
-                        placeholder="Âge / poids" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-                      <input value={editForm.voie} onChange={(e) => setEditForm((f) => ({ ...f, voie: e.target.value }))}
-                        placeholder="Voie" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input type="number" step="0.1" value={editForm.dose} onChange={(e) => setEditForm((f) => ({ ...f, dose: e.target.value }))}
-                        placeholder="Dose" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-                      <input value={editForm.unite} onChange={(e) => setEditForm((f) => ({ ...f, unite: e.target.value }))}
-                        placeholder="Unité" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-                      <select value={editForm.doseBase} onChange={(e) => setEditForm((f) => ({ ...f, doseBase: e.target.value }))}
-                        className="border rounded-lg px-2.5 py-1.5 text-sm bg-white">
-                        <option value="ANIMAL">par animal</option>
-                        <option value="KG">par kg</option>
-                        <option value="100KG">par 100 kg</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input value={editForm.frequence} onChange={(e) => setEditForm((f) => ({ ...f, frequence: e.target.value }))}
-                        placeholder="Fréquence" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-                      <input type="number" value={editForm.dureeValeur} onChange={(e) => setEditForm((f) => ({ ...f, dureeValeur: e.target.value }))}
-                        placeholder="Durée" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-                      <input type="number" value={editForm.nombreAdministrations} onChange={(e) => setEditForm((f) => ({ ...f, nombreAdministrations: e.target.value }))}
-                        placeholder="Nb administrations" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="number" value={editForm.delaiAttenteViandeJ} onChange={(e) => setEditForm((f) => ({ ...f, delaiAttenteViandeJ: e.target.value }))}
-                        placeholder="Délai attente viande (j)" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-                      <input type="number" value={editForm.delaiAttenteLaitTraites} onChange={(e) => setEditForm((f) => ({ ...f, delaiAttenteLaitTraites: e.target.value }))}
-                        placeholder="Délai attente lait (traites)" className="border rounded-lg px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <textarea value={editForm.precautions} onChange={(e) => setEditForm((f) => ({ ...f, precautions: e.target.value }))}
-                      placeholder="Précautions particulières" rows={2} className="w-full border rounded-lg px-2.5 py-1.5 text-sm resize-none" />
+                    <PreconisationFields
+                      key={p.id}
+                      form={editForm}
+                      onChange={(field, value) =>
+                        setEditForm((current) => ({ ...current, [field]: value }))
+                      }
+                    />
                     <div className="flex gap-2">
                       <button type="button" onClick={() => enregistrerEdition(p.id)} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg">Enregistrer</button>
                       <button type="button" onClick={() => setEditingId(null)} className="px-3 py-1.5 text-xs text-gray-500 border rounded-lg">Annuler</button>
@@ -363,7 +311,9 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
                           {p.dose != null && <span>{p.dose} {p.unite} {DOSE_BASE_LABEL[p.doseBase ?? ""] ?? ""}</span>}
                           {p.voie && <span>{p.voie}</span>}
                           {p.frequence && <span>{p.frequence}</span>}
-                          {p.dureeValeur != null && <span>{p.dureeValeur} {p.dureeUnite === "48H" ? "× 48h" : "jour(s)"}</span>}
+                          {p.dureeValeur != null && (
+                            <span>{p.dureeValeur} {DUREE_UNITE_LABEL[p.dureeUnite ?? "JOUR"] ?? p.dureeUnite}</span>
+                          )}
                           {p.categorieAnimaux && <span>{p.categorieAnimaux}</span>}
                           {p.agePoidsConcerne && <span>{p.agePoidsConcerne}</span>}
                         </div>
