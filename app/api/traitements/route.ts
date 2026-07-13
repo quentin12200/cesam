@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const {
-    animalId, medicamentId, medicamentNom, dateDebut, dureeJours, voie, frequence,
+    animalId, evenementId, medicamentId, medicamentNom, dateDebut, dureeJours, voie, frequence,
     dose, doseRecommandee, uniteDosage, poidsUtilise, motif, veterinaire,
     ordonnanceNumero, ordonnanceId, ordonnanceAAssocier, delaiAttenteViandeJ, delaiAttenteLaitJ, notes,
   } = body;
@@ -34,9 +34,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "animalId, medicamentNom et dateDebut requis" }, { status: 400 });
   }
 
+  if (evenementId) {
+    const evenement = await prisma.evenementSanitaire.findFirst({
+      where: { id: evenementId, animalId },
+      select: { id: true },
+    });
+    if (!evenement) {
+      return NextResponse.json(
+        { error: "Événement introuvable pour cet animal" },
+        { status: 400 }
+      );
+    }
+  }
+
   const traitement = await prisma.traitement.create({
     data: {
       animalId,
+      evenementId: evenementId ?? null,
       medicamentId: medicamentId ?? null,
       medicamentNom: medicamentNom.trim(),
       dateDebut: new Date(dateDebut),
