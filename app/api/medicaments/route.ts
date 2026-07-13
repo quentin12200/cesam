@@ -3,7 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 
 export async function GET() {
-  const medicaments = await prisma.medicament.findMany({ orderBy: { nom: "asc" } });
+  const medicaments = await prisma.medicament.findMany({
+    include: {
+      preconisations: {
+        where: { statut: { in: ["VALIDE", "A_VERIFIER", "IMPORTE"] } },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+    orderBy: { nom: "asc" },
+  });
   return NextResponse.json(medicaments);
 }
 
