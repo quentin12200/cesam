@@ -1,10 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
-import Link from "next/link";
-import { ArrowLeft, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import OrdonnancesClient, { type OrdonnanceItem } from "./OrdonnancesClient";
 
+import BackButton from "@/app/components/BackButton";
 async function getOrdonnances(): Promise<OrdonnanceItem[]> {
   const rows = await prisma.ordonnance.findMany({
     orderBy: { date: "desc" },
@@ -34,9 +34,7 @@ export default async function OrdonnancesPage() {
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
       <div className="flex items-center gap-3 mt-2">
-        <Link href="/sanitaire" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
-          <ArrowLeft size={18} />
-        </Link>
+        <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex items-center gap-2 flex-1">
           <FileText size={20} className="text-blue-600" />
           <h2 className="text-xl font-bold text-gray-800">Ordonnances</h2>
