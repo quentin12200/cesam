@@ -11,7 +11,7 @@ import {
   type CategorieAnimal,
 } from "@/lib/utils";
 import Link from "next/link";
-import { Search, Plus, SlidersHorizontal, ArrowLeft, Table2, LayoutGrid } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, Table2, LayoutGrid } from "lucide-react";
 import { addDays, differenceInMonths, subDays } from "date-fns";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { Suspense } from "react";
@@ -281,10 +281,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     <div className={`p-4 space-y-4 ${vue === "tableau" ? "max-w-5xl" : "max-w-2xl md:max-w-3xl lg:max-w-4xl"} mx-auto pb-24`}>
       <TroupeauScrollRestorer />
       <div className="flex items-center gap-3 mt-2">
-        <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
-          <ArrowLeft size={18} />
-        </Link>
-        <h2 className="text-xl font-bold text-gray-800 flex-1 min-w-0 truncate">Troupeau</h2>
+<h2 className="text-xl font-bold text-gray-800 flex-1 min-w-0 truncate">Troupeau</h2>
         <Link
           href={buildUrl({ filtres: showFiltres ? undefined : "1" })}
           className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-medium transition-colors ${

@@ -6,7 +6,7 @@ import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib/utils";
 import Link from "next/link";
 import {
-  RefreshCw, CheckCircle, ArrowLeft,
+  RefreshCw, CheckCircle,
   Settings, Printer, Users, Stethoscope, Baby,
 } from "lucide-react";
 import ReproScrollRestorer from "./ReproScrollRestorer";
@@ -555,10 +555,7 @@ function ReproductionContent() {
       {/* Header */}
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-3">
-          <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
-            <ArrowLeft size={18} />
-          </Link>
-          <h2 className="text-xl font-bold text-gray-800">Reproduction</h2>
+<h2 className="text-xl font-bold text-gray-800">Reproduction</h2>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/reproduction/impression" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" title="Imprimer">

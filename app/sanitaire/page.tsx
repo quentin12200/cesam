@@ -5,7 +5,7 @@ import { getVaccinsManquants, formatDate, formatAge, DEFAULT_PROTOCOLES, type Pr
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { differenceInDays, subDays, addDays } from "date-fns";
 import Link from "next/link";
-import { ArrowLeft, Settings, Printer, Building2, BookOpen, Plus } from "lucide-react";
+import { Settings, Printer, Building2, BookOpen, Plus } from "lucide-react";
 import SanitaireClient, {
   type VeauItem,
   type CryptoItem,
@@ -253,10 +253,7 @@ export default async function SanitairePage() {
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
       <div className="flex items-center gap-3 mt-2">
-        <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
-          <ArrowLeft size={18} />
-        </Link>
-        <h2 className="text-xl font-bold text-gray-800">Sanitaire</h2>
+<h2 className="text-xl font-bold text-gray-800">Sanitaire</h2>
         <div className="ml-auto flex gap-2">
           <Link
             href="/sanitaire/impression"
