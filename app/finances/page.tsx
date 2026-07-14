@@ -6,6 +6,9 @@ import { TrendingUp, Package, Euro, Plus, BarChart2 } from "lucide-react";
 import SortieForm from "./SortieForm";
 import AnnulerSortieButton from "./AnnulerSortieButton";
 import EditSortieDrawer from "./EditSortieDrawer";
+import CoutAlimentation from "./CoutAlimentation";
+import FinancesTabs from "./FinancesTabs";
+import PerformancesOverview from "./PerformancesOverview";
 
 function formatEuro(val: number | null | undefined) {
   if (val == null) return "—";
@@ -171,13 +174,15 @@ async function getAnimauxActifs() {
 }
 
 interface PageProps {
-  searchParams: Promise<{ annee?: string; nouvelle?: string }>;
+  searchParams: Promise<{ annee?: string; nouvelle?: string; onglet?: string }>;
 }
 
 const ANNEE_COURANTE = new Date().getFullYear();
 
 export default async function FinancesPage({ searchParams }: PageProps) {
   const sp = await searchParams;
+  if (sp.onglet === "performances") return <PerformancesOverview />;
+
   const annee = sp.annee ? parseInt(sp.annee) : ANNEE_COURANTE;
   const showForm = sp.nouvelle === "1";
 
@@ -203,7 +208,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mt-2">
-<h2 className="text-xl font-bold text-gray-800 flex-1">Finances & Sorties</h2>
+<h2 className="text-xl font-bold text-gray-800 flex-1">Finances</h2>
         <Link
           href="/finances/stats"
           className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-sm font-medium px-3 py-2 rounded-lg shadow-sm hover:bg-gray-50"
@@ -222,6 +227,8 @@ export default async function FinancesPage({ searchParams }: PageProps) {
         )}
       </div>
 
+      <FinancesTabs active="economie" />
+
       {/* Sélecteur d'année */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {[ANNEE_COURANTE - 1, ANNEE_COURANTE, ANNEE_COURANTE + 1].map((y) => (
@@ -238,6 +245,8 @@ export default async function FinancesPage({ searchParams }: PageProps) {
           </Link>
         ))}
       </div>
+
+      <CoutAlimentation />
 
       {/* Formulaire nouvelle sortie */}
       {showForm && <SortieForm animaux={animaux} annee={annee} />}
