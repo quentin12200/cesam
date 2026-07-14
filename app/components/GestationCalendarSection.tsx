@@ -20,12 +20,13 @@ export default function GestationCalendarSection({ rows, now }: { rows: Gestatio
     return date >= aujourdHui && date <= finPeriode;
   });
 
-  const dernierePrioritaire = rows.findLastIndex(
-    (row) => new Date(row.dateVelagePrevue) <= finPeriode
+  const nombrePrioritaire = rows.reduce(
+    (total, row) => total + (new Date(row.dateVelagePrevue) <= finPeriode ? 1 : 0),
+    0
   );
   const limiteInitiale =
     prochainesDansDixJours.length > LIMITE_MINIMALE
-      ? dernierePrioritaire + 1
+      ? nombrePrioritaire
       : Math.min(LIMITE_MINIMALE, rows.length);
 
   const visible = expanded ? rows : rows.slice(0, limiteInitiale);
