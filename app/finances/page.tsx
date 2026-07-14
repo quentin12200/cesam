@@ -37,7 +37,7 @@ async function getFinancesData(annee: number) {
       where: { date: { gte: debut, lt: fin } },
       include: {
         animal: {
-          select: { nutrav: true, nobovi: true, sexbov: true, danais: true, estGenisse: true, velageVeau: { select: { id: true } } },
+          select: { nutrav: true, nobovi: true, sexbov: true, danais: true, estGenisse: true, categorie: true, velageVeau: { select: { id: true } } },
         },
       },
       orderBy: { date: "desc" },
@@ -537,7 +537,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                             poidsCarcasse: sortie.poidsCarcasse,
                             prixKgCarcasse: sortie.prixKgCarcasse,
                             animalId: sortie.animalId,
-                            animal: { nutrav: sortie.animal.nutrav, nobovi: sortie.animal.nobovi },
+                            animal: { nutrav: sortie.animal.nutrav, nobovi: sortie.animal.nobovi, sexbov: sortie.animal.sexbov, categorie: sortie.animal.categorie },
                           }} />
                           <AnnulerSortieButton sortieId={sortie.id} nutrav={sortie.animal.nutrav} />
                         </div>
