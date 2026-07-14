@@ -1,3 +1,4 @@
+import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
@@ -7,7 +8,6 @@ import {
   getCategorie, getCategorieLabel, getCategorieColor,
   type CategorieAnimal,
 } from "@/lib/utils";
-import Link from "next/link";
 import PrintButton from "./PrintButton";
 
 interface PageProps {
@@ -129,7 +129,7 @@ export default async function TroupeauImpressionPage({ searchParams }: PageProps
     <div className="min-h-screen bg-white">
       {/* Barre d'actions — masquée à l'impression */}
       <div className="print:hidden flex items-center justify-between px-4 py-3 bg-green-700 text-white">
-        <Link href="/troupeau" className="text-sm font-medium opacity-80 hover:opacity-100">← Retour</Link>
+        <BackButton label="Retour" className="inline-flex items-center gap-1.5 text-sm font-medium opacity-80 hover:opacity-100" />
         <span className="font-bold">Impression troupeau</span>
         <PrintButton />
       </div>
