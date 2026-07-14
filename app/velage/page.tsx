@@ -2,8 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
-import { CalendarDays, ArrowLeft, Printer } from "lucide-react";
-import Link from "next/link";
+import { CalendarDays } from "lucide-react";
 import VelageFormWrapper from "./VelageFormWrapper";
 import CapteurManager from "./CapteurManager";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
@@ -39,42 +38,29 @@ export default async function VelagePage() {
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mt-2">
-        <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
-          <ArrowLeft size={18} />
-        </Link>
-        <h2 className="text-xl font-bold text-gray-800">Vélage</h2>
-      </div>
+      <h2 className="text-xl font-bold text-gray-800 mt-2">Vélage</h2>
+
+      {/* Action principale */}
+      <VelageFormWrapper />
 
       {/* Calendrier de gestation */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
           <CalendarDays size={18} className="text-green-700" />
-          <h3 className="font-semibold text-gray-800 flex-1">
+          <h3 className="font-semibold text-gray-800">
             Calendrier de gestation ({gestationCalendar.length})
           </h3>
-          <Link
-            href="/reproduction/calendrier"
-            target="_blank"
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-green-700 transition-colors px-2 py-1 rounded border border-gray-200 hover:border-green-300"
-          >
-            <Printer size={13} />
-            Imprimer
-          </Link>
         </div>
         <GestationCalendarSection rows={gestationCalendar} now={now} />
       </div>
 
-      {/* Capteurs — composant interactif */}
+      {/* Capteurs */}
       <CapteurManager
         capteurs={capteurs.map((c) => ({
           ...c,
           dateAttribution: c.dateAttribution?.toISOString() ?? null,
         }))}
       />
-
-      {/* Formulaire vélage rapide */}
-      <VelageFormWrapper />
 
       {/* Vélages récents */}
       {velagesRecents.length > 0 && (
