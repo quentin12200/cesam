@@ -61,6 +61,7 @@ async function getFinancesData(annee: number) {
   );
   const veauxHistoriques = ventesHistoriquesUniques.filter((v) => v.typeVente !== "mort" && estVeauHistorique(v.typeAnimal));
   const vachesHistoriques = ventesHistoriquesUniques.filter((v) => v.typeVente !== "mort" && estVacheHistorique(v.typeAnimal));
+  const ventesHistoriquesFinancieres = ventesHistoriquesUniques.filter((v) => v.typeVente !== "mort");
 
   const caVeaux = ventesElevage
     .filter((s) => s.animal.velageVeau !== null)
@@ -94,7 +95,7 @@ async function getFinancesData(annee: number) {
   const MOIS_COURTS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
   const monthlyCA = MOIS_COURTS.map((label, i) => {
     const monthSorties = sorties.filter((s) => new Date(s.date).getMonth() === i);
-    const monthHistoriques = ventesHistoriquesUniques.filter((v) => new Date(v.date).getMonth() === i);
+    const monthHistoriques = ventesHistoriquesFinancieres.filter((v) => new Date(v.date).getMonth() === i);
     return {
       label,
       ca: monthSorties.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0)
@@ -115,7 +116,7 @@ async function getFinancesData(annee: number) {
       });
     }
   }
-  for (const v of ventesHistoriquesUniques) {
+  for (const v of ventesHistoriquesFinancieres) {
     if (v.acheteur) {
       const existing = buyerMap.get(v.acheteur) ?? { count: 0, total: 0 };
       buyerMap.set(v.acheteur, {
