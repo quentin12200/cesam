@@ -2,9 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { TrendingUp, TrendingDown, Minus, Sparkles, X, Loader2, Pencil, BarChart2, List, Baby } from "lucide-react";
-import type { AnneeStats, SortieDetail, VenteHisto, GestationRecord } from "./page";
-import GestationStats from "./GestationStats";
+import { TrendingUp, TrendingDown, Minus, Sparkles, X, Loader2, Pencil, BarChart2, List } from "lucide-react";
+import type { AnneeStats, SortieDetail, VenteHisto } from "./page";
 import SortieEditorModal, { SortieEditorValues } from "../SortieEditorModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -680,14 +679,13 @@ function VueDetail({ stats, sortiesParAnnee, ventesHisto, anneeActive }: {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function StatsClient({ stats, sortiesParAnnee, anneeActive, ventesHisto, gestationRecords }: {
+export default function StatsClient({ stats, sortiesParAnnee, anneeActive, ventesHisto }: {
   stats: AnneeStats[];
   sortiesParAnnee: Record<number, SortieDetail[]>;
   anneeActive: number;
   ventesHisto: VenteHisto[];
-  gestationRecords: GestationRecord[];
 }) {
-  const [vue, setVue] = useState<"graphiques" | "detail" | "gestation">("graphiques");
+  const [vue, setVue] = useState<"graphiques" | "detail">("graphiques");
   const anneeMax = new Date().getFullYear();
   const anneesDispos = stats.map((s) => s.annee).sort((a, b) => b - a);
   const [anneeKpi, setAnneeKpi] = useState<number>(
@@ -738,10 +736,6 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive, vente
           <button onClick={() => setVue("detail")}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${vue === "detail" ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
             <List size={15} />Détail / Modifier
-          </button>
-          <button onClick={() => setVue("gestation")}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${vue === "gestation" ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
-            <Baby size={15} />Gestation
           </button>
         </div>
         <AnalyseIA stats={stats} />
@@ -897,10 +891,6 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive, vente
 
       {vue === "detail" && (
         <VueDetail stats={stats} sortiesParAnnee={sortiesParAnnee} ventesHisto={ventesHisto} anneeActive={anneeActive} />
-      )}
-
-      {vue === "gestation" && (
-        <GestationStats records={gestationRecords} />
       )}
     </div>
   );
