@@ -237,14 +237,8 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
   return { stats, sortiesParAnnee, ventesHisto };
 }
 
-interface PageProps {
-  searchParams: Promise<{ annee?: string; vue?: string }>;
-}
-
-export default async function FinancesStatsPage({ searchParams }: PageProps) {
-  const sp = await searchParams;
+export default async function FinancesStatsPage() {
   const { stats, sortiesParAnnee, ventesHisto } = await getStatsPluri();
-  const anneeActive = sp.annee ? parseInt(sp.annee) : new Date().getFullYear();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -254,7 +248,7 @@ export default async function FinancesStatsPage({ searchParams }: PageProps) {
           <h2 className="text-xl font-bold text-gray-800 flex-1">Ventes pluriannuelles</h2>
           <span className="text-xs text-gray-400">{stats.length} année{stats.length > 1 ? "s" : ""}</span>
         </div>
-        <StatsClient stats={stats} sortiesParAnnee={sortiesParAnnee} anneeActive={anneeActive} ventesHisto={ventesHisto} />
+        <StatsClient stats={stats} sortiesParAnnee={sortiesParAnnee} ventesHisto={ventesHisto} />
       </div>
     </div>
   );
