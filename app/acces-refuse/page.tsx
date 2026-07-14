@@ -9,7 +9,7 @@ export default function AccesRefusePage() {
           Le propriétaire a été notifié de votre tentative de connexion.
         </p>
         <a href="/login" className="mt-2 text-sm text-green-700 font-medium hover:underline">
-          Retour à la connexion
+          Se connecter avec un autre compte
         </a>
       </div>
     </div>
