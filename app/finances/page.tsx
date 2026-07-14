@@ -243,7 +243,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
           className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-sm font-medium px-3 py-2 rounded-lg shadow-sm hover:bg-gray-50"
         >
           <BarChart2 size={16} />
-          Stats
+          Ventes
         </Link>
         {!showForm && (
           <Link
