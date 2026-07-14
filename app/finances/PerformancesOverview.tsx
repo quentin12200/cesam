@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Baby, Scale, TrendingUp } from "lucide-react";
+import { Baby, Percent, Scale, TrendingUp } from "lucide-react";
 import FinancesTabs from "./FinancesTabs";
 
 export default function PerformancesOverview() {
@@ -29,6 +29,15 @@ export default function PerformancesOverview() {
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-gray-800">Performances des vaches</p>
               <p className="text-xs text-gray-500">IVV, GMQ de la descendance et score global</p>
+            </div>
+          </Link>
+          <Link href="/finances/performances/productivite-numerique" className="min-h-16 flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
+            <span className="h-10 w-10 flex items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 shrink-0">
+              <Percent size={20} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-gray-800">Productivité numérique</p>
+              <p className="text-xs text-gray-500">Veaux obtenus pour 100 femelles mises à la reproduction</p>
             </div>
           </Link>
           <Link href="/finances/performances/gestation" className="min-h-16 flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
