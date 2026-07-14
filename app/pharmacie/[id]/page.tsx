@@ -1,11 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Pill } from "lucide-react";
+import { Pill } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import MedicamentFicheClient from "./MedicamentFicheClient";
 
+import BackButton from "@/app/components/BackButton";
 interface PageProps {
   params: Promise<{ id: string }>;
 }
@@ -49,9 +49,7 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl mx-auto pb-24">
       <div className="flex items-center gap-3 mt-2">
-        <Link href="/pharmacie" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
-          <ArrowLeft size={18} />
-        </Link>
+        <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex items-center gap-2">
           <Pill size={20} className="text-blue-600" />
           <h2 className="text-xl font-bold text-gray-800">{medicament.nom}</h2>
