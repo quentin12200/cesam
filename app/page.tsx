@@ -1,3 +1,4 @@
+import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
@@ -25,8 +26,7 @@ import {
   Scissors,
   Activity,
   Pill,
-  ArrowLeft,
-} from "lucide-react";
+  } from "lucide-react";
 
 async function getDashboardData() {
   const now = new Date();
@@ -741,9 +741,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
 
     return (
       <div className="p-4 max-w-2xl mx-auto space-y-4">
-        <Link href="/" className="print:hidden inline-flex items-center gap-1 text-sm text-gray-500">
-          <ArrowLeft size={16} /> Retour au tableau de bord
-        </Link>
+        <BackButton label="Retour" className="print:hidden inline-flex items-center gap-1 text-sm text-gray-500" iconSize={16} />
         {section ?? (
           <p className="text-sm text-gray-400">Rien à imprimer pour cette section.</p>
         )}
