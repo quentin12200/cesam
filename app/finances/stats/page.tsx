@@ -73,6 +73,7 @@ export interface VenteHisto {
   date: string;
   total: number | null;
   notes: string | null;
+  causeMortalite: string | null;
 }
 
 function getSaison(date: Date): GestationRecord["saison"] {
@@ -281,6 +282,7 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     date: v.date.toISOString(),
     total: v.total,
     notes: v.notes,
+    causeMortalite: v.causeMortalite,
   }));
 
   return { stats, sortiesParAnnee, ventesHisto };
