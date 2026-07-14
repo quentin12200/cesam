@@ -2,46 +2,98 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 
+const EDITABLE_FIELDS = [
+  "statut",
+  "notes",
+  "dateDebut",
+  "dureeJours",
+  "voie",
+  "frequence",
+  "dose",
+  "uniteDosage",
+  "motif",
+  "veterinaire",
+  "ordonnanceNumero",
+] as const;
+
+const TEXT_FIELDS = new Set([
+  "statut",
+  "notes",
+  "voie",
+  "frequence",
+  "uniteDosage",
+  "motif",
+  "veterinaire",
+  "ordonnanceNumero",
+]);
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { statut, notes, dureeJours, veterinaire, ordonnanceNumero } = body;
 
   const prev = await prisma.traitement.findUnique({ where: { id } });
-  if (!prev) return NextResponse.json({ error: "Non trouvé" }, { status: 404 });
-
-  const prevFields: Record<string, unknown> = {};
-  if (statut !== undefined) prevFields.statut = prev.statut;
-  if (notes !== undefined) prevFields.notes = prev.notes;
-  if (dureeJours !== undefined) prevFields.dureeJours = prev.dureeJours;
-  if (veterinaire !== undefined) prevFields.veterinaire = prev.veterinaire;
-  if (ordonnanceNumero !== undefined) prevFields.ordonnanceNumero = prev.ordonnanceNumero;
-
-  try {
-    const updated = await prisma.traitement.update({
-      where: { id },
-      data: {
-        ...(statut !== undefined && { statut }),
-        ...(notes !== undefined && { notes }),
-        ...(dureeJours !== undefined && { dureeJours }),
-        ...(veterinaire !== undefined && { veterinaire }),
-        ...(ordonnanceNumero !== undefined && { ordonnanceNumero }),
-      },
-    });
-
-    const desc = `Traitement ${prev.medicamentNom} mis à jour`;
-    let undoId = "";
-    try {
-      undoId = await logAction("PATCH_TRAITEMENT", desc, { op: "update", model: "traitement", where: { id }, data: prevFields });
-    } catch {}
-
-    return NextResponse.json({ ...updated, _undoId: undoId, _undoDesc: desc });
-  } catch {
+  if (!prev) {
     return NextResponse.json({ error: "Traitement non trouvé" }, { status: 404 });
   }
+
+  if (body.dureeJours !== undefined && Number(body.dureeJours) < 1) {
+    return NextResponse.json(
+      { error: "La durée doit être d’au moins un jour" },
+      { status: 400 }
+    );
+  }
+  if (body.dose !== undefined && body.dose !== null && Number(body.dose) < 0) {
+    return NextResponse.json(
+      { error: "La quantité ne peut pas être négative" },
+      { status: 400 }
+    );
+  }
+
+  const prevFields: Record<string, unknown> = {};
+  const data: Record<string, unknown> = {};
+
+  for (const field of EDITABLE_FIELDS) {
+    const value = body[field];
+    if (value === undefined) continue;
+
+    prevFields[field] = (prev as unknown as Record<string, unknown>)[field];
+
+    if (field === "dateDebut") {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return NextResponse.json({ error: "Date de début invalide" }, { status: 400 });
+      }
+      data.dateDebut = date;
+    } else if (field === "dureeJours") {
+      data.dureeJours = Number(value);
+    } else if (field === "dose") {
+      data.dose = value === "" || value === null ? null : Number(value);
+    } else if (TEXT_FIELDS.has(field)) {
+      data[field] =
+        typeof value === "string" ? value.trim() || null : value;
+    }
+  }
+
+  const updated = await prisma.traitement.update({
+    where: { id },
+    data,
+  });
+
+  const desc = `Traitement ${prev.medicamentNom} mis à jour`;
+  let undoId = "";
+  try {
+    undoId = await logAction("PATCH_TRAITEMENT", desc, {
+      op: "update",
+      model: "traitement",
+      where: { id },
+      data: prevFields,
+    });
+  } catch {}
+
+  return NextResponse.json({ ...updated, _undoId: undoId, _undoDesc: desc });
 }
 
 export async function DELETE(
