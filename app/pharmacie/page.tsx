@@ -2,10 +2,11 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, Pill, Printer } from "lucide-react";
+import { Pill, Printer } from "lucide-react";
 import PharmacieClient, { type MedicamentItem } from "./PharmacieClient";
 import { type OrdonnanceItem } from "@/app/ordonnances/OrdonnancesClient";
 
+import BackButton from "@/app/components/BackButton";
 async function getData() {
   const [medicaments, ordonnancesRaw] = await Promise.all([
     prisma.medicament.findMany({
@@ -78,9 +79,7 @@ export default async function PharmaciePage() {
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
       <div className="flex items-center gap-3 mt-2">
-        <Link href="/" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
-          <ArrowLeft size={18} />
-        </Link>
+        <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex items-center gap-2 flex-1">
           <Pill size={20} className="text-blue-600" />
           <h2 className="text-xl font-bold text-gray-800">Pharmacie</h2>
