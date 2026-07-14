@@ -56,6 +56,7 @@ export interface VenteHisto {
   typeAnimal: string;
   typeVente: string;
   nutrav: string | null;
+  animalNom: string | null;
   sexe: string | null;
   poidsVif: number | null;
   prixKgVif: number | null;
@@ -241,12 +242,22 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     }));
   }
 
+  const nutravsHistoriques = [...new Set(ventesHistoUniquesRaw.map((v) => v.nutrav).filter((v): v is string => Boolean(v)))];
+  const animauxHistoriques = nutravsHistoriques.length
+    ? await prisma.animal.findMany({
+        where: { nutrav: { in: nutravsHistoriques } },
+        select: { nutrav: true, nobovi: true },
+      })
+    : [];
+  const nomsAnimaux = new Map(animauxHistoriques.map((animal) => [animal.nutrav, animal.nobovi]));
+
   const ventesHisto: VenteHisto[] = ventesHistoUniquesRaw.map((v) => ({
     id: v.id,
     annee: v.annee,
     typeAnimal: v.typeAnimal,
     typeVente: v.typeVente,
     nutrav: v.nutrav,
+    animalNom: v.nutrav ? (nomsAnimaux.get(v.nutrav) ?? null) : null,
     sexe: v.sexe,
     poidsVif: v.poidsVif,
     prixKgVif: v.prixKgVif,
