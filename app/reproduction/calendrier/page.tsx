@@ -4,7 +4,6 @@ import Link from "next/link";
 import { differenceInDays } from "date-fns";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
 import { GestationCalendarTable } from "@/app/components/GestationCalendarTable";
-import PrintButton from "./PrintButton";
 
 export default async function CalendrierGestationPage() {
   const now = new Date();
@@ -35,7 +34,6 @@ export default async function CalendrierGestationPage() {
             <Link href="/velage" className="text-green-200 hover:text-white text-sm">← Retour</Link>
             <span className="text-green-400">|</span>
             <h1 className="font-bold text-lg flex-1">Calendrier de gestation</h1>
-            <PrintButton />
           </div>
         </div>
 
