@@ -344,10 +344,13 @@ function AnalyseIA({ stats }: { stats: AnneeStats[] }) {
 
 function EditDrawer({ sortie, onClose, onSaved }: { sortie: SortieDetail; onClose: () => void; onSaved: () => void }) {
   async function enregistrer(values: SortieEditorValues) {
+    const type = values.nature === "MORT" ? "MORT" : (values.modeVente === "VIF" ? "ELEVAGE" : "BOUCHERIE");
+    const poids = values.modeVente === "VIF" ? values.poidsVifVente : values.poidsCarcasse;
+    const prixKilo = values.modeVente === "VIF" ? values.prixKgVif : values.prixKgCarcasse;
     const res = await fetch(`/api/sorties/${sortie.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...values, poidsVif: null, rendementCarcasse: null }),
+      body: JSON.stringify({ ...values, type, poids, prixKilo, poidsVif: null, rendementCarcasse: null }),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? "Erreur");
     onSaved();
@@ -360,10 +363,15 @@ function EditDrawer({ sortie, onClose, onSaved }: { sortie: SortieDetail; onClos
       animalLabel={`${sortie.animal.nutrav} — ${sortie.animal.nobovi ?? "Sans nom"}`}
       initial={{
         date: new Date(sortie.date).toISOString().slice(0, 10),
-        type: sortie.type,
+        nature: sortie.type === "MORT" ? "MORT" : "VENTE",
+        categorieSortie: sortie.categorieSortie ?? (sortie.isVeau ? "VEAU" : (sortie.animal.sexbov === "F" ? "VACHE" : "TAUREAU")),
+        sexeSortie: sortie.sexeSortie ?? sortie.animal.sexbov,
+        modeVente: sortie.modeVente ?? (sortie.type === "BOUCHERIE" ? "CARCASSE" : "VIF"),
         acheteur: sortie.acheteur,
-        poids: sortie.poids,
-        prixKilo: sortie.prixKilo,
+        poidsVifVente: sortie.poidsVifVente ?? (sortie.type === "ELEVAGE" ? sortie.poids : null),
+        prixKgVif: sortie.prixKgVif ?? (sortie.type === "ELEVAGE" ? sortie.prixKilo : null),
+        poidsCarcasse: sortie.poidsCarcasse ?? (sortie.type === "BOUCHERIE" ? sortie.poids : null),
+        prixKgCarcasse: sortie.prixKgCarcasse ?? (sortie.type === "BOUCHERIE" ? sortie.prixKilo : null),
         prixDefinitifHT: sortie.prixDefinitifHT,
         notes: sortie.notes,
         causeMortalite: sortie.causeMortalite,
@@ -376,33 +384,42 @@ function EditDrawer({ sortie, onClose, onSaved }: { sortie: SortieDetail; onClos
 
 // ── Edit vente historique ─────────────────────────────────────────────────────
 
+function categorieHistorique(typeAnimal: string) {
+  const valeur = typeAnimal.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (valeur.includes("genisse")) return "GENISSE";
+  if (valeur.includes("vache")) return "VACHE";
+  if (valeur.includes("taureau")) return "TAUREAU";
+  return "VEAU";
+}
+
 function EditVenteHisto({ vente, onClose, onSaved }: { vente: VenteHisto; onClose: () => void; onSaved: () => void }) {
   const isCarcasse = vente.typeVente === "carcasse";
-  const poidsInitial = isCarcasse ? vente.poidsCarc : vente.poidsVif;
-  const prixInitial = isCarcasse ? vente.prixKgCarc : vente.prixKgVif;
-  const totalEstCalcule = poidsInitial != null && prixInitial != null;
+  const poidsActif = isCarcasse ? vente.poidsCarc : vente.poidsVif;
+  const prixActif = isCarcasse ? vente.prixKgCarc : vente.prixKgVif;
+  const totalEstCalcule = poidsActif != null && prixActif != null;
 
   async function enregistrer(values: SortieEditorValues) {
-    const venteVif = values.type === "ELEVAGE";
-    const montantCalcule = values.poids != null && values.prixKilo != null
-      ? Math.round(values.poids * values.prixKilo * 100) / 100
-      : null;
+    const poids = values.modeVente === "VIF" ? values.poidsVifVente : values.poidsCarcasse;
+    const prix = values.modeVente === "VIF" ? values.prixKgVif : values.prixKgCarcasse;
+    const montantCalcule = poids != null && prix != null ? Math.round(poids * prix * 100) / 100 : null;
+    const nomsCategories = { VEAU: "veaux", GENISSE: "génisse", VACHE: "vaches", TAUREAU: "taureau" } as const;
     const res = await fetch(`/api/ventes-historiques/${vente.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         date: values.date,
-        typeAnimal: vente.typeAnimal,
-        typeVente: values.type === "MORT" ? "mort" : (venteVif ? "vif" : "carcasse"),
+        typeAnimal: nomsCategories[values.categorieSortie],
+        typeVente: values.nature === "MORT" ? "mort" : (values.modeVente === "VIF" ? "vif" : "carcasse"),
         nutrav: vente.nutrav,
-        sexe: vente.sexe,
-        poidsVif: venteVif ? values.poids : null,
-        prixKgVif: venteVif ? values.prixKilo : null,
-        poidsCarc: values.type === "BOUCHERIE" ? values.poids : null,
-        prixKgCarc: values.type === "BOUCHERIE" ? values.prixKilo : null,
+        sexe: values.sexeSortie,
+        poidsVif: values.poidsVifVente,
+        prixKgVif: values.prixKgVif,
+        poidsCarc: values.poidsCarcasse,
+        prixKgCarc: values.prixKgCarcasse,
         acheteur: values.acheteur,
-        total: values.type === "MORT" ? null : (values.prixDefinitifHT ?? montantCalcule),
+        total: values.nature === "MORT" ? null : (values.prixDefinitifHT ?? montantCalcule),
         notes: values.notes,
+        causeMortalite: values.causeMortalite,
       }),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? "Erreur");
@@ -423,12 +440,18 @@ function EditVenteHisto({ vente, onClose, onSaved }: { vente: VenteHisto; onClos
       animalLabel={`${vente.nutrav ?? "Numéro inconnu"} — ${vente.animalNom ?? "Sans nom"}`}
       initial={{
         date: new Date(vente.date).toISOString().slice(0, 10),
-        type: vente.typeVente === "mort" ? "MORT" : (isCarcasse ? "BOUCHERIE" : "ELEVAGE"),
+        nature: vente.typeVente === "mort" ? "MORT" : "VENTE",
+        categorieSortie: categorieHistorique(vente.typeAnimal),
+        sexeSortie: vente.sexe,
+        modeVente: isCarcasse ? "CARCASSE" : "VIF",
         acheteur: vente.acheteur,
-        poids: poidsInitial,
-        prixKilo: prixInitial,
+        poidsVifVente: vente.poidsVif,
+        prixKgVif: vente.prixKgVif,
+        poidsCarcasse: vente.poidsCarc,
+        prixKgCarcasse: vente.prixKgCarc,
         prixDefinitifHT: totalEstCalcule ? null : vente.total,
         notes: vente.notes,
+        causeMortalite: vente.causeMortalite,
       }}
       onClose={onClose}
       onSubmit={enregistrer}
