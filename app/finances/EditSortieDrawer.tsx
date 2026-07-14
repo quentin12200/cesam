@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
-import SortieEditorModal, { SortieEditorValues } from "./SortieEditorModal";
+import SortieEditorModal, { categorieSortieAnimal, SortieEditorValues } from "./SortieEditorModal";
 
 interface Sortie {
   id: string;
@@ -26,7 +26,7 @@ interface Sortie {
   poidsCarcasse: number | null;
   prixKgCarcasse: number | null;
   animalId: string;
-  animal: { nutrav: string; nobovi: string | null };
+  animal: { nutrav: string; nobovi: string | null; sexbov: string; categorie: string | null };
 }
 
 export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
@@ -68,8 +68,8 @@ export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
             animalId: sortie.animalId,
             date: new Date(sortie.date).toISOString().slice(0, 10),
             nature: sortie.type === "MORT" ? "MORT" : "VENTE",
-            categorieSortie: sortie.categorieSortie,
-            sexeSortie: sortie.sexeSortie,
+            categorieSortie: sortie.categorieSortie ?? categorieSortieAnimal(sortie.animal.categorie, sortie.animal.sexbov),
+            sexeSortie: sortie.sexeSortie ?? sortie.animal.sexbov,
             modeVente: sortie.modeVente ?? (sortie.type === "BOUCHERIE" ? "CARCASSE" : "VIF"),
             acheteur: sortie.acheteur,
             poidsVifVente: sortie.poidsVifVente ?? (sortie.type === "ELEVAGE" ? sortie.poids : null),
