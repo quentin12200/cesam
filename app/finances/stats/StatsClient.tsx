@@ -6,7 +6,6 @@ import { TrendingUp, TrendingDown, Minus, Sparkles, X, Loader2, Pencil, BarChart
 import type { AnneeStats, SortieDetail, VenteHisto, GestationRecord } from "./page";
 import GestationStats from "./GestationStats";
 import SortieEditorModal, { SortieEditorValues } from "../SortieEditorModal";
-import { CAUSES_MORTALITE, CAUSES_MORTALITE_LABELS } from "@/lib/utils";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
