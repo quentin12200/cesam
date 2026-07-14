@@ -143,6 +143,13 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     byAnnee.get(annee)!.push(s);
   }
 
+  const clesSorties = new Set(
+    sorties.map((s) => `${s.animal.nutrav}|${s.date.toISOString().slice(0, 10)}`)
+  );
+  const ventesHistoUniquesRaw = ventesHistoRaw.filter(
+    (v) => !v.nutrav || !clesSorties.has(`${v.nutrav}|${v.date.toISOString().slice(0, 10)}`)
+  );
+
   // Années avec sorties réelles
   const anneesReelles = new Set(byAnnee.keys());
 
@@ -153,27 +160,42 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     const vaches = rows.filter((s) => s.type === "BOUCHERIE");
     const elevageVaches = rows.filter((s) => s.type === "ELEVAGE" && s.animal.velageVeau === null);
 
-    const veauxCount = veaux.length;
-    const veauxKgTotal = veaux.reduce((s, v) => s + (v.poids ?? 0), 0);
-    const veauxPrix = veaux.filter((v) => v.prixKilo).map((v) => v.prixKilo!);
-    const veauxPrixMoyen = veauxPrix.length ? veauxPrix.reduce((a, b) => a + b, 0) / veauxPrix.length : null;
-    const veauxCA = veaux.reduce((s, v) => s + (v.prixDefinitifHT ?? v.prixPrevuHT ?? 0), 0);
+    const ventesHistoAnnee = ventesHistoUniquesRaw.filter((v) => v.annee === annee);
+    const veauxHisto = ventesHistoAnnee.filter((v) => ["veau", "veaux"].includes(v.typeAnimal.trim().toLowerCase()));
+    const vachesHisto = ventesHistoAnnee.filter((v) => v.typeAnimal.trim().toLowerCase().startsWith("vache"));
 
-    const vachesCount = vaches.length;
-    const vachesKgCarcasse = vaches.reduce((s, v) => s + (v.poids ?? 0), 0);
-    const vachesPrix = vaches.filter((v) => v.prixKilo).map((v) => v.prixKilo!);
+    const veauxCount = veaux.length + veauxHisto.length;
+    const veauxKgTotal = veaux.reduce((s, v) => s + (v.poids ?? 0), 0)
+      + veauxHisto.reduce((s, v) => s + (v.poidsVif ?? v.poidsCarc ?? 0), 0);
+    const veauxPrix = [
+      ...veaux.filter((v) => v.prixKilo).map((v) => v.prixKilo!),
+      ...veauxHisto.map((v) => v.prixKgVif ?? v.prixKgCarc).filter((v): v is number => v != null),
+    ];
+    const veauxPrixMoyen = veauxPrix.length ? veauxPrix.reduce((a, b) => a + b, 0) / veauxPrix.length : null;
+    const veauxCA = veaux.reduce((s, v) => s + (v.prixDefinitifHT ?? v.prixPrevuHT ?? 0), 0)
+      + veauxHisto.reduce((s, v) => s + (v.total ?? 0), 0);
+
+    const vachesCount = vaches.length + vachesHisto.length;
+    const vachesKgCarcasse = vaches.reduce((s, v) => s + (v.poids ?? 0), 0)
+      + vachesHisto.reduce((s, v) => s + (v.poidsCarc ?? v.poidsVif ?? 0), 0);
+    const vachesPrix = [
+      ...vaches.filter((v) => v.prixKilo).map((v) => v.prixKilo!),
+      ...vachesHisto.map((v) => v.prixKgCarc ?? v.prixKgVif).filter((v): v is number => v != null),
+    ];
     const vachesPrixMoyen = vachesPrix.length ? vachesPrix.reduce((a, b) => a + b, 0) / vachesPrix.length : null;
     const vachesCA = [...vaches, ...elevageVaches].reduce(
       (s, v) => s + (v.prixDefinitifHT ?? v.prixPrevuHT ?? 0), 0
-    );
+    ) + vachesHisto.reduce((s, v) => s + (v.total ?? 0), 0);
 
     const caTotal = veauxCA + vachesCA;
     const velagesAnnee = velagesCountByAnnee.get(annee) ?? 0;
     const tauxProductivite = velagesAnnee > 0 ? Math.round((veauxCount / velagesAnnee) * 100) : null;
 
-    const veauxMCount = veaux.filter((v) => v.animal.sexbov === "M").length;
-    const veauxFCount = veaux.filter((v) => v.animal.sexbov === "F").length;
-    return { annee, veauxCount, veauxMCount, veauxFCount, veauxKgTotal, veauxPrixMoyen, veauxCA, vachesCount, vachesKgCarcasse, vachesPrixMoyen, vachesCA, caTotal, tauxProductivite };
+    const veauxMCount = veaux.filter((v) => v.animal.sexbov === "M").length
+      + veauxHisto.filter((v) => v.sexe?.toUpperCase() === "M").length;
+    const veauxFCount = veaux.filter((v) => v.animal.sexbov === "F").length
+      + veauxHisto.filter((v) => v.sexe?.toUpperCase() === "F").length;
+    return { annee, veauxCount, veauxMCount, veauxFCount, veauxKgTotal, veauxPrixMoyen, veauxCA, vachesCount, vachesKgCarcasse, vachesPrixMoyen, vachesCA, caTotal, tauxProductivite, isHistorique: ventesHistoAnnee.length > 0 };
   });
 
   // Fusionner avec historiques (les années historiques qui n'ont pas de sorties réelles)
@@ -219,7 +241,7 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     }));
   }
 
-  const ventesHisto: VenteHisto[] = ventesHistoRaw.map((v) => ({
+  const ventesHisto: VenteHisto[] = ventesHistoUniquesRaw.map((v) => ({
     id: v.id,
     annee: v.annee,
     typeAnimal: v.typeAnimal,
