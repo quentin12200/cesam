@@ -160,7 +160,7 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
     const vaches = rows.filter((s) => s.type === "BOUCHERIE");
     const elevageVaches = rows.filter((s) => s.type === "ELEVAGE" && s.animal.velageVeau === null);
 
-    const ventesHistoAnnee = ventesHistoUniquesRaw.filter((v) => v.annee === annee);
+    const ventesHistoAnnee = ventesHistoUniquesRaw.filter((v) => v.annee === annee && v.typeVente !== "mort");
     const veauxHisto = ventesHistoAnnee.filter((v) => ["veau", "veaux"].includes(v.typeAnimal.trim().toLowerCase()));
     const vachesHisto = ventesHistoAnnee.filter((v) => v.typeAnimal.trim().toLowerCase().startsWith("vache"));
 
