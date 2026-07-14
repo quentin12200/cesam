@@ -197,7 +197,7 @@ async function getFinancesData(annee: number) {
 async function getAnimauxActifs() {
   return prisma.animal.findMany({
     where: { statut: "ACTIF" },
-    select: { id: true, nutrav: true, nobovi: true, sexbov: true },
+    select: { id: true, nutrav: true, nobovi: true, sexbov: true, categorie: true },
     orderBy: { nutrav: "asc" },
   });
 }
@@ -529,6 +529,13 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                             prixPrevuHT: sortie.prixPrevuHT,
                             notes: sortie.notes,
                             causeMortalite: sortie.causeMortalite,
+                            categorieSortie: sortie.categorieSortie,
+                            sexeSortie: sortie.sexeSortie,
+                            modeVente: sortie.modeVente,
+                            poidsVifVente: sortie.poidsVifVente,
+                            prixKgVif: sortie.prixKgVif,
+                            poidsCarcasse: sortie.poidsCarcasse,
+                            prixKgCarcasse: sortie.prixKgCarcasse,
                             animalId: sortie.animalId,
                             animal: { nutrav: sortie.animal.nutrav, nobovi: sortie.animal.nobovi },
                           }} />
