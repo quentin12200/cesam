@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import TopNav from "@/components/TopNav";
@@ -62,7 +63,9 @@ export default function RootLayout({
           <TopNav />
         </header>
         <UndoProvider>
-          <NavigationRestoration />
+          <Suspense fallback={null}>
+            <NavigationRestoration />
+          </Suspense>
           <SplashScreen />
           <main className="flex-1 overflow-auto">
             {children}
