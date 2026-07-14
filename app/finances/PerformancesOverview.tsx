@@ -36,7 +36,7 @@ export default function PerformancesOverview() {
               <BarChart2 size={20} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-gray-800">Statistiques de l'élevage</p>
+              <p className="font-semibold text-gray-800">Statistiques de l&apos;élevage</p>
               <p className="text-xs text-gray-500">Évolution annuelle et indicateurs globaux</p>
             </div>
           </Link>
