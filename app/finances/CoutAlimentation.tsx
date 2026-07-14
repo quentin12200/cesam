@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { ChevronDown, ChevronUp, Info, Plus, Save, X } from "lucide-react";
 
 type ModeVente = "PRIX_KG" | "PRIX_TONNE" | "PRIX_SAC" | "PRIX_BIDON" | "AUTRE";
@@ -237,24 +238,30 @@ export default function CoutAlimentation() {
             const ouvert = detailsOuverts === produit.id;
             return (
               <div key={produit.id}>
-                <div className="grid grid-cols-[1fr_auto] sm:grid-cols-[1.4fr_1fr_1fr_1fr_auto] items-center gap-x-3 gap-y-1 px-4 py-3">
-                  <div className="min-w-0">
+                <div className="flex items-center gap-2 px-4 py-3">
+                  <div className="min-w-0 flex-1 grid grid-cols-[1fr_auto] sm:grid-cols-[1.4fr_1fr_1fr_1fr] items-center gap-x-3 gap-y-1">
                     <p className="font-semibold text-gray-800 truncate">{produit.nom}</p>
-                    <p className="sm:hidden text-xs text-gray-500 mt-0.5">{modeLabel(actuel.modeVente)} · {dateFr(actuel.dateSaisie)}</p>
+                    <div className="hidden sm:block min-w-0">
+                      <p className="text-sm text-gray-700">{prix.format(actuel.prixPaye)}</p>
+                      <p className="text-xs text-gray-500 truncate">{modeLabel(actuel.modeVente)}</p>
+                    </div>
+                    <div className="text-right sm:text-left font-semibold text-green-800">
+                      {prixKg.format(actuel.prixKg)}<span className="text-xs font-normal">/kg</span>
+                    </div>
+                    <div className="hidden sm:block text-sm text-gray-500">{dateFr(actuel.dateSaisie)}</div>
+                    <p className="sm:hidden col-span-2 text-xs text-gray-500">
+                      {prix.format(actuel.prixPaye)} · {modeLabel(actuel.modeVente)} · {dateFr(actuel.dateSaisie)}
+                    </p>
                   </div>
-                  <div className="hidden sm:block text-sm text-gray-600">{prix.format(actuel.prixPaye)}</div>
-                  <div className="text-right sm:text-left font-semibold text-green-800">{prixKg.format(actuel.prixKg)}<span className="text-xs font-normal">/kg</span></div>
-                  <div className="hidden sm:block text-sm text-gray-500">{dateFr(actuel.dateSaisie)}</div>
                   <button
                     type="button"
                     onClick={() => setDetailsOuverts(ouvert ? null : produit.id)}
-                    className="h-11 w-11 col-start-2 sm:col-start-auto row-span-2 sm:row-span-1 flex items-center justify-center text-gray-500 hover:text-green-700 hover:bg-green-50 rounded-lg"
+                    className="h-11 w-11 shrink-0 flex items-center justify-center text-gray-500 hover:text-green-700 hover:bg-green-50 rounded-lg"
                     aria-label={`Informations sur ${produit.nom}`}
                     aria-expanded={ouvert}
                   >
                     <Info size={20} />
                   </button>
-                  <div className="sm:hidden text-sm text-gray-600">{prix.format(actuel.prixPaye)} · {actuel.poidsKg.toLocaleString("fr-FR")} kg</div>
                 </div>
 
                 {ouvert && (
