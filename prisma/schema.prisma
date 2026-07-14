@@ -597,6 +597,32 @@ model NoteTerrain {
   updatedAt DateTime @updatedAt
 }
 
+model AlimentProduit {
+  id        String        @id @default(cuid())
+  nom       String        @unique
+  tarifs    TarifAliment[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model TarifAliment {
+  id               String         @id @default(cuid())
+  produitId        String
+  produit          AlimentProduit @relation(fields: [produitId], references: [id], onDelete: Cascade)
+  dateSaisie       DateTime
+  modeVente        String
+  prixPaye         Float
+  poidsKg          Float
+  prixKg           Float
+  fournisseur      String?
+  marque           String?
+  conditionnement  String?
+  note             String?
+  createdAt        DateTime       @default(now())
+
+  @@index([produitId, dateSaisie])
+}
+
 model ActionLog {
   id          String    @id @default(cuid())
   type        String
