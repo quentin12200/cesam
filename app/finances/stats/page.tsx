@@ -2,10 +2,9 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { differenceInDays } from "date-fns";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import StatsClient from "./StatsClient";
 
+import BackButton from "@/app/components/BackButton";
 export interface AnneeStats {
   annee: number;
   veauxCount: number;
@@ -256,9 +255,7 @@ export default async function FinancesStatsPage({ searchParams }: PageProps) {
     <div className="min-h-screen bg-gray-50">
       <div className="p-4 space-y-5 max-w-2xl md:max-w-4xl lg:max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mt-2">
-          <Link href="/finances" className="p-2 bg-white rounded-lg shadow text-gray-600 hover:bg-gray-50">
-            <ArrowLeft size={18} />
-          </Link>
+          <BackButton className="p-2 bg-white rounded-lg shadow text-gray-600 hover:bg-gray-50" iconSize={18} />
           <h2 className="text-xl font-bold text-gray-800 flex-1">Statistiques pluriannuelles</h2>
           <span className="text-xs text-gray-400">{stats.length} année{stats.length > 1 ? "s" : ""}</span>
         </div>

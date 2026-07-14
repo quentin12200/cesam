@@ -1,7 +1,8 @@
+import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { ArrowLeft, Download } from "lucide-react";
+import { Download } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 import {
@@ -42,9 +43,7 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
   return (
     <>
       <div className="p-4 flex items-center justify-between print:hidden">
-        <Link href="/sanitaire" className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1">
-          <ArrowLeft size={16} /> Retour sanitaire
-        </Link>
+        <BackButton label="Retour" className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1" />
         <div className="flex items-center gap-2">
           <a
             href={`/api/carnet-sanitaire?order=${order}`}

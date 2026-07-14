@@ -1,6 +1,6 @@
+import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { addDays, differenceInDays } from "date-fns";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
@@ -39,7 +39,7 @@ export default async function PharmacieImpressionPage() {
   return (
     <>
       <div className="p-4 flex items-center justify-between print:hidden">
-        <Link href="/pharmacie" className="text-sm text-gray-600 hover:text-gray-800">← Retour pharmacie</Link>
+        <BackButton label="Retour" className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800" />
         <PrintButton />
       </div>
 

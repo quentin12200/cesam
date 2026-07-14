@@ -1,5 +1,7 @@
 "use client";
 
+import BackButton from "@/app/components/BackButton";
+
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, X, Loader2, CheckCircle2, Search, Thermometer, ListChecks, Plus, Syringe } from "lucide-react";
@@ -289,9 +291,10 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
           <button onClick={nouveauEvenement} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
             Nouvel événement
           </button>
-          <button onClick={() => router.push("/sanitaire")} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">
-            Retour au module sanitaire
-          </button>
+          <BackButton
+            label="Retour"
+            className="min-h-11 inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium"
+          />
         </div>
       </div>
     );

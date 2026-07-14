@@ -1,7 +1,7 @@
+import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, addDays } from "date-fns";
 import { formatAge, formatDate, isMheVendable, getVaccinProtocolSteps, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
@@ -83,9 +83,7 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
     <>
       {/* Screen nav */}
       <div className="p-4 flex items-center justify-between print:hidden">
-        <Link href={`/troupeau/${nutrav}`} className="text-sm text-gray-600 hover:text-gray-800">
-          ← Retour fiche animal
-        </Link>
+        <BackButton label="Retour" className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800" />
         <PrintButton />
       </div>
 

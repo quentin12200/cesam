@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, GitBranch } from "lucide-react";
+import { GitBranch } from "lucide-react";
 import ArbreClient from "./ArbreClient";
 
+import BackButton from "@/app/components/BackButton";
 export interface TreeNode {
   id: string;
   nutrav: string;
@@ -163,12 +163,7 @@ export default async function ArbrePage({ params }: { params: Promise<{ nutrav: 
     <div className="min-h-screen bg-gradient-to-b from-green-50/40 to-white">
       <div className="max-w-5xl mx-auto p-4 pb-24">
         <div className="flex items-center gap-3 mt-2 mb-6">
-          <Link
-            href={`/troupeau/${nutrav}`}
-            className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
-          >
-            <ArrowLeft size={18} />
-          </Link>
+          <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
           <div>
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
               <GitBranch size={20} className="text-green-700" />

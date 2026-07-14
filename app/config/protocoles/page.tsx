@@ -3,9 +3,10 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_PROTOCOLES } from "@/lib/utils";
 import Link from "next/link";
-import { ArrowLeft, Settings, Building2 } from "lucide-react";
+import { Settings, Building2 } from "lucide-react";
 import ProtocoleEditor from "./ProtocoleEditor";
 
+import BackButton from "@/app/components/BackButton";
 async function getProtocoles() {
   let protocoles = await prisma.protocoleVaccin.findMany({ orderBy: { ordre: "asc" } });
   if (protocoles.length === 0) {
@@ -36,9 +37,7 @@ export default async function ProtocolesConfigPage() {
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
       <div className="flex items-center gap-3 mt-2">
-        <Link href="/sanitaire" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
-          <ArrowLeft size={18} />
-        </Link>
+        <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex items-center gap-2 flex-1">
           <Settings size={20} className="text-gray-600" />
           <h2 className="text-xl font-bold text-gray-800">Protocoles vaccinaux</h2>

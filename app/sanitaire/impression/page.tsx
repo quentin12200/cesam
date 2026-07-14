@@ -1,6 +1,6 @@
+import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, addDays } from "date-fns";
 import { getVaccinProtocolSteps, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
@@ -68,7 +68,7 @@ export default async function SanitaireImpressionPage() {
   return (
     <>
       <div className="p-4 flex items-center justify-between print:hidden">
-        <Link href="/sanitaire" className="text-sm text-gray-600 hover:text-gray-800">← Retour sanitaire</Link>
+        <BackButton label="Retour" className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800" />
       </div>
 
       <div className="px-4 pb-8 max-w-5xl mx-auto">

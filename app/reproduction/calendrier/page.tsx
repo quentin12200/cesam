@@ -1,6 +1,6 @@
+import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { differenceInDays } from "date-fns";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
 import { GestationCalendarTable } from "@/app/components/GestationCalendarTable";
@@ -31,7 +31,7 @@ export default async function CalendrierGestationPage() {
         {/* Navbar */}
         <div className="bg-green-700 text-white px-6 py-4 no-print">
           <div className="flex items-center gap-3">
-            <Link href="/velage" className="text-green-200 hover:text-white text-sm">← Retour</Link>
+            <BackButton label="Retour" className="inline-flex items-center gap-1.5 text-green-200 hover:text-white text-sm" />
             <span className="text-green-400">|</span>
             <h1 className="font-bold text-lg flex-1">Calendrier de gestation</h1>
           </div>
