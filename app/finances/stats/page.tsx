@@ -35,6 +35,13 @@ export interface SortieDetail {
   prixPrevuHT: number | null;
   notes: string | null;
   causeMortalite: string | null;
+  categorieSortie: string | null;
+  sexeSortie: string | null;
+  modeVente: string | null;
+  poidsVifVente: number | null;
+  prixKgVif: number | null;
+  poidsCarcasse: number | null;
+  prixKgCarcasse: number | null;
   isVeau: boolean;
   animal: { nutrav: string; nobovi: string | null; sexbov: string };
 }
@@ -237,6 +244,13 @@ async function getStatsPluri(): Promise<{ stats: AnneeStats[]; sortiesParAnnee: 
       prixPrevuHT: s.prixPrevuHT,
       notes: s.notes,
       causeMortalite: s.causeMortalite,
+      categorieSortie: s.categorieSortie,
+      sexeSortie: s.sexeSortie,
+      modeVente: s.modeVente,
+      poidsVifVente: s.poidsVifVente,
+      prixKgVif: s.prixKgVif,
+      poidsCarcasse: s.poidsCarcasse,
+      prixKgCarcasse: s.prixKgCarcasse,
       isVeau: s.type === "ELEVAGE" && s.animal.velageVeau !== null,
       animal: { nutrav: s.animal.nutrav, nobovi: s.animal.nobovi, sexbov: s.animal.sexbov },
     }));
