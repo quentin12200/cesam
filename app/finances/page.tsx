@@ -59,8 +59,8 @@ async function getFinancesData(annee: number) {
   const ventesHistoriquesUniques = ventesHistoriques.filter(
     (v) => !v.nutrav || !clesSorties.has(`${v.nutrav}|${v.date.toISOString().slice(0, 10)}`)
   );
-  const veauxHistoriques = ventesHistoriquesUniques.filter((v) => estVeauHistorique(v.typeAnimal));
-  const vachesHistoriques = ventesHistoriquesUniques.filter((v) => estVacheHistorique(v.typeAnimal));
+  const veauxHistoriques = ventesHistoriquesUniques.filter((v) => v.typeVente !== "mort" && estVeauHistorique(v.typeAnimal));
+  const vachesHistoriques = ventesHistoriquesUniques.filter((v) => v.typeVente !== "mort" && estVacheHistorique(v.typeAnimal));
 
   const caVeaux = ventesElevage
     .filter((s) => s.animal.velageVeau !== null)
@@ -556,7 +556,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                              {vh.typeVente === "carcasse" ? "Boucherie" : "Vente vif"}
+                              {vh.typeVente === "mort" ? "Mort" : (vh.typeVente === "carcasse" ? "Boucherie" : "Vente vif")}
                             </span>
                             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                               historique
