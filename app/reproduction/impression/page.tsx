@@ -1,3 +1,4 @@
+import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
@@ -74,9 +75,7 @@ export default async function ImpressionVelagesPage({ searchParams }: PageProps)
     <>
       {/* Navigation et filtres — masqués à l'impression */}
       <div className="p-4 flex items-center justify-between print:hidden">
-        <Link href="/reproduction" className="flex items-center gap-2 text-gray-600 hover:text-gray-800 text-sm">
-          ← Retour reproduction
-        </Link>
+        <BackButton label="Retour" className="flex items-center gap-2 text-gray-600 hover:text-gray-800 text-sm" />
         <PrintButton />
       </div>
 
