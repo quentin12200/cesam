@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { TrendingUp, Package, Euro, Plus, BarChart2 } from "lucide-react";
+import EconomyYearSelector from "./EconomyYearSelector";
 import SortieForm from "./SortieForm";
 import AnnulerSortieButton from "./AnnulerSortieButton";
 import EditSortieDrawer from "./EditSortieDrawer";
@@ -238,13 +239,6 @@ export default async function FinancesPage({ searchParams }: PageProps) {
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mt-2">
         <h2 className="text-xl font-bold text-gray-800 flex-1">Finances</h2>
-        <Link
-          href="/finances/stats"
-          className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-sm font-medium px-3 py-2 rounded-lg shadow-sm hover:bg-gray-50"
-        >
-          <BarChart2 size={16} />
-          Ventes
-        </Link>
         {!showForm && (
           <Link
             href={`/finances?annee=${annee}&nouvelle=1`}
@@ -258,21 +252,19 @@ export default async function FinancesPage({ searchParams }: PageProps) {
 
       <FinancesTabs active="economie" />
 
-      {/* Sélecteur d'année */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {[ANNEE_COURANTE - 1, ANNEE_COURANTE, ANNEE_COURANTE + 1].map((y) => (
-          <Link
-            key={y}
-            href={`/finances?annee=${y}`}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
-              y === annee
-                ? "bg-green-700 text-white shadow"
-                : "bg-white text-gray-600 shadow-sm border border-gray-200"
-            }`}
-          >
-            {y}
-          </Link>
-        ))}
+      <div className="flex items-end gap-2">
+        <EconomyYearSelector
+          value={annee}
+          years={Array.from({ length: 12 }, (_, index) => ANNEE_COURANTE + 1 - index)}
+        />
+        <Link
+          href="/finances/stats"
+          className="min-h-11 flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium px-3 py-2 rounded-lg shadow-sm hover:bg-gray-50"
+        >
+          <BarChart2 size={17} />
+          <span className="hidden sm:inline">Analyse pluriannuelle</span>
+          <span className="sm:hidden">Analyse</span>
+        </Link>
       </div>
 
       <CoutAlimentation />
