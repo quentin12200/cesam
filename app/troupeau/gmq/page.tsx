@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 
+import BackButton from "@/app/components/BackButton";
 // Calcul du GMQ en g/j
 // GMQ = (poids dernière pesée - poids naissance) / age en jours à dernière pesée
 // Poids naissance = première pesée (la plus ancienne)
@@ -228,9 +229,7 @@ export default async function GmqPage() {
     <div className="max-w-3xl mx-auto p-4 pb-24 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3 mt-2">
-        <Link href="/troupeau" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
-          <ArrowLeft size={18} />
-        </Link>
+        <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex-1">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <TrendingUp size={20} className="text-green-600" />
