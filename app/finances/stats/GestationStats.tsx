@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { GestationRecord } from "./page";
+import type { GestationRecord } from "../performances/gestation/types";
 
 type FiltreAnnee = number | "TOUS";
 type FiltreSexe = "M" | "F" | "TOUS";
