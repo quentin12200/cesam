@@ -5,6 +5,7 @@ ALTER TABLE "Sortie" ADD COLUMN "poidsVifVente" REAL;
 ALTER TABLE "Sortie" ADD COLUMN "prixKgVif" REAL;
 ALTER TABLE "Sortie" ADD COLUMN "poidsCarcasse" REAL;
 ALTER TABLE "Sortie" ADD COLUMN "prixKgCarcasse" REAL;
+ALTER TABLE "VenteHistorique" ADD COLUMN "causeMortalite" TEXT;
 
 UPDATE "Sortie"
 SET
