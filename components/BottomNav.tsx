@@ -43,14 +43,14 @@ export default function BottomNav() {
               key={href}
               href={href}
               onClick={restore ? handleClick : undefined}
-              className={`flex flex-col items-center justify-center flex-1 py-2 gap-1 text-xs font-medium transition-colors ${
+              className={`relative flex flex-col items-center justify-center flex-1 min-h-[64px] py-2.5 gap-1.5 text-xs font-medium border-r last:border-r-0 border-gray-100 transition-colors ${
                 isActive
-                  ? "text-green-700 border-t-2 border-green-700"
-                  : "text-gray-500"
+                  ? "text-green-800 bg-green-50 border-t-[3px] border-green-700"
+                  : "text-gray-600 hover:bg-gray-50 active:bg-gray-100"
               }`}
             >
-              <Icon size={18} />
-              <span className="text-[10px] leading-tight">{label}</span>
+              <Icon size={22} />
+              <span className="text-[11px] font-semibold leading-tight">{label}</span>
             </Link>
           );
         })}
