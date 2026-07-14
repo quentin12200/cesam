@@ -461,62 +461,60 @@ export default async function FinancesPage({ searchParams }: PageProps) {
         const totalCount = items.length;
 
         return (
-          <div className="bg-white rounded-xl shadow p-4">
-            <h3 className="font-semibold text-gray-800 mb-3">
+          <div className="bg-white rounded-xl shadow p-3">
+            <h3 className="font-semibold text-gray-800 mb-2">
               Sorties {annee} ({totalCount})
             </h3>
             {totalCount === 0 ? (
               <p className="text-sm text-gray-400 text-center py-4">Aucune sortie enregistrée pour {annee}</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {items.map((item) => {
                   if (item.kind === "sortie") {
                     const sortie = item.data;
+                    const poidsAffiche = sortie.modeVente === "VIF"
+                      ? (sortie.poidsVifVente ?? sortie.poids)
+                      : (sortie.poidsCarcasse ?? sortie.poids);
+                    const prixAffiche = sortie.modeVente === "VIF"
+                      ? (sortie.prixKgVif ?? sortie.prixKilo)
+                      : (sortie.prixKgCarcasse ?? sortie.prixKilo);
+                    const totalAffiche = sortie.prixDefinitifHT ?? sortie.prixPrevuHT;
                     return (
-                      <div key={`s-${sortie.id}`} className="border border-gray-100 rounded-lg p-3">
+                      <div key={`s-${sortie.id}`} className="border border-gray-100 bg-white rounded-lg px-2.5 py-2">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
                             <Link
                               href={`/troupeau/${sortie.animal.nutrav}`}
                               className="bg-gray-700 text-white text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0"
                             >
                               {sortie.animal.nutrav}
                             </Link>
+                            <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full shrink-0">
+                              {sortie.sexeSortie ?? sortie.animal.sexbov}
+                            </span>
                             <span className="text-sm font-medium text-gray-700 truncate">
                               {sortie.animal.nobovi ?? "—"}
                             </span>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${typeBadge[sortie.type] ?? "bg-gray-100 text-gray-600"}`}>
-                              {typeLabel[sortie.type] ?? sortie.type}
-                            </span>
-                            {sortie.type === "MORT" && sortie.causeMortalite && (
-                              <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-                                {sortie.causeMortalite}
-                              </span>
-                            )}
-                          </div>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${typeBadge[sortie.type] ?? "bg-gray-100 text-gray-600"}`}>
+                            {typeLabel[sortie.type] ?? sortie.type}
+                          </span>
                         </div>
-                        <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-                          <span>{new Date(sortie.date).toLocaleDateString("fr-FR")}</span>
-                          <div className="flex items-center gap-3">
-                            {sortie.type === "BOUCHERIE" && sortie.poidsVif && (
-                              <span>{formatPoids(sortie.poidsVif)} vif{sortie.rendementCarcasse ? ` → ${sortie.rendementCarcasse}%` : ""}</span>
-                            )}
-                            {sortie.poids && <span>{formatPoids(sortie.poids)}{sortie.type === "BOUCHERIE" ? " carc." : ""}</span>}
-                            {sortie.prixKilo && <span>{sortie.prixKilo.toFixed(2)} €/kg</span>}
-                            {(sortie.prixDefinitifHT ?? sortie.prixPrevuHT) && (
-                              <span className="font-semibold text-green-700">
-                                {formatEuro(sortie.prixDefinitifHT ?? sortie.prixPrevuHT)}
-                              </span>
-                            )}
-                          </div>
+                        <div className="mt-1 text-xs text-gray-400 truncate" title={[sortie.acheteur, sortie.causeMortalite, sortie.notes].filter(Boolean).join(" · ")}>
+                          {new Date(sortie.date).toLocaleDateString("fr-FR")}
+                          {sortie.acheteur && <> · {sortie.acheteur}</>}
+                          {sortie.causeMortalite && <> · {sortie.causeMortalite}</>}
+                          {sortie.notes && <> · {sortie.notes}</>}
                         </div>
-                        {sortie.acheteur && (
-                          <div className="text-xs text-gray-400 mt-1">Acheteur : {sortie.acheteur}</div>
-                        )}
-                        <div className="flex justify-between items-center mt-1">
-                          <EditSortieDrawer sortie={{
+                        <div className="flex items-center justify-between gap-2 mt-1">
+                          <span className="text-xs text-gray-600 truncate">
+                            {poidsAffiche != null && `${poidsAffiche.toLocaleString("fr-FR")} kg`}
+                            {poidsAffiche != null && prixAffiche != null && " × "}
+                            {prixAffiche != null && `${prixAffiche.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/kg`}
+                          </span>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            {totalAffiche != null && <span className="font-bold text-sm text-green-700 mr-1">{formatEuro(totalAffiche)}</span>}
+                            <EditSortieDrawer sortie={{
                             id: sortie.id,
                             date: sortie.date.toISOString(),
                             type: sortie.type,
@@ -538,17 +536,21 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                             prixKgCarcasse: sortie.prixKgCarcasse,
                             animalId: sortie.animalId,
                             animal: { nutrav: sortie.animal.nutrav, nobovi: sortie.animal.nobovi, sexbov: sortie.animal.sexbov, categorie: sortie.animal.categorie },
-                          }} />
-                          <AnnulerSortieButton sortieId={sortie.id} nutrav={sortie.animal.nutrav} />
+                            }} />
+                            <AnnulerSortieButton sortieId={sortie.id} nutrav={sortie.animal.nutrav} />
+                          </div>
                         </div>
                       </div>
                     );
                   } else {
                     const vh = item.data;
+                    const venteCarcasse = vh.typeVente.toLowerCase() === "carcasse";
+                    const poidsAffiche = venteCarcasse ? vh.poidsCarc : vh.poidsVif;
+                    const prixAffiche = venteCarcasse ? vh.prixKgCarc : vh.prixKgVif;
                     return (
-                      <div key={`h-${vh.id}`} className="border border-amber-100 bg-amber-50/40 rounded-lg p-3">
+                      <div key={`h-${vh.id}`} className="border border-gray-100 bg-white rounded-lg px-2.5 py-2">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
                             {vh.nutrav ? (
                               <span className="bg-gray-500 text-white text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0">
                                 {vh.nutrav}
@@ -558,39 +560,31 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                                 —
                               </span>
                             )}
+                            <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full shrink-0">
+                              {vh.sexe ?? "—"}
+                            </span>
                             <span className="text-sm font-medium text-gray-700 truncate">
                               {vh.typeAnimal}
                             </span>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                              {vh.typeVente === "mort" ? "Mort" : (vh.typeVente === "carcasse" ? "Boucherie" : "Vente vif")}
-                            </span>
-                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                              historique
-                            </span>
-                          </div>
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">
+                            {vh.typeVente === "mort" ? "Mort" : (venteCarcasse ? "Boucherie" : "Vente vif")}
+                          </span>
                         </div>
-                        <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-                          <span>{new Date(vh.date).toLocaleDateString("fr-FR")}</span>
-                          <div className="flex items-center gap-3">
-                            {vh.poidsVif && <span>{formatPoids(vh.poidsVif)} vif</span>}
-                            {vh.poidsCarc && <span>{formatPoids(vh.poidsCarc)} carc.</span>}
-                            {vh.prixKgCarc && <span>{vh.prixKgCarc.toFixed(2)} €/kg carc.</span>}
-                            {vh.prixKgVif && !vh.prixKgCarc && <span>{vh.prixKgVif.toFixed(2)} €/kg vif</span>}
-                            {vh.total && (
-                              <span className="font-semibold text-green-700">
-                                {formatEuro(vh.total)}
-                              </span>
-                            )}
-                          </div>
+                        <div className="mt-1 text-xs text-gray-400 truncate" title={[vh.acheteur, "Historique Excel", vh.notes].filter(Boolean).join(" · ")}>
+                          {new Date(vh.date).toLocaleDateString("fr-FR")}
+                          {vh.acheteur && <> · {vh.acheteur}</>}
+                          <> · Historique Excel</>
+                          {vh.notes && <> · {vh.notes}</>}
                         </div>
-                        {vh.acheteur && (
-                          <div className="text-xs text-gray-400 mt-1">Acheteur : {vh.acheteur}</div>
-                        )}
-                        {vh.notes && (
-                          <div className="text-xs text-gray-400 mt-0.5 italic">{vh.notes}</div>
-                        )}
+                        <div className="flex items-center justify-between gap-2 mt-1">
+                          <span className="text-xs text-gray-600 truncate">
+                            {poidsAffiche != null && `${poidsAffiche.toLocaleString("fr-FR")} kg`}
+                            {poidsAffiche != null && prixAffiche != null && " × "}
+                            {prixAffiche != null && `${prixAffiche.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/kg`}
+                          </span>
+                          {vh.total != null && <span className="font-bold text-sm text-green-700 shrink-0">{formatEuro(vh.total)}</span>}
+                        </div>
                       </div>
                     );
                   }
