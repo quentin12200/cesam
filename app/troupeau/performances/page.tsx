@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import Link from "next/link";
-import { ArrowLeft, BarChart2 } from "lucide-react";
+import { BarChart2 } from "lucide-react";
 import PerformancesClient from "./PerformancesClient";
 
+import BackButton from "@/app/components/BackButton";
 export interface VachePerf {
   vacheId: string;
   nutrav: string;
@@ -203,12 +203,7 @@ export default async function PerformancesPage() {
   return (
     <div className="max-w-4xl mx-auto p-4 pb-24 space-y-6">
       <div className="flex items-center gap-3 mt-2">
-        <Link
-          href="/troupeau"
-          className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
-        >
-          <ArrowLeft size={18} />
-        </Link>
+        <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex-1">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <BarChart2 size={20} className="text-indigo-600" />
