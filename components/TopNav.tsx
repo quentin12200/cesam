@@ -40,7 +40,7 @@ export default function TopNav() {
             key={href}
             href={href}
             onClick={restore ? handleClick : undefined}
-            className={`flex flex-col items-center justify-center flex-1 py-1.5 gap-0.5 transition-colors relative ${
+            className={`relative flex flex-col items-center justify-center flex-1 min-w-0 min-h-[58px] sm:min-h-[52px] py-2 sm:py-1.5 gap-1 border-r border-green-600/50 last:border-r-0 touch-manipulation transition-colors ${
               isActive
                 ? "text-green-700"
                 : "text-green-100 hover:text-white"
@@ -49,8 +49,8 @@ export default function TopNav() {
             {isActive && (
               <span className="absolute inset-x-1 inset-y-1 bg-white rounded-lg" />
             )}
-            <Icon size={16} className="relative z-10" />
-            <span className="text-[9px] font-semibold leading-tight relative z-10 tracking-wide">
+            <Icon size={21} className="relative z-10" />
+            <span className="text-[10px] font-bold leading-tight relative z-10">
               {label}
             </span>
           </Link>
