@@ -3,7 +3,7 @@
 import type { ButtonHTMLAttributes } from "react";
 import { ArrowLeft } from "lucide-react";
 
-interface BackButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface BackButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "type"> {
   label?: string;
   iconSize?: number;
 }
@@ -29,12 +29,12 @@ export default function BackButton({
 
   return (
     <button
+      {...props}
       type="button"
       onClick={handleBack}
       className={className}
-      aria-label={label ? undefined : "Retour à la page précédente"}
-      title="Retour à la page précédente"
-      {...props}
+      aria-label={props["aria-label"] ?? (label ? undefined : "Retour à la page précédente")}
+      title={props.title ?? "Retour à la page précédente"}
     >
       <ArrowLeft size={iconSize} />
       {label && <span>{label}</span>}
