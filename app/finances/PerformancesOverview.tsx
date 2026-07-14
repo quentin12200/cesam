@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart2, Scale, TrendingUp } from "lucide-react";
+import { Baby, Scale, TrendingUp } from "lucide-react";
 import FinancesTabs from "./FinancesTabs";
 
 export default function PerformancesOverview() {
@@ -31,13 +31,13 @@ export default function PerformancesOverview() {
               <p className="text-xs text-gray-500">IVV, GMQ de la descendance et score global</p>
             </div>
           </Link>
-          <Link href="/finances/stats" className="min-h-16 flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
-            <span className="h-10 w-10 flex items-center justify-center rounded-lg bg-gray-100 text-gray-700 shrink-0">
-              <BarChart2 size={20} />
+          <Link href="/finances/performances/gestation" className="min-h-16 flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
+            <span className="h-10 w-10 flex items-center justify-center rounded-lg bg-rose-50 text-rose-700 shrink-0">
+              <Baby size={20} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-gray-800">Statistiques de l&apos;élevage</p>
-              <p className="text-xs text-gray-500">Évolution annuelle et indicateurs globaux</p>
+              <p className="font-semibold text-gray-800">Gestation</p>
+              <p className="text-xs text-gray-500">Durées, sexe des veaux, mode de saillie et âge des mères</p>
             </div>
           </Link>
         </div>
