@@ -421,7 +421,7 @@ function EditVenteHisto({ vente, onClose, onSaved }: { vente: VenteHisto; onClos
   return (
     <SortieEditorModal
       title="Modifier la sortie"
-      animalLabel={`${vente.nutrav ?? "Numéro inconnu"} — Sans nom`}
+      animalLabel={`${vente.nutrav ?? "Numéro inconnu"} — ${vente.animalNom ?? "Sans nom"}`}
       initial={{
         date: new Date(vente.date).toISOString().slice(0, 10),
         type: vente.typeVente === "mort" ? "MORT" : (isCarcasse ? "BOUCHERIE" : "ELEVAGE"),
