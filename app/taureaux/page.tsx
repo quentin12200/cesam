@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
-import { ArrowLeft } from "lucide-react";
 import TaureauxClient from "./TaureauxClient";
 
 import BackButton from "@/app/components/BackButton";
