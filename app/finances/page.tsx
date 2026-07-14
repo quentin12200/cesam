@@ -202,7 +202,7 @@ async function getAnimauxActifs() {
 }
 
 interface PageProps {
-  searchParams: Promise<{ annee?: string; nouvelle?: string; onglet?: string }>;
+  searchParams: Promise<{ annee?: string; nouvelle?: string; onglet?: string; animal?: string }>;
 }
 
 const ANNEE_COURANTE = new Date().getFullYear();
@@ -277,7 +277,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
       <CoutAlimentation />
 
       {/* Formulaire nouvelle sortie */}
-      {showForm && <SortieForm animaux={animaux} annee={annee} />}
+      {showForm && <SortieForm animaux={animaux} annee={annee} initialAnimalId={sp.animal} />}
 
       {/* CA Total */}
       <div className="bg-gradient-to-br from-green-700 to-green-800 rounded-xl shadow p-4 text-white">
