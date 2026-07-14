@@ -45,7 +45,7 @@ export default function BottomNav() {
               onClick={restore ? handleClick : undefined}
               className={`relative flex flex-col items-center justify-center flex-1 min-h-[64px] py-2.5 gap-1.5 text-xs font-medium border-r last:border-r-0 border-gray-100 transition-colors ${
                 isActive
-                  ? "text-green-800 bg-green-50 border-t-[3px] border-green-700"
+                  ? "text-green-800 bg-green-50 border-t-[3px] border-t-green-700"
                   : "text-gray-600 hover:bg-gray-50 active:bg-gray-100"
               }`}
             >
