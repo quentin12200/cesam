@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { TrendingUp, TrendingDown, Minus, Sparkles, X, Loader2, Pencil, BarChart2, List } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Sparkles, X, Loader2, Pencil, BarChart2, List, ChevronDown } from "lucide-react";
 import type { AnneeStats, SortieDetail, VenteHisto } from "./page";
 import SortieEditorModal, { SortieEditorValues } from "../SortieEditorModal";
 
@@ -527,15 +527,14 @@ function SortieRow({ s, onEdit }: { s: SortieDetail; onEdit: (s: SortieDetail) =
   );
 }
 
-function VueDetail({ stats, sortiesParAnnee, ventesHisto, anneeActive }: {
+function VueDetail({ stats, sortiesParAnnee, ventesHisto, anneesSelectionnees }: {
   stats: AnneeStats[];
   sortiesParAnnee: Record<number, SortieDetail[]>;
   ventesHisto: VenteHisto[];
-  anneeActive: number;
+  anneesSelectionnees: number[];
 }) {
   const router = useRouter();
   const annees = stats.map((s) => s.annee).sort((a, b) => b - a);
-  const [filtreAnnee, setFiltreAnnee] = useState<number | "all">("all");
   const [filtreType, setFiltreType] = useState<string>("all");
   const [editSortie, setEditSortie] = useState<SortieDetail | null>(null);
   const [editVente, setEditVente] = useState<VenteHisto | null>(null);
@@ -545,7 +544,7 @@ function VueDetail({ stats, sortiesParAnnee, ventesHisto, anneeActive }: {
     (sortiesParAnnee[a] ?? []).map((s) => ({ ...s, anneeNum: a }))
   );
   const sortiesFiltrees = toutesLesSorties.filter((s) => {
-    if (filtreAnnee !== "all" && s.anneeNum !== filtreAnnee) return false;
+    if (!anneesSelectionnees.includes(s.anneeNum)) return false;
     if (filtreType !== "all") {
       if (filtreType === "veaux" && !s.isVeau) return false;
       if (filtreType === "vaches" && (s.type !== "BOUCHERIE" || s.isVeau)) return false;
@@ -555,7 +554,7 @@ function VueDetail({ stats, sortiesParAnnee, ventesHisto, anneeActive }: {
 
   // Ventes historiques
   const ventesFiltrees = ventesHisto.filter((v) => {
-    if (filtreAnnee !== "all" && v.annee !== filtreAnnee) return false;
+    if (!anneesSelectionnees.includes(v.annee)) return false;
     if (filtreType !== "all") {
       if (filtreType === "veaux" && v.typeAnimal !== "veaux") return false;
       if (filtreType === "vaches" && v.typeAnimal === "veaux") return false;
@@ -579,19 +578,7 @@ function VueDetail({ stats, sortiesParAnnee, ventesHisto, anneeActive }: {
     <div className="space-y-4">
       {/* Filtres */}
       <div className="bg-white rounded-xl shadow px-4 py-3 flex flex-wrap gap-3 items-center">
-        <div className="flex gap-1.5 flex-wrap">
-          <button onClick={() => setFiltreAnnee("all")}
-            className={`px-3 py-1 rounded-full text-sm font-semibold transition-colors ${filtreAnnee === "all" ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
-            Toutes
-          </button>
-          {annees.map((a) => (
-            <button key={a} onClick={() => setFiltreAnnee(a)}
-              className={`px-3 py-1 rounded-full text-sm font-semibold transition-colors ${filtreAnnee === a ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
-              {a}
-            </button>
-          ))}
-        </div>
-        <div className="h-5 w-px bg-gray-200 hidden sm:block" />
+
         <div className="flex gap-1.5 flex-wrap">
           {[{ key: "all", label: "Tous" }, { key: "veaux", label: "Veaux" }, { key: "vaches", label: "Vaches" }].map(({ key, label }) => (
             <button key={key} onClick={() => setFiltreType(key)}
@@ -677,12 +664,66 @@ function VueDetail({ stats, sortiesParAnnee, ventesHisto, anneeActive }: {
   );
 }
 
+function AnneesMultiSelect({ years, selected, onChange }: {
+  years: number[];
+  selected: number[];
+  onChange: (years: number[]) => void;
+}) {
+  function toggle(year: number) {
+    onChange(
+      selected.includes(year)
+        ? selected.filter((item) => item !== year)
+        : [...selected, year].sort((a, b) => b - a)
+    );
+  }
+
+  return (
+    <details className="relative">
+      <summary className="min-h-11 cursor-pointer list-none bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2 flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <span className="block text-xs font-medium text-gray-500">Années à comparer</span>
+          <span className="block text-sm font-semibold text-gray-800 truncate">
+            {selected.length === 0
+              ? "Aucune année"
+              : selected.length === years.length
+                ? "Toutes les années"
+                : selected.slice().sort((a, b) => a - b).join(", ")}
+          </span>
+        </div>
+        <ChevronDown size={18} className="text-gray-500 shrink-0" />
+      </summary>
+      <div className="absolute left-0 right-0 sm:right-auto z-30 mt-1 w-full sm:w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+        <div className="flex gap-2 pb-2 mb-2 border-b border-gray-100">
+          <button type="button" onClick={() => onChange([...years])} className="text-xs font-semibold text-green-700 hover:underline">
+            Tout sélectionner
+          </button>
+          <button type="button" onClick={() => onChange([])} className="text-xs font-semibold text-gray-500 hover:underline">
+            Tout désélectionner
+          </button>
+        </div>
+        <div className="max-h-56 overflow-y-auto space-y-1">
+          {years.map((year) => (
+            <label key={year} className="min-h-10 flex items-center gap-3 px-2 rounded-md hover:bg-gray-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.includes(year)}
+                onChange={() => toggle(year)}
+                className="h-4 w-4 accent-green-700"
+              />
+              <span className="text-sm font-medium text-gray-700">{year}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </details>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function StatsClient({ stats, sortiesParAnnee, anneeActive, ventesHisto }: {
+export default function StatsClient({ stats, sortiesParAnnee, ventesHisto }: {
   stats: AnneeStats[];
   sortiesParAnnee: Record<number, SortieDetail[]>;
-  anneeActive: number;
   ventesHisto: VenteHisto[];
 }) {
   const [vue, setVue] = useState<"graphiques" | "detail">("graphiques");
@@ -691,12 +732,38 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive, vente
   const [anneeKpi, setAnneeKpi] = useState<number>(
     stats.find((s) => s.annee === anneeMax)?.annee ?? anneesDispos[0] ?? anneeMax
   );
-  // Filtres graphiques
-  const [filtreAnneesGraph, setFiltreAnneesGraph] = useState<number[]>([]); // vide = toutes
+  const anneesKey = anneesDispos.join(",");
+  const [filtreAnneesGraph, setFiltreAnneesGraph] = useState<number[]>(anneesDispos);
+  const [selectionChargee, setSelectionChargee] = useState(false);
   const [filtreSexe, setFiltreSexe] = useState<"all" | "M" | "F">("all");
 
+  useEffect(() => {
+    const sauvegarde = window.localStorage.getItem("cesam-finances-annees-comparees");
+    if (sauvegarde !== null) {
+      try {
+        const annees = (JSON.parse(sauvegarde) as number[]).filter((annee) => anneesDispos.includes(annee));
+        setFiltreAnneesGraph(annees);
+      } catch {
+        setFiltreAnneesGraph(anneesDispos);
+      }
+    }
+    setSelectionChargee(true);
+  }, [anneesKey]);
+
+  useEffect(() => {
+    if (selectionChargee) {
+      window.localStorage.setItem("cesam-finances-annees-comparees", JSON.stringify(filtreAnneesGraph));
+    }
+  }, [filtreAnneesGraph, selectionChargee]);
+
+  useEffect(() => {
+    if (filtreAnneesGraph.length > 0 && !filtreAnneesGraph.includes(anneeKpi)) {
+      setAnneeKpi(filtreAnneesGraph[0]);
+    }
+  }, [filtreAnneesGraph, anneeKpi]);
+
   const statsFiltrees = stats.filter((s) =>
-    filtreAnneesGraph.length === 0 || filtreAnneesGraph.includes(s.annee)
+    filtreAnneesGraph.includes(s.annee)
   ).map((s) => {
     if (filtreSexe === "all") return s;
     // Pour les veaux : filtrer par sexe (M ou F)
@@ -712,14 +779,10 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive, vente
   });
 
   const curr = statsFiltrees.find((s) => s.annee === anneeKpi) ?? statsFiltrees[statsFiltrees.length - 1];
-  const prev = statsFiltrees.find((s) => s.annee === (curr?.annee ?? 0) - 1);
+  const currIndex = curr ? statsFiltrees.findIndex((item) => item.annee === curr.annee) : -1;
+  const prev = currIndex > 0 ? statsFiltrees[currIndex - 1] : undefined;
   const labels = statsFiltrees.map((s) => String(s.annee));
 
-  function toggleAnneeGraph(a: number) {
-    setFiltreAnneesGraph((prev) =>
-      prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -741,26 +804,16 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive, vente
         <AnalyseIA stats={stats} />
       </div>
 
+      <AnneesMultiSelect
+        years={anneesDispos}
+        selected={filtreAnneesGraph}
+        onChange={setFiltreAnneesGraph}
+      />
+
       {vue === "graphiques" && (
         <div className="space-y-5">
           {/* Filtres graphiques */}
           <div className="bg-white rounded-xl shadow px-4 py-3 flex flex-wrap gap-3 items-center">
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Années</span>
-              <div className="flex gap-1.5 flex-wrap">
-                <button onClick={() => setFiltreAnneesGraph([])}
-                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filtreAnneesGraph.length === 0 ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
-                  Toutes
-                </button>
-                {anneesDispos.slice().reverse().map((a) => (
-                  <button key={a} onClick={() => toggleAnneeGraph(a)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filtreAnneesGraph.includes(a) ? "bg-green-700 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
-                    {a}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="h-8 w-px bg-gray-200 hidden sm:block" />
             <div className="flex flex-col gap-1">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Sexe veaux</span>
               <div className="flex gap-1.5">
@@ -774,6 +827,12 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive, vente
             </div>
           </div>
 
+          {statsFiltrees.length === 0 ? (
+            <div className="bg-white rounded-xl shadow p-8 text-center text-sm text-gray-500">
+              Sélectionnez au moins une année pour afficher l&apos;analyse.
+            </div>
+          ) : (
+            <>
           {/* Sélecteur d'année + KPIs */}
           {curr && (
             <div>
@@ -886,11 +945,13 @@ export default function StatsClient({ stats, sortiesParAnnee, anneeActive, vente
               </table>
             </div>
           </div>
+            </>
+          )}
         </div>
       )}
 
       {vue === "detail" && (
-        <VueDetail stats={stats} sortiesParAnnee={sortiesParAnnee} ventesHisto={ventesHisto} anneeActive={anneeActive} />
+        <VueDetail stats={stats} sortiesParAnnee={sortiesParAnnee} ventesHisto={ventesHisto} anneesSelectionnees={filtreAnneesGraph} />
       )}
     </div>
   );
