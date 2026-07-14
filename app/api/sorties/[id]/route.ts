@@ -31,6 +31,12 @@ export async function PATCH(
       }
     }
 
+    const poidsFinal = poids !== undefined ? (poids !== null ? parseFloat(poids) : null) : sortie.poids;
+    const prixKiloFinal = prixKilo !== undefined ? (prixKilo !== null ? parseFloat(prixKilo) : null) : sortie.prixKilo;
+    const prixPrevuHT = poidsFinal && prixKiloFinal
+      ? Math.round(poidsFinal * prixKiloFinal * 100) / 100
+      : null;
+
     const updated = await prisma.sortie.update({
       where: { id },
       data: {
@@ -41,6 +47,7 @@ export async function PATCH(
         ...(poidsVif !== undefined && { poidsVif: poidsVif !== null ? parseFloat(poidsVif) : null }),
         ...(rendementCarcasse !== undefined && { rendementCarcasse: rendementCarcasse !== null ? parseFloat(rendementCarcasse) : null }),
         ...(prixKilo !== undefined && { prixKilo: prixKilo !== null ? parseFloat(prixKilo) : null }),
+        ...((poids !== undefined || prixKilo !== undefined) && { prixPrevuHT }),
         ...(prixDefinitifHT !== undefined && { prixDefinitifHT: prixDefinitifHT !== null ? parseFloat(prixDefinitifHT) : null }),
         ...(notes !== undefined && { notes: notes || null }),
         ...(causeMortalite !== undefined && { causeMortalite: causeMortalite || null }),

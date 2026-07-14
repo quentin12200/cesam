@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { TrendingUp, TrendingDown, Minus, Sparkles, X, Loader2, Pencil, BarChart2, List, Baby } from "lucide-react";
 import type { AnneeStats, SortieDetail, VenteHisto, GestationRecord } from "./page";
 import GestationStats from "./GestationStats";
-import { CAUSES_MORTALITE, CAUSES_MORTALITE_LABELS } from "@/lib/utils";
+import SortieEditorModal, { SortieEditorValues } from "../SortieEditorModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -343,362 +343,97 @@ function AnalyseIA({ stats }: { stats: AnneeStats[] }) {
 // ── Edit sortie drawer ────────────────────────────────────────────────────────
 
 function EditDrawer({ sortie, onClose, onSaved }: { sortie: SortieDetail; onClose: () => void; onSaved: () => void }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [date, setDate] = useState(new Date(sortie.date).toISOString().slice(0, 10));
-  const [type, setType] = useState(sortie.type);
-  const [acheteur, setAcheteur] = useState(sortie.acheteur ?? "");
-  const [poids, setPoids] = useState(sortie.poids?.toString() ?? "");
-  const [poidsVif, setPoidsVif] = useState(sortie.poidsVif?.toString() ?? "");
-  const [rendement, setRendement] = useState(sortie.rendementCarcasse?.toString() ?? "55");
-  const [prixKilo, setPrixKilo] = useState(sortie.prixKilo?.toString() ?? "");
-  const [prixHT, setPrixHT] = useState(sortie.prixDefinitifHT?.toString() ?? "");
-  const [notes, setNotes] = useState(sortie.notes ?? "");
-  const [causeMortalite, setCauseMortalite] = useState(sortie.causeMortalite ?? "");
-
-  const isBoucherie = type === "BOUCHERIE";
-  const hasFinancials = type === "ELEVAGE" || type === "BOUCHERIE";
-  const poidsCarcasseCalc = isBoucherie && poidsVif && rendement ? (parseFloat(poidsVif) * parseFloat(rendement) / 100).toFixed(1) : null;
-  const poidsEff = isBoucherie ? (poids || poidsCarcasseCalc || "") : poids;
-  const prixCalc = prixKilo && poidsEff ? (parseFloat(prixKilo) * parseFloat(poidsEff)).toFixed(2) : null;
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true); setError(null);
-    try {
-      const res = await fetch(`/api/sorties/${sortie.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date, type, acheteur: acheteur || null,
-          poids: poids ? parseFloat(poids) : (poidsCarcasseCalc ? parseFloat(poidsCarcasseCalc) : null),
-          poidsVif: isBoucherie && poidsVif ? parseFloat(poidsVif) : null,
-          rendementCarcasse: isBoucherie && rendement ? parseFloat(rendement) : null,
-          prixKilo: prixKilo ? parseFloat(prixKilo) : null,
-          prixDefinitifHT: prixHT ? parseFloat(prixHT) : null,
-          notes: notes || null,
-          causeMortalite: type === "MORT" ? causeMortalite || null : null,
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Erreur");
-      onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
-    } finally {
-      setLoading(false);
-    }
+  async function enregistrer(values: SortieEditorValues) {
+    const res = await fetch(`/api/sorties/${sortie.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...values, poidsVif: null, rendementCarcasse: null }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error ?? "Erreur");
+    onSaved();
+    onClose();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-100 flex items-center justify-between px-4 py-3 z-10">
-          <div>
-            <h3 className="font-semibold text-gray-800">Modifier la sortie</h3>
-            <p className="text-xs text-gray-500">{sortie.animal.nutrav} — {sortie.animal.nobovi ?? "Sans nom"}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} className="text-gray-500" /></button>
-        </div>
-        <form onSubmit={submit} className="p-4 space-y-4">
-          {error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[["ELEVAGE","Vente vif"],["BOUCHERIE","Boucherie"],["ENGRAISSEMENT","Engraissement"],["MORT","Mort"]].map(([v,l]) => (
-                <button key={v} type="button" onClick={() => setType(v)}
-                  className={`p-2 rounded-lg border text-sm font-medium transition-all ${type === v ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 text-gray-600"}`}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-          </div>
-
-          {type === "MORT" && (
-            <div>
-              <label className="block text-sm font-medium text-red-700 mb-1">Cause de mortalité</label>
-              <div className="grid grid-cols-2 gap-2">
-                {CAUSES_MORTALITE.map((c) => (
-                  <button key={c} type="button" onClick={() => setCauseMortalite(c)}
-                    className={`p-2 rounded-lg border text-sm font-medium transition-all ${causeMortalite === c ? "border-red-600 bg-red-50 text-red-800" : "border-gray-200 text-gray-600"}`}>
-                    {CAUSES_MORTALITE_LABELS[c] ?? c}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {hasFinancials && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Acheteur</label>
-                <input type="text" value={acheteur} onChange={(e) => setAcheteur(e.target.value)}
-                  placeholder="Nom du maquignon / abattoir…"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-              </div>
-
-              {isBoucherie && (
-                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-3">
-                  <p className="text-xs font-medium text-orange-700">Rendement carcasse</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Poids vif (kg)</label>
-                      <input type="number" step="0.5" min="0" value={poidsVif} onChange={(e) => setPoidsVif(e.target.value)}
-                        placeholder="ex: 700"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Rendement (%)</label>
-                      <input type="number" step="0.5" min="0" max="100" value={rendement} onChange={(e) => setRendement(e.target.value)}
-                        placeholder="ex: 55"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-                    </div>
-                  </div>
-                  {poidsCarcasseCalc && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-600">Carcasse calculée :</span>
-                      <span className="font-bold text-orange-700">{poidsCarcasseCalc} kg</span>
-                      <button type="button" onClick={() => setPoids(poidsCarcasseCalc)} className="text-xs text-orange-600 underline">Utiliser</button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{isBoucherie ? "Poids carcasse (kg)" : "Poids vif (kg)"}</label>
-                  <input type="number" step="0.1" min="0" value={poids} onChange={(e) => setPoids(e.target.value)}
-                    placeholder={poidsCarcasseCalc ?? "ex: 280"}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Prix / kg (€)</label>
-                  <input type="number" step="0.01" min="0" value={prixKilo} onChange={(e) => setPrixKilo(e.target.value)}
-                    placeholder="ex: 3.20"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-              </div>
-
-              {prixCalc && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
-                  <span className="text-gray-600">Prix calculé : </span>
-                  <span className="font-bold text-green-700 text-base">{parseFloat(prixCalc).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prix définitif HT (€)</label>
-                <input type="number" step="0.01" min="0" value={prixHT} onChange={(e) => setPrixHT(e.target.value)}
-                  placeholder={prixCalc ?? "ex: 850.00"}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-              </div>
-            </>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Informations…"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
-          </div>
-
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium">Annuler</button>
-            <button type="submit" disabled={loading} className="flex-1 py-2.5 bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-              {loading ? "Enregistrement…" : "Enregistrer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <SortieEditorModal
+      title="Modifier la sortie"
+      animalLabel={`${sortie.animal.nutrav} — ${sortie.animal.nobovi ?? "Sans nom"}`}
+      initial={{
+        date: new Date(sortie.date).toISOString().slice(0, 10),
+        type: sortie.type,
+        acheteur: sortie.acheteur,
+        poids: sortie.poids,
+        prixKilo: sortie.prixKilo,
+        prixDefinitifHT: sortie.prixDefinitifHT,
+        notes: sortie.notes,
+        causeMortalite: sortie.causeMortalite,
+      }}
+      onClose={onClose}
+      onSubmit={enregistrer}
+    />
   );
 }
 
 // ── Edit vente historique ─────────────────────────────────────────────────────
 
 function EditVenteHisto({ vente, onClose, onSaved }: { vente: VenteHisto; onClose: () => void; onSaved: () => void }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [date, setDate] = useState(new Date(vente.date).toISOString().slice(0, 10));
-  const [typeAnimal, setTypeAnimal] = useState(vente.typeAnimal);
-  const [typeVente, setTypeVente] = useState(vente.typeVente);
-  const [nutrav, setNutrav] = useState(vente.nutrav ?? "");
-  const [sexe, setSexe] = useState(vente.sexe ?? "");
-  const [poidsVif, setPoidsVif] = useState(vente.poidsVif?.toString() ?? "");
-  const [prixKgVif, setPrixKgVif] = useState(vente.prixKgVif?.toString() ?? "");
-  const [poidsCarc, setPoidsCarc] = useState(vente.poidsCarc?.toString() ?? "");
-  const [prixKgCarc, setPrixKgCarc] = useState(vente.prixKgCarc?.toString() ?? "");
-  const [acheteur, setAcheteur] = useState(vente.acheteur ?? "");
-  const [total, setTotal] = useState(vente.total?.toString() ?? "");
-  const [notes, setNotes] = useState(vente.notes ?? "");
+  const isCarcasse = vente.typeVente === "carcasse";
+  const poidsInitial = isCarcasse ? vente.poidsCarc : vente.poidsVif;
+  const prixInitial = isCarcasse ? vente.prixKgCarc : vente.prixKgVif;
+  const totalEstCalcule = poidsInitial != null && prixInitial != null;
 
-  const isVif = typeVente === "vif";
-  const poidsSelectionne = isVif ? poidsVif : poidsCarc;
-  const prixKgSelectionne = isVif ? prixKgVif : prixKgCarc;
-  const montantCalcule = poidsSelectionne && prixKgSelectionne
-    ? Math.round(parseFloat(poidsSelectionne) * parseFloat(prixKgSelectionne) * 100) / 100
-    : null;
-  const montantTotal = montantCalcule ?? (total ? Math.round(parseFloat(total) * 100) / 100 : null);
-  const montantFormate = montantTotal?.toLocaleString("fr-FR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true); setError(null);
-    try {
-      const res = await fetch(`/api/ventes-historiques/${vente.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date, typeAnimal, typeVente, nutrav: nutrav || null, sexe: sexe || null,
-          poidsVif: isVif && poidsVif ? parseFloat(poidsVif) : null,
-          prixKgVif: isVif && prixKgVif ? parseFloat(prixKgVif) : null,
-          poidsCarc: !isVif && poidsCarc ? parseFloat(poidsCarc) : null,
-          prixKgCarc: !isVif && prixKgCarc ? parseFloat(prixKgCarc) : null,
-          acheteur: acheteur || null,
-          total: montantTotal,
-          notes: notes || null,
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Erreur");
-      onSaved(); onClose();
-    } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
-    finally { setLoading(false); }
+  async function enregistrer(values: SortieEditorValues) {
+    const venteVif = values.type === "ELEVAGE";
+    const montantCalcule = values.poids != null && values.prixKilo != null
+      ? Math.round(values.poids * values.prixKilo * 100) / 100
+      : null;
+    const res = await fetch(`/api/ventes-historiques/${vente.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: values.date,
+        typeAnimal: vente.typeAnimal,
+        typeVente: values.type === "MORT" ? "mort" : (venteVif ? "vif" : "carcasse"),
+        nutrav: vente.nutrav,
+        sexe: vente.sexe,
+        poidsVif: venteVif ? values.poids : null,
+        prixKgVif: venteVif ? values.prixKilo : null,
+        poidsCarc: values.type === "BOUCHERIE" ? values.poids : null,
+        prixKgCarc: values.type === "BOUCHERIE" ? values.prixKilo : null,
+        acheteur: values.acheteur,
+        total: values.type === "MORT" ? null : (values.prixDefinitifHT ?? montantCalcule),
+        notes: values.notes,
+      }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error ?? "Erreur");
+    onSaved();
+    onClose();
   }
 
   async function supprimer() {
-    if (!confirm("Supprimer cette vente ?")) return;
-    setLoading(true);
-    try {
-      await fetch(`/api/ventes-historiques/${vente.id}`, { method: "DELETE" });
-      onSaved(); onClose();
-    } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
-    finally { setLoading(false); }
+    const res = await fetch(`/api/ventes-historiques/${vente.id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("La suppression a échoué");
+    onSaved();
+    onClose();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-          <span className="font-semibold text-gray-800 text-sm">Modifier la vente — {vente.nutrav ?? "?"} ({vente.annee})</span>
-          <button onClick={onClose}><X size={18} className="text-gray-400" /></button>
-        </div>
-        <form onSubmit={submit} className="p-4 space-y-3">
-          {error && <p className="text-red-600 text-sm bg-red-50 rounded-lg p-2">{error}</p>}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">N° animal</label>
-              <input value={nutrav} onChange={(e) => setNutrav(e.target.value)} placeholder="Ex: 9284"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Type animal</label>
-              <select value={typeAnimal} onChange={(e) => setTypeAnimal(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option value="veaux">Veaux</option>
-                <option value="vaches">Vaches</option>
-                <option value="taureau">Taureau</option>
-                <option value="génisse">Génisse</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Type vente</label>
-              <select value={typeVente} onChange={(e) => { setTypeVente(e.target.value); setTotal(""); }}
-                className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option value="vif">Vif</option>
-                <option value="carcasse">Carcasse</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Sexe</label>
-              <select value={sexe} onChange={(e) => setSexe(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option value="">—</option>
-                <option value="M">M</option>
-                <option value="F">F</option>
-              </select>
-            </div>
-          </div>
-          {isVif ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Poids vif (kg)</label>
-                <input type="number" step="0.5" value={poidsVif} onChange={(e) => setPoidsVif(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Prix €/kg vif</label>
-                <input type="number" step="0.01" value={prixKgVif} onChange={(e) => setPrixKgVif(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Poids carcasse (kg)</label>
-                <input type="number" step="0.1" value={poidsCarc} onChange={(e) => setPoidsCarc(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Prix €/kg carcasse</label>
-                <input type="number" step="0.01" value={prixKgCarc} onChange={(e) => setPrixKgCarc(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-              </div>
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Acheteur</label>
-              <input value={acheteur} onChange={(e) => setAcheteur(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Total HT</label>
-              <input type="number" step="0.01"
-                value={montantCalcule != null ? montantCalcule.toFixed(2) : total}
-                onChange={(e) => setTotal(e.target.value)}
-                readOnly={montantCalcule != null}
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${montantCalcule != null ? "bg-gray-50 text-gray-600" : ""}`} />
-              {montantFormate && (
-                <p className="mt-1 text-sm font-semibold text-green-700">{montantFormate} € HT</p>
-              )}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
-            <input value={notes} onChange={(e) => setNotes(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-          </div>
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={supprimer} disabled={loading}
-              className="px-3 py-2.5 border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50">
-              Supprimer
-            </button>
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium">Annuler</button>
-            <button type="submit" disabled={loading} className="flex-1 py-2.5 bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-              {loading ? "Enregistrement…" : "Enregistrer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <SortieEditorModal
+      title="Modifier la sortie"
+      animalLabel={`${vente.nutrav ?? "Numéro inconnu"} — ${vente.animalNom ?? "Sans nom"}`}
+      initial={{
+        date: new Date(vente.date).toISOString().slice(0, 10),
+        type: vente.typeVente === "mort" ? "MORT" : (isCarcasse ? "BOUCHERIE" : "ELEVAGE"),
+        acheteur: vente.acheteur,
+        poids: poidsInitial,
+        prixKilo: prixInitial,
+        prixDefinitifHT: totalEstCalcule ? null : vente.total,
+        notes: vente.notes,
+      }}
+      onClose={onClose}
+      onSubmit={enregistrer}
+      onDelete={supprimer}
+    />
   );
 }
 

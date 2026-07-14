@@ -59,8 +59,9 @@ async function getFinancesData(annee: number) {
   const ventesHistoriquesUniques = ventesHistoriques.filter(
     (v) => !v.nutrav || !clesSorties.has(`${v.nutrav}|${v.date.toISOString().slice(0, 10)}`)
   );
-  const veauxHistoriques = ventesHistoriquesUniques.filter((v) => estVeauHistorique(v.typeAnimal));
-  const vachesHistoriques = ventesHistoriquesUniques.filter((v) => estVacheHistorique(v.typeAnimal));
+  const veauxHistoriques = ventesHistoriquesUniques.filter((v) => v.typeVente !== "mort" && estVeauHistorique(v.typeAnimal));
+  const vachesHistoriques = ventesHistoriquesUniques.filter((v) => v.typeVente !== "mort" && estVacheHistorique(v.typeAnimal));
+  const ventesHistoriquesFinancieres = ventesHistoriquesUniques.filter((v) => v.typeVente !== "mort");
 
   const caVeaux = ventesElevage
     .filter((s) => s.animal.velageVeau !== null)
@@ -94,7 +95,7 @@ async function getFinancesData(annee: number) {
   const MOIS_COURTS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
   const monthlyCA = MOIS_COURTS.map((label, i) => {
     const monthSorties = sorties.filter((s) => new Date(s.date).getMonth() === i);
-    const monthHistoriques = ventesHistoriquesUniques.filter((v) => new Date(v.date).getMonth() === i);
+    const monthHistoriques = ventesHistoriquesFinancieres.filter((v) => new Date(v.date).getMonth() === i);
     return {
       label,
       ca: monthSorties.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0)
@@ -115,7 +116,7 @@ async function getFinancesData(annee: number) {
       });
     }
   }
-  for (const v of ventesHistoriquesUniques) {
+  for (const v of ventesHistoriquesFinancieres) {
     if (v.acheteur) {
       const existing = buyerMap.get(v.acheteur) ?? { count: 0, total: 0 };
       buyerMap.set(v.acheteur, {
@@ -202,7 +203,7 @@ async function getAnimauxActifs() {
 }
 
 interface PageProps {
-  searchParams: Promise<{ annee?: string; nouvelle?: string; onglet?: string }>;
+  searchParams: Promise<{ annee?: string; nouvelle?: string; onglet?: string; animal?: string }>;
 }
 
 const ANNEE_COURANTE = new Date().getFullYear();
@@ -277,7 +278,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
       <CoutAlimentation />
 
       {/* Formulaire nouvelle sortie */}
-      {showForm && <SortieForm animaux={animaux} annee={annee} />}
+      {showForm && <SortieForm animaux={animaux} annee={annee} initialAnimalId={sp.animal} />}
 
       {/* CA Total */}
       <div className="bg-gradient-to-br from-green-700 to-green-800 rounded-xl shadow p-4 text-white">
@@ -556,7 +557,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                              {vh.typeVente === "carcasse" ? "Boucherie" : "Vente vif"}
+                              {vh.typeVente === "mort" ? "Mort" : (vh.typeVente === "carcasse" ? "Boucherie" : "Vente vif")}
                             </span>
                             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                               historique
