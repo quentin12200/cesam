@@ -2,7 +2,6 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { differenceInDays } from "date-fns";
-import { ArrowLeft } from "lucide-react";
 import StatsClient from "./StatsClient";
 
 import BackButton from "@/app/components/BackButton";
