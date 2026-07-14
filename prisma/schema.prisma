@@ -365,6 +365,7 @@ model VenteHistorique {
   date        DateTime
   total       Float?
   notes       String?
+  causeMortalite String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
