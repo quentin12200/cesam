@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Search, X, Pencil } from "lucide-react";
 import { searchTypesEvenement } from "@/lib/fuzzy-search";
 import { getCategorieMedicament } from "@/lib/medicament-categories";
@@ -52,6 +52,7 @@ export default function MedicamentPicker({
 }: Props) {
   const [query, setQuery] = useState("");
   const [ouvert, setOuvert] = useState(false);
+  const listeId = useId();
 
   const resultats = useMemo(() => {
     if (!query.trim()) return [];
@@ -132,6 +133,8 @@ export default function MedicamentPicker({
           placeholder="Tapez le nom ou la substance active…"
           role="combobox"
           aria-expanded={ouvert && Boolean(query.trim())}
+          aria-controls={listeId}
+          aria-haspopup="listbox"
           aria-autocomplete="list"
           className="w-full text-sm outline-none bg-transparent"
         />
@@ -148,13 +151,19 @@ export default function MedicamentPicker({
       </div>
 
       {ouvert && query.trim() && (
-        <div className="absolute top-full left-0 right-0 bg-white border rounded-lg shadow-lg mt-1 z-20 max-h-64 overflow-y-auto">
+        <div
+          id={listeId}
+          role="listbox"
+          className="absolute top-full left-0 right-0 bg-white border rounded-lg shadow-lg mt-1 z-20 max-h-64 overflow-y-auto"
+        >
           {resultats.map((medicament) => {
             const cat = getCategorieMedicament(medicament.categorie);
             return (
               <button
                 key={medicament.id}
                 type="button"
+                role="option"
+                aria-selected={false}
                 onClick={() => {
                   onChange(medicament);
                   onFreeTextChange?.("");
@@ -188,6 +197,8 @@ export default function MedicamentPicker({
           {allowFreeText && (
             <button
               type="button"
+              role="option"
+              aria-selected={false}
               onClick={() => {
                 onChange(null);
                 onFreeTextChange?.(query.trim());
