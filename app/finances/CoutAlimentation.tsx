@@ -137,7 +137,7 @@ export default function CoutAlimentation() {
     <section className="bg-white rounded-xl shadow overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-gray-800">Coût de l'alimentation</h3>
+          <h3 className="font-semibold text-gray-800">Coût de l&apos;alimentation</h3>
           <p className="text-xs text-gray-500">Tarifs actuels des aliments et compléments</p>
         </div>
         <button
@@ -230,7 +230,7 @@ export default function CoutAlimentation() {
       {loading ? (
         <p className="px-4 py-6 text-sm text-gray-500 text-center">Chargement...</p>
       ) : produits.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-gray-500 text-center">Aucun tarif d'aliment enregistré.</p>
+        <p className="px-4 py-6 text-sm text-gray-500 text-center">Aucun tarif d&apos;aliment enregistré.</p>
       ) : (
         <div className="divide-y divide-gray-100">
           {produits.map((produit) => {
