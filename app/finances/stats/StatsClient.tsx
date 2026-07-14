@@ -540,9 +540,16 @@ function EditVenteHisto({ vente, onClose, onSaved }: { vente: VenteHisto; onClos
   const [notes, setNotes] = useState(vente.notes ?? "");
 
   const isVif = typeVente === "vif";
-  const prixCalc = isVif
-    ? (prixKgVif && poidsVif ? (parseFloat(prixKgVif) * parseFloat(poidsVif)).toFixed(2) : null)
-    : (prixKgCarc && poidsCarc ? (parseFloat(prixKgCarc) * parseFloat(poidsCarc)).toFixed(2) : null);
+  const poidsSelectionne = isVif ? poidsVif : poidsCarc;
+  const prixKgSelectionne = isVif ? prixKgVif : prixKgCarc;
+  const montantCalcule = poidsSelectionne && prixKgSelectionne
+    ? Math.round(parseFloat(poidsSelectionne) * parseFloat(prixKgSelectionne) * 100) / 100
+    : null;
+  const montantTotal = montantCalcule ?? (total ? Math.round(parseFloat(total) * 100) / 100 : null);
+  const montantFormate = montantTotal?.toLocaleString("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -553,12 +560,12 @@ function EditVenteHisto({ vente, onClose, onSaved }: { vente: VenteHisto; onClos
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date, typeAnimal, typeVente, nutrav: nutrav || null, sexe: sexe || null,
-          poidsVif: poidsVif ? parseFloat(poidsVif) : null,
-          prixKgVif: prixKgVif ? parseFloat(prixKgVif) : null,
-          poidsCarc: poidsCarc ? parseFloat(poidsCarc) : null,
-          prixKgCarc: prixKgCarc ? parseFloat(prixKgCarc) : null,
+          poidsVif: isVif && poidsVif ? parseFloat(poidsVif) : null,
+          prixKgVif: isVif && prixKgVif ? parseFloat(prixKgVif) : null,
+          poidsCarc: !isVif && poidsCarc ? parseFloat(poidsCarc) : null,
+          prixKgCarc: !isVif && prixKgCarc ? parseFloat(prixKgCarc) : null,
           acheteur: acheteur || null,
-          total: total ? parseFloat(total) : (prixCalc ? parseFloat(prixCalc) : null),
+          total: montantTotal,
           notes: notes || null,
         }),
       });
@@ -613,7 +620,7 @@ function EditVenteHisto({ vente, onClose, onSaved }: { vente: VenteHisto; onClos
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Type vente</label>
-              <select value={typeVente} onChange={(e) => setTypeVente(e.target.value)}
+              <select value={typeVente} onChange={(e) => { setTypeVente(e.target.value); setTotal(""); }}
                 className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                 <option value="vif">Vif</option>
                 <option value="carcasse">Carcasse</option>
@@ -650,7 +657,7 @@ function EditVenteHisto({ vente, onClose, onSaved }: { vente: VenteHisto; onClos
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Prix €/kg carc.</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Prix €/kg carcasse</label>
                 <input type="number" step="0.01" value={prixKgCarc} onChange={(e) => setPrixKgCarc(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
@@ -663,12 +670,15 @@ function EditVenteHisto({ vente, onClose, onSaved }: { vente: VenteHisto; onClos
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Total HT {prixCalc && !total && <span className="text-green-600 font-normal">≈ {prixCalc} €</span>}
-              </label>
-              <input type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)}
-                placeholder={prixCalc ?? ""}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              <label className="block text-xs font-medium text-gray-700 mb-1">Total HT</label>
+              <input type="number" step="0.01"
+                value={montantCalcule != null ? montantCalcule.toFixed(2) : total}
+                onChange={(e) => setTotal(e.target.value)}
+                readOnly={montantCalcule != null}
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${montantCalcule != null ? "bg-gray-50 text-gray-600" : ""}`} />
+              {montantFormate && (
+                <p className="mt-1 text-sm font-semibold text-green-700">{montantFormate} € HT</p>
+              )}
             </div>
           </div>
           <div>
