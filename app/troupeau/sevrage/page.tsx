@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, Scissors } from "lucide-react";
+import { Scissors } from "lucide-react";
 import { formatAge, formatDate } from "@/lib/utils";
 import { differenceInDays, subDays } from "date-fns";
 
+import BackButton from "@/app/components/BackButton";
 // Page sans segment dynamique ni searchParams : sans cette directive, Next.js
 // la fige en HTML statique au moment du build et ne reflète plus les
 // évolutions de la base tant qu'un nouveau déploiement n'a pas lieu.
@@ -75,9 +76,7 @@ export default async function SevragePage() {
     <div className="max-w-3xl mx-auto p-4 pb-24 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3 mt-2">
-        <Link href="/troupeau" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50">
-          <ArrowLeft size={18} />
-        </Link>
+        <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex-1">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <Scissors size={20} className="text-orange-600" />
