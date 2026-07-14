@@ -21,6 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         ...(body.date != null && { date: new Date(body.date) }),
         ...(body.total !== undefined && { total: body.total != null ? parseFloat(body.total) : null }),
         ...(body.notes !== undefined && { notes: body.notes || null }),
+        ...(body.causeMortalite !== undefined && { causeMortalite: body.causeMortalite || null }),
         updatedAt: new Date(),
       },
     });

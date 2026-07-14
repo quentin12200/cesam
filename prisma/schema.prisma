@@ -323,11 +323,20 @@ model Sortie {
   date            DateTime
   type            String    // MORT | ELEVAGE | BOUCHERIE | ENGRAISSEMENT
 
+  // Copie des informations au moment de la sortie, modifiable pour corriger les imports.
+  categorieSortie String?   // VEAU | GENISSE | VACHE | TAUREAU
+  sexeSortie      String?   // M | F
+  modeVente       String?   // VIF | CARCASSE
+
   acheteur        String?
   prixKilo        Float?
   poids           Float?   // poids carcasse pour BOUCHERIE, poids vif sinon
   poidsVif        Float?   // poids vif avant abattage (BOUCHERIE)
   rendementCarcasse Float? // % rendement carcasse (ex: 55.0)
+  poidsVifVente   Float?
+  prixKgVif       Float?
+  poidsCarcasse   Float?
+  prixKgCarcasse  Float?
   prixPrevuHT     Float?
   prixDefinitifHT Float?
 
@@ -356,6 +365,7 @@ model VenteHistorique {
   date        DateTime
   total       Float?
   notes       String?
+  causeMortalite String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

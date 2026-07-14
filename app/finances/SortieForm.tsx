@@ -8,6 +8,7 @@ interface Animal {
   nutrav: string;
   nobovi: string | null;
   sexbov: string;
+  categorie: string | null;
 }
 
 interface Props {
@@ -24,10 +25,13 @@ export default function SortieForm({ animaux, annee, initialAnimalId }: Props) {
   }
 
   async function enregistrer(values: SortieEditorValues) {
+    const type = values.nature === "MORT" ? "MORT" : (values.modeVente === "VIF" ? "ELEVAGE" : "BOUCHERIE");
+    const poids = values.modeVente === "VIF" ? values.poidsVifVente : values.poidsCarcasse;
+    const prixKilo = values.modeVente === "VIF" ? values.prixKgVif : values.prixKgCarcasse;
     const res = await fetch("/api/sorties", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
+      body: JSON.stringify({ ...values, type, poids, prixKilo }),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? "Erreur serveur");
     fermer();
@@ -44,7 +48,7 @@ export default function SortieForm({ animaux, annee, initialAnimalId }: Props) {
       initial={{
         animalId: initialAnimalId,
         date: new Date().toISOString().slice(0, 10),
-        type: "ELEVAGE",
+        nature: "VENTE",
       }}
       onClose={fermer}
       onSubmit={enregistrer}
