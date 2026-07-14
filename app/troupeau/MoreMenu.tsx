@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { MoreVertical, Printer, TrendingUp, BarChart2, Network, Scissors } from "lucide-react";
+import { MoreVertical, Printer, TrendingUp, Network, Scissors } from "lucide-react";
 
 export default function MoreMenu({ printHref }: { printHref: string }) {
   const [open, setOpen] = useState(false);
@@ -19,7 +19,6 @@ export default function MoreMenu({ printHref }: { printHref: string }) {
   const items = [
     { href: printHref, icon: Printer, label: "Imprimer la liste", color: "text-gray-500" },
     { href: "/troupeau/gmq", icon: TrendingUp, label: "Performances GMQ", color: "text-green-600" },
-    { href: "/troupeau/performances", icon: BarChart2, label: "Performances vaches", color: "text-indigo-600" },
     { href: "/troupeau/genealogie", icon: Network, label: "Généalogie globale", color: "text-emerald-700" },
     { href: "/troupeau/sevrage", icon: Scissors, label: "Historique des sevrages", color: "text-orange-600" },
   ];
