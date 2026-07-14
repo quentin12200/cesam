@@ -10,6 +10,7 @@ import VoiceButton from "@/app/components/VoiceButton";
 import UndoProvider from "@/app/components/UndoProvider";
 import LogoutButton from "@/app/components/LogoutButton";
 import Image from "next/image";
+import NavigationRestoration from "@/app/components/NavigationRestoration";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -61,6 +62,7 @@ export default function RootLayout({
           <TopNav />
         </header>
         <UndoProvider>
+          <NavigationRestoration />
           <SplashScreen />
           <main className="flex-1 overflow-auto">
             {children}
