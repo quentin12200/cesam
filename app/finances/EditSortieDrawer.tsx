@@ -54,10 +54,10 @@ export default function EditSortieDrawer({ sortie }: { sortie: Sortie }) {
   return (
     <>
       <button onClick={() => setOpen(true)}
-        className="text-xs text-gray-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
+        className="shrink-0 p-1.5 text-gray-300 hover:text-blue-600 transition-colors"
         title="Modifier cette sortie">
-        <Pencil size={13} />
-        Modifier
+        <Pencil size={15} />
+        <span className="sr-only">Modifier cette sortie</span>
       </button>
 
       {open && (
