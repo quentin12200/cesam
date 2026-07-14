@@ -20,6 +20,14 @@ function formatPoids(val: number | null | undefined) {
   return `${val.toFixed(0)} kg`;
 }
 
+function estVeauHistorique(typeAnimal: string) {
+  return ["veau", "veaux"].includes(typeAnimal.trim().toLowerCase());
+}
+
+function estVacheHistorique(typeAnimal: string) {
+  return typeAnimal.trim().toLowerCase().startsWith("vache");
+}
+
 async function getFinancesData(annee: number) {
   const debut = new Date(`${annee}-01-01`);
   const fin = new Date(`${annee + 1}-01-01`);
@@ -45,44 +53,53 @@ async function getFinancesData(annee: number) {
   const morts = sorties.filter((s) => s.type === "MORT");
   const engraissements = sorties.filter((s) => s.type === "ENGRAISSEMENT");
 
+  const clesSorties = new Set(
+    sorties.map((s) => `${s.animal.nutrav}|${s.date.toISOString().slice(0, 10)}`)
+  );
+  const ventesHistoriquesUniques = ventesHistoriques.filter(
+    (v) => !v.nutrav || !clesSorties.has(`${v.nutrav}|${v.date.toISOString().slice(0, 10)}`)
+  );
+  const veauxHistoriques = ventesHistoriquesUniques.filter((v) => estVeauHistorique(v.typeAnimal));
+  const vachesHistoriques = ventesHistoriquesUniques.filter((v) => estVacheHistorique(v.typeAnimal));
+
   const caVeaux = ventesElevage
     .filter((s) => s.animal.velageVeau !== null)
-    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0)
+    + veauxHistoriques.reduce((sum, v) => sum + (v.total ?? 0), 0);
 
   const caVaches = [
     ...ventesElevage.filter((s) => s.animal.velageVeau === null),
     ...ventesBoucherie,
-  ].reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+  ].reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0)
+    + vachesHistoriques.reduce((sum, v) => sum + (v.total ?? 0), 0);
 
   const caTotal = caVeaux + caVaches;
 
   const veauxVendus = ventesElevage.filter((s) => s.animal.velageVeau !== null);
-  const poidsVeauxTotal = veauxVendus.reduce((sum, s) => sum + (s.poids ?? 0), 0);
-  const poidsMoyenVeau = veauxVendus.length > 0 ? poidsVeauxTotal / veauxVendus.length : null;
-  const prixMoyenVeau =
-    veauxVendus.length > 0
-      ? veauxVendus.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0) /
-        veauxVendus.length
-      : null;
+  const veauxVendusCount = veauxVendus.length + veauxHistoriques.length;
+  const poidsVeauxTotal = veauxVendus.reduce((sum, s) => sum + (s.poids ?? 0), 0)
+    + veauxHistoriques.reduce((sum, v) => sum + (v.poidsVif ?? v.poidsCarc ?? 0), 0);
+  const poidsMoyenVeau = veauxVendusCount > 0 ? poidsVeauxTotal / veauxVendusCount : null;
+  const prixMoyenVeau = veauxVendusCount > 0 ? caVeaux / veauxVendusCount : null;
 
   const vachesBoucherie = ventesBoucherie;
-  const poidsCarcasseTotal = vachesBoucherie.reduce((sum, s) => sum + (s.poids ?? 0), 0);
+  const vachesBoucherieCount = vachesBoucherie.length + vachesHistoriques.length;
+  const poidsCarcasseTotal = vachesBoucherie.reduce((sum, s) => sum + (s.poids ?? 0), 0)
+    + vachesHistoriques.reduce((sum, v) => sum + (v.poidsCarc ?? v.poidsVif ?? 0), 0);
   const poidsMoyenCarcasse =
-    vachesBoucherie.length > 0 ? poidsCarcasseTotal / vachesBoucherie.length : null;
-  const prixMoyenVache =
-    vachesBoucherie.length > 0
-      ? vachesBoucherie.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0) /
-        vachesBoucherie.length
-      : null;
+    vachesBoucherieCount > 0 ? poidsCarcasseTotal / vachesBoucherieCount : null;
+  const prixMoyenVache = vachesBoucherieCount > 0 ? caVaches / vachesBoucherieCount : null;
 
   // Monthly CA distribution
   const MOIS_COURTS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
   const monthlyCA = MOIS_COURTS.map((label, i) => {
     const monthSorties = sorties.filter((s) => new Date(s.date).getMonth() === i);
+    const monthHistoriques = ventesHistoriquesUniques.filter((v) => new Date(v.date).getMonth() === i);
     return {
       label,
-      ca: monthSorties.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0),
-      count: monthSorties.length,
+      ca: monthSorties.reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0)
+        + monthHistoriques.reduce((sum, v) => sum + (v.total ?? 0), 0),
+      count: monthSorties.length + monthHistoriques.length,
     };
   });
   const maxMonthlyCA = Math.max(...monthlyCA.map((m) => m.ca), 1);
@@ -98,6 +115,15 @@ async function getFinancesData(annee: number) {
       });
     }
   }
+  for (const v of ventesHistoriquesUniques) {
+    if (v.acheteur) {
+      const existing = buyerMap.get(v.acheteur) ?? { count: 0, total: 0 };
+      buyerMap.set(v.acheteur, {
+        count: existing.count + 1,
+        total: existing.total + (v.total ?? 0),
+      });
+    }
+  }
   const topBuyers = [...buyerMap.entries()]
     .sort((a, b) => b[1].total - a[1].total)
     .slice(0, 5)
@@ -106,12 +132,14 @@ async function getFinancesData(annee: number) {
   // CA by animal category
   const caVeauxVif = ventesElevage
     .filter((s) => s.animal.velageVeau !== null)
-    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0)
+    + veauxHistoriques.reduce((sum, v) => sum + (v.total ?? 0), 0);
   const caGenisses = ventesElevage
     .filter((s) => s.animal.velageVeau === null && s.animal.estGenisse)
     .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
   const caVachesBoucherie = ventesBoucherie
-    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
+    .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0)
+    + vachesHistoriques.reduce((sum, v) => sum + (v.total ?? 0), 0);
   const caVachesElevage = ventesElevage
     .filter((s) => s.animal.velageVeau === null && !s.animal.estGenisse && s.animal.sexbov === "F")
     .reduce((sum, s) => sum + (s.prixDefinitifHT ?? s.prixPrevuHT ?? 0), 0);
@@ -138,19 +166,19 @@ async function getFinancesData(annee: number) {
 
   return {
     sorties,
-    ventesHistoriques,
+    ventesHistoriques: ventesHistoriquesUniques,
     caVeaux,
     caVaches,
     caTotal,
-    ventesElevageCount: ventesElevage.length,
-    ventesBoucherieCount: ventesBoucherie.length,
+    ventesElevageCount: ventesElevage.length + veauxHistoriques.length,
+    ventesBoucherieCount: vachesBoucherieCount,
     mortsCount: morts.length,
     engraissementsCount: engraissements.length,
     poidsMoyenVeau,
     prixMoyenVeau,
     poidsMoyenCarcasse,
     prixMoyenVache,
-    veauxVendusCount: veauxVendus.length,
+    veauxVendusCount,
     monthlyCA,
     maxMonthlyCA,
     topBuyers,
