@@ -133,7 +133,7 @@ export default function MedicamentPicker({
           placeholder="Tapez le nom ou la substance active…"
           role="combobox"
           aria-expanded={ouvert && Boolean(query.trim())}
-          aria-controls={listeId}
+          aria-controls={ouvert && query.trim() ? listeId : undefined}
           aria-haspopup="listbox"
           aria-autocomplete="list"
           className="w-full text-sm outline-none bg-transparent"
