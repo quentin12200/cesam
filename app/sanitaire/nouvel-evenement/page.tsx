@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 
-import { ArrowLeft } from "lucide-react";
 import NouvelEvenementForm from "./NouvelEvenementForm";
 
 import BackButton from "@/app/components/BackButton";
