@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Wifi, WifiOff, X, AlertTriangle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, Plus, Wifi, X } from "lucide-react";
 
 interface Capteur {
   id: string;
@@ -14,6 +14,7 @@ interface Capteur {
 
 export default function CapteurManager({ capteurs: initial }: { capteurs: Capteur[] }) {
   const [capteurs, setCapteurs] = useState(initial);
+  const [gestionOuverte, setGestionOuverte] = useState(false);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [nutravInput, setNutravInput] = useState("");
   const [nomInput, setNomInput] = useState("");
@@ -30,7 +31,11 @@ export default function CapteurManager({ capteurs: initial }: { capteurs: Capteu
       });
       if (res.ok) {
         const updated = await res.json();
-        setCapteurs((c) => c.map((cap) => (cap.id === id ? { ...updated, dateAttribution: updated.dateAttribution ?? null } : cap)));
+        setCapteurs((current) =>
+          current.map((capteur) =>
+            capteur.id === id ? { ...updated, dateAttribution: updated.dateAttribution ?? null } : capteur
+          )
+        );
         setAssigningId(null);
         setNutravInput("");
         setNomInput("");
@@ -50,120 +55,148 @@ export default function CapteurManager({ capteurs: initial }: { capteurs: Capteu
       });
       if (res.ok) {
         const updated = await res.json();
-        setCapteurs((c) => c.map((cap) => (cap.id === id ? { ...updated, dateAttribution: null } : cap)));
+        setCapteurs((current) =>
+          current.map((capteur) =>
+            capteur.id === id ? { ...updated, dateAttribution: null } : capteur
+          )
+        );
       }
     } finally {
       setLoading(false);
     }
   }
 
-  const capteursActifs = capteurs.filter((c) => c.actif);
+  function annulerAttribution() {
+    setAssigningId(null);
+    setNutravInput("");
+    setNomInput("");
+  }
+
+  const capteursActifs = capteurs.filter((capteur) => capteur.actif);
+  const capteursDisponibles = capteurs.filter((capteur) => !capteur.actif);
 
   return (
-    <div className="bg-white rounded-xl shadow p-4">
-      <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+    <section className="bg-white rounded-xl shadow overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3">
         <Wifi size={16} className="text-green-700" />
-        Capteurs vélage
-        <span className="text-xs text-gray-400 ml-auto">{capteursActifs.length}/4 actifs</span>
-      </h3>
+        <h3 className="font-semibold text-gray-800">Capteurs vêlage</h3>
+        <span className="ml-auto text-xs text-gray-500">
+          {capteursActifs.length} actif{capteursActifs.length > 1 ? "s" : ""} · {capteursDisponibles.length} disponible{capteursDisponibles.length > 1 ? "s" : ""}
+        </span>
+      </div>
 
       {capteursActifs.length > 0 && (
-        <div className="mb-3 p-3 bg-orange-50 border border-orange-300 rounded-lg flex items-center gap-2">
-          <AlertTriangle size={16} className="text-orange-600 shrink-0" />
-          <p className="text-xs font-semibold text-orange-800">
-            Capteur(s) posé(s) — pensez à le retirer après le vêlage
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-3">
-        {capteurs.map((capteur) => (
-          <div
-            key={capteur.id}
-            className={`p-3 rounded-xl border-2 ${capteur.actif ? "border-green-400 bg-green-50" : "border-gray-200 bg-gray-50"}`}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-bold text-gray-700 text-sm">Capteur {capteur.numero}</span>
-              {capteur.actif ? (
-                <Wifi size={15} className="text-green-600" />
-              ) : (
-                <WifiOff size={15} className="text-gray-400" />
-              )}
-            </div>
-
-            {capteur.actif ? (
-              <>
-                <div className="text-sm font-medium text-green-800 truncate">
-                  {capteur.animalNom ?? capteur.animalNutrav ?? "Animal inconnu"}
-                </div>
-                {capteur.animalNutrav && capteur.animalNom && (
-                  <div className="text-xs text-green-600 font-mono">{capteur.animalNutrav}</div>
-                )}
-                {capteur.dateAttribution && (
-                  <div className="text-xs text-gray-400 mt-0.5">
-                    Depuis le {new Date(capteur.dateAttribution).toLocaleDateString("fr-FR")}
+        <>
+          <div className="mx-4 mb-2 flex items-center gap-2 text-xs text-orange-700">
+            <AlertTriangle size={14} className="shrink-0" />
+            Retirer le capteur après le vêlage
+          </div>
+          <div className="border-t border-gray-100 divide-y divide-gray-100">
+            {capteursActifs.map((capteur) => (
+              <div key={capteur.id} className="flex items-center gap-3 px-4 py-2.5">
+                <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-semibold text-gray-800">Capteur {capteur.numero}</span>
+                    <span className="text-sm text-green-800 truncate">
+                      {capteur.animalNutrav ?? "Animal inconnu"}
+                      {capteur.animalNom ? ` · ${capteur.animalNom}` : ""}
+                    </span>
                   </div>
-                )}
+                  {capteur.dateAttribution && (
+                    <p className="text-xs text-gray-400">
+                      Posé le {new Date(capteur.dateAttribution).toLocaleDateString("fr-FR")}
+                    </p>
+                  )}
+                </div>
                 <button
+                  type="button"
                   onClick={() => handleLiberer(capteur.id)}
                   disabled={loading}
-                  className="mt-2 w-full py-1.5 text-xs font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg disabled:opacity-50 flex items-center justify-center gap-1 transition-colors"
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                  title="Retirer le capteur"
+                  aria-label={`Retirer le capteur ${capteur.numero}`}
                 >
-                  <X size={12} />
-                  Retirer capteur
+                  <X size={17} />
                 </button>
-              </>
-            ) : (
-              <>
-                <div className="text-sm text-gray-400 mb-2">Disponible</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setGestionOuverte((value) => !value)}
+        className="w-full flex items-center justify-center gap-1.5 border-t border-gray-100 px-4 py-2.5 text-xs font-medium text-green-700 hover:bg-green-50"
+        aria-expanded={gestionOuverte}
+      >
+        Gérer les capteurs
+        {gestionOuverte ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      </button>
+
+      {gestionOuverte && (
+        <div className="border-t border-gray-100 divide-y divide-gray-100">
+          {capteursDisponibles.length === 0 ? (
+            <p className="px-4 py-3 text-xs text-gray-500">Aucun capteur disponible.</p>
+          ) : (
+            capteursDisponibles.map((capteur) => (
+              <div key={capteur.id} className="px-4 py-2.5">
                 {assigningId === capteur.id ? (
-                  <div className="space-y-1.5">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                     <input
                       value={nutravInput}
-                      onChange={(e) => setNutravInput(e.target.value)}
-                      placeholder="N° Travail *"
-                      className="w-full border rounded px-2 py-1.5 text-xs bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-green-500"
+                      onChange={(event) => setNutravInput(event.target.value)}
+                      placeholder="N° travail *"
+                      className="w-full border rounded-lg px-3 py-2 text-sm bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-green-500"
                       autoFocus
                     />
                     <input
                       value={nomInput}
-                      onChange={(e) => setNomInput(e.target.value)}
+                      onChange={(event) => setNomInput(event.target.value)}
                       placeholder="Nom (optionnel)"
-                      className="w-full border rounded px-2 py-1.5 text-xs bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-green-500"
+                      className="w-full border rounded-lg px-3 py-2 text-sm bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-green-500"
                     />
                     <div className="flex gap-1">
                       <button
+                        type="button"
                         onClick={() => handleAttribuer(capteur.id)}
                         disabled={loading || !nutravInput.trim()}
-                        className="flex-1 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded disabled:opacity-50 transition-colors"
+                        className="px-3 py-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50"
                       >
                         Confirmer
                       </button>
                       <button
-                        onClick={() => {
-                          setAssigningId(null);
-                          setNutravInput("");
-                          setNomInput("");
-                        }}
-                        className="px-2 py-1.5 text-xs text-gray-500 border rounded hover:bg-gray-100 transition-colors"
+                        type="button"
+                        onClick={annulerAttribution}
+                        className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+                        title="Annuler"
+                        aria-label="Annuler l’attribution"
                       >
-                        ✕
+                        <X size={16} />
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setAssigningId(capteur.id)}
-                    className="w-full py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-lg hover:bg-green-50 transition-colors"
-                  >
-                    + Attribuer
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700">Capteur {capteur.numero}</span>
+                    <span className="text-xs text-gray-400">Disponible</span>
+                    <button
+                      type="button"
+                      onClick={() => setAssigningId(capteur.id)}
+                      className="ml-auto p-2 text-green-700 hover:bg-green-50 rounded-lg"
+                      title="Attribuer le capteur"
+                      aria-label={`Attribuer le capteur ${capteur.numero}`}
+                    >
+                      <Plus size={17} />
+                    </button>
+                  </div>
                 )}
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </section>
   );
 }
