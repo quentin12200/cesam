@@ -701,7 +701,7 @@ function AnneesMultiSelect({ years, selected, onChange }: {
             Tout désélectionner
           </button>
         </div>
-        <div className="max-h-56 overflow-y-auto space-y-1">
+        <div className="max-h-[60vh] sm:max-h-56 overflow-y-auto overscroll-contain space-y-1 pr-1">
           {years.map((year) => (
             <label key={year} className="min-h-10 flex items-center gap-3 px-2 rounded-md hover:bg-gray-50 cursor-pointer">
               <input
