@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 function pageKey() {
   return `cesam:scroll:${window.location.pathname}${window.location.search}`;
@@ -24,6 +24,8 @@ function restorePosition(position: number) {
 
 export default function NavigationRestoration() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
 
   useEffect(() => {
     const markReturn = () => sessionStorage.setItem("cesam:restore-scroll", "1");
@@ -53,13 +55,13 @@ export default function NavigationRestoration() {
     }
 
     return () => {
-      save();
+      sessionStorage.setItem(key, String(currentPosition()));
       window.removeEventListener("scroll", save);
       scrollContainer()?.removeEventListener("scroll", save);
       window.removeEventListener("pagehide", save);
       if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [pathname]);
+  }, [pathname, search]);
 
   return null;
 }
