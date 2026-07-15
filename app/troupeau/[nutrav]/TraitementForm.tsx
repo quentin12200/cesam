@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Save, X, ScanLine, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-import { scanAndPersistOrdonnance } from "@/lib/scan-ordonnance-client";
+import { scanAndCreateExtraction } from "@/lib/scan-ordonnance-client";
 import MedicamentPicker, {
   type MedicamentOption,
   type PreconisationOption,
@@ -206,11 +206,8 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
     setScanMsg("");
 
     try {
-      const { ordonnanceId: newOrdonnanceId, extracted } = await scanAndPersistOrdonnance(file);
-      applyScanned(extracted);
-      setOrdonnanceId(newOrdonnanceId);
-      setScanStatus("ok");
-      setScanMsg("Ordonnance analysée — vérifiez les champs ci-dessous");
+      const { extractionId } = await scanAndCreateExtraction(file);
+      router.push(`/ordonnances/a-verifier/${extractionId}`);
     } catch (err) {
       setScanStatus("error");
       setScanMsg(err instanceof Error ? err.message : "Erreur lors du scan");

@@ -17,16 +17,23 @@ export interface OrdonnanceExtracted {
   rappels: string | null;
   ordonnanceNumero: string | null;
   raw: string;
+  modele: string;
+  versionPrompt: string;
+  analyseLe: string;
 }
 
 export interface OrdonnanceScanResult {
-  ordonnanceId: string | null;
+  extractionId: string;
   extracted: OrdonnanceExtracted;
 }
 
-export async function scanAndPersistOrdonnance(file: File): Promise<OrdonnanceScanResult> {
+export async function scanAndCreateExtraction(file: File): Promise<OrdonnanceScanResult> {
   const dataUrl = await fileToDocumentDataUrl(file);
   const base64 = dataUrl.split(",")[1] ?? "";
+
+  const ext = file.type === "application/pdf" ? "pdf" : "jpg";
+  const path = `ordonnances/extractions/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const documentUrl = await uploadDataUrlToStorage(dataUrl, path);
 
   const scanRes = await fetch("/api/scan-ordonnance", {
     method: "POST",
@@ -38,39 +45,23 @@ export async function scanAndPersistOrdonnance(file: File): Promise<OrdonnanceSc
     throw new Error(err.error ?? "Erreur lors du scan");
   }
   const extracted: OrdonnanceExtracted = await scanRes.json();
-
-  let ordonnanceId: string | null = null;
-  try {
-    const ext = file.type === "application/pdf" ? "pdf" : "jpg";
-    const path = `ordonnances/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const photoUrl = await uploadDataUrlToStorage(dataUrl, path);
-    const upsertRes = await fetch("/api/ordonnances", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        numero: extracted.ordonnanceNumero,
-        veterinaireNom: extracted.veterinaire,
-        medicamentNom: extracted.medicamentNom ?? "",
-        dose: extracted.dose,
-        uniteDosage: extracted.uniteDosage,
-        voie: extracted.voie,
-        frequence: extracted.frequence,
-        dureeJours: extracted.dureeJours,
-        motif: extracted.motif,
-        delaiAttenteViandeJ: extracted.delaiAttenteViandeJ,
-        delaiAttenteLaitJ: extracted.delaiAttenteLaitJ,
-        precautions: extracted.precautions,
-        rappels: extracted.rappels,
-        photoUrl,
-      }),
-    });
-    if (upsertRes.ok) {
-      const data = await upsertRes.json();
-      ordonnanceId = data.id ?? null;
-    }
-  } catch {
-    // le document n'a pas pu être conservé, on garde quand même les champs extraits
+  const { raw, modele, versionPrompt, analyseLe, ...propositionInitiale } = extracted;
+  const draftRes = await fetch("/api/extractions-ordonnance", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      documentUrl,
+      reponseBrute: raw,
+      propositionInitiale,
+      modele,
+      versionPrompt,
+      analyseLe,
+    }),
+  });
+  if (!draftRes.ok) {
+    const err = await draftRes.json().catch(() => ({}));
+    throw new Error(err.error ?? "Le brouillon n'a pas pu être créé");
   }
-
-  return { ordonnanceId, extracted };
+  const draft = await draftRes.json();
+  return { extractionId: draft.id, extracted };
 }

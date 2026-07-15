@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { FileText } from "lucide-react";
-import OrdonnancesClient, { type OrdonnanceItem } from "./OrdonnancesClient";
+import OrdonnancesClient, { type ExtractionAVerifierItem, type OrdonnanceItem } from "./OrdonnancesClient";
 
 import BackButton from "@/app/components/BackButton";
 async function getOrdonnances(): Promise<OrdonnanceItem[]> {
@@ -28,8 +28,31 @@ async function getOrdonnances(): Promise<OrdonnanceItem[]> {
   }));
 }
 
+async function getExtractionsAVerifier(): Promise<ExtractionAVerifierItem[]> {
+  const rows = await prisma.extractionOrdonnance.findMany({
+    where: { statut: "A_VERIFIER" },
+    orderBy: { analyseLe: "desc" },
+    take: 50,
+  });
+  return rows.map((row) => {
+    let proposition: { medicamentNom?: string | null; ordonnanceNumero?: string | null } = {};
+    try {
+      proposition = JSON.parse(row.propositionInitiale);
+    } catch {}
+    return {
+      id: row.id,
+      analyseLe: row.analyseLe.toISOString(),
+      medicamentNom: proposition.medicamentNom ?? null,
+      ordonnanceNumero: proposition.ordonnanceNumero ?? null,
+    };
+  });
+}
+
 export default async function OrdonnancesPage() {
-  const ordonnances = await getOrdonnances();
+  const [ordonnances, extractionsAVerifier] = await Promise.all([
+    getOrdonnances(),
+    getExtractionsAVerifier(),
+  ]);
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
@@ -42,7 +65,7 @@ export default async function OrdonnancesPage() {
         <span className="text-sm text-gray-400">{ordonnances.filter((o) => o.statut !== "ARCHIVE").length} active{ordonnances.filter((o) => o.statut !== "ARCHIVE").length > 1 ? "s" : ""}</span>
       </div>
 
-      <OrdonnancesClient ordonnances={ordonnances} />
+      <OrdonnancesClient ordonnances={ordonnances} extractionsAVerifier={extractionsAVerifier} />
     </div>
   );
 }
