@@ -79,25 +79,40 @@ function normaliserMedicament(brut: unknown): MedicamentPropose {
   };
 }
 
-function construireResultat(parsed: Record<string, unknown>, raw: string): OrdonnanceResult {
+function construireResultat(parsed: Record<string, unknown> | null | undefined, raw: string): OrdonnanceResult {
+  const p = parsed && typeof parsed === "object" ? parsed : {};
   const texte = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
   let medicaments: MedicamentPropose[] = [];
-  if (Array.isArray(parsed.medicaments)) {
-    medicaments = parsed.medicaments.map(normaliserMedicament).filter((m) => m.medicamentNom || m.dose || m.numeroLot);
+  if (Array.isArray(p.medicaments)) {
+    medicaments = p.medicaments.map(normaliserMedicament).filter((m) => m.medicamentNom || m.dose || m.numeroLot);
   }
   // Repli : ancien format « à plat » (un seul médicament au niveau racine).
   if (medicaments.length === 0) {
-    const seul = normaliserMedicament(parsed);
+    const seul = normaliserMedicament(p);
     if (seul.medicamentNom || seul.dose) medicaments = [seul];
   }
   if (medicaments.length === 0) medicaments = [medicamentVide()];
 
+  // Champs « à plat » miroir du 1er médicament, pour les appelants existants
+  // (réanalyse mono-image de OrdonnanceDetailClient).
+  const premier = medicaments[0];
+
   return {
-    dateDebut: texte(parsed.dateDebut),
-    ordonnanceNumero: texte(parsed.ordonnanceNumero),
-    veterinaire: texte(parsed.veterinaire),
-    motif: texte(parsed.motif),
+    dateDebut: texte(p.dateDebut),
+    ordonnanceNumero: texte(p.ordonnanceNumero),
+    veterinaire: texte(p.veterinaire),
+    motif: texte(p.motif),
     medicaments,
+    medicamentNom: premier.medicamentNom,
+    voie: premier.voie,
+    dose: premier.dose,
+    uniteDosage: premier.uniteDosage,
+    frequence: premier.frequence,
+    dureeJours: premier.dureeJours,
+    delaiAttenteViandeJ: premier.delaiAttenteViandeJ,
+    delaiAttenteLaitJ: premier.delaiAttenteLaitJ,
+    precautions: premier.precautions,
+    rappels: premier.rappels,
     raw,
     modele: MODEL,
     versionPrompt: PROMPT_VERSION,
@@ -119,6 +134,9 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
+    return NextResponse.json({ error: "Corps de requête invalide" }, { status: 400 });
+  }
+  if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Corps de requête invalide" }, { status: 400 });
   }
 

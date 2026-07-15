@@ -57,17 +57,18 @@ function normaliserMedicament(brut: Record<string, unknown>): MedicamentFinal {
   };
 }
 
-function normaliser(body: Record<string, unknown>): ValeursFinales {
-  const brutMedicaments = Array.isArray(body.medicaments) ? body.medicaments : [body];
+function normaliser(body: Record<string, unknown> | null | undefined): ValeursFinales {
+  const b = body && typeof body === "object" ? body : {};
+  const brutMedicaments = Array.isArray(b.medicaments) ? b.medicaments : [b];
   const medicaments = brutMedicaments
     .map((m) => normaliserMedicament((m ?? {}) as Record<string, unknown>))
     .filter((m) => m.medicamentNom);
   return {
-    dateDebut: texte(body.dateDebut) ?? "",
-    ordonnanceNumero: texte(body.ordonnanceNumero),
-    veterinaire: texte(body.veterinaire),
-    motif: texte(body.motif),
-    animaux: texte(body.animaux),
+    dateDebut: texte(b.dateDebut) ?? "",
+    ordonnanceNumero: texte(b.ordonnanceNumero),
+    veterinaire: texte(b.veterinaire),
+    motif: texte(b.motif),
+    animaux: texte(b.animaux),
     medicaments,
   };
 }

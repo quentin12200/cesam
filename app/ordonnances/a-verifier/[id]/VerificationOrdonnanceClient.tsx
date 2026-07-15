@@ -19,6 +19,8 @@ interface ExtractionInfo {
 }
 
 interface MedChamps {
+  key: string;
+  ia?: MedicamentPropose;
   medicamentNom: string;
   numeroLot: string;
   dose: string;
@@ -32,12 +34,20 @@ interface MedChamps {
   rappels: string;
 }
 
+let compteurCle = 0;
+function nouvelleCle(): string {
+  compteurCle += 1;
+  return `med-${compteurCle}-${Math.random().toString(36).slice(2)}`;
+}
+
 function s(value: string | number | null | undefined): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
 function versChamps(m: MedicamentPropose): MedChamps {
   return {
+    key: nouvelleCle(),
+    ia: m,
     medicamentNom: s(m.medicamentNom),
     numeroLot: s(m.numeroLot),
     dose: s(m.dose),
@@ -54,6 +64,7 @@ function versChamps(m: MedicamentPropose): MedChamps {
 
 function champsVides(): MedChamps {
   return {
+    key: nouvelleCle(),
     medicamentNom: "", numeroLot: "", dose: "", uniteDosage: "", voie: "",
     frequence: "", dureeJours: "", delaiAttenteViandeJ: "", delaiAttenteLaitJ: "",
     precautions: "", rappels: "",
@@ -130,7 +141,19 @@ export default function VerificationOrdonnanceClient({
           veterinaire,
           motif,
           animaux,
-          medicaments,
+          medicaments: medicaments.map((m) => ({
+            medicamentNom: m.medicamentNom,
+            numeroLot: m.numeroLot,
+            dose: m.dose,
+            uniteDosage: m.uniteDosage,
+            voie: m.voie,
+            frequence: m.frequence,
+            dureeJours: m.dureeJours,
+            delaiAttenteViandeJ: m.delaiAttenteViandeJ,
+            delaiAttenteLaitJ: m.delaiAttenteLaitJ,
+            precautions: m.precautions,
+            rappels: m.rappels,
+          })),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -219,9 +242,9 @@ export default function VerificationOrdonnanceClient({
 
           <div className="space-y-4">
             {medicaments.map((med, i) => {
-              const ia = medsInitiaux[i];
+              const ia = med.ia;
               return (
-                <div key={i} className="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
+                <div key={med.key} className="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-xs font-semibold text-gray-700">Médicament {i + 1}</span>
                     {medicaments.length > 1 && (

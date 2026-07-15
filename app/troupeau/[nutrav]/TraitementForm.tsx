@@ -206,7 +206,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
     setScanMsg("");
 
     try {
-      const { extractionId } = await scanAndCreateExtraction(file);
+      const { extractionId } = await scanAndCreateExtraction([file]);
       router.push(`/ordonnances/a-verifier/${extractionId}`);
     } catch (err) {
       setScanStatus("error");

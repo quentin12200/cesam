@@ -55,7 +55,8 @@ export function medicamentVide(): MedicamentPropose {
 
 /** Renvoie toujours au moins un médicament, en reconstruisant depuis les
  *  anciens champs à plat si nécessaire (rétrocompatibilité des brouillons). */
-export function medicamentsDepuisProposition(prop: PropositionOrdonnance): MedicamentPropose[] {
+export function medicamentsDepuisProposition(prop: PropositionOrdonnance | null | undefined): MedicamentPropose[] {
+  if (!prop || typeof prop !== "object") return [medicamentVide()];
   if (Array.isArray(prop.medicaments) && prop.medicaments.length > 0) {
     return prop.medicaments.map((m) => ({ ...medicamentVide(), ...m }));
   }
