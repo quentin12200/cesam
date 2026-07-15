@@ -12,7 +12,7 @@ import {
 } from "@/lib/utils";
 import Link from "next/link";
 import { Search, Plus, SlidersHorizontal, Table2, LayoutGrid } from "lucide-react";
-import { addDays, differenceInMonths, subDays } from "date-fns";
+import { addDays, differenceInDays, differenceInMonths, subDays } from "date-fns";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
@@ -171,6 +171,8 @@ async function getAnimaux(params: {
         groupeId: true,
         tarieFaite: true,
         aEchographier: true,
+        reproductionEtatManuel: true,
+        reproductionEtatPrecedent: true,
         groupe: { select: { id: true, nom: true, couleur: true } },
         saillies: {
           orderBy: { date: "desc" as const },
@@ -187,6 +189,11 @@ async function getAnimaux(params: {
             date: true,
             veau: { select: { nutrav: true, statut: true, sevreFait: true } },
           },
+        },
+        pesees: {
+          orderBy: { date: "desc" as const },
+          take: 1,
+          select: { poids: true, date: true },
         },
         traitements: {
           where: { dateDebut: { gte: subDays(now, 90) } },
@@ -632,8 +639,8 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         </span>
       </div>
 
-      {/* Vue tableau */}
-      {vue === "tableau" ? (
+      {/* Tableau sur ordinateur */}
+      <div className="hidden md:block">
         <Suspense fallback={<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Chargement…</div>}>
           <TroupeauTableau
             animaux={animaux.map<AnimalRow>((a) => ({
@@ -645,6 +652,8 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               estGenisse: a.estGenisse,
               tarieFaite: a.tarieFaite,
               aEchographier: a.aEchographier,
+              reproductionEtatManuel: a.reproductionEtatManuel,
+              reproductionEtatPrecedent: a.reproductionEtatPrecedent,
               categorie: a.categorie,
               groupeNom: a.groupe?.nom ?? null,
               saillieDate: a.saillies[0]?.date.toISOString() ?? null,
@@ -654,27 +663,30 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               veauNutrav: a.velagesVache[0]?.veau?.nutrav ?? null,
               veauStatut: a.velagesVache[0]?.veau?.statut ?? null,
               veauSevreFait: a.velagesVache[0]?.veau?.sevreFait ?? null,
+              dernierPoids: a.pesees[0]?.poids ?? null,
+              dernierePeseeDate: a.pesees[0]?.date.toISOString() ?? null,
               enAttente: a.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente),
             }))}
             groupes={groupes}
           />
         </Suspense>
-      ) : (
-        /* Vue cartes */
-        <div className="space-y-2">
+      </div>
+
+      {/* Cartes sur téléphone */}
+      <div className="space-y-2 md:hidden">
           {animaux.map((animal) => {
             const cat = getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
             const catLabel = getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
             const catColor = getCategorieColor(cat);
             const etat =
               ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "A_ENGRAISSER"].includes(cat)
-                ? getEtatGestation(
+                ? (animal.reproductionEtatManuel ?? getEtatGestation(
                     animal.saillies[0]?.date ?? null,
                     animal.saillies[0]?.gestation?.etat ?? null,
                     animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
                     animal.velagesVache[0]?.date ?? null,
                     animal.aEchographier
-                  )
+                  ))
                 : null;
             const veau = animal.velagesVache[0]?.veau;
             const enAttente = animal.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente);
@@ -701,8 +713,8 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                       </div>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {enAttente && (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700" title="Délai d'attente en cours">
-                            ⏱ Attente
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700" title="Animal interdit à la vente pendant le délai d'attente">
+                            ⛔ Vente interdite
                           </span>
                         )}
                         {etat && (
@@ -715,9 +727,17 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                               : "Vide"}
                           </span>
                         )}
-                        {veau && veau.statut === "ACTIF" && !veau.sevreFait && (
-                          <span className="text-xs text-blue-600 font-mono bg-blue-50 px-1.5 py-0.5 rounded">
-                            🐮 {veau.nutrav}
+                        {veau && veau.statut === "ACTIF" && !veau.sevreFait && !animal.tarieFaite && (
+                          <span className="text-xs text-blue-700 font-mono font-bold bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                            🍼 {veau.nutrav}
+                          </span>
+                        )}
+                        {animal.pesees[0] && (
+                          <span className="text-xs font-semibold text-gray-700">
+                            {animal.pesees[0].poids} kg
+                            <span className="ml-1 font-normal text-gray-400">
+                              · il y a {differenceInDays(new Date(), animal.pesees[0].date)} j
+                            </span>
                           </span>
                         )}
                         {animal.groupe && (
@@ -739,7 +759,6 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             </div>
           )}
         </div>
-      )}
 
     </div>
   );
