@@ -7,6 +7,7 @@ import PharmacieClient, { type MedicamentItem } from "./PharmacieClient";
 import { type OrdonnanceItem } from "@/app/ordonnances/OrdonnancesClient";
 
 import BackButton from "@/app/components/BackButton";
+import SanitaireTabs from "@/components/SanitaireTabs";
 async function getData() {
   const [medicaments, ordonnancesRaw] = await Promise.all([
     prisma.medicament.findMany({
@@ -78,6 +79,7 @@ export default async function PharmaciePage() {
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
+      <SanitaireTabs />
       <div className="flex items-center gap-3 mt-2">
         <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex items-center gap-2 flex-1">

@@ -7,6 +7,7 @@ import VelageFormWrapper from "./VelageFormWrapper";
 import CapteurManager from "./CapteurManager";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
 import GestationCalendarSection from "@/app/components/GestationCalendarSection";
+import TroupeauTabs from "@/components/TroupeauTabs";
 
 async function getVelageData() {
   const now = new Date();
@@ -38,6 +39,7 @@ export default async function VelagePage() {
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
+      <TroupeauTabs />
       <h2 className="text-xl font-bold text-gray-800 mt-2">Vélage</h2>
 
       {/* Action principale */}
