@@ -100,11 +100,11 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
   return (
     <>
       {/* Action buttons row */}
-      <div className="flex gap-2 px-4 pt-3 pb-1 flex-wrap">
+      <div className="flex gap-2 px-4 pt-3 pb-1">
         {isFemelle && isActif && (
           <button
             onClick={() => open("chaleur")}
-            className="flex items-center gap-1.5 px-3 py-2 bg-pink-50 border border-pink-200 text-pink-700 rounded-lg text-sm font-medium hover:bg-pink-100 active:scale-95 transition-all"
+            className="flex flex-1 min-w-0 min-h-11 items-center justify-center gap-1.5 px-2 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-50 active:scale-95 transition-all"
           >
             <Thermometer size={15} />
             Chaleur
@@ -113,7 +113,7 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
         {isFemelle && isActif && (
           <button
             onClick={() => open("saillie")}
-            className="flex items-center gap-1.5 px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100 active:scale-95 transition-all"
+            className="flex flex-1 min-w-0 min-h-11 items-center justify-center gap-1.5 px-2 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-50 active:scale-95 transition-all"
           >
             <Syringe size={15} />
             Saillie / IA
@@ -122,10 +122,10 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
         {isActif && (
           <Link
             href={`/sanitaire/nouvel-evenement?animal=${encodeURIComponent(nutrav)}`}
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 active:scale-95 transition-all"
+            className="flex flex-1 min-w-0 min-h-11 items-center justify-center gap-1.5 px-2 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-50 active:scale-95 transition-all"
           >
             <Stethoscope size={15} />
-            Événement sanitaire
+            Événement
           </Link>
         )}
       </div>
@@ -251,3 +251,4 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
     </>
   );
 }
+
