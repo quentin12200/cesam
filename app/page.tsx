@@ -362,7 +362,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
   const annee = new Date().getFullYear();
 
   const sectionReproVelage = hasRepro ? (
-    <div className="bg-white rounded-xl shadow p-4">
+    <div data-layout-section="accueil-reproduction-velage" data-layout-label="Reproduction & Vêlage" className="bg-white rounded-xl shadow p-4">
       <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Baby size={18} className="text-pink-500" />
@@ -474,7 +474,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
   ) : null;
 
   const sectionSanteVaccins = hasSante ? (
-    <div className="bg-white rounded-xl shadow p-4">
+    <div data-layout-section="accueil-sante-vaccins" data-layout-label="Santé & Vaccins" className="bg-white rounded-xl shadow p-4">
       <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Activity size={18} className="text-red-500" />
