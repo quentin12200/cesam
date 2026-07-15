@@ -34,7 +34,6 @@ import {
 } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import EditAnimalDrawer from "./EditAnimalDrawer";
-import CowIcon from "@/components/CowIcon";
 import PeseeInlineForm from "./PeseeInlineForm";
 import SevrageButton from "./SevrageButton";
 import QuickActionsBar from "./QuickActionsBar";
@@ -176,50 +175,47 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto min-h-screen bg-gray-50">
       {/* Header */}
       <div className="p-4 pb-0">
-        <div className="flex items-center gap-3 mt-2">
+        <div className="flex items-start gap-2 mt-2">
           <BackButton />
-          <div className="flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="bg-green-700 text-white font-bold px-3 py-1 rounded-lg font-mono text-lg">
-                {animal.nutrav}
-              </span>
-              {etat && (
-                <span className={`text-xs font-bold px-2 py-1 rounded-full ${getBadgeClass(etat)}`}>
-                  {getEtatLabel(etat)}
-                </span>
-              )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <span className="font-mono text-lg font-bold text-green-800 shrink-0">{animal.nutrav}</span>
+              <span className="text-gray-400">—</span>
+              <h2 className="text-xl font-bold text-gray-800 truncate">{animal.nobovi ?? "Sans nom"}</h2>
             </div>
-            <h2 className="text-xl font-bold text-gray-800 mt-1">{animal.nobovi ?? "Sans nom"}</h2>
-            {(etat === "VERT" || etat === "ROSE") && animal.saillies[0]?.gestation?.dateVelagePrevue && (
-              <div className="text-xs text-gray-500 mt-0.5">
-                Vélage prévu : <span className="font-semibold text-gray-700">{formatDate(animal.saillies[0].gestation.dateVelagePrevue)}</span>
-              </div>
-            )}
+            <p className="mt-0.5 text-sm font-medium text-gray-600">
+              {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
+              <span className="mx-1.5 text-gray-300">·</span>
+              {formatAge(animal.danais)}
+            </p>
+            <p className="mt-0.5 font-mono text-xs text-gray-500 break-all">{animal.nunati}</p>
           </div>
-          <EditAnimalDrawer
-            nutrav={animal.nutrav}
-            nobovi={animal.nobovi}
-            danais={animal.danais.toISOString()}
-            statut={animal.statut}
-            estGenisse={animal.estGenisse}
-            sexbov={animal.sexbov}
-            notes={animal.notes ?? null}
-            boucleFaite={animal.boucleFaite}
-          />
-          <Link
-            href={`/troupeau/${animal.nutrav}/arbre`}
-            className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
-            title="Arbre généalogique"
-          >
-            <GitBranch size={18} />
-          </Link>
-          <Link
-            href={`/troupeau/${animal.nutrav}/impression`}
-            className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
-            title="Imprimer la fiche"
-          >
-            <Printer size={18} />
-          </Link>
+          <div className="flex shrink-0 items-center gap-1">
+            <EditAnimalDrawer
+              nutrav={animal.nutrav}
+              nobovi={animal.nobovi}
+              danais={animal.danais.toISOString()}
+              statut={animal.statut}
+              estGenisse={animal.estGenisse}
+              sexbov={animal.sexbov}
+              notes={animal.notes ?? null}
+              boucleFaite={animal.boucleFaite}
+            />
+            <Link
+              href={`/troupeau/${animal.nutrav}/arbre`}
+              className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
+              title="Arbre généalogique"
+            >
+              <GitBranch size={18} />
+            </Link>
+            <Link
+              href={`/troupeau/${animal.nutrav}/impression`}
+              className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
+              title="Imprimer la fiche"
+            >
+              <Printer size={18} />
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -256,45 +252,12 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
           <>
             {/* Identité */}
             <div className="bg-white rounded-xl shadow overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
-                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <CowIcon size={16} className="text-green-700" />
-                  Identité
-                </h3>
-                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                  animal.statut === "ACTIF"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-600"
-                }`}>
-                  {animal.statut === "ACTIF" ? "Animal actif" : animal.statut}
-                </span>
-              </div>
-
               <dl className="grid grid-cols-2 sm:grid-cols-3">
-                <div className="p-3 bg-green-50/60 border-b border-r border-gray-100">
-                  <dt className="text-[11px] font-medium text-gray-500 uppercase">N° de travail</dt>
-                  <dd className="mt-1 font-mono font-bold text-xl text-green-800">{animal.nutrav}</dd>
-                </div>
-                <div className="p-3 border-b sm:border-r border-gray-100">
-                  <dt className="text-[11px] font-medium text-gray-500 uppercase">Nom usuel</dt>
-                  <dd className="mt-1 font-semibold text-base text-gray-900">
-                    {animal.nobovi ?? <span className="text-gray-400 font-normal">Sans nom</span>}
-                  </dd>
-                </div>
-                <div className="col-span-2 sm:col-span-1 p-3 border-b border-gray-100">
-                  <dt className="text-[11px] font-medium text-gray-500 uppercase">N° national</dt>
-                  <dd className="mt-1 font-mono text-sm font-medium text-gray-800 break-all">{animal.nunati}</dd>
-                </div>
-
                 <div className="p-3 border-b border-r border-gray-100">
                   <dt className="text-[11px] font-medium text-gray-500 uppercase">Naissance</dt>
                   <dd className="mt-1 text-sm font-medium text-gray-800">{formatDate(animal.danais)}</dd>
                 </div>
                 <div className="p-3 border-b sm:border-r border-gray-100">
-                  <dt className="text-[11px] font-medium text-gray-500 uppercase">Âge</dt>
-                  <dd className="mt-1 text-sm font-semibold text-gray-800">{formatAge(animal.danais)}</dd>
-                </div>
-                <div className="col-span-2 sm:col-span-1 p-3 border-b border-gray-100">
                   <dt className="text-[11px] font-medium text-gray-500 uppercase">Catégorie</dt>
                   <dd className="mt-1 flex items-center gap-2 flex-wrap">
                     <span className={`text-xs font-semibold px-2 py-1 rounded-full ${getCategorieColor(getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie))}`}>
@@ -304,7 +267,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   </dd>
                 </div>
 
-                <div className="col-span-2 sm:col-span-3 p-3">
+                <div className="col-span-2 sm:col-span-1 p-3 border-b border-gray-100">
                   <dt className="text-[11px] font-medium text-gray-500 uppercase">Groupe</dt>
                   <dd className="mt-1 text-sm font-semibold text-gray-800">
                     {animal.groupe?.nom ?? <span className="text-gray-400 font-normal">Aucun groupe</span>}
