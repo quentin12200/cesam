@@ -32,7 +32,9 @@ export async function PUT(request: Request) {
   const body = await request.json().catch(() => null);
   const profil = typeof body?.profil === "string" ? body.profil : null;
   const moduleId = typeof body?.module === "string" ? body.module : null;
-  const sections = Array.isArray(body?.sections) ? body.sections : null;
+  const sections: unknown[] | null = Array.isArray(body?.sections)
+    ? body.sections as unknown[]
+    : null;
 
   if (!valide(profil, moduleId) || !sections) {
     return NextResponse.json({ error: "Préférence invalide" }, { status: 400 });
