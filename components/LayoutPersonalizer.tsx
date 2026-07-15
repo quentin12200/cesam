@@ -95,7 +95,16 @@ export default function LayoutPersonalizer() {
     preference.forEach((section) => {
       const element = elements.get(section.id);
       if (!element) return;
-      element.hidden = editMode ? false : !section.visible;
+      const mustHide = !editMode && !section.visible;
+      element.hidden = mustHide;
+      // Les classes d'affichage responsives peuvent prendre le dessus sur
+      // l'attribut HTML hidden. Le style important garantit le même résultat
+      // sur ordinateur et téléphone, puis est retiré dès que la section redevient visible.
+      if (mustHide) {
+        element.style.setProperty("display", "none", "important");
+      } else {
+        element.style.removeProperty("display");
+      }
       element.classList.toggle("cesam-section-hidden-draft", editMode && !section.visible);
     });
   }, []);
