@@ -13,6 +13,7 @@ import ChecklistSection, {
 } from "@/app/components/ChecklistSection";
 import QuickSearch from "@/app/components/QuickSearch";
 import AccueilQuickActions from "@/app/components/AccueilQuickActions";
+import AccueilTodoSection, { type AccueilTodoItem } from "@/app/components/AccueilTodoSection";
 import NotesTerrain from "@/app/components/NotesTerrain";
 import RapportGestationButton from "@/app/components/RapportGestationButton";
 import PrintSectionButton from "@/app/components/PrintSectionButton";
@@ -727,6 +728,161 @@ export default async function Dashboard({ searchParams }: PageProps) {
     </Collapsible>
   );
 
+  const todoItems: AccueilTodoItem[] = [];
+
+  if (data.evenementsSanitairesUrgents > 0) {
+    todoItems.push({
+      id: "sanitaire-urgent",
+      title: "Traiter les événements sanitaires",
+      subject: `${data.evenementsSanitairesUrgents} intervention${data.evenementsSanitairesUrgents > 1 ? "s" : ""} non résolue${data.evenementsSanitairesUrgents > 1 ? "s" : ""}`,
+      due: "Urgent ou en retard",
+      priority: "urgent",
+      order: 0,
+      href: "/sanitaire",
+      actionLabel: "Traiter",
+    });
+  }
+
+  if (data.vachesVidesEnRetard > 0) {
+    todoItems.push({
+      id: "vaches-vides-retard",
+      title: "Contrôler les vaches vides",
+      subject: `${data.vachesVidesEnRetard} vache${data.vachesVidesEnRetard > 1 ? "s" : ""} concernée${data.vachesVidesEnRetard > 1 ? "s" : ""}`,
+      due: "En retard",
+      priority: "urgent",
+      order: 1,
+      href: "/reproduction?filtre=ROUGE",
+      actionLabel: "Voir",
+    });
+  }
+
+  data.bouclageItems.forEach((item, index) => {
+    todoItems.push({
+      id: `bouclage-${item.nutrav}`,
+      title: "Boucler le veau",
+      subject: `${item.nutrav}${item.nom ? ` — ${item.nom}` : ""}${item.extra ? ` · ${item.extra}` : ""}`,
+      due: item.isUrgent ? `${item.ageLabel} · en retard` : `${item.ageLabel} · à faire prochainement`,
+      priority: item.isUrgent ? "urgent" : "soon",
+      order: 10 + index,
+      actionLabel: "✓ Bouclé",
+      nutrav: item.nutrav,
+      apiField: item.apiField,
+    });
+  });
+
+  if (data.aEchographier > 0) {
+    todoItems.push({
+      id: "a-echographier",
+      title: "Réaliser les échographies",
+      subject: `${data.aEchographier} vache${data.aEchographier > 1 ? "s" : ""} à échographier`,
+      due: "À programmer prochainement",
+      priority: "soon",
+      order: 30,
+      href: "/reproduction?filtre=JAUNE",
+      actionLabel: "Échographier",
+    });
+  }
+
+  if (data.velagesSemaine > 0) {
+    todoItems.push({
+      id: "velages-semaine",
+      title: "Préparer les vêlages proches",
+      subject: `${data.velagesSemaine} vêlage${data.velagesSemaine > 1 ? "s" : ""} prévu${data.velagesSemaine > 1 ? "s" : ""}`,
+      due: "Dans les 7 prochains jours",
+      priority: "soon",
+      order: 31,
+      href: "/velage",
+      actionLabel: "Préparer",
+    });
+  }
+
+  if (data.vaccinationPreVelage > 0) {
+    todoItems.push({
+      id: "vaccination-pre-velage",
+      title: "Vacciner avant vêlage",
+      subject: `${data.vaccinationPreVelage} animal${data.vaccinationPreVelage > 1 ? "aux" : ""} concerné${data.vaccinationPreVelage > 1 ? "s" : ""}`,
+      due: "À anticiper",
+      priority: "soon",
+      order: 32,
+      href: "/sanitaire",
+      actionLabel: "Voir",
+    });
+  }
+
+  if (data.bolusPreVelage > 0) {
+    todoItems.push({
+      id: "bolus-pre-velage",
+      title: "Administrer le bolus pré-vêlage",
+      subject: `${data.bolusPreVelage} animal${data.bolusPreVelage > 1 ? "aux" : ""} concerné${data.bolusPreVelage > 1 ? "s" : ""}`,
+      due: "Entre J-45 et J-21",
+      priority: "soon",
+      order: 33,
+      href: "/sanitaire",
+      actionLabel: "Voir",
+    });
+  }
+
+  vachesACapteurSansCapteur.forEach((gestation, index) => {
+    const animal = gestation.saillie.animal;
+    const jours = gestation.dateVelagePrevue
+      ? differenceInDays(gestation.dateVelagePrevue, now)
+      : null;
+    todoItems.push({
+      id: `capteur-${animal.nutrav}`,
+      title: "Poser un capteur de vêlage",
+      subject: `${animal.nutrav}${animal.nobovi ? ` — ${animal.nobovi}` : ""}`,
+      due: jours === null ? "À programmer" : `Terme dans ${jours} jour${jours > 1 ? "s" : ""}`,
+      priority: jours !== null && jours <= 7 ? "urgent" : "soon",
+      order: 40 + (jours ?? index),
+      href: "/velage",
+      actionLabel: "Poser",
+    });
+  });
+
+  data.genissesArapatrier.forEach((gestation, index) => {
+    const animal = gestation.saillie.animal;
+    const jours = gestation.dateVelagePrevue
+      ? differenceInDays(gestation.dateVelagePrevue, now)
+      : null;
+    todoItems.push({
+      id: `rapatrier-${animal.nutrav}`,
+      title: "Rapatrier la génisse",
+      subject: `${animal.nutrav}${animal.nobovi ? ` — ${animal.nobovi}` : ""}`,
+      due: jours === null ? "À programmer" : `Terme dans ${jours} jour${jours > 1 ? "s" : ""}`,
+      priority: "soon",
+      order: 50 + (jours ?? index),
+      href: `/troupeau/${animal.nutrav}`,
+      actionLabel: "Voir",
+    });
+  });
+
+  if (data.veauxAVacciner > 0) {
+    todoItems.push({
+      id: "veaux-vacciner",
+      title: "Vacciner les veaux",
+      subject: `${data.veauxAVacciner} veau${data.veauxAVacciner > 1 ? "x" : ""} avec un vaccin manquant`,
+      due: "Échéance normale",
+      priority: "normal",
+      order: 70,
+      href: "/sanitaire",
+      actionLabel: "Vacciner",
+    });
+  }
+
+  data.sevrageItems.forEach((item, index) => {
+    todoItems.push({
+      id: `sevrage-${item.nutrav}`,
+      title: "Sevrer le veau",
+      subject: `${item.nutrav}${item.nom ? ` — ${item.nom}` : ""}${item.extra ? ` · ${item.extra}` : ""}`,
+      due: `${item.ageLabel} · échéance normale`,
+      priority: "normal",
+      order: 80 + index,
+      actionLabel: "✓ Sevré",
+      nutrav: item.nutrav,
+      apiField: item.apiField,
+    });
+  });
+
   if (printMode) {
     const sections: Record<string, React.ReactNode> = {
       "repro-velage": sectionReproVelage,
@@ -752,33 +908,61 @@ export default async function Dashboard({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
-      <QuickSearch />
+    <div className="mx-auto max-w-2xl space-y-4 p-4 md:max-w-3xl lg:max-w-4xl">
       <AccueilQuickActions />
-      <h2 className="text-xl font-bold text-gray-800 mt-2">Tableau de bord</h2>
 
-      {/* NOTES TERRAIN DICTÉES */}
-      <NotesTerrain initialNotes={notesTerrain.map((n) => ({ ...n, createdAt: n.createdAt.toISOString() }))} />
+      <AccueilTodoSection items={todoItems} />
 
-      {sectionReproVelage}
-      {sectionSanteVaccins}
-      {sectionVeauxBoucler}
-      {sectionVeauxSevrer}
+      <details
+        data-layout-section="accueil-apercu-elevage"
+        data-layout-label="Aperçu de l’élevage"
+        className="group rounded-xl bg-white shadow"
+      >
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Aperçu de l’élevage</h2>
+            <p className="text-xs text-gray-500">Quelques repères, détails disponibles dans les modules</p>
+          </div>
+          <span className="text-sm font-bold text-green-700 group-open:rotate-180">⌄</span>
+        </summary>
 
-      {/* Accès rapide Pharmacie */}
-      <Link href="/pharmacie"
-        className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-200 hover:bg-blue-100 transition-colors">
-        <div className="flex items-center gap-2">
-          <Pill size={18} className="text-blue-600" />
-          <span className="text-sm font-medium text-blue-800">Pharmacie — traitements &amp; médicaments</span>
+        <div className="space-y-4 border-t border-gray-100 p-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Link href="/troupeau" className="rounded-xl bg-green-50 p-3 text-center">
+              <div className="text-xl font-bold text-green-800">{data.vachesActives}</div>
+              <div className="text-xs text-gray-600">Vaches actives</div>
+            </Link>
+            <Link href="/reproduction" className="rounded-xl bg-emerald-50 p-3 text-center">
+              <div className="text-xl font-bold text-emerald-700">{data.pctPleine}%</div>
+              <div className="text-xs text-gray-600">Vaches pleines</div>
+            </Link>
+            <Link href="/velage" className="rounded-xl bg-pink-50 p-3 text-center">
+              <div className="text-xl font-bold text-pink-700">{data.velagesPrevus}</div>
+              <div className="text-xs text-gray-600">Vêlages sous 30 j</div>
+            </Link>
+            <Link href="/sanitaire" className="rounded-xl bg-blue-50 p-3 text-center">
+              <div className="text-xl font-bold text-blue-700">{data.veauxAVacciner}</div>
+              <div className="text-xs text-gray-600">Vaccins à prévoir</div>
+            </Link>
+          </div>
+
+          {notesTerrain.length > 0 && (
+            <NotesTerrain initialNotes={notesTerrain.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() }))} />
+          )}
+
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Link href="/troupeau" className="rounded-lg border border-gray-200 px-3 py-2 text-center text-xs font-semibold text-gray-700">
+              Consulter le troupeau
+            </Link>
+            <Link href="/reproduction" className="rounded-lg border border-gray-200 px-3 py-2 text-center text-xs font-semibold text-gray-700">
+              Détails reproduction
+            </Link>
+            <Link href="/velage" className="rounded-lg border border-gray-200 px-3 py-2 text-center text-xs font-semibold text-gray-700">
+              Calendrier des vêlages
+            </Link>
+          </div>
         </div>
-        <span className="text-xs text-blue-600">→</span>
-      </Link>
-
-      {sectionStatsRapides}
-      {sectionMortalite}
-      {sectionComposition}
-      {sectionCapteurs}
+      </details>
     </div>
   );
 }
