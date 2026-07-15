@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Syringe, Stethoscope, Thermometer } from "lucide-react";
+import QuickActionButton from "@/components/QuickActionButton";
+import type { ActionVisualKey } from "@/components/action-visuals";
 import AnimalPickerModal from "@/app/sanitaire/nouvel-evenement/AnimalPickerModal";
 import type { AnimalOption } from "@/app/sanitaire/nouvel-evenement/AnimalPicker";
 
@@ -14,10 +15,10 @@ interface Groupe {
 }
 
 const actions = [
-  { id: "chaleur", label: "Chaleur", icon: Thermometer },
-  { id: "saillie", label: "Saillie / IA", icon: Syringe },
-  { id: "evenement", label: "Événement", icon: Stethoscope },
-] satisfies { id: ActionRapide; label: string; icon: typeof Thermometer }[];
+  { id: "chaleur", visual: "chaleur" },
+  { id: "saillie", visual: "saillieIA" },
+  { id: "evenement", visual: "evenementSanitaire" },
+] satisfies { id: ActionRapide; visual: ActionVisualKey }[];
 
 export default function AccueilQuickActions() {
   const router = useRouter();
@@ -55,16 +56,13 @@ export default function AccueilQuickActions() {
   return (
     <>
       <section aria-label="Actions rapides" className="grid grid-cols-3 gap-2">
-        {actions.map(({ id, label, icon: Icon }) => (
-          <button
+        {actions.map(({ id, visual }) => (
+          <QuickActionButton
             key={id}
-            type="button"
+            action={visual}
             onClick={() => ouvrir(id)}
-            className="min-h-14 rounded-lg border border-gray-200 bg-white px-2 py-2.5 text-gray-700 shadow-sm transition-colors hover:border-green-300 hover:bg-green-50 active:bg-green-100 flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2"
-          >
-            <Icon size={19} className="text-green-700 shrink-0" />
-            <span className="text-xs sm:text-sm font-semibold leading-tight text-center">{label}</span>
-          </button>
+            className="w-full"
+          />
         ))}
       </section>
 
