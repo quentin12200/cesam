@@ -740,7 +740,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
         ? `${identificationEnRetard} en retard · ${aFaireBientot} à faire bientôt`
         : `${aFaireBientot} à faire bientôt`,
       priority: identificationEnRetard > 0 ? "urgent" : "soon",
-      href: "/troupeau",
+      href: "/troupeau/identification",
     });
   }
 
