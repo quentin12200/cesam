@@ -273,7 +273,11 @@ export default async function FinancesPage({ searchParams }: PageProps) {
       {showForm && <SortieForm animaux={animaux} annee={annee} initialAnimalId={sp.animal} />}
 
       {/* CA Total */}
-      <div className="bg-gradient-to-br from-green-700 to-green-800 rounded-xl shadow p-4 text-white">
+      <div
+        data-layout-section="chiffre-affaires"
+        data-layout-label="Chiffre d’affaires"
+        className="bg-gradient-to-br from-green-700 to-green-800 rounded-xl shadow p-4 text-white"
+      >
         <div className="flex items-center gap-2 mb-1">
           <Euro size={18} />
           <span className="text-sm font-medium opacity-90">Chiffre d&apos;affaires {annee}</span>
