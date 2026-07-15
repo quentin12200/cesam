@@ -645,3 +645,14 @@ model ActionLog {
   revertedAt  DateTime?
   createdAt   DateTime  @default(now())
 }
+
+
+model MiseEnPage {
+  id          String   @id @default(cuid())
+  profil      String
+  module      String
+  sections    String
+  updatedAt   DateTime @updatedAt
+
+  @@unique([profil, module])
+}
