@@ -39,7 +39,6 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
 
   const [medicaments, setMedicaments] = useState<Medicament[]>([]);
   const [medicamentId, setMedicamentId] = useState("");
-  const [medicamentNomLibre, setMedicamentNomLibre] = useState("");
   const [dateDebut, setDateDebut] = useState(today);
   const [dureeJours, setDureeJours] = useState("3");
   const [voie, setVoie] = useState("");
@@ -105,7 +104,6 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
   function appliquerMedicament(medicament: Medicament) {
     const preconisation = preconisationPrioritaire(medicament);
     setMedicamentId(medicament.id);
-    setMedicamentNomLibre("");
     setVoie(preconisation?.voie ?? medicament.voie ?? "");
     setFrequence(preconisation?.frequence ?? "");
     setDose(
@@ -136,7 +134,6 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
       return;
     }
     setMedicamentId("");
-    setMedicamentNomLibre("");
     setVoie("");
     setFrequence("");
     setDose("");
@@ -161,7 +158,6 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         appliquerMedicament(match);
       } else {
         setMedicamentId("");
-        setMedicamentNomLibre(result.medicamentNom);
       }
     }
     if (result.voie) setVoie(result.voie);
@@ -174,7 +170,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
     if (result.ordonnanceNumero) setOrdonnanceNumero(result.ordonnanceNumero);
   }
 
-  const effectiveNom = medicamentId ? (selectedMed?.nom ?? "") : medicamentNomLibre;
+  const effectiveNom = selectedMed?.nom ?? "";
 
   function applyScanned(result: ScanResult) {
     if (result.medicamentNom) {
@@ -188,7 +184,6 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         appliquerMedicament(match);
       } else {
         setMedicamentId("");
-        setMedicamentNomLibre(result.medicamentNom);
       }
     }
     if (result.voie) setVoie(result.voie);
@@ -306,17 +301,6 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
           medicaments={medicaments}
           value={selectedMed ?? null}
           onChange={choisirMedicament}
-          allowFreeText
-          freeText={medicamentNomLibre}
-          onFreeTextChange={(value) => {
-            setMedicamentNomLibre(value);
-            if (value) {
-              setMedicamentId("");
-              setPreconisationChargee(false);
-              setDoseRecommandee(null);
-              setDoseBase("");
-            }
-          }}
         />
       </div>
 
@@ -417,3 +401,4 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
     </form>
   );
 }
+
