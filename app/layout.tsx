@@ -12,6 +12,9 @@ import UndoProvider from "@/app/components/UndoProvider";
 import LogoutButton from "@/app/components/LogoutButton";
 import Image from "next/image";
 import NavigationRestoration from "@/app/components/NavigationRestoration";
+import { UserPreferencesProvider } from "@/components/UserPreferencesProvider";
+import GlobalSettingsButton from "@/components/GlobalSettingsButton";
+import LayoutPersonalizer from "@/components/LayoutPersonalizer";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -41,6 +44,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className={`${geist.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-gray-100">
+        <UserPreferencesProvider>
         <header className="print:hidden bg-green-700 text-white shadow-md sticky top-0 z-30">
           <div className="flex items-center justify-between px-4 py-2.5">
             <div className="flex items-center gap-2.5">
@@ -57,6 +61,7 @@ export default function RootLayout({
               <GlobalScanner />
               <VoiceButton />
               <NotificationBell />
+              <GlobalSettingsButton />
               <LogoutButton />
             </div>
           </div>
@@ -70,8 +75,10 @@ export default function RootLayout({
           <main className="flex-1 overflow-auto">
             {children}
           </main>
+          <LayoutPersonalizer />
           <InstallPrompt />
         </UndoProvider>
+        </UserPreferencesProvider>
       </body>
     </html>
   );
