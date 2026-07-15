@@ -43,6 +43,8 @@ import GroupeButton from "./GroupeButton";
 import EvenementsSection from "./EvenementsSection";
 import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
 import LierVeauButton from "./LierVeauButton";
+import ReproductionStatusEditor from "@/components/ReproductionStatusEditor";
+import type { EtatGestation } from "@/lib/utils";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -120,9 +122,9 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
   if (!animal) notFound();
 
-  const etat =
-    animal.sexbov === "F" && !animal.estGenisse
-      ? getEtatGestation(
+  const etat: EtatGestation | null =
+    animal.sexbov === "F"
+      ? (animal.reproductionEtatManuel as EtatGestation | null) ?? getEtatGestation(
           animal.saillies[0]?.date ?? null,
           animal.saillies[0]?.gestation?.etat ?? null,
           animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
@@ -697,11 +699,18 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     : "bg-gray-50 border border-gray-200"
                 }`}
               >
-                <span
-                  className={`text-sm font-bold px-3 py-1.5 rounded-full ${getBadgeClass(etat)}`}
-                >
-                  {getEtatLabel(etat)}
-                </span>
+                <div className="flex items-center">
+                  <span
+                    className={`text-sm font-bold px-3 py-1.5 rounded-full ${getBadgeClass(etat)}`}
+                  >
+                    {getEtatLabel(etat)}
+                  </span>
+                  <ReproductionStatusEditor
+                    animalIds={[animal.id]}
+                    currentStatus={etat}
+                    previousStatus={animal.reproductionEtatPrecedent as EtatGestation | null}
+                  />
+                </div>
                 {animal.saillies[0]?.gestation?.dateVelagePrevue && (
                   <div className="text-sm text-gray-700">
                     Vélage prévu:{" "}
