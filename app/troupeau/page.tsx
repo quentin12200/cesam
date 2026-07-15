@@ -11,7 +11,7 @@ import {
   type CategorieAnimal,
 } from "@/lib/utils";
 import Link from "next/link";
-import { Search, Plus, SlidersHorizontal, Table2, LayoutGrid } from "lucide-react";
+import { Search, Plus, SlidersHorizontal } from "lucide-react";
 import { addDays, differenceInDays, differenceInMonths, subDays } from "date-fns";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { Suspense } from "react";
@@ -286,7 +286,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   ];
 
   return (
-    <div className={`p-4 space-y-4 ${vue === "tableau" ? "max-w-5xl" : "max-w-2xl md:max-w-3xl lg:max-w-4xl"} mx-auto pb-24`}>
+    <div className="p-4 space-y-4 max-w-6xl mx-auto pb-24">
       <TroupeauScrollRestorer />
       <TroupeauTabs />
       <div className="flex items-center gap-3 mt-2">
@@ -307,15 +307,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             </span>
           )}
         </Link>
-        <Link
-          href={buildUrl({ vue: vue === "tableau" ? undefined : "tableau" })}
-          className={`p-2 rounded-lg shadow transition-colors ${
-            vue === "tableau" ? "bg-green-700 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
-          }`}
-          title={vue === "tableau" ? "Vue cartes" : "Vue tableau"}
-        >
-          {vue === "tableau" ? <LayoutGrid size={16} /> : <Table2 size={16} />}
-        </Link>
+
         <MoreMenu
           printHref={`/troupeau/impression?${new URLSearchParams(
             Object.fromEntries(
@@ -652,8 +644,8 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               estGenisse: a.estGenisse,
               tarieFaite: a.tarieFaite,
               aEchographier: a.aEchographier,
-              reproductionEtatManuel: a.reproductionEtatManuel,
-              reproductionEtatPrecedent: a.reproductionEtatPrecedent,
+              reproductionEtatManuel: a.reproductionEtatManuel as AnimalRow["reproductionEtatManuel"],
+              reproductionEtatPrecedent: a.reproductionEtatPrecedent as AnimalRow["reproductionEtatPrecedent"],
               categorie: a.categorie,
               groupeNom: a.groupe?.nom ?? null,
               saillieDate: a.saillies[0]?.date.toISOString() ?? null,
