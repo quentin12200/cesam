@@ -113,13 +113,28 @@ export default function LayoutPersonalizer() {
     if (!moduleInfo || !ready) return;
     const controller = new AbortController();
     const retryTimers: number[] = [];
+    const activeModuleId = moduleInfo.id;
 
     function mergeAndApply(found: SectionPreference[], remote: SectionPreference[] | null) {
       if (found.length === 0) return;
       defaultOrder.current = found;
-      const remoteMap = new Map(remote?.map((section) => [section.id, section]));
+
+      // Compatibilité avec les dispositions enregistrées avant la stabilisation
+      // des identifiants des deux sections d'alertes de l'accueil.
+      const normalizedRemote = remote?.map((section) => {
+        if (activeModuleId !== "accueil") return section;
+        if (section.id === "reproduction-velage") {
+          return { ...section, id: "accueil-reproduction-velage" };
+        }
+        if (section.id === "sante-vaccins") {
+          return { ...section, id: "accueil-sante-vaccins" };
+        }
+        return section;
+      }) ?? null;
+
+      const remoteMap = new Map(normalizedRemote?.map((section) => [section.id, section]));
       const ordered = [
-        ...(remote ?? []).filter((section) => found.some((item) => item.id === section.id)),
+        ...(normalizedRemote ?? []).filter((section) => found.some((item) => item.id === section.id)),
         ...found.filter((section) => !remoteMap.has(section.id)),
       ].map((section) => ({ ...section, visible: remoteMap.get(section.id)?.visible ?? true }));
 
