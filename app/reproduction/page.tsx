@@ -454,7 +454,457 @@ function ReproductionContent() {
     if (!saillieDate) { setSaillieError("Choisissez une date"); return; }
     setSaving(true);
     try {
-  …6923 tokens truncated… "" : nom); }}
+      let taureauId: string | undefined;
+      if (saillieType === "NATURELLE") {
+        if (saillieTaureauId) {
+          taureauId = saillieTaureauId;
+        } else if (saillieTaureauNom.trim()) {
+          const res = await fetch("/api/taureaux", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nupere: saillieTaureauNom.trim(), nopere: saillieTaureauNom.trim(), present: true }),
+          });
+          if (res.status === 409) {
+            taureauId = taureaux.find((t) => t.nupere === saillieTaureauNom.trim() || (t.nopere ?? "") === saillieTaureauNom.trim())?.id;
+          } else if (res.ok) {
+            taureauId = (await res.json()).id;
+          }
+        }
+      } else {
+        if (iaSelectedId) {
+          taureauId = iaSelectedId;
+        } else if (iaNupere.trim()) {
+          const res = await fetch("/api/taureaux", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nupere: iaNupere.trim(), nopere: iaNopere.trim() || null, traper: iaTraper.trim() || null, present: false }),
+          });
+          if (res.status === 409) {
+            taureauId = taureaux.find((t) => t.nupere === iaNupere.trim())?.id;
+          } else if (res.ok) {
+            taureauId = (await res.json()).id;
+          }
+        }
+      }
+      const res = await fetch("/api/saillies", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animalIds, date: saillieDate, type: saillieType, taureauId }),
+      });
+      if (!res.ok) {
+        setSaillieError((await res.json().catch(() => ({}))).error ?? "Erreur serveur");
+        return;
+      }
+      setMessage(animalIds.length > 1 ? `✓ Saillie enregistrée pour ${animalIds.length} vaches !` : "✓ Saillie enregistrée !");
+      setShowSaillieForm(false);
+      setFilterEtat("TOUS");
+      await fetchData();
+    } catch (err) {
+      setSaillieError("Erreur réseau : " + String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleChaleurSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const animalIds = chaleurAnimalIds.length > 0 ? chaleurAnimalIds : chaleurAnimalId ? [chaleurAnimalId] : [];
+    if (animalIds.length === 0) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/chaleurs", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animalIds, date: chaleurDate, notes: chaleurNotes.trim() || null }),
+      });
+      if (!res.ok) throw new Error();
+      setMessage(animalIds.length > 1 ? `✓ Chaleur enregistrée pour ${animalIds.length} vaches !` : "✓ Chaleur enregistrée !");
+      setShowChaleurForm(false);
+      await fetchData();
+    } catch {
+      setMessage("Erreur lors de l'enregistrement");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleEchoSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const joursGestationFinal = echoUnite === "mois" ? Math.round(echoJours * 30.5) : echoJours;
+      const res = await fetch("/api/echographies", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          saillieId: echoSaillieId, date: echoDate, resultat: echoResultat,
+          joursGestation: echoResultat === "PLEINE" ? joursGestationFinal : undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setMessage("✓ Échographie enregistrée !");
+      setShowEchoForm(false);
+      await fetchData();
+    } catch (err) {
+      setMessage("Erreur: " + String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function marquerVide(vache: VacheRepro) {
+    if (!vache.saillieId) return;
+    setSaving(true);
+    try {
+      await fetch("/api/echographies", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saillieId: vache.saillieId, date: today, resultat: "VIDE" }),
+      });
+      setMessage(`${vache.nutrav} marquée vide`);
+      setConfirmVideId(null);
+      await fetchData();
+    } catch {
+      setMessage("Erreur");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteSaillie(vache: VacheRepro) {
+    if (!vache.saillieId) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/saillies/${vache.saillieId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setMessage(`Erreur : ${data.error ?? "impossible de supprimer"}`);
+        return;
+      }
+      setMessage(`✓ Saillie de ${vache.nutrav} supprimée`);
+      setConfirmDeleteSaillieId(null);
+      await fetchData();
+    } catch {
+      setMessage("Erreur réseau");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleGroupageSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (groupageIds.length === 0) { setGroupageError("Sélectionnez au moins une vache"); return; }
+    if (!groupageDate) { setGroupageError("Choisissez une date"); return; }
+    setSaving(true);
+    setGroupageError(null);
+    try {
+      const taureauId = groupageTaureauId || undefined;
+      const results = await Promise.allSettled(
+        groupageIds.map((id) =>
+          fetch("/api/saillies", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ animalId: id, date: groupageDate, type: groupageType, taureauId }),
+          })
+        )
+      );
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      const ko = results.length - ok;
+      setMessage(`✓ Groupage : ${ok} saillie${ok > 1 ? "s" : ""} enregistrée${ok > 1 ? "s" : ""}${ko > 0 ? ` (${ko} échec)` : ""}`);
+      setShowGroupageForm(false);
+      setFilterEtat("TOUS");
+      await fetchData();
+    } catch {
+      setGroupageError("Erreur réseau");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const groupageFiltered = vaches.filter((v) => {
+    const q = groupageQuery.toLowerCase();
+    return v.nutrav.toLowerCase().includes(q) || (v.nobovi ?? "").toLowerCase().includes(q);
+  });
+
+  // ── RENDER ──────────────────────────────────────────────────────────────
+  return (
+    <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
+
+      {/* Header */}
+      <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center gap-3">
+<h2 className="text-xl font-bold text-gray-800">Reproduction</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/reproduction/impression" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" title="Imprimer">
+            <Printer size={18} />
+          </Link>
+          <Link href="/taureaux" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" title="Taureaux">
+            <Settings size={18} />
+          </Link>
+        </div>
+      </div>
+
+      {/* Barre d'actions rapides */}
+      <div className="grid grid-cols-4 gap-2">
+        <button
+          onClick={() => openChaleurForm()}
+          className="flex flex-col items-center gap-1.5 py-3 bg-pink-600 text-white rounded-xl font-semibold text-sm shadow active:scale-95 transition-transform"
+        >
+          <span className="text-2xl leading-none">🌡️</span>
+          <span>Chaleur</span>
+        </button>
+        <button
+          onClick={() => openSaillieForm()}
+          className="flex flex-col items-center gap-1.5 py-3 bg-green-700 text-white rounded-xl font-semibold text-sm shadow active:scale-95 transition-transform"
+        >
+          <span className="text-2xl leading-none">🐄</span>
+          <span>Saillie / IA</span>
+        </button>
+        <button
+          onClick={openGroupageForm}
+          className="flex flex-col items-center gap-1.5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow active:scale-95 transition-transform"
+        >
+          <Users size={22} />
+          <span>Groupage</span>
+        </button>
+        <Link
+          href="/sanitaire/nouvel-evenement"
+          className="flex flex-col items-center gap-1.5 py-3 bg-red-600 text-white rounded-xl font-semibold text-sm shadow active:scale-95 transition-transform"
+        >
+          <Stethoscope size={22} />
+          <span>Signaler</span>
+        </Link>
+      </div>
+
+      {/* Message de retour */}
+      {message && (
+        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl text-sm flex items-center justify-between">
+          {message}
+          <button onClick={() => setMessage(null)} className="font-bold ml-2 text-lg leading-none">×</button>
+        </div>
+      )}
+
+      {/* Le calendrier de gestation détaillé vit maintenant sur la page Vélage */}
+      <Link
+        href="/velage"
+        className="flex items-center gap-2 bg-white rounded-xl shadow px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+      >
+        <Baby size={18} className="text-pink-500" />
+        <span className="flex-1 font-medium">Voir le calendrier de gestation et enregistrer un vélage</span>
+        <span className="text-gray-400">→</span>
+      </Link>
+
+      {/* Filtres */}
+      <div className="bg-white rounded-xl shadow p-2 flex gap-1 overflow-x-auto">
+        {(["TOUS", "ROUGE", "REPOS", "JAUNE", "VERT", "ROSE", "GRIS"] as FilterEtat[]).map((etat) => {
+          const count = etat === "TOUS" ? vachesAvecEtat.length : counts[etat];
+          const isActive = filterEtat === etat;
+          const cls =
+            etat === "TOUS" ? (isActive ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-600")
+            : etat === "ROUGE" ? (isActive ? "bg-red-500 text-white" : "bg-red-100 text-red-600")
+            : etat === "JAUNE" ? (isActive ? "bg-yellow-400 text-black" : "bg-yellow-50 text-yellow-700")
+            : etat === "VERT" ? (isActive ? "bg-green-500 text-white" : "bg-green-100 text-green-700")
+            : etat === "ROSE" ? (isActive ? "bg-pink-400 text-white" : "bg-pink-100 text-pink-600")
+            : etat === "REPOS" ? (isActive ? "bg-sky-500 text-white" : "bg-sky-100 text-sky-700")
+            : (isActive ? "bg-gray-400 text-white" : "bg-gray-100 text-gray-600");
+          return (
+            <button key={etat} onClick={() => setFilterEtat(etat)}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${cls}`}>
+              {filterLabels[etat]} <span className="font-bold ml-0.5">({count})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Liste vaches */}
+      {loading ? (
+        <div className="text-center py-12 text-gray-400">Chargement…</div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((vache) => {
+            const joursDepuisChaleur = vache.derniereChaleur
+              ? differenceInDays(now, new Date(vache.derniereChaleur)) : null;
+            return (
+              <div key={vache.id} className="bg-white rounded-xl shadow p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Link href={`/troupeau/${vache.nutrav}`}>
+                      <span className="bg-green-700 text-white text-xs font-bold px-2 py-1 rounded-lg font-mono">{vache.nutrav}</span>
+                    </Link>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-gray-800 text-sm">{vache.nobovi ?? "Sans nom"}</span>
+                        {vache.estGenisse && (
+                          <span className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-medium">Génisse</span>
+                        )}
+                        {vache.categorie === "A_ENGRAISSER" && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">🥩 À engraisser</span>
+                        )}
+                        {vache.derniereSaillie && new Date(vache.derniereSaillie) > now && (
+                          <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium animate-pulse">⚠️ Date saillie future</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {vache.derniereSaillie ? `Saillie : ${formatDate(new Date(vache.derniereSaillie))}` : "Pas de saillie"}
+                      </div>
+                      {vache.taureauNom && <div className="text-xs text-gray-400">Père : {vache.taureauNom}</div>}
+                      {vache.derniereChaleur && (
+                        <div className="text-xs text-pink-500 mt-0.5">
+                          Chaleur : {formatDate(new Date(vache.derniereChaleur))} · J+{joursDepuisChaleur}
+                        </div>
+                      )}
+                      {vache.dateVelagePrevue && (vache.etat === "VERT" || vache.etat === "ROSE") && (
+                        <div className="text-xs text-green-700 font-medium mt-0.5">
+                          Terme : {formatDate(new Date(vache.dateVelagePrevue))} · J-{differenceInDays(new Date(vache.dateVelagePrevue), now)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${getBadgeClass(vache.etat)}`}>
+                      {getEtatLabel(vache.etat)}
+                    </span>
+                    {joursDepuisChaleur !== null && joursDepuisChaleur <= 2 && (
+                      <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">🌡️ En chaleur</span>
+                    )}
+                    {joursDepuisChaleur !== null && joursDepuisChaleur >= 19 && joursDepuisChaleur <= 21 && (
+                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold animate-pulse">⚡ Retour chaleur J+{joursDepuisChaleur} ?</span>
+                    )}
+                    <div className="flex gap-1 flex-wrap justify-end">
+                      {(vache.etat === "JAUNE" || vache.etat === "GRIS") && vache.saillieId && (
+                        <button onClick={() => openEchoForm(vache)}
+                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg flex items-center gap-1">
+                          <CheckCircle size={12} /> Écho
+                        </button>
+                      )}
+                      {(vache.etat === "ROUGE" || vache.etat === "REPOS") && (
+                        <button onClick={() => openChaleurForm(vache)}
+                          className="text-xs bg-pink-100 text-pink-700 px-2 py-1 rounded-lg">
+                          🌡️ Chaleur
+                        </button>
+                      )}
+                      <button onClick={() => openSaillieForm(vache)}
+                        className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg flex items-center gap-1">
+                        <RefreshCw size={12} /> Saillie
+                      </button>
+                    </div>
+                    {vache.saillieId && vache.etat !== "ROUGE" && vache.etat !== "REPOS" && (
+                      confirmVideId === vache.id ? (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-xs text-gray-500">Non pleine ?</span>
+                          <button onClick={() => marquerVide(vache)} disabled={saving}
+                            className="text-xs bg-blue-500 text-white px-2 py-1 rounded-lg font-semibold">Oui</button>
+                          <button onClick={() => setConfirmVideId(null)}
+                            className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-lg">Non</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmVideId(vache.id)}
+                          className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-0.5">
+                          ✗ Marquer vide
+                        </button>
+                      )
+                    )}
+                    {vache.saillieId && (
+                      confirmDeleteSaillieId === vache.id ? (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-xs text-gray-500">Supprimer saillie ?</span>
+                          <button onClick={() => deleteSaillie(vache)} disabled={saving}
+                            className="text-xs bg-red-600 text-white px-2 py-1 rounded-lg font-semibold">Oui</button>
+                          <button onClick={() => setConfirmDeleteSaillieId(null)}
+                            className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-lg">Non</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmDeleteSaillieId(vache.id)}
+                          className="text-xs text-gray-400 hover:text-red-600 transition-colors mt-0.5">
+                          🗑 Saillie incorrecte
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="text-center text-gray-500 py-12 bg-white rounded-xl shadow">Aucune vache dans cette catégorie</div>
+          )}
+        </div>
+      )}
+
+      {/* ── Modal Chaleur ───────────────────────────────────────────────── */}
+      {showChaleurForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
+          <div className="bg-white rounded-t-2xl w-full p-5 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800">🌡️ Observer une chaleur</h3>
+              <button onClick={() => setShowChaleurForm(false)} className="text-gray-400 text-2xl leading-none">×</button>
+            </div>
+            <form onSubmit={handleChaleurSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vache{chaleurAnimalIds.length > 1 ? "s" : ""}</label>
+                {chaleurAnimalIds.length > 0 ? (
+                  <VachesSelectionnees vaches={vaches} ids={chaleurAnimalIds} onChange={setChaleurAnimalIds} />
+                ) : (
+                  <VacheSearch vaches={vaches} selectedId={chaleurAnimalId} onSelect={setChaleurAnimalId} placeholder="Numéro ou nom de la vache…" />
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;observation</label>
+                <DateInput value={chaleurDate} onChange={setChaleurDate} required
+                  className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes <span className="text-gray-400 font-normal">(optionnel)</span></label>
+                <input type="text" value={chaleurNotes} onChange={(e) => setChaleurNotes(e.target.value)}
+                  placeholder="ex : chaleur forte, montée, mucus…"
+                  className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
+              </div>
+              <button type="submit" disabled={saving || (chaleurAnimalIds.length === 0 && !chaleurAnimalId)}
+                className="w-full bg-pink-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50">
+                {saving ? "Enregistrement…" : chaleurAnimalIds.length > 1 ? `Enregistrer pour ${chaleurAnimalIds.length} vaches` : "Enregistrer la chaleur"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Saillie ───────────────────────────────────────────────── */}
+      {showSaillieForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
+          <div className="bg-white rounded-t-2xl w-full p-5 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800">🐄 Enregistrer une saillie</h3>
+              <button onClick={() => setShowSaillieForm(false)} className="text-gray-400 text-2xl leading-none">×</button>
+            </div>
+            <form onSubmit={handleSaillieSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vache{saillieAnimalIds.length > 1 ? "s" : ""}</label>
+                {saillieAnimalIds.length > 0 ? (
+                  <VachesSelectionnees vaches={vaches} ids={saillieAnimalIds} onChange={setSaillieAnimalIds} />
+                ) : (
+                  <VacheSearch vaches={vaches} selectedId={saillieAnimalId} onSelect={setSaillieAnimalId} placeholder="Numéro ou nom de la vache…" />
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <DateInput value={saillieDate} onChange={setSaillieDate} required
+                  className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setSaillieType("NATURELLE")}
+                    className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${saillieType === "NATURELLE" ? "bg-green-700 text-white border-green-700" : "border-gray-200 text-gray-600"}`}>
+                    🐄 Naturelle
+                  </button>
+                  <button type="button" onClick={() => setSaillieType("IA")}
+                    className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${saillieType === "IA" ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 text-gray-600"}`}>
+                    💉 Insémination
+                  </button>
+                </div>
+              </div>
+
+              {saillieType === "NATURELLE" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Taureau <span className="text-gray-400 font-normal">(optionnel)</span></label>
+                  <TaureauSearch
+                    taureaux={farmBulls}
+                    selectedId={saillieTaureauId}
+                    onSelect={(id, nom) => { setSaillieTaureauId(id ?? ""); setSaillieTaureauNom(id ? "" : nom); }}
                     onClear={() => { setSaillieTaureauId(""); setSaillieTaureauNom(""); }}
                   />
                   {saillieTaureauNom && !saillieTaureauId && (
