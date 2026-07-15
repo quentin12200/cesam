@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CheckCircle2, ChevronDown, Pencil, Settings2, Pill, Plus, Clock, AlertTriangle, ScanLine, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, Pencil, Settings2, Pill, Clock, AlertTriangle } from "lucide-react";
 import { addDays } from "date-fns";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
@@ -11,7 +11,6 @@ import { getCategorieLabel } from "@/lib/evenements-sanitaires";
 import EvenementEditPanel from "./EvenementEditPanel";
 import TraitementForm from "./TraitementForm";
 import TraitementEditForm from "./TraitementEditForm";
-import { scanAndPersistOrdonnance } from "@/lib/scan-ordonnance-client";
 import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 
 export interface TraitementRow {
@@ -57,18 +56,6 @@ export interface EvenementRow {
   symptomes: { id: string; libelle: string; typeEvenementId: string | null }[];
   reponses: ReponseRow[];
   traitements: TraitementRow[];
-}
-
-interface ScanResult {
-  medicamentNom: string | null;
-  voie: string | null;
-  dose: number | null;
-  uniteDosage: string | null;
-  dureeJours: number | null;
-  dateDebut: string | null;
-  veterinaire: string | null;
-  motif: string | null;
-  ordonnanceNumero: string | null;
 }
 
 function formatValeur(r: ReponseRow): string {
@@ -396,26 +383,6 @@ interface Props {
 
 export default function EvenementsSection({ animalId, evenements, traitementsOrphelins, affichageDelaiAttente }: Props) {
   const router = useRouter();
-  const [showForm, setShowForm] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const [pendingScan, setPendingScan] = useState<ScanResult | undefined>();
-  const [pendingOrdonnanceId, setPendingOrdonnanceId] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  async function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-    setScanning(true);
-    try {
-      const { ordonnanceId, extracted } = await scanAndPersistOrdonnance(file);
-      setPendingScan(extracted);
-      setPendingOrdonnanceId(ordonnanceId);
-      setShowForm(true);
-    } finally {
-      setScanning(false);
-    }
-  }
 
   async function terminer(id: string) {
     await fetch(`/api/traitements/${id}`, {
@@ -437,7 +404,7 @@ export default function EvenementsSection({ animalId, evenements, traitementsOrp
 
   return (
     <div className="bg-white rounded-xl shadow p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center mb-3">
         <h3 className="font-semibold text-gray-800 flex items-center gap-2">
           <AlertCircle size={16} className="text-red-500" />
           Événements
@@ -445,35 +412,9 @@ export default function EvenementsSection({ animalId, evenements, traitementsOrp
             <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{items.length}</span>
           )}
         </h3>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={scanning}
-            className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
-            title="Scanner une ordonnance (photo ou PDF)"
-          >
-            {scanning ? <Loader2 size={13} className="animate-spin" /> : <ScanLine size={13} />}
-            {scanning ? "Scan..." : "Scanner"}
-          </button>
-          <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFilePick} />
-          <button onClick={() => { setShowForm((v) => !v); setPendingScan(undefined); setPendingOrdonnanceId(null); }}
-            className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
-            <Plus size={13} /> Traitement
-          </button>
-        </div>
       </div>
 
-      {showForm && (
-        <TraitementForm
-          animalId={animalId}
-          onClose={() => { setShowForm(false); setPendingScan(undefined); setPendingOrdonnanceId(null); }}
-          initialScan={pendingScan}
-          initialOrdonnanceId={pendingOrdonnanceId}
-        />
-      )}
-
-      {items.length === 0 && !showForm ? (
+      {items.length === 0 ? (
         <div className="text-center py-6 text-gray-400 text-sm">Aucun événement enregistré</div>
       ) : (
         <div className="space-y-2 mt-2">
@@ -489,3 +430,4 @@ export default function EvenementsSection({ animalId, evenements, traitementsOrp
     </div>
   );
 }
+
