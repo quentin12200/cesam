@@ -69,7 +69,7 @@ export default function GlobalSettingsButton() {
             </div>
 
             <div className="mt-5 rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
-              Dans chaque module, utilisez « Modifier la mise en page » pour changer l’ordre, masquer des sections ou choisir la densité.
+              Sur ordinateur, utilisez « Modifier la mise en page » pour changer l’ordre ou masquer des sections. La disposition enregistrée est ensuite appliquée automatiquement sur le téléphone du même profil.
             </div>
           </section>
         </div>
