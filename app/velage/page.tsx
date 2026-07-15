@@ -40,7 +40,10 @@ export default async function VelagePage() {
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
       <TroupeauTabs />
-      <h2 className="text-xl font-bold text-gray-800 mt-2">Vélage</h2>
+      <div className="mt-2">
+        <h2 className="text-xl font-bold text-gray-800">Vêlages</h2>
+        <p className="text-xs text-gray-500">Préparer, suivre et enregistrer les vêlages</p>
+      </div>
 
       {/* Action principale */}
       <VelageFormWrapper />
