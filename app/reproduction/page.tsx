@@ -13,6 +13,7 @@ import ReproductionStatusEditor from "@/components/ReproductionStatusEditor";
 import type { EtatGestation as EtatGestationPartage } from "@/lib/utils";
 import ReproScrollRestorer from "./ReproScrollRestorer";
 import { ACTION_VISUALS } from "@/components/action-visuals";
+import TroupeauTabs from "@/components/TroupeauTabs";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
@@ -683,6 +684,7 @@ function ReproductionContent() {
   // ── RENDER ──────────────────────────────────────────────────────────────
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
+      <TroupeauTabs />
 
       {/* Header */}
       <div className="flex items-center justify-between mt-2">
