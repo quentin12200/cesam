@@ -678,7 +678,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                     animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
                     animal.velagesVache[0]?.date ?? null,
                     animal.aEchographier
-                  )))
+                  ))
                 : null;
             const veau = animal.velagesVache[0]?.veau;
             const enAttente = animal.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente);
