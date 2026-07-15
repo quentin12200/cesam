@@ -107,7 +107,7 @@ export default function LayoutPersonalizer() {
     const timer = window.setTimeout(() => {
       const found = discover();
       defaultOrder.current = found;
-      const raw = localStorage.getItem(storageKey(profile, moduleInfo.id));
+      const raw = localStorage.getItem(storageKey(profile, moduleId));
       let saved: LayoutPreference | null = null;
       try { saved = raw ? JSON.parse(raw) as LayoutPreference : null; } catch { saved = null; }
 
@@ -126,6 +126,7 @@ export default function LayoutPersonalizer() {
   }, [apply, discover, moduleInfo?.id, profile, ready]);
 
   if (!moduleInfo || !ready) return null;
+  const moduleId = moduleInfo.id;
 
   function currentPreference(): LayoutPreference {
     return { density, sections };
@@ -144,13 +145,13 @@ export default function LayoutPersonalizer() {
   }
 
   function save() {
-    localStorage.setItem(storageKey(profile, moduleInfo.id), JSON.stringify(currentPreference()));
+    localStorage.setItem(storageKey(profile, moduleId), JSON.stringify(currentPreference()));
     apply(currentPreference(), false);
     setEditing(false);
   }
 
   function cancel() {
-    const raw = localStorage.getItem(storageKey(profile, moduleInfo.id));
+    const raw = localStorage.getItem(storageKey(profile, moduleId));
     const saved = raw ? JSON.parse(raw) as LayoutPreference : { density: "confortable" as Density, sections: defaultOrder.current };
     setSections(saved.sections);
     setDensity(saved.density);
