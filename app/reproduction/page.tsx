@@ -9,6 +9,8 @@ import {
   RefreshCw, CheckCircle,
   Settings, Printer, Users, Baby, MoreHorizontal, Eye,
 } from "lucide-react";
+import ReproductionStatusEditor from "@/components/ReproductionStatusEditor";
+import type { EtatGestation as EtatGestationPartage } from "@/lib/utils";
 import ReproScrollRestorer from "./ReproScrollRestorer";
 import { ACTION_VISUALS } from "@/components/action-visuals";
 
@@ -29,6 +31,9 @@ interface VacheRepro {
   aEchographier: boolean;
   estGenisse: boolean;
   categorie: string | null;
+  reproductionEtatManuel: EtatGestation | null;
+  reproductionEtatPrecedent: EtatGestation | null;
+  reproductionEtatModifieAt: string | null;
 }
 
 interface Taureau {
@@ -303,6 +308,8 @@ function ReproductionContent() {
   const [confirmVideId, setConfirmVideId] = useState<string | null>(null);
   const [confirmDeleteSaillieId, setConfirmDeleteSaillieId] = useState<string | null>(null);
   const [menuVacheId, setMenuVacheId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedAnimalIds, setSelectedAnimalIds] = useState<string[]>([]);
 
   // ── Saillie form state ──
   const [showSaillieForm, setShowSaillieForm] = useState(false);
@@ -448,7 +455,7 @@ function ReproductionContent() {
   // ── Computed ──
   const vachesAvecEtat = vaches.map((v) => ({
     ...v,
-    etat: getEtatGestation(
+    etat: v.reproductionEtatManuel ?? getEtatGestation(
       v.derniereSaillie ? new Date(v.derniereSaillie) : null,
       v.gestationEtat,
       v.dateVelagePrevue ? new Date(v.dateVelagePrevue) : null,
@@ -474,6 +481,33 @@ function ReproductionContent() {
     ? differenceInDays(echoDateVelagePrevue, new Date(echoDate)) : null;
 
   // ── Handlers ──
+  function toggleSelection(animalId: string) {
+    setSelectedAnimalIds((ids) => ids.includes(animalId) ? ids.filter((id) => id !== animalId) : [...ids, animalId]);
+  }
+
+  async function passerSelectionAEcho() {
+    if (selectedAnimalIds.length === 0) return;
+    if (!window.confirm(`Passer ${selectedAnimalIds.length} animal(aux) au statut « À écho » ?`)) return;
+    setSaving(true);
+    try {
+      const response = await fetch("/api/reproduction/statut", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animalIds: selectedAnimalIds, statut: "JAUNE" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Modification impossible");
+      setMessage(`${selectedAnimalIds.length} animal(aux) passé(s) à écho`);
+      setSelectedAnimalIds([]);
+      setSelectionMode(false);
+      await fetchData();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Modification impossible");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleSaillieSubmit(e: React.FormEvent) {
     e.preventDefault();
     const animalIds = saillieAnimalIds.length > 0 ? saillieAnimalIds : saillieAnimalId ? [saillieAnimalId] : [];
@@ -717,6 +751,27 @@ function ReproductionContent() {
         })}
       </div>
 
+      {/* Sélection multiple */}
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => { setSelectionMode((active) => !active); setSelectedAnimalIds([]); }}
+          className={`min-h-10 rounded-xl border px-3 text-sm font-semibold ${selectionMode ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 bg-white text-gray-700"}`}
+        >
+          {selectionMode ? "Annuler la sélection" : "Sélectionner plusieurs animaux"}
+        </button>
+        {selectionMode && selectedAnimalIds.length > 0 && (
+          <button
+            type="button"
+            disabled={saving}
+            onClick={passerSelectionAEcho}
+            className="min-h-10 rounded-xl bg-amber-500 px-3 text-sm font-bold text-white disabled:opacity-50"
+          >
+            Passer à écho ({selectedAnimalIds.length})
+          </button>
+        )}
+      </div>
+
       {/* Liste vaches */}
       {loading ? (
         <div className="text-center py-12 text-gray-400">Chargement…</div>
@@ -743,6 +798,15 @@ function ReproductionContent() {
               <article key={vache.id} className={`rounded-xl border-2 bg-white px-3 py-2.5 shadow-sm ${carteEtat.border}`}>
                 {/* Ligne 1 : identité et statut */}
                 <div className="flex min-w-0 items-center gap-2">
+                  {selectionMode && (
+                    <input
+                      type="checkbox"
+                      checked={selectedAnimalIds.includes(vache.id)}
+                      onChange={() => toggleSelection(vache.id)}
+                      aria-label={`Sélectionner ${vache.nutrav}`}
+                      className="h-5 w-5 shrink-0 accent-green-700"
+                    />
+                  )}
                   <Link
                     href={`/troupeau/${vache.nutrav}`}
                     className="shrink-0 font-mono text-sm font-bold text-green-800 hover:underline"
@@ -756,9 +820,17 @@ function ReproductionContent() {
                   >
                     {vache.nobovi ?? "Sans nom"}
                   </Link>
-                  <span className={`max-w-28 shrink-0 text-right text-[11px] font-bold leading-tight ${carteEtat.text}`}>
-                    {carteEtat.label}
-                  </span>
+                  <div className="flex shrink-0 items-center">
+                    <span className={`max-w-28 text-right text-[11px] font-bold leading-tight ${carteEtat.text}`}>
+                      {carteEtat.label}
+                    </span>
+                    <ReproductionStatusEditor
+                      animalIds={[vache.id]}
+                      currentStatus={vache.etat as EtatGestationPartage}
+                      previousStatus={vache.reproductionEtatPrecedent as EtatGestationPartage | null}
+                      onChanged={fetchData}
+                    />
+                  </div>
                 </div>
 
                 {/* Ligne 2 : informations secondaires */}

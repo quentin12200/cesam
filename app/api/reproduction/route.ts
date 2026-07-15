@@ -37,6 +37,9 @@ export async function GET() {
       danais: true,
       estGenisse: true,
       aEchographier: true,
+      reproductionEtatManuel: true,
+      reproductionEtatPrecedent: true,
+      reproductionEtatModifieAt: true,
       categorie: true,
       saillies: {
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -88,6 +91,9 @@ export async function GET() {
       return chaleur.toISOString();
     })(),
     aEchographier: v.aEchographier,
+    reproductionEtatManuel: v.reproductionEtatManuel,
+    reproductionEtatPrecedent: v.reproductionEtatPrecedent,
+    reproductionEtatModifieAt: v.reproductionEtatModifieAt?.toISOString() ?? null,
     estGenisse: v.estGenisse,
     categorie: v.categorie ?? null,
   }));
