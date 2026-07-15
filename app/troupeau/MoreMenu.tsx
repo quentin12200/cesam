@@ -34,10 +34,15 @@ export default function MoreMenu({ printHref }: { printHref: string }) {
         <MoreVertical size={18} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden w-56">
+        <div
+          role="menu"
+          aria-label="Actions secondaires du troupeau"
+          className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden w-56"
+        >
           {items.map((item) => (
             <Link
               key={item.href}
+              role="menuitem"
               href={item.href}
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
