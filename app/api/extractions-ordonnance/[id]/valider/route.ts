@@ -1,23 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthorizedEmail } from "@/lib/cesam-auth";
+import { parseDocumentUrls } from "@/lib/ordonnance-types";
 
-type ValeursFinales = {
-  dateDebut: string;
-  ordonnanceNumero: string | null;
-  veterinaire: string | null;
+type MedicamentFinal = {
   medicamentNom: string;
+  numeroLot: string | null;
   dose: number | null;
   uniteDosage: string | null;
   voie: string | null;
   frequence: string | null;
   dureeJours: number | null;
-  motif: string | null;
-  animaux: string | null;
   delaiAttenteViandeJ: number | null;
   delaiAttenteLaitJ: number | null;
   precautions: string | null;
   rappels: string | null;
+};
+
+type ValeursFinales = {
+  dateDebut: string;
+  ordonnanceNumero: string | null;
+  veterinaire: string | null;
+  motif: string | null;
+  animaux: string | null;
+  medicaments: MedicamentFinal[];
 };
 
 function texte(value: unknown): string | null {
@@ -35,35 +41,35 @@ function entier(value: unknown): number | null {
   return parsed === null ? null : Math.max(0, Math.round(parsed));
 }
 
+function normaliserMedicament(brut: Record<string, unknown>): MedicamentFinal {
+  return {
+    medicamentNom: texte(brut.medicamentNom) ?? "",
+    numeroLot: texte(brut.numeroLot),
+    dose: nombre(brut.dose),
+    uniteDosage: texte(brut.uniteDosage),
+    voie: texte(brut.voie),
+    frequence: texte(brut.frequence),
+    dureeJours: entier(brut.dureeJours),
+    delaiAttenteViandeJ: entier(brut.delaiAttenteViandeJ),
+    delaiAttenteLaitJ: entier(brut.delaiAttenteLaitJ),
+    precautions: texte(brut.precautions),
+    rappels: texte(brut.rappels),
+  };
+}
+
 function normaliser(body: Record<string, unknown>): ValeursFinales {
+  const brutMedicaments = Array.isArray(body.medicaments) ? body.medicaments : [body];
+  const medicaments = brutMedicaments
+    .map((m) => normaliserMedicament((m ?? {}) as Record<string, unknown>))
+    .filter((m) => m.medicamentNom);
   return {
     dateDebut: texte(body.dateDebut) ?? "",
     ordonnanceNumero: texte(body.ordonnanceNumero),
     veterinaire: texte(body.veterinaire),
-    medicamentNom: texte(body.medicamentNom) ?? "",
-    dose: nombre(body.dose),
-    uniteDosage: texte(body.uniteDosage),
-    voie: texte(body.voie),
-    frequence: texte(body.frequence),
-    dureeJours: entier(body.dureeJours),
     motif: texte(body.motif),
     animaux: texte(body.animaux),
-    delaiAttenteViandeJ: entier(body.delaiAttenteViandeJ),
-    delaiAttenteLaitJ: entier(body.delaiAttenteLaitJ),
-    precautions: texte(body.precautions),
-    rappels: texte(body.rappels),
+    medicaments,
   };
-}
-
-function calculerCorrections(initiale: Record<string, unknown>, finale: ValeursFinales) {
-  const corrections: Record<string, { initiale: unknown; finale: unknown }> = {};
-  for (const [champ, valeurFinale] of Object.entries(finale)) {
-    const valeurInitiale = initiale[champ] ?? null;
-    if (JSON.stringify(valeurInitiale) !== JSON.stringify(valeurFinale)) {
-      corrections[champ] = { initiale: valeurInitiale, finale: valeurFinale };
-    }
-  }
-  return corrections;
 }
 
 export async function POST(
@@ -89,51 +95,58 @@ export async function POST(
   if (!finale.dateDebut || Number.isNaN(date.getTime())) {
     return NextResponse.json({ error: "La date de l’ordonnance est requise" }, { status: 400 });
   }
-  if (!finale.medicamentNom) {
-    return NextResponse.json({ error: "Le médicament principal est requis" }, { status: 400 });
+  if (finale.medicaments.length === 0) {
+    return NextResponse.json({ error: "Au moins un médicament est requis" }, { status: 400 });
   }
 
-  let propositionInitiale: Record<string, unknown> = {};
-  try {
-    propositionInitiale = JSON.parse(extraction.propositionInitiale);
-  } catch {}
-  const corrections = calculerCorrections(propositionInitiale, finale);
+  const pages = parseDocumentUrls(extraction.documentUrls, extraction.documentUrl);
+  const photoUrlsJson = JSON.stringify(pages);
 
-  const ordonnance = await prisma.$transaction(async (tx) => {
-    const created = await tx.ordonnance.create({
-      data: {
-        date,
-        numero: finale.ordonnanceNumero,
-        veterinaireNom: finale.veterinaire,
-        medicamentNom: finale.medicamentNom,
-        dose: finale.dose,
-        uniteDosage: finale.uniteDosage,
-        voie: finale.voie,
-        frequence: finale.frequence,
-        dureeJours: finale.dureeJours,
-        motif: finale.motif,
-        animaux: finale.animaux,
-        delaiAttenteViandeJ: finale.delaiAttenteViandeJ,
-        delaiAttenteLaitJ: finale.delaiAttenteLaitJ,
-        precautions: finale.precautions,
-        rappels: finale.rappels,
-        photoUrl: extraction.documentUrl,
-        statut: "VALIDE",
-      },
-    });
+  const ordonnanceIds = await prisma.$transaction(async (tx) => {
+    const ids: string[] = [];
+    for (const med of finale.medicaments) {
+      const created = await tx.ordonnance.create({
+        data: {
+          date,
+          numero: finale.ordonnanceNumero,
+          veterinaireNom: finale.veterinaire,
+          medicamentNom: med.medicamentNom,
+          dose: med.dose,
+          uniteDosage: med.uniteDosage,
+          voie: med.voie,
+          frequence: med.frequence,
+          dureeJours: med.dureeJours,
+          motif: finale.motif,
+          animaux: finale.animaux,
+          delaiAttenteViandeJ: med.delaiAttenteViandeJ,
+          delaiAttenteLaitJ: med.delaiAttenteLaitJ,
+          precautions: med.precautions,
+          rappels: med.rappels,
+          photoUrl: pages[0] ?? extraction.documentUrl,
+          photoUrls: photoUrlsJson,
+          statut: "VALIDE",
+        },
+      });
+      ids.push(created.id);
+    }
+
     await tx.extractionOrdonnance.update({
       where: { id, statut: "A_VERIFIER" },
       data: {
         statut: "VALIDEE",
         valeursCorrigees: JSON.stringify(finale),
-        corrections: JSON.stringify(corrections),
-        resultatFinal: JSON.stringify(finale),
+        resultatFinal: JSON.stringify({ ...finale, ordonnanceIds: ids }),
         valideeLe: new Date(),
-        ordonnanceId: created.id,
+        ordonnanceId: ids[0],
       },
     });
-    return created;
+    return ids;
   });
 
-  return NextResponse.json({ ordonnanceId: ordonnance.id, statut: "VALIDEE" });
+  return NextResponse.json({
+    ordonnanceId: ordonnanceIds[0],
+    ordonnanceIds,
+    count: ordonnanceIds.length,
+    statut: "VALIDEE",
+  });
 }

@@ -597,6 +597,7 @@ model Ordonnance {
   statut         String   @default("VALIDE")
   notes          String?
   photoUrl       String?
+  photoUrls      String?  // JSON: string[] de toutes les pages du document
   traitements    Traitement[]
   vaccinations   Vaccination[]
   extraction     ExtractionOrdonnance?
@@ -608,6 +609,7 @@ model ExtractionOrdonnance {
   id                   String      @id @default(cuid())
   statut               String      @default("A_VERIFIER")
   documentUrl           String
+  documentUrls          String?     // JSON: string[] de toutes les pages
   reponseBrute          String
   propositionInitiale   String
   valeursCorrigees      String?
