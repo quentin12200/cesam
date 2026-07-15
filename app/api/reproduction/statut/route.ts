@@ -62,13 +62,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Un ou plusieurs animaux sont introuvables" }, { status: 404 });
   }
 
+  if (restaurer) {
+    const sansPrecedent = animaux.find((animal) =>
+      !animal.reproductionEtatPrecedent || !STATUTS.includes(animal.reproductionEtatPrecedent as EtatGestation)
+    );
+    if (sansPrecedent) {
+      return NextResponse.json(
+        { error: `Aucun statut précédent pour ${sansPrecedent.nutrav}` },
+        { status: 400 }
+      );
+    }
+  }
+
   const now = new Date();
   const changements = animaux.map((animal) => {
     const courant = (animal.reproductionEtatManuel as EtatGestation | null) ?? statutAutomatique(animal);
-    const cible = restaurer ? animal.reproductionEtatPrecedent as EtatGestation | null : statut!;
-    if (!cible || !STATUTS.includes(cible)) {
-      throw new Error(`Aucun statut précédent pour ${animal.nutrav}`);
-    }
+    const cible = restaurer ? animal.reproductionEtatPrecedent as EtatGestation : statut!;
     return { animal, courant, cible };
   });
 
