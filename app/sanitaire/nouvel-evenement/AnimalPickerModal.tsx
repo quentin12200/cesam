@@ -28,9 +28,10 @@ interface Props {
   onChange: (animaux: AnimalOption[]) => void;
   onClose: () => void;
   groupes: Groupe[];
+  sexeImpose?: "F" | "M";
 }
 
-export default function AnimalPickerModal({ selected, onChange, onClose, groupes }: Props) {
+export default function AnimalPickerModal({ selected, onChange, onClose, groupes, sexeImpose }: Props) {
   const [animaux, setAnimaux] = useState<AnimalPickerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -62,11 +63,12 @@ export default function AnimalPickerModal({ selected, onChange, onClose, groupes
     return animaux.filter((a) => {
       if (q && !(a.nutrav.toLowerCase().includes(q) || (a.nobovi ?? "").toLowerCase().includes(q) || a.nunati.toLowerCase().includes(q))) return false;
       if (filtreGroupe && a.groupeId !== filtreGroupe) return false;
-      if (filtreSexe && a.sexbov !== filtreSexe) return false;
+      if (sexeImpose && a.sexbov !== sexeImpose) return false;
+      if (!sexeImpose && filtreSexe && a.sexbov !== filtreSexe) return false;
       if (filtreCategorie && getCategorie(a.sexbov, new Date(a.danais), a.estGenisse, a.categorie) !== filtreCategorie) return false;
       return true;
     });
-  }, [animaux, query, filtreGroupe, filtreSexe, filtreCategorie]);
+  }, [animaux, query, filtreGroupe, filtreSexe, filtreCategorie, sexeImpose]);
 
   function toggle(a: AnimalPickerRow) {
     setSelectedIds((prev) => {
@@ -137,12 +139,18 @@ export default function AnimalPickerModal({ selected, onChange, onClose, groupes
               <option value="">Tous les lots</option>
               {groupes.map((g) => <option key={g.id} value={g.id}>{g.nom}</option>)}
             </select>
-            <select value={filtreSexe} onChange={(e) => setFiltreSexe(e.target.value as "" | "F" | "M")}
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white">
-              <option value="">Tous sexes</option>
-              <option value="F">Femelle</option>
-              <option value="M">Mâle</option>
-            </select>
+            {sexeImpose ? (
+              <span className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-gray-50 text-gray-600">
+                {sexeImpose === "F" ? "Femelles" : "Mâles"}
+              </span>
+            ) : (
+              <select value={filtreSexe} onChange={(e) => setFiltreSexe(e.target.value as "" | "F" | "M")}
+                className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white">
+                <option value="">Tous sexes</option>
+                <option value="F">Femelle</option>
+                <option value="M">Mâle</option>
+              </select>
+            )}
             <select value={filtreCategorie} onChange={(e) => setFiltreCategorie(e.target.value as "" | CategorieAnimal)}
               className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white">
               <option value="">Toutes catégories</option>
