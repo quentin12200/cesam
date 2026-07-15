@@ -459,7 +459,85 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                       {animal.taureau?.nopere ?? animal.taureau?.nupere ?? "—"}
                     </span>
                     {perePresentExploitation && (
-       …943 tokens truncated…atus.reason}`}
+                      <span className="flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                        <AlertTriangle size={11} />
+                        Présent — risque consanguinité
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {animal.taureau?.traper && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500">Race père</span>
+                    <span className="text-gray-700">{animal.taureau.traper}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Veaux */}
+              {animal.veaux.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="text-xs font-semibold text-gray-500 mb-2">
+                    Descendance ({animal.veaux.length})
+                  </div>
+                  <div className="space-y-1">
+                    {animal.veaux.map((veau) => (
+                      <Link
+                        key={veau.id}
+                        href={`/troupeau/${veau.nutrav}`}
+                        className="flex items-center justify-between py-1.5 hover:bg-gray-50 rounded px-1"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded font-bold">
+                            {veau.nutrav}
+                          </span>
+                          <span className="text-sm text-gray-700">{veau.nobovi ?? "Sans nom"}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">{formatAge(veau.danais)}</span>
+                          <span className="text-xs text-gray-400">{veau.sexbov === "M" ? "M" : "F"}</span>
+                          <span
+                            className={`text-xs px-1.5 py-0.5 rounded-full ${
+                              veau.statut === "ACTIF"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {veau.statut === "ACTIF" ? "Présent" : "Sorti"}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ─── ONGLET SANTÉ ─── */}
+        {onglet === "sante" && (
+          <>
+            {/* Protocole vaccinal visuel */}
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                Protocole vaccinal
+              </h3>
+              {/* Badge MHE vendabilité */}
+              <div
+                className={`mb-3 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+                  mheStatus.vendable
+                    ? "bg-green-50 text-green-800 border border-green-200"
+                    : "bg-red-50 text-red-800 border border-red-200"
+                }`}
+              >
+                {mheStatus.vendable ? (
+                  <ShieldCheck size={16} className="text-green-600 flex-shrink-0" />
+                ) : (
+                  <ShieldX size={16} className="text-red-600 flex-shrink-0" />
+                )}
+                MHE — {mheStatus.vendable ? "Vendable" : `Non vendable · ${mheStatus.reason}`}
               </div>
 
               <div className="space-y-1.5">
@@ -868,4 +946,3 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     </div>
   );
 }
-
