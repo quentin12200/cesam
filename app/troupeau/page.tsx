@@ -672,13 +672,13 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             const catColor = getCategorieColor(cat);
             const etat =
               ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "A_ENGRAISSER"].includes(cat)
-                ? (animal.reproductionEtatManuel ?? getEtatGestation(
+                ? ((animal.reproductionEtatManuel as ReturnType<typeof getEtatGestation> | null) ?? getEtatGestation(
                     animal.saillies[0]?.date ?? null,
                     animal.saillies[0]?.gestation?.etat ?? null,
                     animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
                     animal.velagesVache[0]?.date ?? null,
                     animal.aEchographier
-                  ))
+                  )))
                 : null;
             const veau = animal.velagesVache[0]?.veau;
             const enAttente = animal.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente);
