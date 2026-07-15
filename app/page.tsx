@@ -728,7 +728,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
 
   const todoGroups: AccueilTodoGroup[] = [];
 
-  const identificationTotal = data.bouclageItems.length + data.sevrageItems.length;
+  const identificationTotal = data.bouclageItems.length;
   const identificationEnRetard = data.bouclageItems.filter((item) => item.isUrgent).length;
   if (identificationTotal > 0) {
     const aFaireBientot = identificationTotal - identificationEnRetard;
