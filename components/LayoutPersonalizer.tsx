@@ -136,7 +136,7 @@ export default function LayoutPersonalizer() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [apply, discover, moduleInfo?.id, profile, ready]);
+  }, [apply, discover, moduleInfo, profile, ready]);
 
   if (!moduleInfo || !ready) return null;
   const moduleId = moduleInfo.id;
