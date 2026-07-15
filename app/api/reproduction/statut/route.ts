@@ -23,8 +23,14 @@ function statutAutomatique(animal: {
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const animalIds = Array.isArray(body?.animalIds)
-    ? [...new Set(body.animalIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0))]
+  const animalIds: string[] = Array.isArray(body?.animalIds)
+    ? Array.from(
+        new Set<string>(
+          body.animalIds.filter(
+            (id: unknown): id is string => typeof id === "string" && id.length > 0
+          )
+        )
+      )
     : [];
   const restaurer = body?.restaurer === true;
   const statut = body?.statut as EtatGestation | undefined;
