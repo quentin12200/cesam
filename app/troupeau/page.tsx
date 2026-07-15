@@ -21,6 +21,7 @@ import NutravBadge from "@/app/components/NutravBadge";
 import TroupeauScrollRestorer from "./TroupeauScrollRestorer";
 import TroupeauTableau, { type AnimalRow } from "./TroupeauTableau";
 import MoreMenu from "./MoreMenu";
+import TroupeauTabs from "@/components/TroupeauTabs";
 
 interface PageProps {
   searchParams: Promise<{
@@ -280,6 +281,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   return (
     <div className={`p-4 space-y-4 ${vue === "tableau" ? "max-w-5xl" : "max-w-2xl md:max-w-3xl lg:max-w-4xl"} mx-auto pb-24`}>
       <TroupeauScrollRestorer />
+      <TroupeauTabs />
       <div className="flex items-center gap-3 mt-2">
 <h2 className="text-xl font-bold text-gray-800 flex-1 min-w-0 truncate">Troupeau</h2>
         <Link
