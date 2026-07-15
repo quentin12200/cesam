@@ -6,20 +6,20 @@ import { prisma } from "@/lib/prisma";
 const PROFILS = ["Céline", "Samuel"];
 const MODULES = ["accueil", "troupeau", "reproduction", "velage", "sanitaire", "pharmacie", "finances"];
 
-function valide(profil: string | null, module: string | null) {
-  return !!profil && !!module && PROFILS.includes(profil) && MODULES.includes(module);
+function valide(profil: string | null, moduleId: string | null) {
+  return !!profil && !!moduleId && PROFILS.includes(profil) && MODULES.includes(moduleId);
 }
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const profil = url.searchParams.get("profil");
-  const module = url.searchParams.get("module");
-  if (!valide(profil, module)) {
+  const moduleId = url.searchParams.get("module");
+  if (!valide(profil, moduleId)) {
     return NextResponse.json({ error: "Profil ou module invalide" }, { status: 400 });
   }
 
   const preference = await prisma.miseEnPage.findUnique({
-    where: { profil_module: { profil: profil!, module: module! } },
+    where: { profil_module: { profil: profil!, module: moduleId! } },
   });
 
   return NextResponse.json({
@@ -31,10 +31,10 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   const body = await request.json().catch(() => null);
   const profil = typeof body?.profil === "string" ? body.profil : null;
-  const module = typeof body?.module === "string" ? body.module : null;
+  const moduleId = typeof body?.module === "string" ? body.module : null;
   const sections = Array.isArray(body?.sections) ? body.sections : null;
 
-  if (!valide(profil, module) || !sections) {
+  if (!valide(profil, moduleId) || !sections) {
     return NextResponse.json({ error: "Préférence invalide" }, { status: 400 });
   }
 
@@ -47,8 +47,8 @@ export async function PUT(request: Request) {
     .map((section) => ({ id: section.id.slice(0, 80), label: section.label.slice(0, 120), visible: section.visible }));
 
   await prisma.miseEnPage.upsert({
-    where: { profil_module: { profil: profil!, module: module! } },
-    create: { profil: profil!, module: module!, sections: JSON.stringify(nettoyees) },
+    where: { profil_module: { profil: profil!, module: moduleId! } },
+    create: { profil: profil!, module: moduleId!, sections: JSON.stringify(nettoyees) },
     update: { sections: JSON.stringify(nettoyees) },
   });
 
