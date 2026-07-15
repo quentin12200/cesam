@@ -34,6 +34,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "animalId, medicamentNom et dateDebut requis" }, { status: 400 });
   }
 
+  if (!evenementId || !medicamentId) {
+    return NextResponse.json(
+      { error: "Tout nouveau traitement doit etre lie a un evenement sanitaire et a un medicament de la Pharmacie" },
+      { status: 400 }
+    );
+  }
+
   if (evenementId) {
     const evenement = await prisma.evenementSanitaire.findFirst({
       where: { id: evenementId, animalId },
@@ -85,3 +92,4 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ ...traitement, _undoId: undoId, _undoDesc: desc }, { status: 201 });
 }
+
