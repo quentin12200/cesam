@@ -210,6 +210,7 @@ function SortHeader({
 
 export default function TroupeauTableau({ animaux, groupes }: Props) {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Read current filter state
   const currentTri = searchParams.get("tri") ?? undefined;
@@ -342,9 +343,10 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
               return (
                 <tr
                   key={animal.id}
-                  onClick={() =>
-                    (window.location.href = `/troupeau/${animal.nutrav}`)
-                  }
+                  onClick={() => {
+                    sessionStorage.setItem("troupeau:scrollY", String(window.scrollY));
+                    router.push(`/troupeau/${animal.nutrav}`);
+                  }}
                   className={`border-t border-gray-100 cursor-pointer hover:bg-green-50 transition-colors ${
                     i % 2 === 1 ? "bg-gray-50/50" : ""
                   }`}
