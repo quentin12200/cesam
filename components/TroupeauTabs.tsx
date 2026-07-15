@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { href: "/troupeau", label: "Tous" },
+  { href: "/troupeau", label: "Animaux" },
   { href: "/reproduction", label: "Reproduction" },
-  { href: "/velage", label: "Vêlage" },
+  { href: "/velage", label: "Vêlages" },
 ];
 
 export default function TroupeauTabs() {
