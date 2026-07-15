@@ -2,16 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, RefreshCw, Stethoscope, Euro } from "lucide-react";
+import { Home, Stethoscope, Euro } from "lucide-react";
 import BullHeadIcon from "@/components/BullHeadIcon";
-import CalvingIcon from "@/components/CalvingIcon";
 
 const navItems = [
   { href: "/", label: "Accueil", icon: Home },
-  { href: "/troupeau", label: "Troupeau", icon: BullHeadIcon, restore: true },
-  { href: "/reproduction", label: "Repro", icon: RefreshCw },
-  { href: "/velage", label: "Vélage", icon: CalvingIcon },
-  { href: "/sanitaire", label: "Sanitaire", icon: Stethoscope },
+  { href: "/troupeau", label: "Troupeau", icon: BullHeadIcon, restore: true, paths: ["/troupeau", "/reproduction", "/velage"] },
+  { href: "/sanitaire", label: "Sanitaire", icon: Stethoscope, paths: ["/sanitaire", "/pharmacie"] },
   { href: "/finances", label: "Finances", icon: Euro },
 ];
 
@@ -21,9 +18,9 @@ export default function TopNav() {
 
   return (
     <div className="flex border-t border-green-600/40">
-      {navItems.map(({ href, label, icon: Icon, restore }) => {
+      {navItems.map(({ href, label, icon: Icon, restore, paths }) => {
         const isActive =
-          href === "/" ? pathname === "/" : pathname.startsWith(href);
+          href === "/" ? pathname === "/" : (paths ?? [href]).some((path) => pathname.startsWith(path));
 
         function handleClick(e: React.MouseEvent) {
           if (!restore) return;
