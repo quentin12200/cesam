@@ -728,7 +728,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
 
   const todoGroups: AccueilTodoGroup[] = [];
 
-  const identificationTotal = data.bouclageItems.length + data.sevrageItems.length;
+  const identificationTotal = data.bouclageItems.length;
   const identificationEnRetard = data.bouclageItems.filter((item) => item.isUrgent).length;
   if (identificationTotal > 0) {
     const aFaireBientot = identificationTotal - identificationEnRetard;
@@ -740,7 +740,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
         ? `${identificationEnRetard} en retard · ${aFaireBientot} à faire bientôt`
         : `${aFaireBientot} à faire bientôt`,
       priority: identificationEnRetard > 0 ? "urgent" : "soon",
-      href: "/troupeau",
+      href: "/troupeau/identification",
     });
   }
 

@@ -43,6 +43,7 @@ model Animal {
 
   boucleNumero  String?
   boucleFaite   Boolean   @default(false)
+  dateBouclage DateTime?
   sevreFait     Boolean   @default(false)
   dateSevrage   DateTime?
   tarieFaite    Boolean   @default(false)

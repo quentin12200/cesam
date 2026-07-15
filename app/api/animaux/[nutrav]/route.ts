@@ -72,7 +72,7 @@ export async function PATCH(
   if ("estGenisse"    in body) prevFields.estGenisse    = animal.estGenisse;
   if ("notes"         in body) prevFields.notes         = animal.notes;
   if ("danais"        in body) prevFields.danais        = animal.danais;
-  if ("boucleFaite"   in body) prevFields.boucleFaite   = animal.boucleFaite;
+  if ("boucleFaite"   in body) { prevFields.boucleFaite = animal.boucleFaite; prevFields.dateBouclage = animal.dateBouclage; }
   if ("sevreFait"     in body) { prevFields.sevreFait = animal.sevreFait; prevFields.dateSevrage = animal.dateSevrage; }
   if ("tarieFaite"    in body) { prevFields.tarieFaite = animal.tarieFaite; prevFields.dateTarie = animal.dateTarie; }
   if ("categorie"     in body) prevFields.categorie     = animal.categorie;
@@ -96,7 +96,10 @@ export async function PATCH(
   if ("estGenisse"   in body) data.estGenisse   = body.estGenisse;
   if ("notes"        in body) data.notes        = body.notes?.trim() || null;
   if ("danais"       in body) data.danais       = new Date(body.danais);
-  if ("boucleFaite"  in body) data.boucleFaite  = body.boucleFaite;
+  if ("boucleFaite"  in body) {
+    data.boucleFaite = body.boucleFaite;
+    data.dateBouclage = body.boucleFaite ? new Date() : null;
+  }
   if ("sevreFait"    in body) {
     data.sevreFait = body.sevreFait;
     data.dateSevrage = body.sevreFait ? (body.dateSevrage ? new Date(body.dateSevrage) : new Date()) : null;
