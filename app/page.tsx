@@ -12,7 +12,7 @@ import ChecklistSection, {
   type SubItem,
 } from "@/app/components/ChecklistSection";
 import AccueilQuickActions from "@/app/components/AccueilQuickActions";
-import AccueilTodoSection, { type AccueilTodoItem } from "@/app/components/AccueilTodoSection";
+import AccueilTodoSection, { type AccueilTodoGroup } from "@/app/components/AccueilTodoSection";
 import NotesTerrain from "@/app/components/NotesTerrain";
 import RapportGestationButton from "@/app/components/RapportGestationButton";
 import PrintSectionButton from "@/app/components/PrintSectionButton";
@@ -726,161 +726,90 @@ export default async function Dashboard({ searchParams }: PageProps) {
     </Collapsible>
   );
 
-  const now = new Date();
-  const todoItems: AccueilTodoItem[] = [];
+  const todoGroups: AccueilTodoGroup[] = [];
 
-  if (data.evenementsSanitairesUrgents > 0) {
-    todoItems.push({
-      id: "sanitaire-urgent",
-      title: "Traiter les événements sanitaires",
-      subject: `${data.evenementsSanitairesUrgents} intervention${data.evenementsSanitairesUrgents > 1 ? "s" : ""} non résolue${data.evenementsSanitairesUrgents > 1 ? "s" : ""}`,
-      due: "Urgent ou en retard",
-      priority: "urgent",
-      order: 0,
+  const identificationTotal = data.bouclageItems.length + data.sevrageItems.length;
+  const identificationEnRetard = data.bouclageItems.filter((item) => item.isUrgent).length;
+  if (identificationTotal > 0) {
+    const aFaireBientot = identificationTotal - identificationEnRetard;
+    todoGroups.push({
+      id: "identification",
+      title: "Identification",
+      total: identificationTotal,
+      summary: identificationEnRetard > 0
+        ? `${identificationEnRetard} en retard · ${aFaireBientot} à faire bientôt`
+        : `${aFaireBientot} à faire bientôt`,
+      priority: identificationEnRetard > 0 ? "urgent" : "soon",
+      href: "/troupeau",
+    });
+  }
+
+  const santeTotal =
+    data.evenementsSanitairesUrgents +
+    data.vaccinationPreVelage +
+    data.bolusPreVelage +
+    data.veauxAVacciner;
+  if (santeTotal > 0) {
+    const santeSummary = data.evenementsSanitairesUrgents > 0
+      ? `${data.evenementsSanitairesUrgents} intervention${data.evenementsSanitairesUrgents > 1 ? "s" : ""} urgente${data.evenementsSanitairesUrgents > 1 ? "s" : ""}`
+      : data.vaccinationPreVelage > 0
+        ? `${data.vaccinationPreVelage} vaccination${data.vaccinationPreVelage > 1 ? "s" : ""} pré-vêlage à prévoir`
+        : data.bolusPreVelage > 0
+          ? `${data.bolusPreVelage} bolus pré-vêlage à prévoir`
+          : `${data.veauxAVacciner} vaccin${data.veauxAVacciner > 1 ? "s" : ""} à prévoir`;
+    todoGroups.push({
+      id: "sante",
+      title: "Santé",
+      total: santeTotal,
+      summary: santeSummary,
+      priority: data.evenementsSanitairesUrgents > 0 ? "urgent" : "soon",
       href: "/sanitaire",
-      actionLabel: "Traiter",
     });
   }
 
-  if (data.vachesVidesEnRetard > 0) {
-    todoItems.push({
-      id: "vaches-vides-retard",
-      title: "Contrôler les vaches vides",
-      subject: `${data.vachesVidesEnRetard} vache${data.vachesVidesEnRetard > 1 ? "s" : ""} concernée${data.vachesVidesEnRetard > 1 ? "s" : ""}`,
-      due: "En retard",
-      priority: "urgent",
-      order: 1,
-      href: "/reproduction?filtre=ROUGE",
-      actionLabel: "Voir",
+  const reproductionTotal =
+    data.vachesVidesEnRetard +
+    data.aEchographier +
+    data.genissesArapatrier.length;
+  if (reproductionTotal > 0) {
+    const reproductionSummary = data.vachesVidesEnRetard > 0
+      ? `${data.vachesVidesEnRetard} vache${data.vachesVidesEnRetard > 1 ? "s" : ""} vide${data.vachesVidesEnRetard > 1 ? "s" : ""} en retard`
+      : data.aEchographier > 0
+        ? `${data.aEchographier} échographie${data.aEchographier > 1 ? "s" : ""} à programmer`
+        : `${data.genissesArapatrier.length} génisse${data.genissesArapatrier.length > 1 ? "s" : ""} à rapatrier`;
+    todoGroups.push({
+      id: "reproduction",
+      title: "Reproduction",
+      total: reproductionTotal,
+      summary: reproductionSummary,
+      priority: data.vachesVidesEnRetard > 0 ? "urgent" : "soon",
+      href: "/reproduction",
     });
   }
 
-  data.bouclageItems.forEach((item, index) => {
-    todoItems.push({
-      id: `bouclage-${item.nutrav}`,
-      title: "Boucler le veau",
-      subject: `${item.nutrav}${item.nom ? ` — ${item.nom}` : ""}${item.extra ? ` · ${item.extra}` : ""}`,
-      due: item.isUrgent ? `${item.ageLabel} · en retard` : `${item.ageLabel} · à faire prochainement`,
-      priority: item.isUrgent ? "urgent" : "soon",
-      order: 10 + index,
-      actionLabel: "✓ Bouclé",
-      nutrav: item.nutrav,
-      apiField: item.apiField,
-    });
-  });
-
-  if (data.aEchographier > 0) {
-    todoItems.push({
-      id: "a-echographier",
-      title: "Réaliser les échographies",
-      subject: `${data.aEchographier} vache${data.aEchographier > 1 ? "s" : ""} à échographier`,
-      due: "À programmer prochainement",
-      priority: "soon",
-      order: 30,
-      href: "/reproduction?filtre=JAUNE",
-      actionLabel: "Échographier",
-    });
-  }
-
+  const joursDesVelages = data.vachesACapteur
+    .map((gestation) => gestation.dateVelagePrevue
+      ? differenceInDays(gestation.dateVelagePrevue, new Date())
+      : null)
+    .filter((jours): jours is number => jours !== null);
+  const prochainVelageJours = joursDesVelages.length > 0 ? Math.min(...joursDesVelages) : null;
   if (data.velagesSemaine > 0) {
-    todoItems.push({
-      id: "velages-semaine",
-      title: "Préparer les vêlages proches",
-      subject: `${data.velagesSemaine} vêlage${data.velagesSemaine > 1 ? "s" : ""} prévu${data.velagesSemaine > 1 ? "s" : ""}`,
-      due: "Dans les 7 prochains jours",
-      priority: "soon",
-      order: 31,
+    const velageSummary = prochainVelageJours === null
+      ? "Échéance à vérifier"
+      : prochainVelageJours < 0
+        ? `Terme dépassé de ${Math.abs(prochainVelageJours)} jour${Math.abs(prochainVelageJours) > 1 ? "s" : ""}`
+        : prochainVelageJours === 0
+          ? "Prochain terme aujourd’hui"
+          : `Prochain terme dans ${prochainVelageJours} jour${prochainVelageJours > 1 ? "s" : ""}`;
+    todoGroups.push({
+      id: "velages",
+      title: "Vêlages",
+      total: data.velagesSemaine,
+      summary: velageSummary,
+      priority: prochainVelageJours !== null && prochainVelageJours <= 2 ? "urgent" : "soon",
       href: "/velage",
-      actionLabel: "Préparer",
     });
   }
-
-  if (data.vaccinationPreVelage > 0) {
-    todoItems.push({
-      id: "vaccination-pre-velage",
-      title: "Vacciner avant vêlage",
-      subject: `${data.vaccinationPreVelage} animal${data.vaccinationPreVelage > 1 ? "aux" : ""} concerné${data.vaccinationPreVelage > 1 ? "s" : ""}`,
-      due: "À anticiper",
-      priority: "soon",
-      order: 32,
-      href: "/sanitaire",
-      actionLabel: "Voir",
-    });
-  }
-
-  if (data.bolusPreVelage > 0) {
-    todoItems.push({
-      id: "bolus-pre-velage",
-      title: "Administrer le bolus pré-vêlage",
-      subject: `${data.bolusPreVelage} animal${data.bolusPreVelage > 1 ? "aux" : ""} concerné${data.bolusPreVelage > 1 ? "s" : ""}`,
-      due: "Entre J-45 et J-21",
-      priority: "soon",
-      order: 33,
-      href: "/sanitaire",
-      actionLabel: "Voir",
-    });
-  }
-
-  vachesACapteurSansCapteur.forEach((gestation, index) => {
-    const animal = gestation.saillie.animal;
-    const jours = gestation.dateVelagePrevue
-      ? differenceInDays(gestation.dateVelagePrevue, now)
-      : null;
-    todoItems.push({
-      id: `capteur-${animal.nutrav}`,
-      title: "Poser un capteur de vêlage",
-      subject: `${animal.nutrav}${animal.nobovi ? ` — ${animal.nobovi}` : ""}`,
-      due: jours === null ? "À programmer" : `Terme dans ${jours} jour${jours > 1 ? "s" : ""}`,
-      priority: jours !== null && jours <= 7 ? "urgent" : "soon",
-      order: 40 + (jours ?? index),
-      href: "/velage",
-      actionLabel: "Poser",
-    });
-  });
-
-  data.genissesArapatrier.forEach((gestation, index) => {
-    const animal = gestation.saillie.animal;
-    const jours = gestation.dateVelagePrevue
-      ? differenceInDays(gestation.dateVelagePrevue, now)
-      : null;
-    todoItems.push({
-      id: `rapatrier-${animal.nutrav}`,
-      title: "Rapatrier la génisse",
-      subject: `${animal.nutrav}${animal.nobovi ? ` — ${animal.nobovi}` : ""}`,
-      due: jours === null ? "À programmer" : `Terme dans ${jours} jour${jours > 1 ? "s" : ""}`,
-      priority: "soon",
-      order: 50 + (jours ?? index),
-      href: `/troupeau/${animal.nutrav}`,
-      actionLabel: "Voir",
-    });
-  });
-
-  if (data.veauxAVacciner > 0) {
-    todoItems.push({
-      id: "veaux-vacciner",
-      title: "Vacciner les veaux",
-      subject: `${data.veauxAVacciner} veau${data.veauxAVacciner > 1 ? "x" : ""} avec un vaccin manquant`,
-      due: "Échéance normale",
-      priority: "normal",
-      order: 70,
-      href: "/sanitaire",
-      actionLabel: "Vacciner",
-    });
-  }
-
-  data.sevrageItems.forEach((item, index) => {
-    todoItems.push({
-      id: `sevrage-${item.nutrav}`,
-      title: "Sevrer le veau",
-      subject: `${item.nutrav}${item.nom ? ` — ${item.nom}` : ""}${item.extra ? ` · ${item.extra}` : ""}`,
-      due: `${item.ageLabel} · échéance normale`,
-      priority: "normal",
-      order: 80 + index,
-      actionLabel: "✓ Sevré",
-      nutrav: item.nutrav,
-      apiField: item.apiField,
-    });
-  });
 
   if (printMode) {
     const sections: Record<string, React.ReactNode> = {
@@ -910,7 +839,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
     <div className="mx-auto max-w-2xl space-y-5 p-4 md:max-w-3xl lg:max-w-4xl">
       <AccueilQuickActions />
 
-      <AccueilTodoSection items={todoItems} />
+      <AccueilTodoSection groups={todoGroups} />
 
       <details
         data-layout-section="accueil-apercu-elevage"
