@@ -599,8 +599,30 @@ model Ordonnance {
   photoUrl       String?
   traitements    Traitement[]
   vaccinations   Vaccination[]
+  extraction     ExtractionOrdonnance?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+model ExtractionOrdonnance {
+  id                   String      @id @default(cuid())
+  statut               String      @default("A_VERIFIER")
+  documentUrl           String
+  reponseBrute          String
+  propositionInitiale   String
+  valeursCorrigees      String?
+  corrections           String?
+  resultatFinal         String?
+  modele                String
+  versionPrompt         String
+  analyseLe             DateTime    @default(now())
+  valideeLe             DateTime?
+  ordonnanceId          String?     @unique
+  ordonnance            Ordonnance? @relation(fields: [ordonnanceId], references: [id])
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([statut, analyseLe])
 }
 
 model NoteTerrain {

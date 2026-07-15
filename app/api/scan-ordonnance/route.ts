@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 export const maxDuration = 60;
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const MODEL = "gpt-4o-mini";
+const PROMPT_VERSION = "ordonnance-v1";
 
 interface OrdonnanceResult {
   medicamentNom: string | null;
@@ -20,6 +22,9 @@ interface OrdonnanceResult {
   rappels: string | null;
   ordonnanceNumero: string | null;
   raw: string;
+  modele: string;
+  versionPrompt: string;
+  analyseLe: string;
 }
 
 const SYSTEM_PROMPT = `Tu es un assistant vétérinaire qui analyse des ordonnances françaises.
@@ -70,7 +75,7 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: MODEL,
       max_tokens: 800,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
@@ -109,7 +114,13 @@ export async function POST(req: NextRequest) {
   try {
     const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     const parsed = JSON.parse(cleaned);
-    result = { ...parsed, raw };
+    result = {
+      ...parsed,
+      raw,
+      modele: MODEL,
+      versionPrompt: PROMPT_VERSION,
+      analyseLe: new Date().toISOString(),
+    };
   } catch {
     result = {
       medicamentNom: null,
@@ -127,6 +138,9 @@ export async function POST(req: NextRequest) {
       rappels: null,
       ordonnanceNumero: null,
       raw,
+      modele: MODEL,
+      versionPrompt: PROMPT_VERSION,
+      analyseLe: new Date().toISOString(),
     };
   }
 

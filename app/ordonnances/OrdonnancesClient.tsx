@@ -3,8 +3,8 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, ScanLine, Loader2, Archive, FileText, Save, X, Camera } from "lucide-react";
-import { scanAndPersistOrdonnance, type OrdonnanceExtracted } from "@/lib/scan-ordonnance-client";
+import { Plus, ScanLine, Loader2, Archive, FileText, Save, X, Camera, ClipboardCheck } from "lucide-react";
+import { scanAndCreateExtraction, type OrdonnanceExtracted } from "@/lib/scan-ordonnance-client";
 
 export interface OrdonnanceItem {
   id: string;
@@ -21,6 +21,13 @@ export interface OrdonnanceItem {
   statut: string;
   notes: string | null;
   photoUrl: string | null;
+}
+
+export interface ExtractionAVerifierItem {
+  id: string;
+  analyseLe: string;
+  medicamentNom: string | null;
+  ordonnanceNumero: string | null;
 }
 
 function OrdonnanceForm({
@@ -242,11 +249,17 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
   );
 }
 
-export default function OrdonnancesClient({ ordonnances }: { ordonnances: OrdonnanceItem[] }) {
+export default function OrdonnancesClient({
+  ordonnances,
+  extractionsAVerifier = [],
+}: {
+  ordonnances: OrdonnanceItem[];
+  extractionsAVerifier?: ExtractionAVerifierItem[];
+}) {
+  const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [pendingScan, setPendingScan] = useState<OrdonnanceExtracted | undefined>();
-  const [pendingOrdonnanceId, setPendingOrdonnanceId] = useState<string | null>(null);
+  const [scanError, setScanError] = useState("");
   const [showArchives, setShowArchives] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -255,11 +268,12 @@ export default function OrdonnancesClient({ ordonnances }: { ordonnances: Ordonn
     if (!file) return;
     e.target.value = "";
     setScanning(true);
+    setScanError("");
     try {
-      const { ordonnanceId, extracted } = await scanAndPersistOrdonnance(file);
-      setPendingScan(extracted);
-      setPendingOrdonnanceId(ordonnanceId);
-      setShowForm(true);
+      const { extractionId } = await scanAndCreateExtraction(file);
+      router.push(`/ordonnances/a-verifier/${extractionId}`);
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "L’analyse du document a échoué");
     } finally {
       setScanning(false);
     }
@@ -281,7 +295,7 @@ export default function OrdonnancesClient({ ordonnances }: { ordonnances: Ordonn
           {scanning ? "Scan…" : "Scanner ordonnance"}
         </button>
         <button
-          onClick={() => { setShowForm((v) => !v); setPendingScan(undefined); setPendingOrdonnanceId(null); }}
+          onClick={() => setShowForm((v) => !v)}
           className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-sm"
         >
           <Plus size={15} /> Nouvelle
@@ -291,10 +305,39 @@ export default function OrdonnancesClient({ ordonnances }: { ordonnances: Ordonn
 
       {showForm && (
         <OrdonnanceForm
-          initial={pendingScan}
-          existingId={pendingOrdonnanceId}
-          onClose={() => { setShowForm(false); setPendingScan(undefined); setPendingOrdonnanceId(null); }}
+          onClose={() => setShowForm(false)}
         />
+      )}
+
+      {scanError && (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {scanError}
+        </p>
+      )}
+
+      {extractionsAVerifier.length > 0 && (
+        <section className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-900">
+            <ClipboardCheck size={16} /> À vérifier ({extractionsAVerifier.length})
+          </h3>
+          <div className="space-y-1.5">
+            {extractionsAVerifier.map((extraction) => (
+              <Link
+                key={extraction.id}
+                href={`/ordonnances/a-verifier/${extraction.id}`}
+                className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm hover:bg-amber-50"
+              >
+                <span className="min-w-0 truncate font-medium text-gray-800">
+                  {extraction.medicamentNom || "Médicament à vérifier"}
+                  {extraction.ordonnanceNumero ? ` · n°${extraction.ordonnanceNumero}` : ""}
+                </span>
+                <span className="shrink-0 text-xs text-gray-400">
+                  {new Date(extraction.analyseLe).toLocaleDateString("fr-FR")}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* List */}
