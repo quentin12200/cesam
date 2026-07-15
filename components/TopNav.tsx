@@ -1,42 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Home, Stethoscope, Euro } from "lucide-react";
 import BullHeadIcon from "@/components/BullHeadIcon";
 
 const navItems = [
   { href: "/", label: "Accueil", icon: Home },
-  { href: "/troupeau", label: "Troupeau", icon: BullHeadIcon, restore: true, paths: ["/troupeau", "/reproduction", "/velage"] },
+  { href: "/troupeau", label: "Troupeau", icon: BullHeadIcon, paths: ["/troupeau", "/reproduction", "/velage"] },
   { href: "/sanitaire", label: "Sanitaire", icon: Stethoscope, paths: ["/sanitaire", "/pharmacie"] },
   { href: "/finances", label: "Finances", icon: Euro },
 ];
 
 export default function TopNav() {
   const pathname = usePathname();
-  const router = useRouter();
 
   return (
     <div className="flex border-t border-green-600/40">
-      {navItems.map(({ href, label, icon: Icon, restore, paths }) => {
+      {navItems.map(({ href, label, icon: Icon, paths }) => {
         const isActive =
           href === "/" ? pathname === "/" : (paths ?? [href]).some((path) => pathname.startsWith(path));
 
-        function handleClick(e: React.MouseEvent) {
-          if (!restore) return;
-          if (pathname.startsWith("/troupeau")) return;
-          const lastUrl = sessionStorage.getItem("troupeau:lastUrl");
-          if (lastUrl && lastUrl !== "/troupeau") {
-            e.preventDefault();
-            router.push(lastUrl);
-          }
-        }
 
         return (
           <Link
             key={href}
             href={href}
-            onClick={restore ? handleClick : undefined}
             className={`relative flex flex-col items-center justify-center flex-1 min-w-0 min-h-[58px] sm:min-h-[52px] py-2 sm:py-1.5 gap-1 border-r border-green-600/50 last:border-r-0 touch-manipulation transition-colors ${
               isActive
                 ? "text-green-700"
