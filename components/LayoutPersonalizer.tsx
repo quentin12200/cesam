@@ -41,6 +41,7 @@ export default function LayoutPersonalizer() {
   const [sections, setSections] = useState<SectionPreference[]>([]);
   const [density, setDensity] = useState<Density>("confortable");
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const defaultOrder = useRef<SectionPreference[]>([]);
   const rootRef = useRef<HTMLElement | null>(null);
 
@@ -55,10 +56,15 @@ export default function LayoutPersonalizer() {
     Array.from(root.children).forEach((child, index) => {
       const element = child as HTMLElement;
       if (element.matches("nav,[data-layout-fixed]")) return;
+      const explicitId = element.dataset.layoutSection;
       const heading = element.querySelector("h2,h3");
-      if (!heading) return;
-      const label = heading.textContent?.trim().replace(/\s+/g, " ") || `Section ${index + 1}`;
-      let id = element.dataset.layoutSection || slug(label) || `section-${index + 1}`;
+      // Les titres de page (h2) restent toujours fixes et visibles.
+      if (!explicitId && (!heading || heading.tagName === "H2")) return;
+      const label =
+        element.dataset.layoutLabel ||
+        heading?.textContent?.trim().replace(/\s+/g, " ") ||
+        `Section ${index + 1}`;
+      let id = explicitId || slug(label) || `section-${index + 1}`;
       let suffix = 2;
       while (used.has(id)) id = `${slug(label)}-${suffix++}`;
       used.add(id);
@@ -175,6 +181,7 @@ export default function LayoutPersonalizer() {
     next.splice(to, 0, moved);
     updateSections(next);
     setDraggedId(null);
+    setDropTargetId(null);
   }
 
   return (
@@ -231,11 +238,16 @@ export default function LayoutPersonalizer() {
                 <div
                   key={section.id}
                   draggable
-                  onDragStart={() => setDraggedId(section.id)}
-                  onDragOver={(event) => event.preventDefault()}
+                  onDragStart={() => { setDraggedId(section.id); setDropTargetId(null); }}
+                  onDragEnd={() => { setDraggedId(null); setDropTargetId(null); }}
+                  onDragOver={(event) => { event.preventDefault(); if (draggedId !== section.id) setDropTargetId(section.id); }}
                   onDrop={() => moveBefore(section.id)}
-                  className={`flex min-h-11 items-center gap-2 rounded-xl border px-2 ${
+                  className={`relative flex min-h-11 items-center gap-2 rounded-xl border px-2 ${
                     section.visible ? "border-gray-200 bg-white" : "border-gray-200 bg-gray-100 text-gray-400"
+                  } ${
+                    dropTargetId === section.id
+                      ? "before:absolute before:-top-[7px] before:left-1 before:right-1 before:h-1 before:rounded-full before:bg-green-600"
+                      : ""
                   }`}
                 >
                   <GripVertical size={18} className="cursor-grab text-gray-400" />
