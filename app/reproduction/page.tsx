@@ -50,6 +50,10 @@ const DUREE_GESTATION = 285;
 const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 const SaillieIcon = ACTION_VISUALS.saillieIA.icon;
 
+function formatDateCompacte(date: Date): string {
+  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
 // ── Composant recherche vache ──────────────────────────────────────────────
 function VacheSearch({
   vaches, selectedId, onSelect, placeholder,
@@ -712,144 +716,217 @@ function ReproductionContent() {
           {filtered.map((vache) => {
             const joursDepuisChaleur = vache.derniereChaleur
               ? differenceInDays(now, new Date(vache.derniereChaleur)) : null;
-            return (
-              <div key={vache.id} className="bg-white rounded-xl shadow p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <Link href={`/troupeau/${vache.nutrav}`}>
-                      <span className="bg-green-700 text-white text-xs font-bold px-2 py-1 rounded-lg font-mono">{vache.nutrav}</span>
-                    </Link>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-gray-800 text-sm">{vache.nobovi ?? "Sans nom"}</span>
-                        {vache.estGenisse && (
-                          <span className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-medium">Génisse</span>
-                        )}
-                        {vache.categorie === "A_ENGRAISSER" && (
-                          <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">🥩 À engraisser</span>
-                        )}
-                        {vache.derniereSaillie && new Date(vache.derniereSaillie) > now && (
-                          <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium animate-pulse">⚠️ Date saillie future</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {vache.derniereSaillie ? `Saillie : ${formatDate(new Date(vache.derniereSaillie))}` : "Pas de saillie"}
-                      </div>
-                      {vache.taureauNom && <div className="text-xs text-gray-400">Père : {vache.taureauNom}</div>}
-                      {vache.derniereChaleur && (
-                        <div className="text-xs text-pink-500 mt-0.5">
-                          Chaleur : {formatDate(new Date(vache.derniereChaleur))} · J+{joursDepuisChaleur}
-                        </div>
-                      )}
-                      {vache.dateVelagePrevue && (vache.etat === "VERT" || vache.etat === "ROSE") && (
-                        <div className="text-xs text-green-700 font-medium mt-0.5">
-                          Terme : {formatDate(new Date(vache.dateVelagePrevue))} · J-{differenceInDays(new Date(vache.dateVelagePrevue), now)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1.5">
-                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${getBadgeClass(vache.etat)}`}>
-                      {getEtatLabel(vache.etat)}
-                    </span>
-                    {joursDepuisChaleur !== null && joursDepuisChaleur <= 2 && (
-                      <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">🌡️ En chaleur</span>
-                    )}
-                    {joursDepuisChaleur !== null && joursDepuisChaleur >= 19 && joursDepuisChaleur <= 21 && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold animate-pulse">⚡ Retour chaleur J+{joursDepuisChaleur} ?</span>
-                    )}
-                    <div data-repro-menu className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setMenuVacheId((id) => id === vache.id ? null : vache.id)}
-                        aria-label={`Actions pour ${vache.nutrav}`}
-                        aria-expanded={menuVacheId === vache.id}
-                        aria-haspopup="menu"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
-                      >
-                        <MoreHorizontal size={20} />
-                      </button>
+            const joursAvantVelage = vache.dateVelagePrevue
+              ? differenceInDays(new Date(vache.dateVelagePrevue), now) : null;
+            const categorie = vache.estGenisse
+              ? "Génisse"
+              : vache.categorie === "A_ENGRAISSER"
+                ? "À engraisser"
+                : null;
+            const terme = joursAvantVelage === null
+              ? null
+              : joursAvantVelage >= 0
+                ? `J-${joursAvantVelage}`
+                : `J+${Math.abs(joursAvantVelage)}`;
 
-                      {menuVacheId === vache.id && (
-                        <div
-                          role="menu"
-                          className="absolute right-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl"
-                        >
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => { setMenuVacheId(null); openChaleurForm(vache); }}
-                            className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-pink-700 hover:bg-pink-50"
-                          >
-                            <ChaleurIcon size={18} />
-                            Chaleur
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => { setMenuVacheId(null); openSaillieForm(vache); }}
-                            className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-fuchsia-700 hover:bg-fuchsia-50"
-                          >
-                            <SaillieIcon size={18} />
-                            Saillie / IA
-                          </button>
-                          {(vache.etat === "JAUNE" || vache.etat === "GRIS") && vache.saillieId && (
-                            <button
-                              type="button"
-                              role="menuitem"
-                              onClick={() => { setMenuVacheId(null); openEchoForm(vache); }}
-                              className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50"
-                            >
-                              <CheckCircle size={18} />
-                              Échographie
-                            </button>
-                          )}
-                          <Link
-                            role="menuitem"
-                            href={`/troupeau/${vache.nutrav}`}
-                            className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                          >
-                            <Eye size={18} />
-                            Voir la fiche
-                          </Link>
-                        </div>
-                      )}
-                    </div>
-                    {vache.saillieId && vache.etat !== "ROUGE" && vache.etat !== "REPOS" && (
-                      confirmVideId === vache.id ? (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <span className="text-xs text-gray-500">Non pleine ?</span>
-                          <button onClick={() => marquerVide(vache)} disabled={saving}
-                            className="text-xs bg-blue-500 text-white px-2 py-1 rounded-lg font-semibold">Oui</button>
-                          <button onClick={() => setConfirmVideId(null)}
-                            className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-lg">Non</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setConfirmVideId(vache.id)}
-                          className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-0.5">
-                          ✗ Marquer vide
-                        </button>
-                      )
+            return (
+              <article key={vache.id} className="rounded-xl bg-white px-3 py-2.5 shadow">
+                {/* Ligne 1 : identité et statut */}
+                <div className="flex min-w-0 items-center gap-2">
+                  <Link
+                    href={`/troupeau/${vache.nutrav}`}
+                    className="shrink-0 font-mono text-sm font-bold text-green-800 hover:underline"
+                  >
+                    {vache.nutrav}
+                  </Link>
+                  <span className="text-gray-300">—</span>
+                  <Link
+                    href={`/troupeau/${vache.nutrav}`}
+                    className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900 hover:text-green-800"
+                  >
+                    {vache.nobovi ?? "Sans nom"}
+                  </Link>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${getBadgeClass(vache.etat)}`}>
+                    {getEtatLabel(vache.etat)}
+                  </span>
+                </div>
+
+                {/* Ligne 2 : informations secondaires */}
+                <div className="mt-1 flex min-w-0 items-center gap-x-2 overflow-hidden text-[11px] leading-4 text-gray-500">
+                  {categorie && <span className="shrink-0">{categorie}</span>}
+                  {categorie && vache.derniereSaillie && <span className="text-gray-300">·</span>}
+                  <span className="truncate">
+                    {vache.derniereSaillie
+                      ? `Saillie : ${formatDateCompacte(new Date(vache.derniereSaillie))}`
+                      : "Pas de saillie"}
+                    {vache.taureauNom ? ` · Père : ${vache.taureauNom}` : ""}
+                  </span>
+                  {vache.derniereSaillie && new Date(vache.derniereSaillie) > now && (
+                    <span className="shrink-0 font-semibold text-red-600">Date future</span>
+                  )}
+                </div>
+
+                {/* Ligne 3 : terme, alertes et actions */}
+                <div className="mt-1.5 flex min-h-9 items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    {vache.dateVelagePrevue && (vache.etat === "VERT" || vache.etat === "ROSE") ? (
+                      <p className="truncate text-xs font-bold text-green-700">
+                        Terme : {formatDateCompacte(new Date(vache.dateVelagePrevue))} · {terme}
+                      </p>
+                    ) : vache.derniereChaleur ? (
+                      <p className="truncate text-[11px] text-pink-600">
+                        Chaleur : {formatDateCompacte(new Date(vache.derniereChaleur))} · J+{joursDepuisChaleur}
+                      </p>
+                    ) : (
+                      <span className="text-[11px] text-gray-400">Aucun terme calculé</span>
                     )}
-                    {vache.saillieId && (
-                      confirmDeleteSaillieId === vache.id ? (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <span className="text-xs text-gray-500">Supprimer saillie ?</span>
-                          <button onClick={() => deleteSaillie(vache)} disabled={saving}
-                            className="text-xs bg-red-600 text-white px-2 py-1 rounded-lg font-semibold">Oui</button>
-                          <button onClick={() => setConfirmDeleteSaillieId(null)}
-                            className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-lg">Non</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setConfirmDeleteSaillieId(vache.id)}
-                          className="text-xs text-gray-400 hover:text-red-600 transition-colors mt-0.5">
-                          🗑 Saillie incorrecte
+                  </div>
+
+                  {joursDepuisChaleur !== null && joursDepuisChaleur <= 2 && (
+                    <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                      En chaleur
+                    </span>
+                  )}
+                  {joursDepuisChaleur !== null && joursDepuisChaleur >= 19 && joursDepuisChaleur <= 21 && (
+                    <span className="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
+                      Retour J+{joursDepuisChaleur} ?
+                    </span>
+                  )}
+
+                  <div data-repro-menu className="relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmVideId(null);
+                        setConfirmDeleteSaillieId(null);
+                        setMenuVacheId((id) => id === vache.id ? null : vache.id);
+                      }}
+                      aria-label={`Actions pour ${vache.nutrav}`}
+                      aria-expanded={menuVacheId === vache.id}
+                      aria-haspopup="menu"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
+                    >
+                      <MoreHorizontal size={20} />
+                    </button>
+
+                    {menuVacheId === vache.id && (
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => { setMenuVacheId(null); openChaleurForm(vache); }}
+                          className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-pink-700 hover:bg-pink-50"
+                        >
+                          <ChaleurIcon size={18} />
+                          Chaleur
                         </button>
-                      )
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => { setMenuVacheId(null); openSaillieForm(vache); }}
+                          className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-fuchsia-700 hover:bg-fuchsia-50"
+                        >
+                          <SaillieIcon size={18} />
+                          Saillie / IA
+                        </button>
+                        {(vache.etat === "JAUNE" || vache.etat === "GRIS") && vache.saillieId && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => { setMenuVacheId(null); openEchoForm(vache); }}
+                            className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50"
+                          >
+                            <CheckCircle size={18} />
+                            Échographie
+                          </button>
+                        )}
+                        <Link
+                          role="menuitem"
+                          href={`/troupeau/${vache.nutrav}`}
+                          className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          <Eye size={18} />
+                          Voir la fiche
+                        </Link>
+
+                        {vache.saillieId && (
+                          <>
+                            <div className="my-1 border-t border-gray-100" />
+                            {vache.etat !== "ROUGE" && vache.etat !== "REPOS" && (
+                              confirmVideId === vache.id ? (
+                                <div className="rounded-lg bg-blue-50 p-2.5">
+                                  <p className="mb-2 text-xs font-medium text-blue-800">Marquer cette vache vide ?</p>
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => marquerVide(vache)}
+                                      disabled={saving}
+                                      className="flex-1 rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-semibold text-white"
+                                    >
+                                      Confirmer
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmVideId(null)}
+                                      className="rounded-lg px-2 py-1.5 text-xs text-gray-600"
+                                    >
+                                      Annuler
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() => setConfirmVideId(vache.id)}
+                                  className="flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-50"
+                                >
+                                  Marquer vide
+                                </button>
+                              )
+                            )}
+
+                            {confirmDeleteSaillieId === vache.id ? (
+                              <div className="rounded-lg bg-red-50 p-2.5">
+                                <p className="mb-2 text-xs font-medium text-red-800">Supprimer la saillie enregistrée ?</p>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteSaillie(vache)}
+                                    disabled={saving}
+                                    className="flex-1 rounded-lg bg-red-600 px-2 py-1.5 text-xs font-semibold text-white"
+                                  >
+                                    Supprimer
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteSaillieId(null)}
+                                    className="rounded-lg px-2 py-1.5 text-xs text-gray-600"
+                                  >
+                                    Annuler
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => setConfirmDeleteSaillieId(vache.id)}
+                                className="flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                              >
+                                Saillie incorrecte
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
-              </div>
+              </article>
             );
           })}
           {filtered.length === 0 && (
