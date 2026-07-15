@@ -24,7 +24,10 @@ model Animal {
   groupeId      String?
   groupe        Groupe?   @relation(fields: [groupeId], references: [id])
 
-  aEchographier Boolean   @default(false)
+  aEchographier              Boolean   @default(false)
+  reproductionEtatManuel     String?
+  reproductionEtatPrecedent  String?
+  reproductionEtatModifieAt  DateTime?
 
   copami        String?
   numeip        String?
