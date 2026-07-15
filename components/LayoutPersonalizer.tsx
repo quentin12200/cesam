@@ -103,24 +103,11 @@ export default function LayoutPersonalizer() {
   useEffect(() => {
     if (!moduleInfo || !ready) return;
     const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      const found = discover();
+    const retryTimers: number[] = [];
+
+    function mergeAndApply(found: SectionPreference[], remote: SectionPreference[] | null) {
+      if (found.length === 0) return;
       defaultOrder.current = found;
-
-      let remote: SectionPreference[] | null = null;
-      try {
-        const response = await fetch(
-          `/api/mise-en-page?profil=${encodeURIComponent(profile)}&module=${moduleInfo.id}`,
-          { cache: "no-store", signal: controller.signal }
-        );
-        if (response.ok) {
-          const data = await response.json();
-          remote = Array.isArray(data.sections) ? data.sections : null;
-        }
-      } catch {
-        // En cas de coupure réseau, la mise en page par défaut reste utilisable.
-      }
-
       const remoteMap = new Map(remote?.map((section) => [section.id, section]));
       const ordered = [
         ...(remote ?? []).filter((section) => found.some((item) => item.id === section.id)),
@@ -130,11 +117,34 @@ export default function LayoutPersonalizer() {
       savedPreference.current = ordered;
       setSections(ordered);
       apply(ordered, false);
+    }
+
+    const timer = window.setTimeout(async () => {
+      let remote: SectionPreference[] | null = null;
+      try {
+        const response = await fetch(
+          `/api/mise-en-page?profil=${encodeURIComponent(profile)}&module=${moduleInfo.id}`,
+          { cache: "no-store", signal: controller.signal }
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        remote = Array.isArray(data.sections) ? data.sections : null;
+      } catch {
+        return;
+      }
+
+      // Application immédiate, puis deux nouvelles passes pour les sections
+      // rendues plus tard par Suspense ou par un composant client.
+      mergeAndApply(discover(), remote);
+      [350, 1200].forEach((delay) => {
+        retryTimers.push(window.setTimeout(() => mergeAndApply(discover(), remote), delay));
+      });
     }, 80);
 
     return () => {
       controller.abort();
       window.clearTimeout(timer);
+      retryTimers.forEach((retry) => window.clearTimeout(retry));
     };
   }, [apply, discover, moduleInfo, profile, ready]);
 
