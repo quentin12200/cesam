@@ -714,9 +714,14 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                             {etat === "VERT" ? "Pleine"
                               : etat === "ROSE" ? "Imminente"
                               : etat === "JAUNE" ? "À écho"
-                              : etat === "GRIS" ? "En attente"
+                              : etat === "GRIS" ? "Saillie récente"
                               : etat === "REPOS" ? "Repos"
                               : "Vide"}
+                          </span>
+                        )}
+                        {animal.aEchographier && etat !== "JAUNE" && (
+                          <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                            À échographier
                           </span>
                         )}
                         {veau && veau.statut === "ACTIF" && !veau.sevreFait && !animal.tarieFaite && (
