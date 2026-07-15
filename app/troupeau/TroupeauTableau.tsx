@@ -389,11 +389,18 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                   </td>
                   <td className="px-3 py-2.5">
                     {etat ? (
-                      <span
-                        className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${getBadgeClass(etat)}`}
-                      >
-                        {ETAT_LABEL[etat] ?? etat}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        <span
+                          className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${getBadgeClass(etat)}`}
+                        >
+                          {ETAT_LABEL[etat] ?? etat}
+                        </span>
+                        {animal.aEchographier && etat !== "JAUNE" && (
+                          <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                            À écho
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-gray-200 text-xs">—</span>
                     )}
