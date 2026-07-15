@@ -100,7 +100,7 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
   return (
     <>
       {/* Action buttons row */}
-      <div className="flex gap-2 px-4 pt-3 pb-1">
+      <div className="flex gap-2 px-3 pt-2 pb-0.5">
         {isFemelle && isActif && (
           <button
             onClick={() => open("chaleur")}
