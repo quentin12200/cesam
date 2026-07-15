@@ -82,10 +82,16 @@ export default function LayoutPersonalizer() {
 
     const first = Array.from(root.children).find((child) => (child as HTMLElement).dataset.layoutSection);
     if (first) {
+      const marker = document.createComment("cesam-layout-anchor");
+      root.insertBefore(marker, first);
+      let cursor: ChildNode = marker;
       preference.sections.forEach((section) => {
         const element = elements.get(section.id);
-        if (element) root.insertBefore(element, first);
+        if (!element) return;
+        root.insertBefore(element, cursor.nextSibling);
+        cursor = element;
       });
+      marker.remove();
     }
 
     preference.sections.forEach((section) => {
