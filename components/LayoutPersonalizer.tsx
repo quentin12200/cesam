@@ -113,6 +113,7 @@ export default function LayoutPersonalizer() {
     if (!moduleInfo || !ready) return;
     const controller = new AbortController();
     const retryTimers: number[] = [];
+    const activeModuleId = moduleInfo.id;
 
     function mergeAndApply(found: SectionPreference[], remote: SectionPreference[] | null) {
       if (found.length === 0) return;
@@ -121,7 +122,7 @@ export default function LayoutPersonalizer() {
       // Compatibilité avec les dispositions enregistrées avant la stabilisation
       // des identifiants des deux sections d'alertes de l'accueil.
       const normalizedRemote = remote?.map((section) => {
-        if (moduleInfo.id !== "accueil") return section;
+        if (activeModuleId !== "accueil") return section;
         if (section.id === "reproduction-velage") {
           return { ...section, id: "accueil-reproduction-velage" };
         }
