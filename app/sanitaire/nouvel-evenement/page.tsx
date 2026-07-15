@@ -4,11 +4,12 @@ import NouvelEvenementForm from "./NouvelEvenementForm";
 
 import BackButton from "@/app/components/BackButton";
 interface PageProps {
-  searchParams: Promise<{ animal?: string; medicament?: string }>;
+  searchParams: Promise<{ animal?: string; animaux?: string; medicament?: string }>;
 }
 
 export default async function NouvelEvenementPage({ searchParams }: PageProps) {
-  const { animal, medicament } = await searchParams;
+  const { animal, animaux, medicament } = await searchParams;
+  const presetNutravs = animaux?.split(",").map((nutrav) => nutrav.trim()).filter(Boolean);
 
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto space-y-4">
@@ -17,7 +18,7 @@ export default async function NouvelEvenementPage({ searchParams }: PageProps) {
         <h2 className="text-xl font-bold text-gray-800">Nouvel événement sanitaire</h2>
       </div>
 
-      <NouvelEvenementForm presetNutrav={animal} presetMedicamentId={medicament} />
+      <NouvelEvenementForm presetNutrav={animal} presetNutravs={presetNutravs} presetMedicamentId={medicament} />
     </div>
   );
 }

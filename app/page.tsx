@@ -12,6 +12,7 @@ import ChecklistSection, {
   type SubItem,
 } from "@/app/components/ChecklistSection";
 import QuickSearch from "@/app/components/QuickSearch";
+import AccueilQuickActions from "@/app/components/AccueilQuickActions";
 import NotesTerrain from "@/app/components/NotesTerrain";
 import RapportGestationButton from "@/app/components/RapportGestationButton";
 import PrintSectionButton from "@/app/components/PrintSectionButton";
@@ -753,6 +754,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
       <QuickSearch />
+      <AccueilQuickActions />
       <h2 className="text-xl font-bold text-gray-800 mt-2">Tableau de bord</h2>
 
       {/* NOTES TERRAIN DICTÉES */}

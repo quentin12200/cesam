@@ -104,6 +104,41 @@ function VacheSearch({
   );
 }
 
+function VachesSelectionnees({
+  vaches, ids, onChange,
+}: {
+  vaches: VacheRepro[];
+  ids: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-green-200 bg-green-50 p-3 space-y-2">
+      <p className="text-xs font-semibold text-green-800">
+        {ids.length} vache{ids.length > 1 ? "s" : ""} sélectionnée{ids.length > 1 ? "s" : ""}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {ids.map((id) => {
+          const vache = vaches.find((item) => item.id === id);
+          return (
+            <span key={id} className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-green-200 px-2 py-1 text-xs text-gray-700">
+              <span className="font-mono font-semibold">{vache?.nutrav ?? "…"}</span>
+              {vache?.nobovi && <span>{vache.nobovi}</span>}
+              <button
+                type="button"
+                aria-label="Retirer cette vache"
+                onClick={() => onChange(ids.filter((animalId) => animalId !== id))}
+                className="ml-0.5 text-gray-400 hover:text-red-600 text-base leading-none"
+              >
+                ×
+              </button>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Helpers dates JJ/MM/AA ────────────────────────────────────────────────
 function parseShortDate(val: string): string {
   // Accepte JJ/MM/AA ou JJ/MM/AAAA → YYYY-MM-DD
@@ -255,6 +290,7 @@ function ReproductionContent() {
   // ── Saillie form state ──
   const [showSaillieForm, setShowSaillieForm] = useState(false);
   const [saillieAnimalId, setSaillieAnimalId] = useState("");
+  const [saillieAnimalIds, setSaillieAnimalIds] = useState<string[]>([]);
   const [saillieDate, setSaillieDate] = useState("");
   const [saillieType, setSaillieType] = useState<"NATURELLE" | "IA">("NATURELLE");
   const [saillieTaureauId, setSaillieTaureauId] = useState("");
@@ -268,6 +304,7 @@ function ReproductionContent() {
   // ── Chaleur form state ──
   const [showChaleurForm, setShowChaleurForm] = useState(false);
   const [chaleurAnimalId, setChaleurAnimalId] = useState("");
+  const [chaleurAnimalIds, setChaleurAnimalIds] = useState<string[]>([]);
   const [chaleurDate, setChaleurDate] = useState("");
   const [chaleurNotes, setChaleurNotes] = useState("");
 
@@ -291,6 +328,36 @@ function ReproductionContent() {
 
   useEffect(() => { fetchData(); }, []);
 
+  const actionRapideTraitee = useRef(false);
+  useEffect(() => {
+    if (actionRapideTraitee.current) return;
+    const action = searchParams.get("action");
+    const ids = (searchParams.get("animaux") ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+    if (ids.length === 0 || (action !== "chaleur" && action !== "saillie")) return;
+
+    actionRapideTraitee.current = true;
+    if (action === "chaleur") {
+      setChaleurAnimalIds(ids);
+      setChaleurAnimalId("");
+      setChaleurDate(new Date().toISOString().split("T")[0]);
+      setChaleurNotes("");
+      setShowChaleurForm(true);
+    } else {
+      setSaillieAnimalIds(ids);
+      setSaillieAnimalId("");
+      setSaillieDate(new Date().toISOString().split("T")[0]);
+      setSaillieType("NATURELLE");
+      setSaillieTaureauId("");
+      setSaillieTaureauNom("");
+      setIaSelectedId("");
+      setIaNupere("");
+      setIaNopere("");
+      setIaTraper("");
+      setSaillieError(null);
+      setShowSaillieForm(true);
+    }
+  }, [searchParams]);
+
   async function fetchData() {
     setLoading(true);
     try {
@@ -311,6 +378,7 @@ function ReproductionContent() {
 
   function openSaillieForm(vache?: VacheRepro) {
     setSaillieAnimalId(vache?.id ?? "");
+    setSaillieAnimalIds([]);
     setSaillieDate(today);
     setSaillieType("NATURELLE");
     setSaillieTaureauId("");
@@ -322,6 +390,7 @@ function ReproductionContent() {
 
   function openChaleurForm(vache?: VacheRepro) {
     setChaleurAnimalId(vache?.id ?? "");
+    setChaleurAnimalIds([]);
     setChaleurDate(today);
     setChaleurNotes("");
     setShowChaleurForm(true);
@@ -380,7 +449,8 @@ function ReproductionContent() {
   // ── Handlers ──
   async function handleSaillieSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!saillieAnimalId) { setSaillieError("Sélectionnez une vache"); return; }
+    const animalIds = saillieAnimalIds.length > 0 ? saillieAnimalIds : saillieAnimalId ? [saillieAnimalId] : [];
+    if (animalIds.length === 0) { setSaillieError("Sélectionnez une vache"); return; }
     if (!saillieDate) { setSaillieError("Choisissez une date"); return; }
     setSaving(true);
     try {
@@ -416,13 +486,13 @@ function ReproductionContent() {
       }
       const res = await fetch("/api/saillies", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ animalId: saillieAnimalId, date: saillieDate, type: saillieType, taureauId }),
+        body: JSON.stringify({ animalIds, date: saillieDate, type: saillieType, taureauId }),
       });
       if (!res.ok) {
         setSaillieError((await res.json().catch(() => ({}))).error ?? "Erreur serveur");
         return;
       }
-      setMessage("✓ Saillie enregistrée !");
+      setMessage(animalIds.length > 1 ? `✓ Saillie enregistrée pour ${animalIds.length} vaches !` : "✓ Saillie enregistrée !");
       setShowSaillieForm(false);
       setFilterEtat("TOUS");
       await fetchData();
@@ -435,15 +505,16 @@ function ReproductionContent() {
 
   async function handleChaleurSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!chaleurAnimalId) return;
+    const animalIds = chaleurAnimalIds.length > 0 ? chaleurAnimalIds : chaleurAnimalId ? [chaleurAnimalId] : [];
+    if (animalIds.length === 0) return;
     setSaving(true);
     try {
       const res = await fetch("/api/chaleurs", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ animalId: chaleurAnimalId, date: chaleurDate, notes: chaleurNotes.trim() || null }),
+        body: JSON.stringify({ animalIds, date: chaleurDate, notes: chaleurNotes.trim() || null }),
       });
       if (!res.ok) throw new Error();
-      setMessage("✓ Chaleur enregistrée !");
+      setMessage(animalIds.length > 1 ? `✓ Chaleur enregistrée pour ${animalIds.length} vaches !` : "✓ Chaleur enregistrée !");
       setShowChaleurForm(false);
       await fetchData();
     } catch {
@@ -764,8 +835,12 @@ function ReproductionContent() {
             </div>
             <form onSubmit={handleChaleurSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Vache</label>
-                <VacheSearch vaches={vaches} selectedId={chaleurAnimalId} onSelect={setChaleurAnimalId} placeholder="Numéro ou nom de la vache…" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vache{chaleurAnimalIds.length > 1 ? "s" : ""}</label>
+                {chaleurAnimalIds.length > 0 ? (
+                  <VachesSelectionnees vaches={vaches} ids={chaleurAnimalIds} onChange={setChaleurAnimalIds} />
+                ) : (
+                  <VacheSearch vaches={vaches} selectedId={chaleurAnimalId} onSelect={setChaleurAnimalId} placeholder="Numéro ou nom de la vache…" />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;observation</label>
@@ -778,9 +853,9 @@ function ReproductionContent() {
                   placeholder="ex : chaleur forte, montée, mucus…"
                   className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
               </div>
-              <button type="submit" disabled={saving || !chaleurAnimalId}
+              <button type="submit" disabled={saving || (chaleurAnimalIds.length === 0 && !chaleurAnimalId)}
                 className="w-full bg-pink-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50">
-                {saving ? "Enregistrement…" : "Enregistrer la chaleur"}
+                {saving ? "Enregistrement…" : chaleurAnimalIds.length > 1 ? `Enregistrer pour ${chaleurAnimalIds.length} vaches` : "Enregistrer la chaleur"}
               </button>
             </form>
           </div>
@@ -797,8 +872,12 @@ function ReproductionContent() {
             </div>
             <form onSubmit={handleSaillieSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Vache</label>
-                <VacheSearch vaches={vaches} selectedId={saillieAnimalId} onSelect={setSaillieAnimalId} placeholder="Numéro ou nom de la vache…" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vache{saillieAnimalIds.length > 1 ? "s" : ""}</label>
+                {saillieAnimalIds.length > 0 ? (
+                  <VachesSelectionnees vaches={vaches} ids={saillieAnimalIds} onChange={setSaillieAnimalIds} />
+                ) : (
+                  <VacheSearch vaches={vaches} selectedId={saillieAnimalId} onSelect={setSaillieAnimalId} placeholder="Numéro ou nom de la vache…" />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
@@ -873,9 +952,9 @@ function ReproductionContent() {
               {saillieError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{saillieError}</div>
               )}
-              <button type="submit" disabled={saving || !saillieAnimalId || !saillieDate}
+              <button type="submit" disabled={saving || (saillieAnimalIds.length === 0 && !saillieAnimalId) || !saillieDate}
                 className="w-full bg-green-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50">
-                {saving ? "Enregistrement…" : "Enregistrer la saillie"}
+                {saving ? "Enregistrement…" : saillieAnimalIds.length > 1 ? `Enregistrer pour ${saillieAnimalIds.length} vaches` : "Enregistrer la saillie"}
               </button>
             </form>
           </div>

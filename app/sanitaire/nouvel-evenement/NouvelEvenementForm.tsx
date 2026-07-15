@@ -36,7 +36,7 @@ function nouveauDraft(): TraitementDraft {
   return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", executant: "", dose: "", uniteDosage: "ml", motif: "" };
 }
 
-export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }: { presetNutrav?: string; presetMedicamentId?: string }) {
+export default function NouvelEvenementForm({ presetNutrav, presetNutravs, presetMedicamentId }: { presetNutrav?: string; presetNutravs?: string[]; presetMedicamentId?: string }) {
   const router = useRouter();
 
   const [targetMode, setTargetMode] = useState<TargetMode>("animal");
@@ -83,14 +83,20 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
   }, []);
 
   useEffect(() => {
-    if (!presetNutrav) return;
-    fetch(`/api/search?q=${encodeURIComponent(presetNutrav)}`)
+    const nutravs = presetNutravs?.length ? presetNutravs : presetNutrav ? [presetNutrav] : [];
+    if (nutravs.length === 0) return;
+
+    fetch("/api/animaux/picker")
       .then((r) => r.json())
-      .then((data: { id: string; nutrav: string; nom: string | null }[]) => {
-        const exact = data.find((a) => a.nutrav === presetNutrav) ?? data[0];
-        if (exact) setSelectedAnimaux([{ id: exact.id, nutrav: exact.nutrav, nom: exact.nom }]);
+      .then((data: { id: string; nutrav: string; nobovi: string | null }[]) => {
+        const demandes = new Set(nutravs);
+        setSelectedAnimaux(
+          data
+            .filter((animal) => demandes.has(animal.nutrav))
+            .map((animal) => ({ id: animal.id, nutrav: animal.nutrav, nom: animal.nobovi }))
+        );
       });
-  }, [presetNutrav]);
+  }, [presetNutrav, presetNutravs]);
 
   useEffect(() => {
     if (!presetMedicamentId || medicaments.length === 0) return;
@@ -275,7 +281,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetMedicamentId }
     setPhotoPreview(null);
     setTraitementActif(false);
     setTraitementsDrafts([nouveauDraft()]);
-    if (!presetNutrav) setSelectedAnimaux([]);
+    if (!presetNutrav && !presetNutravs?.length) setSelectedAnimaux([]);
   }
 
   if (result) {
