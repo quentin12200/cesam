@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
-import QuickActionButton from "@/components/QuickActionButton";
+import { Plus, X } from "lucide-react";
 import { ACTION_VISUALS } from "@/components/action-visuals";
 
 interface Taureau {
@@ -24,12 +23,14 @@ type Modal = "chaleur" | "saillie" | null;
 const today = new Date().toISOString().slice(0, 10);
 const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 const SaillieIcon = ACTION_VISUALS.saillieIA.icon;
+const EvenementIcon = ACTION_VISUALS.evenementSanitaire.icon;
 
 export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }: Props) {
   const router = useRouter();
   const [modal, setModal] = useState<Modal>(null);
   const [loading, setLoading] = useState(false);
   const [taureaux, setTaureaux] = useState<Taureau[]>([]);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Chaleur state
   const [chaleurDate, setChaleurDate] = useState(today);
@@ -41,6 +42,7 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
   const [saillieTabId, setSaillieTabId] = useState("");
 
   const backdropRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (modal === "saillie" && taureaux.length === 0) {
@@ -49,6 +51,17 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
         .then((d) => setTaureaux(d.taureaux ?? []));
     }
   }, [modal, taureaux.length]);
+
+  useEffect(() => {
+    function closeMenu(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeMenu);
+    return () => document.removeEventListener("mousedown", closeMenu);
+  }, []);
 
   function open(m: Modal) {
     setChaleurDate(today);
@@ -102,30 +115,60 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
 
   return (
     <>
-      {/* Action buttons row */}
-      <div className="flex gap-2 px-3 pt-2 pb-0.5">
-        {isFemelle && isActif && (
-          <QuickActionButton
-            action="chaleur"
-            onClick={() => open("chaleur")}
-            className="flex-1"
-          />
-        )}
-        {isFemelle && isActif && (
-          <QuickActionButton
-            action="saillieIA"
-            onClick={() => open("saillie")}
-            className="flex-1"
-          />
-        )}
-        {isActif && (
-          <QuickActionButton
-            action="evenementSanitaire"
-            onClick={() => router.push(`/sanitaire/nouvel-evenement?animal=${encodeURIComponent(nutrav)}`)}
-            className="flex-1"
-          />
-        )}
-      </div>
+      {/* Accès compact aux actions de l'animal */}
+      {isActif && (
+        <div ref={menuRef} className="relative px-3 pt-2 pb-0.5">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-green-800 active:scale-[0.97]"
+          >
+            <Plus size={19} />
+            Ajouter
+          </button>
+
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute left-3 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl"
+            >
+              {isFemelle && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setMenuOpen(false); open("chaleur"); }}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-pink-700 hover:bg-pink-50"
+                >
+                  <ChaleurIcon size={19} />
+                  Chaleur
+                </button>
+              )}
+              {isFemelle && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setMenuOpen(false); open("saillie"); }}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-fuchsia-700 hover:bg-fuchsia-50"
+                >
+                  <SaillieIcon size={19} />
+                  Saillie / IA
+                </button>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => router.push(`/sanitaire/nouvel-evenement?animal=${encodeURIComponent(nutrav)}`)}
+                className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50"
+              >
+                <EvenementIcon size={19} />
+                Événement
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal backdrop */}
       {modal && (
