@@ -11,7 +11,6 @@ import ChecklistSection, {
   type ChecklistItem,
   type SubItem,
 } from "@/app/components/ChecklistSection";
-import QuickSearch from "@/app/components/QuickSearch";
 import AccueilQuickActions from "@/app/components/AccueilQuickActions";
 import AccueilTodoSection, { type AccueilTodoItem } from "@/app/components/AccueilTodoSection";
 import NotesTerrain from "@/app/components/NotesTerrain";
@@ -27,7 +26,6 @@ import {
   Tag,
   Scissors,
   Activity,
-  Pill,
   } from "lucide-react";
 
 async function getDashboardData() {
@@ -728,6 +726,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
     </Collapsible>
   );
 
+  const now = new Date();
   const todoItems: AccueilTodoItem[] = [];
 
   if (data.evenementsSanitairesUrgents > 0) {
