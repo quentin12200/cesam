@@ -55,7 +55,12 @@ export default function AccueilQuickActions() {
 
   return (
     <>
-      <section aria-label="Actions rapides" className="grid grid-cols-3 gap-2">
+      <section
+        data-layout-section="accueil-actions-rapides"
+        data-layout-label="Actions rapides"
+        aria-label="Actions rapides"
+        className="grid grid-cols-3 gap-2 sm:gap-3"
+      >
         {actions.map(({ id, visual }) => (
           <QuickActionButton
             key={id}
