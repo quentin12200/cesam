@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Thermometer, Syringe, Stethoscope, X } from "lucide-react";
+import { X } from "lucide-react";
+import QuickActionButton from "@/components/QuickActionButton";
+import { ACTION_VISUALS } from "@/components/action-visuals";
 
 interface Taureau {
   id: string;
@@ -21,6 +22,8 @@ interface Props {
 type Modal = "chaleur" | "saillie" | null;
 
 const today = new Date().toISOString().slice(0, 10);
+const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
+const SaillieIcon = ACTION_VISUALS.saillieIA.icon;
 
 export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }: Props) {
   const router = useRouter();
@@ -102,31 +105,25 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
       {/* Action buttons row */}
       <div className="flex gap-2 px-3 pt-2 pb-0.5">
         {isFemelle && isActif && (
-          <button
+          <QuickActionButton
+            action="chaleur"
             onClick={() => open("chaleur")}
-            className="flex flex-1 min-w-0 min-h-11 items-center justify-center gap-1.5 px-2 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-50 active:scale-95 transition-all"
-          >
-            <Thermometer size={15} />
-            Chaleur
-          </button>
+            className="flex-1"
+          />
         )}
         {isFemelle && isActif && (
-          <button
+          <QuickActionButton
+            action="saillieIA"
             onClick={() => open("saillie")}
-            className="flex flex-1 min-w-0 min-h-11 items-center justify-center gap-1.5 px-2 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-50 active:scale-95 transition-all"
-          >
-            <Syringe size={15} />
-            Saillie / IA
-          </button>
+            className="flex-1"
+          />
         )}
         {isActif && (
-          <Link
-            href={`/sanitaire/nouvel-evenement?animal=${encodeURIComponent(nutrav)}`}
-            className="flex flex-1 min-w-0 min-h-11 items-center justify-center gap-1.5 px-2 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-50 active:scale-95 transition-all"
-          >
-            <Stethoscope size={15} />
-            Événement
-          </Link>
+          <QuickActionButton
+            action="evenementSanitaire"
+            onClick={() => router.push(`/sanitaire/nouvel-evenement?animal=${encodeURIComponent(nutrav)}`)}
+            className="flex-1"
+          />
         )}
       </div>
 
@@ -143,7 +140,7 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
               <>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <Thermometer size={18} className="text-pink-500" />
+                    <ChaleurIcon size={18} className="text-pink-600" />
                     Chaleur observée
                   </h3>
                   <button onClick={close} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
@@ -185,7 +182,7 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
               <>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <Syringe size={18} className="text-green-600" />
+                    <SaillieIcon size={18} className="text-fuchsia-600" />
                     Saillie / IA
                   </h3>
                   <button onClick={close} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
