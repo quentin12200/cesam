@@ -15,6 +15,7 @@ import SanitaireClient, {
   type EvenementItem,
 } from "./SanitaireClient";
 import { type TraitementItem } from "./EvenementsTab";
+import SanitaireTabs from "@/components/SanitaireTabs";
 
 async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
   try {
@@ -252,6 +253,7 @@ export default async function SanitairePage() {
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
+      <SanitaireTabs />
       <div className="flex items-center gap-3 mt-2">
 <h2 className="text-xl font-bold text-gray-800">Sanitaire</h2>
         <div className="ml-auto flex gap-2">
