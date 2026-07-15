@@ -290,7 +290,10 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       <TroupeauScrollRestorer />
       <TroupeauTabs />
       <div className="flex items-center gap-3 mt-2">
-<h2 className="text-xl font-bold text-gray-800 flex-1 min-w-0 truncate">Troupeau</h2>
+<div className="min-w-0 flex-1">
+          <h2 className="truncate text-xl font-bold text-gray-800">Animaux</h2>
+          <p className="truncate text-xs text-gray-500">Consulter et rechercher tout le troupeau</p>
+        </div>
         <Link
           href={buildUrl({ filtres: showFiltres ? undefined : "1" })}
           className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-medium transition-colors ${
