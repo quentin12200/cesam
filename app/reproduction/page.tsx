@@ -7,9 +7,11 @@ import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib
 import Link from "next/link";
 import {
   RefreshCw, CheckCircle,
-  Settings, Printer, Users, Stethoscope, Baby,
+  Settings, Printer, Users, Baby,
 } from "lucide-react";
 import ReproScrollRestorer from "./ReproScrollRestorer";
+import QuickActionButton from "@/components/QuickActionButton";
+import { ACTION_VISUALS } from "@/components/action-visuals";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
@@ -46,6 +48,8 @@ const filterLabels: Record<FilterEtat, string> = {
 };
 
 const DUREE_GESTATION = 285;
+const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
+const SaillieIcon = ACTION_VISUALS.saillieIA.icon;
 
 // ── Composant recherche vache ──────────────────────────────────────────────
 function VacheSearch({
@@ -639,35 +643,18 @@ function ReproductionContent() {
       </div>
 
       {/* Barre d'actions rapides */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <QuickActionButton action="chaleur" onClick={() => openChaleurForm()} className="w-full" />
+        <QuickActionButton action="saillieIA" onClick={() => openSaillieForm()} className="w-full" />
         <button
-          onClick={() => openChaleurForm()}
-          className="flex flex-col items-center gap-1.5 py-3 bg-pink-600 text-white rounded-xl font-semibold text-sm shadow active:scale-95 transition-transform"
-        >
-          <span className="text-2xl leading-none">🌡️</span>
-          <span>Chaleur</span>
-        </button>
-        <button
-          onClick={() => openSaillieForm()}
-          className="flex flex-col items-center gap-1.5 py-3 bg-green-700 text-white rounded-xl font-semibold text-sm shadow active:scale-95 transition-transform"
-        >
-          <span className="text-2xl leading-none">🐄</span>
-          <span>Saillie / IA</span>
-        </button>
-        <button
+          type="button"
           onClick={openGroupageForm}
-          className="flex flex-col items-center gap-1.5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow active:scale-95 transition-transform"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 active:scale-[0.97]"
         >
-          <Users size={22} />
+          <Users size={20} />
           <span>Groupage</span>
         </button>
-        <Link
-          href="/sanitaire/nouvel-evenement"
-          className="flex flex-col items-center gap-1.5 py-3 bg-red-600 text-white rounded-xl font-semibold text-sm shadow active:scale-95 transition-transform"
-        >
-          <Stethoscope size={22} />
-          <span>Signaler</span>
-        </Link>
+        <QuickActionButton action="evenementSanitaire" href="/sanitaire/nouvel-evenement" className="w-full" />
       </div>
 
       {/* Message de retour */}
@@ -772,15 +759,9 @@ function ReproductionContent() {
                         </button>
                       )}
                       {(vache.etat === "ROUGE" || vache.etat === "REPOS") && (
-                        <button onClick={() => openChaleurForm(vache)}
-                          className="text-xs bg-pink-100 text-pink-700 px-2 py-1 rounded-lg">
-                          🌡️ Chaleur
-                        </button>
+                        <QuickActionButton action="chaleur" onClick={() => openChaleurForm(vache)} />
                       )}
-                      <button onClick={() => openSaillieForm(vache)}
-                        className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg flex items-center gap-1">
-                        <RefreshCw size={12} /> Saillie
-                      </button>
+                      <QuickActionButton action="saillieIA" onClick={() => openSaillieForm(vache)} />
                     </div>
                     {vache.saillieId && vache.etat !== "ROUGE" && vache.etat !== "REPOS" && (
                       confirmVideId === vache.id ? (
@@ -830,7 +811,7 @@ function ReproductionContent() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-800">🌡️ Observer une chaleur</h3>
+              <h3 className="flex items-center gap-2 text-lg font-bold text-gray-800"><ChaleurIcon size={20} className="text-pink-600" /> Chaleur</h3>
               <button onClick={() => setShowChaleurForm(false)} className="text-gray-400 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={handleChaleurSubmit} className="space-y-4">
@@ -867,7 +848,7 @@ function ReproductionContent() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-800">🐄 Enregistrer une saillie</h3>
+              <h3 className="flex items-center gap-2 text-lg font-bold text-gray-800"><SaillieIcon size={20} className="text-fuchsia-600" /> Saillie / IA</h3>
               <button onClick={() => setShowSaillieForm(false)} className="text-gray-400 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={handleSaillieSubmit} className="space-y-4">
