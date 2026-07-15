@@ -21,19 +21,19 @@ const PRIORITY = { urgent: 0, soon: 1, normal: 2 } as const;
 
 const styles = {
   urgent: {
-    row: "border-red-200 bg-red-50",
+    row: "border-l-red-500",
     icon: "text-red-600",
     due: "text-red-700",
     button: "bg-red-600 text-white hover:bg-red-700",
   },
   soon: {
-    row: "border-orange-200 bg-orange-50",
+    row: "border-l-orange-400",
     icon: "text-orange-600",
     due: "text-orange-700",
     button: "bg-orange-500 text-white hover:bg-orange-600",
   },
   normal: {
-    row: "border-gray-200 bg-white",
+    row: "border-l-gray-200",
     icon: "text-gray-400",
     due: "text-gray-500",
     button: "bg-gray-100 text-gray-700 hover:bg-gray-200",
@@ -71,17 +71,14 @@ export default function AccueilTodoSection({ items: initialItems }: { items: Acc
   return (
     <section data-layout-section="accueil-a-faire" data-layout-label="À faire" className="rounded-xl bg-white p-4 shadow">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">À faire</h2>
-          <p className="text-xs text-gray-500">Priorités classées par urgence et par échéance</p>
-        </div>
+        <h2 className="text-lg font-bold text-gray-900">À faire</h2>
         {sorted.length > 0 && (
-          <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">{sorted.length}</span>
+          <span className="text-xs font-semibold tabular-nums text-gray-500">{sorted.length}</span>
         )}
       </div>
 
       {sorted.length === 0 ? (
-        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-5 text-center">
+        <div className="rounded-xl bg-green-50 px-4 py-4 text-center">
           <CheckCircle2 className="mx-auto text-green-600" size={24} />
           <p className="mt-2 text-sm font-semibold text-green-800">Aucune intervention prioritaire</p>
         </div>
@@ -90,7 +87,7 @@ export default function AccueilTodoSection({ items: initialItems }: { items: Acc
           {visible.map((item) => {
             const style = styles[item.priority];
             return (
-              <article key={item.id} className={`flex items-center gap-3 rounded-xl border p-3 ${style.row}`}>
+              <article key={item.id} className={`flex items-center gap-3 rounded-lg border-l-[3px] bg-gray-50/70 px-3 py-2.5 ${style.row}`}>
                 <AlertCircle size={18} className={`shrink-0 ${style.icon}`} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-gray-900">{item.title}</p>
