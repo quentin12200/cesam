@@ -7,10 +7,9 @@ import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib
 import Link from "next/link";
 import {
   RefreshCw, CheckCircle,
-  Settings, Printer, Users, Baby,
+  Settings, Printer, Users, Baby, MoreHorizontal, Eye,
 } from "lucide-react";
 import ReproScrollRestorer from "./ReproScrollRestorer";
-import QuickActionButton from "@/components/QuickActionButton";
 import { ACTION_VISUALS } from "@/components/action-visuals";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
@@ -290,6 +289,7 @@ function ReproductionContent() {
   const [message, setMessage] = useState<string | null>(null);
   const [confirmVideId, setConfirmVideId] = useState<string | null>(null);
   const [confirmDeleteSaillieId, setConfirmDeleteSaillieId] = useState<string | null>(null);
+  const [menuVacheId, setMenuVacheId] = useState<string | null>(null);
 
   // ── Saillie form state ──
   const [showSaillieForm, setShowSaillieForm] = useState(false);
@@ -331,6 +331,16 @@ function ReproductionContent() {
   const [groupageError, setGroupageError] = useState<string | null>(null);
 
   useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    function closeRowMenu(event: MouseEvent) {
+      const target = event.target as Element;
+      if (!target.closest("[data-repro-menu]")) setMenuVacheId(null);
+    }
+
+    document.addEventListener("mousedown", closeRowMenu);
+    return () => document.removeEventListener("mousedown", closeRowMenu);
+  }, []);
 
   const actionRapideTraitee = useRef(false);
   useEffect(() => {
@@ -642,19 +652,16 @@ function ReproductionContent() {
         </div>
       </div>
 
-      {/* Barre d'actions rapides */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <QuickActionButton action="chaleur" onClick={() => openChaleurForm()} className="w-full" />
-        <QuickActionButton action="saillieIA" onClick={() => openSaillieForm()} className="w-full" />
+      {/* Action spécifique au module */}
+      <div>
         <button
           type="button"
           onClick={openGroupageForm}
-          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 active:scale-[0.97]"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
         >
-          <Users size={20} />
-          <span>Groupage</span>
+          <Users size={18} />
+          Groupage
         </button>
-        <QuickActionButton action="evenementSanitaire" href="/sanitaire/nouvel-evenement" className="w-full" />
       </div>
 
       {/* Message de retour */}
@@ -751,17 +758,62 @@ function ReproductionContent() {
                     {joursDepuisChaleur !== null && joursDepuisChaleur >= 19 && joursDepuisChaleur <= 21 && (
                       <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold animate-pulse">⚡ Retour chaleur J+{joursDepuisChaleur} ?</span>
                     )}
-                    <div className="flex gap-1 flex-wrap justify-end">
-                      {(vache.etat === "JAUNE" || vache.etat === "GRIS") && vache.saillieId && (
-                        <button onClick={() => openEchoForm(vache)}
-                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg flex items-center gap-1">
-                          <CheckCircle size={12} /> Écho
-                        </button>
+                    <div data-repro-menu className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setMenuVacheId((id) => id === vache.id ? null : vache.id)}
+                        aria-label={`Actions pour ${vache.nutrav}`}
+                        aria-expanded={menuVacheId === vache.id}
+                        aria-haspopup="menu"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
+                      >
+                        <MoreHorizontal size={20} />
+                      </button>
+
+                      {menuVacheId === vache.id && (
+                        <div
+                          role="menu"
+                          className="absolute right-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl"
+                        >
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => { setMenuVacheId(null); openChaleurForm(vache); }}
+                            className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-pink-700 hover:bg-pink-50"
+                          >
+                            <ChaleurIcon size={18} />
+                            Chaleur
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => { setMenuVacheId(null); openSaillieForm(vache); }}
+                            className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-fuchsia-700 hover:bg-fuchsia-50"
+                          >
+                            <SaillieIcon size={18} />
+                            Saillie / IA
+                          </button>
+                          {(vache.etat === "JAUNE" || vache.etat === "GRIS") && vache.saillieId && (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => { setMenuVacheId(null); openEchoForm(vache); }}
+                              className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50"
+                            >
+                              <CheckCircle size={18} />
+                              Échographie
+                            </button>
+                          )}
+                          <Link
+                            role="menuitem"
+                            href={`/troupeau/${vache.nutrav}`}
+                            className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            <Eye size={18} />
+                            Voir la fiche
+                          </Link>
+                        </div>
                       )}
-                      {(vache.etat === "ROUGE" || vache.etat === "REPOS") && (
-                        <QuickActionButton action="chaleur" onClick={() => openChaleurForm(vache)} />
-                      )}
-                      <QuickActionButton action="saillieIA" onClick={() => openSaillieForm(vache)} />
                     </div>
                     {vache.saillieId && vache.etat !== "ROUGE" && vache.etat !== "REPOS" && (
                       confirmVideId === vache.id ? (
