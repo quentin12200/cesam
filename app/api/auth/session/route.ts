@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { sendUnauthorizedAccessEmail } from "@/lib/gmail";
-import { AUTHORIZED_EMAILS, getAuthorizedEmail } from "@/lib/cesam-auth";
+import {
+  AUTHORIZED_EMAILS,
+  getAuthorizedEmail,
+  signSession,
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
+} from "@/lib/cesam-auth";
 
 const FIREBASE_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "cesam-gaec-d781e";
 
@@ -19,7 +25,7 @@ async function verifyFirebaseToken(idToken: string) {
 }
 
 export async function GET(request: Request) {
-  const email = getAuthorizedEmail(request.headers.get("cookie"));
+  const email = await getAuthorizedEmail(request.headers.get("cookie"));
   if (email) return NextResponse.json({ ok: true, email });
   return NextResponse.json({ error: "no session" }, { status: 401 });
 }
@@ -38,12 +44,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "unauthorized" }, { status: 403 });
     }
 
+    const token = await signSession(email);
     const response = NextResponse.json({ ok: true, email });
-    response.cookies.set("cesam_session", email, {
+    response.cookies.set(SESSION_COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: SESSION_MAX_AGE_SECONDS,
       path: "/",
     });
     return response;
@@ -54,6 +61,6 @@ export async function POST(request: Request) {
 
 export async function DELETE() {
   const response = NextResponse.json({ ok: true });
-  response.cookies.delete("cesam_session");
+  response.cookies.delete(SESSION_COOKIE_NAME);
   return response;
 }

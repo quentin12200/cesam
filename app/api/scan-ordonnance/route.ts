@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthorizedEmail } from "@/lib/cesam-auth";
 
 export const maxDuration = 60;
 
@@ -49,6 +50,10 @@ Si une information n'est pas visible ou lisible, mets null.
 Réponds uniquement avec le JSON, pas d'explication.`;
 
 export async function POST(req: NextRequest) {
+  if (!(await getAuthorizedEmail(req.headers.get("cookie")))) {
+    return NextResponse.json({ error: "Connexion requise" }, { status: 401 });
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "OPENAI_API_KEY non configurée" }, { status: 500 });

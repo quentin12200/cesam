@@ -6,7 +6,7 @@ import { getAdminStorageBucket } from "@/lib/firebase-admin";
 const EXTRACTIONS_PREFIX = "ordonnances/extractions/";
 const ALLOWED_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
-function requireAuthorized(request: NextRequest) {
+async function requireAuthorized(request: NextRequest) {
   return getAuthorizedEmail(request.headers.get("cookie"));
 }
 
@@ -20,7 +20,7 @@ function extensionFor(contentType: string) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!requireAuthorized(request)) {
+  if (!(await requireAuthorized(request))) {
     return NextResponse.json({ error: "Connexion requise" }, { status: 401 });
   }
 
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  if (!requireAuthorized(request)) {
+  if (!(await requireAuthorized(request))) {
     return NextResponse.json({ error: "Connexion requise" }, { status: 401 });
   }
 
