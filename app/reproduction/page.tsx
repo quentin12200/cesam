@@ -46,6 +46,15 @@ const filterLabels: Record<FilterEtat, string> = {
   VERT: "Pleine", ROUGE: "Vide", ROSE: "Imminent", REPOS: "Repos",
 };
 
+const reproductionCardStates: Record<EtatGestation, { label: string; border: string; text: string }> = {
+  VERT: { label: "Pleine", border: "border-green-500", text: "text-green-700" },
+  ROUGE: { label: "Vide", border: "border-red-400", text: "text-red-700" },
+  JAUNE: { label: "À écho", border: "border-amber-400", text: "text-amber-700" },
+  REPOS: { label: "Repos post-vêlage", border: "border-sky-400", text: "text-sky-700" },
+  ROSE: { label: "Imminent", border: "border-pink-400", text: "text-pink-700" },
+  GRIS: { label: "Saillie récente", border: "border-slate-300", text: "text-slate-600" },
+};
+
 const DUREE_GESTATION = 285;
 const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 const SaillieIcon = ACTION_VISUALS.saillieIA.icon;
@@ -718,6 +727,7 @@ function ReproductionContent() {
               ? differenceInDays(now, new Date(vache.derniereChaleur)) : null;
             const joursAvantVelage = vache.dateVelagePrevue
               ? differenceInDays(new Date(vache.dateVelagePrevue), now) : null;
+            const carteEtat = reproductionCardStates[vache.etat];
             const categorie = vache.estGenisse
               ? "Génisse"
               : vache.categorie === "A_ENGRAISSER"
@@ -730,7 +740,7 @@ function ReproductionContent() {
                 : `J+${Math.abs(joursAvantVelage)}`;
 
             return (
-              <article key={vache.id} className="rounded-xl bg-white px-3 py-2.5 shadow">
+              <article key={vache.id} className={`rounded-xl border-2 bg-white px-3 py-2.5 shadow-sm ${carteEtat.border}`}>
                 {/* Ligne 1 : identité et statut */}
                 <div className="flex min-w-0 items-center gap-2">
                   <Link
@@ -746,8 +756,8 @@ function ReproductionContent() {
                   >
                     {vache.nobovi ?? "Sans nom"}
                   </Link>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${getBadgeClass(vache.etat)}`}>
-                    {getEtatLabel(vache.etat)}
+                  <span className={`max-w-28 shrink-0 text-right text-[11px] font-bold leading-tight ${carteEtat.text}`}>
+                    {carteEtat.label}
                   </span>
                 </div>
 
