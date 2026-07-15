@@ -264,13 +264,13 @@ export default function OrdonnancesClient({
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     e.target.value = "";
     setScanning(true);
     setScanError("");
     try {
-      const { extractionId } = await scanAndCreateExtraction(file);
+      const { extractionId } = await scanAndCreateExtraction(files);
       router.push(`/ordonnances/a-verifier/${extractionId}`);
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "L’analyse du document a échoué");
@@ -294,13 +294,14 @@ export default function OrdonnancesClient({
           {scanning ? <Loader2 size={15} className="animate-spin" /> : <ScanLine size={15} />}
           {scanning ? "Scan…" : "Scanner ordonnance"}
         </button>
+        <span className="text-[11px] text-gray-400 hidden sm:inline">Plusieurs photos possibles</span>
         <button
           onClick={() => setShowForm((v) => !v)}
           className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-sm"
         >
           <Plus size={15} /> Nouvelle
         </button>
-        <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFilePick} />
+        <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFilePick} />
       </div>
 
       {showForm && (

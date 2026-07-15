@@ -3,7 +3,8 @@ export const dynamic = "force-dynamic";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import BackButton from "@/app/components/BackButton";
-import VerificationOrdonnanceClient, { type PropositionOrdonnance } from "./VerificationOrdonnanceClient";
+import { parseDocumentUrls, type PropositionOrdonnance } from "@/lib/ordonnance-types";
+import VerificationOrdonnanceClient from "./VerificationOrdonnanceClient";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -40,7 +41,7 @@ export default async function VerificationOrdonnancePage({ params }: PageProps) 
       <VerificationOrdonnanceClient
         extraction={{
           id: extraction.id,
-          documentUrl: extraction.documentUrl,
+          documentUrls: parseDocumentUrls(extraction.documentUrls, extraction.documentUrl),
           modele: extraction.modele,
           versionPrompt: extraction.versionPrompt,
           analyseLe: extraction.analyseLe.toISOString(),

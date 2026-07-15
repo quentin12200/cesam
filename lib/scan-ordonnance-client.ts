@@ -1,20 +1,8 @@
 import { fileToDocumentDataUrl } from "@/lib/image-client";
+import type { MedicamentPropose, PropositionOrdonnance } from "@/lib/ordonnance-types";
 
-export interface OrdonnanceExtracted {
-  medicamentNom: string | null;
-  voie: string | null;
-  dose: number | null;
-  uniteDosage: string | null;
-  frequence: string | null;
-  dureeJours: number | null;
-  dateDebut: string | null;
-  veterinaire: string | null;
-  motif: string | null;
-  delaiAttenteViandeJ: number | null;
-  delaiAttenteLaitJ: number | null;
-  precautions: string | null;
-  rappels: string | null;
-  ordonnanceNumero: string | null;
+export interface OrdonnanceExtracted extends PropositionOrdonnance {
+  medicaments: MedicamentPropose[];
   raw: string;
   modele: string;
   versionPrompt: string;
@@ -26,40 +14,56 @@ export interface OrdonnanceScanResult {
   extracted: OrdonnanceExtracted;
 }
 
-export async function scanAndCreateExtraction(file: File): Promise<OrdonnanceScanResult> {
+async function uploadDocument(file: File): Promise<{ documentUrl: string; base64: string; mimeType: string }> {
   const dataUrl = await fileToDocumentDataUrl(file);
   const base64 = dataUrl.split(",")[1] ?? "";
-  const documentMimeType = dataUrl.match(/^data:([^;,]+)/)?.[1] ?? file.type ?? "image/jpeg";
+  const mimeType = dataUrl.match(/^data:([^;,]+)/)?.[1] ?? file.type ?? "image/jpeg";
 
   const uploadRes = await fetch("/api/documents/ordonnances", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dataUrl, contentType: documentMimeType }),
+    body: JSON.stringify({ dataUrl, contentType: mimeType }),
   });
   if (!uploadRes.ok) {
     const err = await uploadRes.json().catch(() => ({}));
-    throw new Error(err.error ?? "Le document n'a pas pu Ãªtre enregistrÃ©");
+    throw new Error(err.error ?? "Le document n'a pas pu être enregistré");
   }
   const { documentUrl } = await uploadRes.json();
+  return { documentUrl, base64, mimeType };
+}
+
+/** Prend une ou plusieurs photos formant UNE ordonnance : chaque page est
+ *  enregistrée, puis toutes les images sont analysées ensemble en un seul appel. */
+export async function scanAndCreateExtraction(files: File[]): Promise<OrdonnanceScanResult> {
+  const liste = files.filter(Boolean);
+  if (liste.length === 0) throw new Error("Aucune photo sélectionnée");
+
+  const pages = [];
+  for (const file of liste) {
+    pages.push(await uploadDocument(file));
+  }
+  const documentUrls = pages.map((p) => p.documentUrl);
 
   const scanRes = await fetch("/api/scan-ordonnance", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image: base64, mimeType: documentMimeType }),
+    body: JSON.stringify({ images: pages.map((p) => ({ data: p.base64, mimeType: p.mimeType })) }),
   });
   if (!scanRes.ok) {
-    const err = await scanRes.json();
+    const err = await scanRes.json().catch(() => ({}));
     throw new Error(err.error ?? "Erreur lors du scan");
   }
   const extracted: OrdonnanceExtracted = await scanRes.json();
-  const { raw, modele, versionPrompt, analyseLe, ...propositionInitiale } = extracted;
+
+  const { raw, modele, versionPrompt, analyseLe, ...proposition } = extracted;
   const draftRes = await fetch("/api/extractions-ordonnance", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      documentUrl,
+      documentUrl: documentUrls[0],
+      documentUrls,
       reponseBrute: raw,
-      propositionInitiale,
+      propositionInitiale: proposition,
       modele,
       versionPrompt,
       analyseLe,
@@ -67,7 +71,7 @@ export async function scanAndCreateExtraction(file: File): Promise<OrdonnanceSca
   });
   if (!draftRes.ok) {
     const err = await draftRes.json().catch(() => ({}));
-    throw new Error(err.error ?? "Le brouillon n'a pas pu Ãªtre crÃ©Ã©");
+    throw new Error(err.error ?? "Le brouillon n'a pas pu être créé");
   }
   const draft = await draftRes.json();
   return { extractionId: draft.id, extracted };

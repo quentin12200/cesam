@@ -10,6 +10,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const {
     documentUrl,
+    documentUrls,
     reponseBrute,
     propositionInitiale,
     modele,
@@ -21,11 +22,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Analyse incomplète" }, { status: 400 });
   }
 
+  const pages = Array.isArray(documentUrls) && documentUrls.length > 0
+    ? documentUrls.filter((u: unknown): u is string => typeof u === "string")
+    : [documentUrl];
+
   const dateAnalyse = analyseLe ? new Date(analyseLe) : new Date();
   const extraction = await prisma.extractionOrdonnance.create({
     data: {
       statut: "A_VERIFIER",
       documentUrl,
+      documentUrls: JSON.stringify(pages),
       reponseBrute,
       propositionInitiale: JSON.stringify(propositionInitiale),
       modele,
