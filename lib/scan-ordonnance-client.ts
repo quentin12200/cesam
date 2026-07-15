@@ -1,5 +1,4 @@
 import { fileToDocumentDataUrl } from "@/lib/image-client";
-import { uploadDataUrlToStorage } from "@/lib/firebase-client";
 
 export interface OrdonnanceExtracted {
   medicamentNom: string | null;
@@ -30,15 +29,23 @@ export interface OrdonnanceScanResult {
 export async function scanAndCreateExtraction(file: File): Promise<OrdonnanceScanResult> {
   const dataUrl = await fileToDocumentDataUrl(file);
   const base64 = dataUrl.split(",")[1] ?? "";
+  const documentMimeType = dataUrl.match(/^data:([^;,]+)/)?.[1] ?? file.type ?? "image/jpeg";
 
-  const ext = file.type === "application/pdf" ? "pdf" : "jpg";
-  const path = `ordonnances/extractions/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const documentUrl = await uploadDataUrlToStorage(dataUrl, path);
+  const uploadRes = await fetch("/api/documents/ordonnances", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dataUrl, contentType: documentMimeType }),
+  });
+  if (!uploadRes.ok) {
+    const err = await uploadRes.json().catch(() => ({}));
+    throw new Error(err.error ?? "Le document n'a pas pu Ãªtre enregistrÃ©");
+  }
+  const { documentUrl } = await uploadRes.json();
 
   const scanRes = await fetch("/api/scan-ordonnance", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image: base64, mimeType: file.type || "image/jpeg" }),
+    body: JSON.stringify({ image: base64, mimeType: documentMimeType }),
   });
   if (!scanRes.ok) {
     const err = await scanRes.json();
@@ -60,7 +67,7 @@ export async function scanAndCreateExtraction(file: File): Promise<OrdonnanceSca
   });
   if (!draftRes.ok) {
     const err = await draftRes.json().catch(() => ({}));
-    throw new Error(err.error ?? "Le brouillon n'a pas pu être créé");
+    throw new Error(err.error ?? "Le brouillon n'a pas pu Ãªtre crÃ©Ã©");
   }
   const draft = await draftRes.json();
   return { extractionId: draft.id, extracted };

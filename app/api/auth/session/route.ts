@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { sendUnauthorizedAccessEmail } from "@/lib/gmail";
-
-const AUTHORIZED_EMAILS = ["leyrat.quentin@gmail.com", "gaec.cesam@gmail.com"];
+import { AUTHORIZED_EMAILS, getAuthorizedEmail } from "@/lib/cesam-auth";
 
 const FIREBASE_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "cesam-gaec-d781e";
 
-// Clés publiques Google pour les tokens Firebase
+// ClÃ©s publiques Google pour les tokens Firebase
 const JWKS = createRemoteJWKSet(
   new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
 );
@@ -20,9 +19,8 @@ async function verifyFirebaseToken(idToken: string) {
 }
 
 export async function GET(request: Request) {
-  const cookie = request.headers.get("cookie") ?? "";
-  const match = cookie.match(/cesam_session=([^;]+)/);
-  if (match) return NextResponse.json({ ok: true, email: decodeURIComponent(match[1]) });
+  const email = getAuthorizedEmail(request.headers.get("cookie"));
+  if (email) return NextResponse.json({ ok: true, email });
   return NextResponse.json({ error: "no session" }, { status: 401 });
 }
 

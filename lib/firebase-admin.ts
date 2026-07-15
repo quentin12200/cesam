@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { getMessaging, Messaging } from "firebase-admin/messaging";
+import { getStorage } from "firebase-admin/storage";
 
 let app: App;
 
@@ -25,4 +26,10 @@ export { getAdminApp };
 
 export function getAdminMessaging(): Messaging {
   return getMessaging(getAdminApp());
+}
+
+export function getAdminStorageBucket() {
+  const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  if (!bucketName) throw new Error("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is missing");
+  return getStorage(getAdminApp()).bucket(bucketName);
 }
