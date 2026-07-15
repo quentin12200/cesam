@@ -689,7 +689,10 @@ function ReproductionContent() {
       {/* Header */}
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-3">
-<h2 className="text-xl font-bold text-gray-800">Reproduction</h2>
+<div>
+            <h2 className="text-xl font-bold text-gray-800">Reproduction</h2>
+            <p className="text-xs text-gray-500">Suivre les femelles reproductrices</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/reproduction/impression" className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" title="Imprimer">
