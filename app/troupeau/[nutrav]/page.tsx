@@ -174,21 +174,23 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   return (
     <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="p-4 pb-0">
-        <div className="flex items-start gap-2 mt-2">
+      <div className="px-3 pt-3">
+        <div className="flex items-start gap-2">
           <BackButton />
           <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-2 min-w-0">
-              <span className="font-mono text-lg font-bold text-green-800 shrink-0">{animal.nutrav}</span>
-              <span className="text-gray-400">—</span>
-              <h2 className="text-xl font-bold text-gray-800 truncate">{animal.nobovi ?? "Sans nom"}</h2>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="shrink-0 rounded-lg bg-green-700 px-2.5 py-1 font-mono text-xl font-bold text-white">
+                {animal.nutrav}
+              </span>
+              <h2 className="truncate text-xl sm:text-2xl font-bold text-gray-900">{animal.nobovi ?? "Sans nom"}</h2>
             </div>
-            <p className="mt-0.5 text-sm font-medium text-gray-600">
-              {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
-              <span className="mx-1.5 text-gray-300">·</span>
-              {formatAge(animal.danais)}
-            </p>
-            <p className="mt-0.5 font-mono text-xs text-gray-500 break-all">{animal.nunati}</p>
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getCategorieColor(getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie))}`}>
+                {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
+              </span>
+              <span className="text-sm font-semibold text-gray-700">{formatAge(animal.danais)}</span>
+            </div>
+            <p className="mt-1 font-mono text-xs text-gray-400 break-all">{animal.nunati}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <EditAnimalDrawer
@@ -228,13 +230,13 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
       />
 
       {/* Onglets */}
-      <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 mt-3">
+      <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 mt-2">
         <div className="flex">
           {tabs.map((tab) => (
             <Link
               key={tab.id}
               href={tabHref(tab.id)}
-              className={`flex-1 text-center py-3 text-sm font-semibold border-b-2 transition-colors ${
+              className={`flex-1 text-center py-2.5 text-sm font-semibold border-b-2 transition-colors ${
                 onglet === tab.id
                   ? "border-green-600 text-green-700"
                   : "border-transparent text-gray-500 hover:text-gray-700"
@@ -246,31 +248,30 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-3 space-y-3">
         {/* ─── ONGLET IDENTITÉ ─── */}
         {onglet === "identite" && (
           <>
             {/* Identité */}
             <div className="bg-white rounded-xl shadow overflow-hidden">
               <dl className="grid grid-cols-2 sm:grid-cols-3">
-                <div className="p-3 border-b border-r border-gray-100">
+                <div className="p-2.5 border-b border-r border-gray-100">
                   <dt className="text-[11px] font-medium text-gray-500 uppercase">Naissance</dt>
-                  <dd className="mt-1 text-sm font-medium text-gray-800">{formatDate(animal.danais)}</dd>
+                  <dd className="mt-0.5 text-sm font-semibold text-gray-800">{formatDate(animal.danais)}</dd>
                 </div>
-                <div className="p-3 border-b sm:border-r border-gray-100">
+                <div className="p-2.5 border-b sm:border-r border-gray-100">
                   <dt className="text-[11px] font-medium text-gray-500 uppercase">Catégorie</dt>
-                  <dd className="mt-1 flex items-center gap-2 flex-wrap">
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${getCategorieColor(getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie))}`}>
+                  <dd className="mt-0.5 flex items-center flex-wrap">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getCategorieColor(getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie))}`}>
                       {animal.sexbov === "F" ? "♀" : "♂"} {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
                     </span>
-                    {!animal.categorie && <span className="text-[11px] text-gray-400">Calculée automatiquement</span>}
                   </dd>
                 </div>
 
-                <div className="col-span-2 sm:col-span-1 p-3 border-b border-gray-100">
+                <div className="col-span-2 sm:col-span-1 p-2.5 border-b border-gray-100">
                   <dt className="text-[11px] font-medium text-gray-500 uppercase">Groupe</dt>
-                  <dd className="mt-1 text-sm font-semibold text-gray-800">
-                    {animal.groupe?.nom ?? <span className="text-gray-400 font-normal">Aucun groupe</span>}
+                  <dd className={`mt-0.5 text-sm ${animal.groupe ? "font-semibold text-gray-800" : "font-normal text-gray-400"}`}>
+                    {animal.groupe?.nom ?? "Aucun groupe"}
                   </dd>
                 </div>
               </dl>
@@ -278,8 +279,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               {(!animal.boucleFaite ||
                 ((animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150) ||
                 (animal.sexbov === "F" && !animal.estGenisse && animal.tarieFaite)) && (
-                <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
-                  <div className="text-[11px] font-medium text-gray-500 uppercase mb-2">Suivi</div>
+                <div className="border-t border-gray-100 bg-gray-50 px-3 py-2.5">
+                  <div className="text-[11px] font-medium text-gray-500 uppercase mb-1.5">Suivi</div>
                   <div className="flex flex-wrap items-center gap-2">
                     {!animal.boucleFaite && (
                       <span className="text-xs font-medium text-orange-700 bg-orange-100 px-2 py-1 rounded-full">
@@ -304,14 +305,14 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               )}
 
               {animal.notes && (
-                <div className="border-t border-gray-100 px-4 py-3">
+                <div className="border-t border-gray-100 px-3 py-2.5">
                   <div className="text-[11px] font-medium text-gray-500 uppercase mb-1">Notes</div>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">{animal.notes}</p>
                 </div>
               )}
 
               {animal.statut === "ACTIF" && (
-                <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 flex flex-wrap gap-2">
+                <div className="border-t border-gray-100 bg-gray-50 px-3 py-2.5 flex flex-wrap gap-2">
                   <CategorieButton
                     nutrav={animal.nutrav}
                     sexbov={animal.sexbov}
@@ -339,12 +340,12 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
             {/* Naissance (si c'est un veau) */}
             {animal.velageVeau && (
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <div className="bg-white rounded-xl shadow p-3">
+                <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                   <Baby size={16} className="text-pink-500" />
                   Naissance
                 </h3>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500">Date</span>
                     <span>{formatDate(animal.velageVeau.date)}</span>
@@ -386,13 +387,13 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             )}
 
             {/* Pesées — tous animaux, tous âges */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <div className="bg-white rounded-xl shadow p-3">
+              <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                 <Scale size={16} className="text-blue-600" />
                 Pesées {pesees.length > 0 && `(${pesees.length})`}
               </h3>
               {gmqGlobal !== null && (
-                <div className="mb-3 bg-blue-50 rounded-lg p-2.5 flex items-center justify-between">
+                <div className="mb-2 bg-blue-50 rounded-lg p-2 flex items-center justify-between">
                   <span className="text-xs text-gray-500">GMQ global</span>
                   <span className="text-lg font-bold text-blue-700">{gmqGlobal} g/j</span>
                 </div>
@@ -424,15 +425,15 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               ) : (
                 <p className="text-sm text-gray-400 italic mb-2">Aucune pesée enregistrée</p>
               )}
-              <div className="mt-3">
+              <div className="mt-2">
                 <PeseeInlineForm nutrav={animal.nutrav} />
               </div>
             </div>
 
             {/* Généalogie */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-3">Généalogie</h3>
-              <div className="space-y-2 text-sm">
+            <div className="bg-white rounded-xl shadow p-3">
+              <h3 className="font-semibold text-gray-800 mb-2">Généalogie</h3>
+              <div className="space-y-1.5 text-sm">
                 {/* Mère */}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Mère</span>
