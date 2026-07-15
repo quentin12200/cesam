@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const tabs = [
   { href: "/troupeau", label: "Animaux" },
+  { href: "/troupeau/identification", label: "Identification" },
   { href: "/reproduction", label: "Reproduction" },
   { href: "/velage", label: "Vêlages" },
 ];
@@ -13,9 +14,9 @@ export default function TroupeauTabs() {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Vues du troupeau" className="grid grid-cols-3 rounded-xl bg-gray-100 p-1">
+    <nav aria-label="Vues du troupeau" className="grid grid-cols-4 rounded-xl bg-gray-100 p-1">
       {tabs.map((tab) => {
-        const active = pathname === tab.href || (tab.href === "/troupeau" && pathname.startsWith("/troupeau/"));
+        const active = pathname === tab.href;
         return (
           <Link
             key={tab.href}
