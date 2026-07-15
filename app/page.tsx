@@ -907,7 +907,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 p-4 md:max-w-3xl lg:max-w-4xl">
+    <div className="mx-auto max-w-2xl space-y-5 p-4 md:max-w-3xl lg:max-w-4xl">
       <AccueilQuickActions />
 
       <AccueilTodoSection items={todoItems} />
@@ -918,11 +918,8 @@ export default async function Dashboard({ searchParams }: PageProps) {
         className="group rounded-xl bg-white shadow"
       >
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-          <div>
-            <h2 className="text-base font-bold text-gray-900">Aperçu de l’élevage</h2>
-            <p className="text-xs text-gray-500">Quelques repères, détails disponibles dans les modules</p>
-          </div>
-          <span className="text-sm font-bold text-green-700 group-open:rotate-180">⌄</span>
+          <h2 className="text-base font-bold text-gray-900">Aperçu de l’élevage</h2>
+          <span className="text-sm font-bold text-gray-400 transition-transform group-open:rotate-180">⌄</span>
         </summary>
 
         <div className="space-y-4 border-t border-gray-100 p-4">
