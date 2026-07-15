@@ -22,6 +22,8 @@ export interface AnimalRow {
   estGenisse: boolean;
   tarieFaite: boolean;
   aEchographier: boolean;
+  reproductionEtatManuel: EtatGestation | null;
+  reproductionEtatPrecedent: EtatGestation | null;
   categorie: string | null;
   groupeNom: string | null;
   saillieDate: string | null;
@@ -31,6 +33,8 @@ export interface AnimalRow {
   veauNutrav: string | null;
   veauStatut: string | null;
   veauSevreFait: boolean | null;
+  dernierPoids: number | null;
+  dernierePeseeDate: string | null;
   enAttente: boolean;
 }
 
@@ -262,6 +266,7 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                   currentTri={currentTri}
                 />
               </th>
+              <th className="px-3 py-2.5 text-left font-semibold">Dernier poids</th>
               <th className="px-3 py-2.5 text-left font-semibold">
                 <FilterDropdown
                   label="Catégorie"
@@ -280,9 +285,10 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                   buildFilterUrl={buildFilterUrl}
                 />
               </th>
+              <th className="px-3 py-2.5 text-left font-semibold">Vente</th>
               <th className="px-3 py-2.5 text-left font-semibold">
                 <FilterDropdown
-                  label="🐮 Allaitante"
+                  label="🍼 Veau" 
                   options={TARIE_OPTIONS}
                   currentValue={currentTarie}
                   paramKey="tarie"
@@ -317,7 +323,7 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
 
               const etat: EtatGestation | null =
                 ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "A_ENGRAISSER"].includes(cat)
-                  ? getEtatGestation(
+                  ? animal.reproductionEtatManuel ?? getEtatGestation(
                       animal.saillieDate ? new Date(animal.saillieDate) : null,
                       animal.gestationEtat ?? null,
                       animal.gestationVelagePrevue
@@ -329,7 +335,7 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                   : null;
 
               const veauActif =
-                animal.veauNutrav && animal.veauStatut === "ACTIF" && !animal.veauSevreFait
+                animal.veauNutrav && animal.veauStatut === "ACTIF" && !animal.veauSevreFait && !animal.tarieFaite
                   ? animal.veauNutrav
                   : null;
 
@@ -353,6 +359,21 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                   </td>
                   <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
                     {formatAgeCompact(danais)}
+                  </td>
+                  <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">
+                    {animal.dernierPoids !== null ? (
+                      <div>
+                        <span className="font-semibold">{animal.dernierPoids} kg</span>
+                        {animal.dernierePeseeDate && (
+                          <div className="text-[10px] text-gray-400">
+                            {new Intl.RelativeTimeFormat("fr", { numeric: "auto" }).format(
+                              -Math.max(0, Math.round((Date.now() - new Date(animal.dernierePeseeDate).getTime()) / 86400000)),
+                              "day"
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : <span className="text-gray-200">—</span>}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     <span
@@ -378,9 +399,16 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                     )}
                   </td>
                   <td className="px-3 py-2.5">
+                    {animal.enAttente ? (
+                      <span className="text-xs font-bold text-red-700">⛔ Interdite</span>
+                    ) : (
+                      <span className="text-xs font-medium text-green-700">Autorisée</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5">
                     {veauActif ? (
                       <span className="text-xs font-mono bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
-                        🐮 {veauActif}
+                        🍼 {veauActif}
                       </span>
                     ) : (
                       <span className="text-gray-200 text-xs">—</span>
