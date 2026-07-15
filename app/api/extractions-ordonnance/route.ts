@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthorizedEmail } from "@/lib/cesam-auth";
 
 export async function POST(request: NextRequest) {
+  if (!(await getAuthorizedEmail(request.headers.get("cookie")))) {
+    return NextResponse.json({ error: "Connexion requise" }, { status: 401 });
+  }
+
   const body = await request.json();
   const {
     documentUrl,

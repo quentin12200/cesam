@@ -1,34 +1,53 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/cesam-auth";
 
-const PUBLIC_PATHS = ["/login", "/acces-refuse", "/api/auth/session", "/api/auth/unauthorized"];
+// Routes accessibles sans session valide.
+// - login / accès refusé : pages publiques
+// - /api/auth/* : établit ou vérifie la session elle-même
+// - /api/cron/* : appelées par Vercel Cron, s'authentifient via CRON_SECRET
+const PUBLIC_PATHS = [
+  "/login",
+  "/acces-refuse",
+  "/api/auth/session",
+  "/api/auth/unauthorized",
+  "/api/cron/",
+];
 
-export function middleware(request: NextRequest) {
+// Ressources statiques / PWA à laisser passer.
+const STATIC_PREFIXES = [
+  "/_next/",
+  "/favicon",
+  "/icon",
+  "/logo",
+  "/manifest",
+  "/firebase-messaging-sw",
+];
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public paths, API routes (except protected ones), static files
   if (
     PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
-    pathname.startsWith("/api/") ||
-    pathname.startsWith("/_next/") ||
-    pathname.startsWith("/favicon") ||
-    pathname.startsWith("/icon") ||
-    pathname.startsWith("/logo") ||
-    pathname.startsWith("/manifest") ||
-    pathname.startsWith("/firebase-messaging-sw") ||
+    STATIC_PREFIXES.some((p) => pathname.startsWith(p)) ||
     pathname === "/sw.js"
   ) {
     return NextResponse.next();
   }
 
-  const session = request.cookies.get("cesam_session")?.value;
-  if (!session) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+  const email = await verifySessionToken(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+  if (email) {
+    return NextResponse.next();
   }
 
-  return NextResponse.next();
+  // Les routes API répondent en JSON 401 plutôt qu'une redirection HTML.
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "Connexion requise" }, { status: 401 });
+  }
+
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set("redirect", pathname);
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {

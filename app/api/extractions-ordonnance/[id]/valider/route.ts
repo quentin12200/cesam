@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthorizedEmail } from "@/lib/cesam-auth";
 
 type ValeursFinales = {
   dateDebut: string;
@@ -69,6 +70,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await getAuthorizedEmail(request.headers.get("cookie")))) {
+    return NextResponse.json({ error: "Connexion requise" }, { status: 401 });
+  }
+
   const { id } = await params;
   const extraction = await prisma.extractionOrdonnance.findUnique({ where: { id } });
   if (!extraction) return NextResponse.json({ error: "Extraction introuvable" }, { status: 404 });
