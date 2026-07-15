@@ -31,24 +31,3 @@ body {
   opacity: 0.42;
   filter: grayscale(0.35);
 }
-
-.cesam-density-compact {
-  row-gap: 0.5rem !important;
-}
-
-.cesam-density-compact > [data-layout-section] {
-  margin-top: 0.5rem !important;
-}
-
-.cesam-density-compact > [data-layout-section] :where(.p-4) {
-  padding: 0.625rem !important;
-}
-
-.cesam-density-compact > [data-layout-section] :where(.py-3) {
-  padding-top: 0.45rem !important;
-  padding-bottom: 0.45rem !important;
-}
-
-.cesam-density-compact > [data-layout-section] :where(.space-y-4) {
-  row-gap: 0.5rem !important;
-}
