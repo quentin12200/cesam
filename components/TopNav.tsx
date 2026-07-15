@@ -5,7 +5,14 @@ import { usePathname } from "next/navigation";
 import { Home, Stethoscope, Euro } from "lucide-react";
 import BullHeadIcon from "@/components/BullHeadIcon";
 
-const navItems = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  paths?: string[];
+};
+
+const navItems: NavItem[] = [
   { href: "/", label: "Accueil", icon: Home },
   { href: "/troupeau", label: "Troupeau", icon: BullHeadIcon, paths: ["/troupeau", "/reproduction", "/velage"] },
   { href: "/sanitaire", label: "Sanitaire", icon: Stethoscope, paths: ["/sanitaire", "/pharmacie"] },
