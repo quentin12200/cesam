@@ -1,14 +1,49 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, X, UserRound } from "lucide-react";
+import { Settings, X, UserRound, Mic, Loader2 } from "lucide-react";
 import { useUserPreferences, type CesamProfile } from "@/components/UserPreferencesProvider";
 
 const PROFILES: CesamProfile[] = ["Céline", "Samuel"];
 
+interface NoteHisto {
+  id: string;
+  texte: string;
+  traitee: boolean;
+  createdAt: string;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("fr-FR", {
+    day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+}
+
 export default function GlobalSettingsButton() {
   const { profile, setProfile, ready } = useUserPreferences();
   const [open, setOpen] = useState(false);
+  const [histoOpen, setHistoOpen] = useState(false);
+  const [notes, setNotes] = useState<NoteHisto[] | null>(null);
+  const [loadingHisto, setLoadingHisto] = useState(false);
+  const [histoError, setHistoError] = useState("");
+
+  async function ouvrirHistorique() {
+    const prochainEtat = !histoOpen;
+    setHistoOpen(prochainEtat);
+    if (prochainEtat && notes === null && !loadingHisto) {
+      setLoadingHisto(true);
+      setHistoError("");
+      try {
+        const res = await fetch("/api/notes-terrain?historique=1");
+        if (!res.ok) throw new Error();
+        setNotes(await res.json());
+      } catch {
+        setHistoError("Impossible de charger l'historique");
+      } finally {
+        setLoadingHisto(false);
+      }
+    }
+  }
 
   return (
     <>
@@ -66,6 +101,48 @@ export default function GlobalSettingsButton() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={ouvrirHistorique}
+                className="flex w-full items-center justify-between gap-2 text-left"
+              >
+                <span className="flex items-center gap-2 text-sm font-bold text-gray-800">
+                  <Mic size={17} />
+                  Historique des notes vocales
+                </span>
+                <span className="text-sm font-bold text-gray-400 transition-transform" style={{ transform: histoOpen ? "rotate(180deg)" : "none" }}>⌄</span>
+              </button>
+              {histoOpen && (
+                <div className="mt-3">
+                  {loadingHisto && (
+                    <p className="flex items-center gap-2 text-xs text-gray-500">
+                      <Loader2 size={14} className="animate-spin" /> Chargement…
+                    </p>
+                  )}
+                  {histoError && <p className="text-xs text-red-600">{histoError}</p>}
+                  {!loadingHisto && !histoError && notes && notes.length === 0 && (
+                    <p className="text-xs text-gray-500">Aucune note vocale enregistrée.</p>
+                  )}
+                  {!loadingHisto && notes && notes.length > 0 && (
+                    <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                      {notes.map((n) => (
+                        <li key={n.id} className="rounded-lg border border-gray-200 bg-gray-50 p-2.5">
+                          <p className="text-sm text-gray-800 leading-snug">« {n.texte} »</p>
+                          <div className="mt-1 flex items-center justify-between gap-2 text-[11px]">
+                            <span className="text-gray-400">{formatDate(n.createdAt)}</span>
+                            <span className={`rounded-full px-2 py-0.5 font-semibold ${n.traitee ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                              {n.traitee ? "Traitée" : "À traiter"}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="mt-5 rounded-xl bg-gray-50 p-3 text-xs text-gray-600">

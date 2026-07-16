@@ -3,10 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { webpush } from "@/lib/push";
 import { logAction } from "@/lib/action-log";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // ?historique=1 renvoie tout l'historique (notes traitées incluses).
+  const historique = request.nextUrl.searchParams.get("historique") === "1";
   const notes = await prisma.noteTerrain.findMany({
-    where: { traitee: false },
+    where: historique ? undefined : { traitee: false },
     orderBy: { createdAt: "desc" },
+    take: historique ? 300 : undefined,
   });
   return NextResponse.json(notes);
 }
