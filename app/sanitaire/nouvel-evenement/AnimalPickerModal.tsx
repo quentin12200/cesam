@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { X, Search, Check } from "lucide-react";
+import { Search, Check } from "lucide-react";
 import { getCategorie, getCategorieLabel, getCategorieColor, CATEGORIES_LABELS, type CategorieAnimal } from "@/lib/utils";
+import SelectionModal from "@/components/SelectionModal";
 import type { AnimalOption } from "./AnimalPicker";
 
 interface AnimalPickerRow {
@@ -29,9 +30,10 @@ interface Props {
   onClose: () => void;
   groupes: Groupe[];
   sexeImpose?: "F" | "M";
+  multiple?: boolean;
 }
 
-export default function AnimalPickerModal({ selected, onChange, onClose, groupes, sexeImpose }: Props) {
+export default function AnimalPickerModal({ selected, onChange, onClose, groupes, sexeImpose, multiple = true }: Props) {
   const [animaux, setAnimaux] = useState<AnimalPickerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -39,7 +41,7 @@ export default function AnimalPickerModal({ selected, onChange, onClose, groupes
   const [filtreSexe, setFiltreSexe] = useState<"" | "F" | "M">("");
   const [filtreCategorie, setFiltreCategorie] = useState<"" | CategorieAnimal>("");
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(selected.map((a) => a.id)));
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set((multiple ? selected : selected.slice(0, 1)).map((a) => a.id)));
   const [meta, setMeta] = useState<Map<string, AnimalOption>>(new Map(selected.map((a) => [a.id, a])));
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export default function AnimalPickerModal({ selected, onChange, onClose, groupes
 
   function toggle(a: AnimalPickerRow) {
     setSelectedIds((prev) => {
+      if (!multiple) return prev.has(a.id) ? new Set() : new Set([a.id]);
       const next = new Set(prev);
       if (next.has(a.id)) next.delete(a.id);
       else next.add(a.id);
@@ -108,22 +111,16 @@ export default function AnimalPickerModal({ selected, onChange, onClose, groupes
 
   function valider() {
     const result = [...selectedIds].map((id) => meta.get(id)).filter((a): a is AnimalOption => !!a);
-    onChange(result);
+    onChange(multiple ? result : result.slice(0, 1));
     onClose();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[85vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-800">Choisir dans le troupeau</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100">
-            <X size={18} className="text-gray-500" />
-          </button>
-        </div>
-
-        <div className="px-4 py-3 space-y-2 border-b border-gray-100">
+    <SelectionModal
+      title="Choisir dans le troupeau"
+      onClose={onClose}
+      controls={(
+        <div className="space-y-2 px-4 py-3">
           <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2">
             <Search size={15} className="text-gray-400 mr-2 shrink-0" />
             <input
@@ -161,14 +158,31 @@ export default function AnimalPickerModal({ selected, onChange, onClose, groupes
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500">{filtered.length} affiché{filtered.length > 1 ? "s" : ""}</span>
-            <div className="flex gap-3">
-              <button type="button" onClick={toutSelectionner} className="text-blue-600 hover:underline">Tout sélectionner</button>
-              <button type="button" onClick={toutDeselectionner} className="text-gray-500 hover:underline">Tout désélectionner</button>
-            </div>
+            {multiple && (
+              <div className="flex gap-3">
+                <button type="button" onClick={toutSelectionner} className="text-blue-600 hover:underline">Tout sélectionner</button>
+                <button type="button" onClick={toutDeselectionner} className="text-gray-500 hover:underline">Tout désélectionner</button>
+              </div>
+            )}
           </div>
         </div>
-
-        <div className="flex-1 overflow-y-auto">
+      )}
+      footer={(
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <span className="text-sm text-gray-600">
+            {selectedIds.size} animal{selectedIds.size > 1 ? "aux" : ""} sélectionné{selectedIds.size > 1 ? "s" : ""}
+          </span>
+          <button
+            type="button"
+            onClick={valider}
+            disabled={selectedIds.size === 0}
+            className="min-h-11 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white disabled:opacity-50"
+          >
+            Valider ({selectedIds.size})
+          </button>
+        </div>
+      )}
+    >
           {loading ? (
             <div className="p-8 text-center text-gray-400 text-sm">Chargement…</div>
           ) : filtered.length === 0 ? (
@@ -197,20 +211,6 @@ export default function AnimalPickerModal({ selected, onChange, onClose, groupes
               );
             })
           )}
-        </div>
-
-        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between gap-3">
-          <span className="text-sm text-gray-600">{selectedIds.size} animal{selectedIds.size > 1 ? "aux" : ""} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
-          <button
-            type="button"
-            onClick={valider}
-            disabled={selectedIds.size === 0}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-          >
-            Valider la sélection ({selectedIds.size})
-          </button>
-        </div>
-      </div>
-    </div>
+    </SelectionModal>
   );
 }

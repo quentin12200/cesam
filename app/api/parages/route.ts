@@ -11,8 +11,8 @@ export async function POST(request: NextRequest) {
   const motif = body.motif === "BOITERIE" ? "BOITERIE" : "PARAGE";
   const date = body.date ? new Date(body.date) : new Date();
 
-  if (animalIds.length === 0) {
-    return NextResponse.json({ error: "Sélectionne au moins une vache" }, { status: 400 });
+  if (animalIds.length !== 1) {
+    return NextResponse.json({ error: "Sélectionne une seule vache" }, { status: 400 });
   }
   if (pattes.length === 0) {
     return NextResponse.json({ error: "Sélectionne au moins une patte" }, { status: 400 });

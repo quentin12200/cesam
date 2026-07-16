@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Layers, X, Plus, Check, Trash2 } from "lucide-react";
+import { Layers, Plus, Check, Trash2 } from "lucide-react";
+import SelectionModal from "@/components/SelectionModal";
 
 interface Groupe {
   id: string;
@@ -93,21 +94,8 @@ export default function GroupeButton({ nutrav, groupeId, groupeNom, groupes }: P
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center"
-          onClick={(e) => {
-            if (e.currentTarget === e.target) setOpen(false);
-          }}
-        >
-          <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl shadow-xl p-5 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900">Groupe / Lot</h3>
-              <button onClick={() => setOpen(false)}>
-                <X size={20} className="text-gray-400" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
+        <SelectionModal title="Groupe / Lot" onClose={() => setOpen(false)} maxWidth="sm">
+            <div className="space-y-2 p-4">
               {/* Sans groupe */}
               <button
                 onClick={() => assign(null)}
@@ -193,8 +181,7 @@ export default function GroupeButton({ nutrav, groupeId, groupeNom, groupes }: P
                 </button>
               )}
             </div>
-          </div>
-        </div>
+        </SelectionModal>
       )}
     </>
   );

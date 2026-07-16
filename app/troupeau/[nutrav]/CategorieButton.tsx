@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Tag } from "lucide-react";
+import SelectionModal from "@/components/SelectionModal";
 import {
   getCategorieLabel,
   getCategorieColor,
@@ -54,13 +55,8 @@ export default function CategorieButton({ nutrav, sexbov, danais, estGenisse, ca
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="relative bg-white rounded-t-2xl w-full p-5 max-h-[70vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-800">Changer la catégorie</h3>
-              <button onClick={() => setOpen(false)} className="text-gray-400 text-2xl leading-none">×</button>
-            </div>
+        <SelectionModal title="Changer la catégorie" onClose={() => setOpen(false)} maxWidth="sm">
+          <div className="p-4">
             <p className="text-xs text-gray-500 mb-3">
               Catégorie actuelle : <strong>{currentLabel}</strong>
               {!categorie && <span className="ml-1 text-gray-400">(automatique)</span>}
@@ -92,7 +88,7 @@ export default function CategorieButton({ nutrav, sexbov, danais, estGenisse, ca
               ))}
             </div>
           </div>
-        </div>
+        </SelectionModal>
       )}
     </>
   );

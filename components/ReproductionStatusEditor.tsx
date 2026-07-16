@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, RotateCcw, X } from "lucide-react";
+import { Pencil, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { EtatGestation } from "@/lib/utils";
+import SelectionModal from "@/components/SelectionModal";
 
 const OPTIONS: { value: EtatGestation; label: string }[] = [
   { value: "VERT", label: "Pleine" },
@@ -69,47 +70,12 @@ export default function ReproductionStatusEditor({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center" onMouseDown={() => setOpen(false)}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="repro-status-title"
-            onMouseDown={(event) => event.stopPropagation()}
-            className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 id="repro-status-title" className="font-bold text-gray-900">
-                Modifier le statut reproductif
-              </h2>
-              <button type="button" onClick={() => setOpen(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-1.5">
-              {OPTIONS.map((option) => (
-                <label
-                  key={option.value}
-                  className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 text-sm font-medium ${
-                    selected === option.value ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 text-gray-700"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="reproduction-status"
-                    value={option.value}
-                    checked={selected === option.value}
-                    onChange={() => setSelected(option.value)}
-                    className="accent-green-700"
-                  />
-                  {option.label}
-                </label>
-              ))}
-            </div>
-
-            {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
-
-            <div className="mt-4 flex flex-wrap gap-2">
+        <SelectionModal
+          title="Modifier le statut reproductif"
+          onClose={() => setOpen(false)}
+          maxWidth="sm"
+          footer={(
+            <div className="flex flex-wrap gap-2 p-4">
               {previousStatus && (
                 <button
                   type="button"
@@ -130,8 +96,30 @@ export default function ReproductionStatusEditor({
                 {saving ? "Enregistrement…" : "Enregistrer"}
               </button>
             </div>
+          )}
+        >
+          <div className="space-y-1.5 p-4">
+              {OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 text-sm font-medium ${
+                    selected === option.value ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 text-gray-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="reproduction-status"
+                    value={option.value}
+                    checked={selected === option.value}
+                    onChange={() => setSelected(option.value)}
+                    className="accent-green-700"
+                  />
+                  {option.label}
+                </label>
+              ))}
+            {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
           </div>
-        </div>
+        </SelectionModal>
       )}
     </>
   );

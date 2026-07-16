@@ -110,7 +110,7 @@ export default function ParageClient({
 
   async function ajouter() {
     setError("");
-    if (animaux.length === 0) { setError("Sélectionne au moins une vache"); return; }
+    if (animaux.length === 0) { setError("Sélectionne une vache"); return; }
     if (pattes.length === 0) { setError("Sélectionne au moins une patte"); return; }
     setSaving(true);
     try {
@@ -179,15 +179,16 @@ export default function ParageClient({
           onClose={() => setShowPicker(false)}
           groupes={groupes}
           sexeImpose="F"
+          multiple={false}
         />
       )}
 
       {showForm && (
         <section className="space-y-4 rounded-lg border border-green-200 bg-white p-4 shadow-sm">
           <div>
-            <span className="mb-1 block text-xs font-medium text-gray-600">Vache(s)</span>
+            <span className="mb-1 block text-xs font-medium text-gray-600">Vache</span>
             <button type="button" onClick={() => setShowPicker(true)} className="min-h-11 w-full rounded-lg border border-gray-300 px-3 text-left text-sm text-gray-700 hover:border-green-500">
-              {animaux.length > 0 ? `${animaux.length} vache${animaux.length > 1 ? "s" : ""} sélectionnée${animaux.length > 1 ? "s" : ""}` : "Choisir dans le troupeau"}
+              {animaux.length > 0 ? `${animaux[0].nutrav}${animaux[0].nom ? ` · ${animaux[0].nom}` : ""}` : "Choisir dans le troupeau"}
             </button>
             {animaux.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
