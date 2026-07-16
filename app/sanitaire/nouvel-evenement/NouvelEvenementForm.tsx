@@ -4,7 +4,7 @@ import BackButton from "@/app/components/BackButton";
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, X, Loader2, CheckCircle2, Search, Thermometer, ListChecks, Plus, Syringe } from "lucide-react";
+import { Camera, X, Loader2, CheckCircle2, Search, Thermometer, ListChecks, Plus, Syringe, Mic } from "lucide-react";
 import AnimalPicker, { type AnimalOption } from "./AnimalPicker";
 import AnimalMultiEntry from "./AnimalMultiEntry";
 import AnimalPickerModal from "./AnimalPickerModal";
@@ -19,6 +19,7 @@ import { uploadEvenementPhoto } from "@/lib/firebase-client";
 import PatteSelector from "@/components/PatteSelector";
 import type { PatteParage } from "@/lib/parage";
 import HoofPrintIcon from "@/components/HoofPrintIcon";
+import { VOICE_SANITARY_STORAGE_KEY, type VoiceSanitaryDraft } from "@/lib/voice-sanitary";
 
 interface Groupe {
   id: string;
@@ -79,6 +80,27 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ count: number; warning: string } | null>(null);
   const [error, setError] = useState("");
+  const [voiceDraft, setVoiceDraft] = useState<VoiceSanitaryDraft | null>(null);
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem(VOICE_SANITARY_STORAGE_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(VOICE_SANITARY_STORAGE_KEY);
+    try {
+      const draft = JSON.parse(raw) as VoiceSanitaryDraft;
+      if (!draft.target?.nutravs.length) return;
+      setVoiceDraft(draft);
+      setTargetMode(draft.target.nutravs.length > 1 ? "plusieurs" : "animal");
+      setDate(draft.date || today);
+      setMoment(draft.moment);
+      setTemperature(draft.temperature !== null ? String(draft.temperature) : "");
+      setAjouterAuParage(draft.ajouterAuParage);
+      setParagePattes(draft.pattes);
+      setDescription(draft.description);
+    } catch {
+      setError("Le brouillon vocal n’a pas pu être relu");
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/groupes").then((r) => r.json()).then(setGroupes);
@@ -89,7 +111,13 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
   }, []);
 
   useEffect(() => {
-    const nutravs = presetNutravs?.length ? presetNutravs : presetNutrav ? [presetNutrav] : [];
+    const nutravs = voiceDraft?.target?.nutravs?.length
+      ? voiceDraft.target.nutravs
+      : presetNutravs?.length
+        ? presetNutravs
+        : presetNutrav
+          ? [presetNutrav]
+          : [];
     if (nutravs.length === 0) return;
 
     fetch("/api/animaux/picker")
@@ -102,11 +130,12 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
             .map((animal) => ({ id: animal.id, nutrav: animal.nutrav, nom: animal.nobovi }))
         );
       });
-  }, [presetNutrav, presetNutravs]);
+  }, [presetNutrav, presetNutravs, voiceDraft]);
 
   useEffect(() => {
-    if (!presetMedicamentId || medicaments.length === 0) return;
-    const m = medicaments.find((med) => med.id === presetMedicamentId);
+    const medicamentId = voiceDraft?.medicament?.id ?? presetMedicamentId;
+    if (!medicamentId || medicaments.length === 0) return;
+    const m = medicaments.find((med) => med.id === medicamentId);
     if (!m) return;
     setTraitementActif(true);
     setTraitementsDrafts((prev) => {
@@ -114,7 +143,20 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
       const [first, ...rest] = prev;
       return [{ ...first, medicament: m, voie: m.voie ?? first.voie }, ...rest];
     });
-  }, [presetMedicamentId, medicaments]);
+  }, [presetMedicamentId, medicaments, voiceDraft]);
+
+  useEffect(() => {
+    if (!voiceDraft?.event || catalogue.length === 0) return;
+    const type = catalogue.find((item) => item.id === voiceDraft.event?.id);
+    if (!type) return;
+    setSelectedTypes((actuels) => actuels.some((item) => item.id === type.id) ? actuels : [...actuels, { id: type.id, nom: type.nom }]);
+    if (!questionsByType[type.id]) {
+      fetch(`/api/event-types/${type.id}/questions`)
+        .then((response) => response.json())
+        .then((questions: QuestionTemplateData[]) => setQuestionsByType((actuelles) => ({ ...actuelles, [type.id]: questions })))
+        .catch(() => {});
+    }
+  }, [catalogue, voiceDraft, questionsByType]);
 
   const resultatsRecherche = useMemo(() => searchTypesEvenement(query, catalogue).slice(0, 8), [query, catalogue]);
 
@@ -327,6 +369,13 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
 
   return (
     <div className="space-y-4">
+      {voiceDraft && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 shadow-sm">
+          <div className="flex items-center gap-2 font-semibold"><Mic size={16} /> Brouillon vocal à vérifier</div>
+          <p className="mt-1 italic">« {voiceDraft.transcript} »</p>
+          <p className="mt-1 text-xs text-amber-800">Toutes les informations restent modifiables. L’événement ne sera créé qu’avec le bouton Enregistrer.</p>
+        </div>
+      )}
       {showPickerModal && (
         <AnimalPickerModal
           selected={selectedAnimaux}

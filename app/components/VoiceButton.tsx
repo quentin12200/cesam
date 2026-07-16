@@ -1,7 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Mic, MicOff, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Check, Mic, MicOff, Pencil, X } from "lucide-react";
+import SelectionModal from "@/components/SelectionModal";
+import {
+  VOICE_SANITARY_STORAGE_KEY,
+  type VoiceAnalysisResponse,
+  type VoiceSanitaryDraft,
+} from "@/lib/voice-sanitary";
 
 declare global {
   interface Window {
@@ -9,6 +16,7 @@ declare global {
     webkitSpeechRecognition: new () => SpeechRecognition;
   }
 }
+
 interface SpeechRecognition extends EventTarget {
   lang: string;
   continuous: boolean;
@@ -22,74 +30,136 @@ interface SpeechRecognition extends EventTarget {
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
   onspeechend: (() => void) | null;
 }
+
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
   resultIndex: number;
 }
+
 interface SpeechRecognitionResultList {
   readonly length: number;
   [index: number]: SpeechRecognitionResult;
 }
+
 interface SpeechRecognitionResult {
   readonly length: number;
   [index: number]: SpeechRecognitionAlternative;
 }
+
 interface SpeechRecognitionAlternative {
   transcript: string;
 }
+
 interface SpeechRecognitionErrorEvent extends Event {
   error: string;
 }
 
-type Status = "idle" | "listening" | "saving" | "saved" | "error";
+type Status = "idle" | "listening" | "analysing" | "note" | "error";
 
 const SILENCE_TIMEOUT_MS = 30000;
 
+function ResumeBrouillon({ draft }: { draft: VoiceSanitaryDraft }) {
+  const details = [
+    draft.event?.nom,
+    draft.temperature !== null ? `${draft.temperature.toFixed(1).replace(".", ",")} °C` : null,
+    draft.pattes.length > 0 ? draft.pattes.join(", ") : null,
+    draft.medicament?.nom,
+    draft.ajouterAuParage ? "Ajouter au parage" : null,
+    draft.rappelDemande ? "Rappel / surveillance demandé" : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="space-y-3 p-4">
+      <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm italic text-amber-900">« {draft.transcript} »</p>
+      <dl className="space-y-2 text-sm">
+        <div className="flex gap-3"><dt className="w-20 shrink-0 text-gray-500">Animal</dt><dd className="font-semibold text-gray-900">{draft.target?.label ?? "À confirmer"}</dd></div>
+        <div className="flex gap-3"><dt className="w-20 shrink-0 text-gray-500">Quand</dt><dd>{draft.date} · {draft.moment.toLowerCase()}</dd></div>
+        <div className="flex gap-3"><dt className="w-20 shrink-0 text-gray-500">Détecté</dt><dd>{details.length > 0 ? details.join(" · ") : "Aucune information sanitaire sûre"}</dd></div>
+      </dl>
+      <p className="text-xs text-gray-500">Rien ne sera enregistré avant la validation finale dans le formulaire sanitaire.</p>
+    </div>
+  );
+}
+
 export default function VoiceButton() {
+  const router = useRouter();
   const [supported, setSupported] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [transcript, setTranscript] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [analysis, setAnalysis] = useState<Exclude<VoiceAnalysisResponse, { outcome: "note" }> | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editedText, setEditedText] = useState("");
   const recRef = useRef<SpeechRecognition | null>(null);
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savedRef = useRef(false); // évite double-sauvegarde sur iOS
+  const handledRef = useRef(false);
 
   useEffect(() => {
-    setSupported(
-      typeof window !== "undefined" &&
-      ("SpeechRecognition" in window || "webkitSpeechRecognition" in window)
-    );
+    setSupported(typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window));
   }, []);
 
   function clearSilenceTimer() {
-    if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null; }
+    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+    silenceTimer.current = null;
   }
 
   function clearHideTimer() {
-    if (hideTimer.current) { clearTimeout(hideTimer.current); hideTimer.current = null; }
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = null;
   }
 
   function clearAfter(ms: number) {
     clearHideTimer();
     hideTimer.current = setTimeout(() => {
       setTranscript(null);
+      setMessage("");
       setStatus("idle");
     }, ms);
   }
 
-  async function saveNote(text: string) {
-    setStatus("saving");
+  async function saveNote(text: string, reason: string) {
     try {
-      const res = await fetch("/api/notes-terrain", {
+      const response = await fetch("/api/notes-terrain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ texte: text }),
       });
-      setStatus(res.ok ? "saved" : "error");
-      clearAfter(res.ok ? 4000 : 6000);
+      if (!response.ok) throw new Error();
+      setStatus("note");
+      setMessage(reason);
+      clearAfter(6000);
     } catch {
       setStatus("error");
+      setMessage("Impossible de conserver la note vocale");
       clearAfter(6000);
+    }
+  }
+
+  async function analysePhrase(text: string) {
+    setAnalysis(null);
+    setEditing(false);
+    setTranscript(text);
+    setStatus("analysing");
+    setMessage("");
+    try {
+      const response = await fetch("/api/notes-terrain/analyser", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texte: text }),
+      });
+      if (!response.ok) throw new Error();
+      const resultat = await response.json() as VoiceAnalysisResponse;
+      if (resultat.outcome === "note") {
+        await saveNote(text, resultat.reason);
+        return;
+      }
+      setAnalysis(resultat);
+      setEditedText(text);
+      setEditing(false);
+      setStatus("idle");
+    } catch {
+      await saveNote(text, "Analyse impossible : note vocale conservée");
     }
   }
 
@@ -103,60 +173,40 @@ export default function VoiceButton() {
       stopRec();
       return;
     }
-    if (!supported) return;
+    if (!supported || status === "analysing") return;
 
     const SpeechRec = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     const rec = new SpeechRec();
     rec.lang = "fr-FR";
-    rec.continuous = false;      // iOS ne supporte pas continuous:true
+    rec.continuous = false;
     rec.interimResults = false;
     rec.maxAlternatives = 1;
+    handledRef.current = false;
 
-    savedRef.current = false;
-
-    // Timeout de sécurité : 5s sans parole → arrêt automatique
     const armSilenceTimer = () => {
       clearSilenceTimer();
-      silenceTimer.current = setTimeout(() => {
-        stopRec();
-      }, SILENCE_TIMEOUT_MS);
+      silenceTimer.current = setTimeout(stopRec, SILENCE_TIMEOUT_MS);
     };
     armSilenceTimer();
 
     rec.onresult = (event) => {
-      if (savedRef.current) return; // iOS peut déclencher plusieurs fois
-      savedRef.current = true;
+      if (handledRef.current) return;
+      handledRef.current = true;
       clearSilenceTimer();
-
-      // Concatène tous les résultats (utile sur certains navigateurs)
       let text = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        text += event.results[i][0].transcript;
-      }
+      for (let i = event.resultIndex; i < event.results.length; i++) text += event.results[i][0].transcript;
       text = text.trim();
-      if (text) {
-        setTranscript(text);
-        saveNote(text);
-      }
+      if (text) void analysePhrase(text);
     };
-
-    // Quand la voix s'arrête, relancer le timer de silence
-    rec.onspeechend = () => { armSilenceTimer(); };
-
+    rec.onspeechend = armSilenceTimer;
     rec.onend = () => {
       clearSilenceTimer();
-      setStatus((prev) => prev === "listening" ? "idle" : prev);
+      setStatus((current) => current === "listening" ? "idle" : current);
     };
-
-    rec.onerror = (e) => {
+    rec.onerror = (event) => {
       clearSilenceTimer();
-      const msg = e.error === "not-allowed"
-        ? "Permission micro refusée"
-        : e.error === "network"
-        ? "Erreur réseau"
-        : "Micro non disponible";
       setStatus("error");
-      setTranscript(msg);
+      setMessage(event.error === "not-allowed" ? "Permission micro refusée" : event.error === "network" ? "Erreur réseau" : "Micro non disponible");
       clearAfter(5000);
     };
 
@@ -165,72 +215,106 @@ export default function VoiceButton() {
       rec.start();
       setStatus("listening");
       setTranscript(null);
+      setMessage("");
       clearHideTimer();
     } catch {
       setStatus("error");
-      setTranscript("Impossible de démarrer le micro");
+      setMessage("Impossible de démarrer le micro");
       clearAfter(4000);
     }
+  }
+
+  function choisirAnimal(nutrav: string, nom: string | null) {
+    if (!analysis) return;
+    setAnalysis({
+      outcome: "draft",
+      draft: {
+        ...analysis.draft,
+        target: { kind: "animal", label: `${nutrav}${nom ? ` · ${nom}` : ""}`, nutravs: [nutrav] },
+      },
+    });
+  }
+
+  function ouvrirFormulaire() {
+    if (!analysis?.draft.target) return;
+    sessionStorage.setItem(VOICE_SANITARY_STORAGE_KEY, JSON.stringify(analysis.draft));
+    setAnalysis(null);
+    router.push("/sanitaire/nouvel-evenement?brouillonVocal=1");
   }
 
   function dismiss() {
     clearHideTimer();
     setTranscript(null);
+    setMessage("");
     setStatus("idle");
   }
 
   if (!supported) return null;
-
   const isListening = status === "listening";
 
   return (
     <>
-      {/* Bulle de retour */}
-      {(isListening || transcript || status === "saving" || status === "saved" || status === "error") && (
-        <div className="fixed top-14 right-3 z-40 shadow-lg rounded-xl px-3 py-2.5 text-sm max-w-[270px] border bg-amber-50/95 border-amber-200 backdrop-blur-sm">
-          {isListening && (
-            <span className="text-amber-700 text-xs font-medium flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block" />
-              Parle… (arrêt auto dans 30s)
-            </span>
-          )}
-          {transcript && !isListening && (
+      {(isListening || status === "analysing" || status === "note" || status === "error") && (
+        <div className="fixed right-3 top-14 z-40 max-w-[290px] rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2.5 text-sm shadow-lg backdrop-blur-sm">
+          {isListening && <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700"><span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />Parle… arrêt automatique dans 30 s</span>}
+          {status === "analysing" && <span className="text-xs font-medium text-amber-700">Analyse de la phrase…</span>}
+          {(status === "note" || status === "error") && (
             <div className="flex items-start gap-2">
-              <span className="flex-1 italic text-amber-800 text-sm leading-snug">« {transcript} »</span>
-              {(status === "saved" || status === "error") && (
-                <button onClick={dismiss} className="text-amber-400 hover:text-amber-600 shrink-0 mt-px">
-                  <X size={13} />
-                </button>
-              )}
+              <div className="min-w-0 flex-1"><p className="line-clamp-2 italic text-amber-900">« {transcript} »</p><p className={`mt-1 text-xs font-semibold ${status === "error" ? "text-red-600" : "text-green-700"}`}>{message}</p></div>
+              <button type="button" onClick={dismiss} className="shrink-0 rounded p-1 text-amber-500" aria-label="Fermer"><X size={15} /></button>
             </div>
-          )}
-          {status === "saving" && (
-            <span className="text-xs text-amber-600 font-medium block mt-1">Enregistrement…</span>
-          )}
-          {status === "saved" && (
-            <span className="text-xs text-green-600 font-semibold block mt-1">✓ Note enregistrée</span>
-          )}
-          {status === "error" && transcript && (
-            <span className="text-xs text-red-600 font-semibold block mt-1">✗ {transcript}</span>
           )}
         </div>
       )}
 
-      {/* Bouton micro — un seul clic pour démarrer/arrêter */}
       <button
+        type="button"
         onClick={toggle}
-        aria-label={isListening ? "Arrêter l'enregistrement" : "Dicter une note"}
-        title={isListening ? "Appuie pour arrêter" : "Appuie pour dicter une note"}
-        className={`p-1.5 rounded-lg transition-colors touch-manipulation ${
-          isListening
-            ? "bg-red-500 text-white animate-pulse"
-            : status === "saved"
-            ? "bg-green-600 text-white"
-            : "bg-amber-500 text-white hover:bg-amber-400"
-        }`}
+        disabled={status === "analysing"}
+        aria-label={isListening ? "Arrêter l’enregistrement" : "Dicter une note ou un événement sanitaire"}
+        title={isListening ? "Appuie pour arrêter" : "Dicter une note ou un événement sanitaire"}
+        className={`rounded-lg p-1.5 text-white transition-colors touch-manipulation disabled:opacity-60 ${isListening ? "animate-pulse bg-red-500" : status === "note" ? "bg-green-600" : "bg-amber-500 hover:bg-amber-400"}`}
       >
         {isListening ? <MicOff size={18} /> : <Mic size={18} />}
       </button>
+
+      {analysis && (
+        <SelectionModal
+          title="Brouillon sanitaire à vérifier"
+          maxWidth="md"
+          onClose={() => setAnalysis(null)}
+          footer={(
+            <div className="flex items-center justify-end gap-2 p-3">
+              <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700"><Pencil size={16} /> Modifier</button>
+              <button type="button" disabled={!analysis.draft.target} onClick={ouvrirFormulaire} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40"><Check size={17} /> Valider</button>
+            </div>
+          )}
+        >
+          {editing ? (
+            <div className="space-y-3 p-4">
+              <label className="block text-sm font-medium text-gray-700">Corriger la phrase</label>
+              <textarea value={editedText} onChange={(event) => setEditedText(event.target.value)} rows={4} className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm" autoFocus />
+              <button type="button" onClick={() => void analysePhrase(editedText.trim())} disabled={!editedText.trim()} className="min-h-11 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-40">Analyser à nouveau</button>
+            </div>
+          ) : (
+            <>
+              <ResumeBrouillon draft={analysis.draft} />
+              {analysis.outcome === "confirm_animal" && (
+                <div className="border-t border-gray-100 p-4">
+                  <p className="mb-2 text-sm font-semibold text-gray-800">Quel animal voulais-tu indiquer ?</p>
+                  <div className="grid gap-2">
+                    {analysis.candidates.map((candidate) => (
+                      <button key={candidate.nutrav} type="button" onClick={() => choisirAnimal(candidate.nutrav, candidate.nom)} className="min-h-11 rounded-lg border border-gray-200 px-3 text-left text-sm hover:border-green-400 hover:bg-green-50">
+                        <span className="font-bold text-green-800">{candidate.nutrav}</span>{candidate.nom ? ` · ${candidate.nom}` : ""}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </SelectionModal>
+      )}
     </>
   );
 }
