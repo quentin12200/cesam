@@ -5,7 +5,10 @@ import {
   extraireNumeroTravail,
   extrairePattes,
   extraireTemperature,
+  compactVoiceText,
+  distanceEdition,
   normaliserNumeroTravail,
+  phonetiserMot,
   type VoiceSanitaryDraft,
   type VoiceTarget,
 } from "@/lib/voice-sanitary";
@@ -81,16 +84,71 @@ function trouverEvenement(texteNormalise: string, types: RecherchableTypeEveneme
   return null;
 }
 
+function variantesMedicament(nom: string, dci: string | null) {
+  const motsIgnores = new Set(["la", "lp", "rs", "pi3", "intranasa", "intranasal", "nasal", "orale", "oral", "im", "iv", "sc"]);
+  const variantes = new Set<string>();
+  for (const valeur of [nom, dci].filter((item): item is string => Boolean(item))) {
+    const normalise = normalizeSearch(valeur);
+    const mots = normalise.split(/[^a-z0-9]+/).filter(Boolean);
+    variantes.add(compactVoiceText(normalise));
+    const significatifs = mots.filter((mot) => !motsIgnores.has(mot));
+    if (significatifs.length > 0) variantes.add(compactVoiceText(significatifs.join("")));
+    for (const mot of significatifs) {
+      if (mot.length >= 5) variantes.add(compactVoiceText(mot));
+    }
+  }
+  return [...variantes].filter((variante) => variante.length >= 3);
+}
+
+function segmentsPhonetiques(texteNormalise: string) {
+  const mots = texteNormalise.split(/\s+/).filter((mot) => /[a-z]/.test(mot));
+  const segments = new Set<string>();
+  for (let debut = 0; debut < mots.length; debut++) {
+    for (let taille = 1; taille <= 4 && debut + taille <= mots.length; taille++) {
+      segments.add(phonetiserMot(mots.slice(debut, debut + taille).join("")));
+    }
+  }
+  return [...segments].filter(Boolean);
+}
+
 function trouverMedicament(texteNormalise: string, medicaments: Array<{ id: string; nom: string; dci: string | null }>) {
-  const correspondances = medicaments
-    .map((medicament) => {
-      const noms = [normalizeSearch(medicament.nom), medicament.dci ? normalizeSearch(medicament.dci) : ""].filter((nom) => nom.length >= 3);
-      const longueur = Math.max(0, ...noms.filter((nom) => texteNormalise.includes(nom)).map((nom) => nom.length));
-      return { medicament, longueur };
-    })
-    .filter(({ longueur }) => longueur > 0)
-    .sort((a, b) => b.longueur - a.longueur);
+  const phraseCompacte = compactVoiceText(texteNormalise);
+  const segments = segmentsPhonetiques(texteNormalise);
+  const correspondances = medicaments.flatMap((medicament) => {
+    let meilleurScore = Number.POSITIVE_INFINITY;
+    let accepte = false;
+    for (const variante of variantesMedicament(medicament.nom, medicament.dci)) {
+      if (phraseCompacte.includes(variante)) {
+        meilleurScore = Math.min(meilleurScore, 0);
+        accepte = true;
+        continue;
+      }
+      if (variante.length < 5) continue;
+      const terme = phonetiserMot(variante);
+      const distance = Math.min(...segments.map((segment) => distanceEdition(segment, terme)));
+      const distanceMax = Math.max(1, Math.floor(terme.length * 0.28));
+      if (distance <= distanceMax) {
+        accepte = true;
+        meilleurScore = Math.min(meilleurScore, distance * 20 + Math.abs(terme.length - variante.length));
+      }
+    }
+    return accepte ? [{ medicament, score: meilleurScore }] : [];
+  });
+  correspondances.sort((a, b) => a.score - b.score || b.medicament.nom.length - a.medicament.nom.length);
   return correspondances[0]?.medicament ?? null;
+}
+
+function trouverVoieAdministration(texteNormalise: string): string | null {
+  const voies: Array<[string, RegExp]> = [
+    ["NASALE", /\b(?:intra\s*nasal(?:e)?|nasal(?:e)?|dans le nez)\b/],
+    ["IMM", /\b(?:intra\s*mammaire|dans le quartier)\b/],
+    ["IM", /\b(?:intra\s*musculaire|intramusculaire|i m)\b/],
+    ["IV", /\b(?:intra\s*veineuse|intraveineuse|i v)\b/],
+    ["SC", /\b(?:sous\s*cutanee|souscutanee|s c)\b/],
+    ["PO", /\b(?:voie orale|par la bouche|oral(?:e)?)\b/],
+    ["POUR_ON", /\b(?:pour\s*on|pour-on)\b/],
+  ];
+  return voies.find(([, expression]) => expression.test(texteNormalise))?.[0] ?? null;
 }
 
 export async function POST(request: NextRequest) {
@@ -154,6 +212,8 @@ export async function POST(request: NextRequest) {
   const temperature = extraireTemperature(texteNormalise);
   const event = trouverEvenement(texteNormalise, types, temperature);
   const medicament = trouverMedicament(texteNormalise, medicaments);
+  const voieAdministration = trouverVoieAdministration(texteNormalise)
+    ?? (medicament ? trouverVoieAdministration(normalizeSearch(medicament.nom)) : null);
   const pattes = extrairePattes(texteNormalise);
   const ajouterAuParage = /\b(?:ajout(?:e|er)?|mettre|mets)\b.*\bparage\b|\bliste de parage\b/.test(texteNormalise);
   const rappelDemande = /\b(?:rappel|rappeler|rappelle|surveiller|surveillance)\b/.test(texteNormalise);
@@ -169,6 +229,7 @@ export async function POST(request: NextRequest) {
     pattes,
     ajouterAuParage,
     medicament: medicament ? { id: medicament.id, nom: medicament.nom } : null,
+    voieAdministration,
     rappelDemande,
     traitementMentionne,
     description: transcript,

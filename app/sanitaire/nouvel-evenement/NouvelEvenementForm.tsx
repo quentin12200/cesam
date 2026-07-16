@@ -141,7 +141,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
     setTraitementsDrafts((prev) => {
       if (prev.some((d) => d.medicament?.id === m.id)) return prev;
       const [first, ...rest] = prev;
-      return [{ ...first, medicament: m, voie: m.voie ?? first.voie }, ...rest];
+      return [{ ...first, medicament: m, voie: voiceDraft?.voieAdministration ?? m.voie ?? first.voie }, ...rest];
     });
   }, [presetMedicamentId, medicaments, voiceDraft]);
 

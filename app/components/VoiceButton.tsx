@@ -64,6 +64,7 @@ function ResumeBrouillon({ draft }: { draft: VoiceSanitaryDraft }) {
     draft.temperature !== null ? `${draft.temperature.toFixed(1).replace(".", ",")} °C` : null,
     draft.pattes.length > 0 ? draft.pattes.join(", ") : null,
     draft.medicament?.nom,
+    draft.voieAdministration ? `Voie ${draft.voieAdministration}` : null,
     draft.ajouterAuParage ? "Ajouter au parage" : null,
     draft.rappelDemande ? "Rappel / surveillance demandé" : null,
   ].filter(Boolean);
