@@ -71,6 +71,7 @@ function ResumeBrouillon({ draft }: { draft: VoiceSanitaryDraft }) {
     draft.temperature !== null ? `${draft.temperature.toFixed(1).replace(".", ",")} °C` : null,
     draft.pattes.length > 0 ? draft.pattes.join(", ") : null,
     draft.medicament?.nom,
+    !draft.medicament && draft.medicamentCandidates.length > 0 && draft.medicamentEntendu ? `Médicament « ${draft.medicamentEntendu} » à confirmer` : null,
     draft.voieAdministration ? `Voie ${draft.voieAdministration}` : null,
     draft.ajouterAuParage ? "Ajouter au parage" : null,
     draft.rappelDemande ? "Rappel / surveillance demandé" : null,
@@ -100,6 +101,7 @@ export default function VoiceButton() {
   const [editedText, setEditedText] = useState("");
   const [chosenAction, setChosenAction] = useState<VoiceActionId | null>(null);
   const [showAllActions, setShowAllActions] = useState(false);
+  const [learningError, setLearningError] = useState("");
   const recRef = useRef<SpeechRecognition | null>(null);
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -151,6 +153,7 @@ export default function VoiceButton() {
     setEditing(false);
     setChosenAction(null);
     setShowAllActions(false);
+    setLearningError("");
     setTranscript(text);
     setStatus("analysing");
     setMessage("");
@@ -250,6 +253,33 @@ export default function VoiceButton() {
     setChosenAction(draft.suggestedActions.length === 1 ? draft.suggestedActions[0] : null);
   }
 
+  async function choisirMedicament(id: string, nom: string) {
+    if (!analysis) return;
+    const transcription = analysis.draft.medicamentEntendu;
+    setAnalysis({
+      ...analysis,
+      draft: {
+        ...analysis.draft,
+        medicament: { id, nom },
+        medicamentCandidates: [],
+        traitementMentionne: true,
+        voieAdministration: analysis.draft.voieAdministration ?? (/intra\s*nasal/i.test(nom) ? "NASALE" : null),
+      },
+    });
+    if (!transcription) return;
+    try {
+      const response = await fetch("/api/medicaments/alias-vocal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcription, medicamentId: id }),
+      });
+      if (!response.ok) throw new Error();
+      setLearningError("");
+    } catch {
+      setLearningError("Le médicament est sélectionné, mais la correction n’a pas pu être mémorisée.");
+    }
+  }
+
   function ouvrirFormulaire() {
     if (!analysis?.draft.target || !chosenAction) return;
     const action = getVoiceAction(chosenAction);
@@ -314,7 +344,7 @@ export default function VoiceButton() {
           footer={(
             <div className="flex items-center justify-end gap-2 p-3">
               <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700"><Pencil size={16} /> Modifier</button>
-              <button type="button" disabled={!analysis.draft.target || !chosenAction} onClick={ouvrirFormulaire} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40"><Check size={17} /> Continuer</button>
+              <button type="button" disabled={!analysis.draft.target || !chosenAction || analysis.draft.medicamentCandidates.length > 0} onClick={ouvrirFormulaire} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40"><Check size={17} /> Continuer</button>
             </div>
           )}
         >
@@ -327,6 +357,20 @@ export default function VoiceButton() {
           ) : (
             <>
               <ResumeBrouillon draft={analysis.draft} />
+              {!analysis.draft.medicament && analysis.draft.medicamentCandidates.length > 0 && (
+                <div className="border-t border-gray-100 p-4">
+                  <p className="mb-1 text-sm font-semibold text-gray-800">Quel médicament voulais-tu dire ?</p>
+                  {analysis.draft.medicamentEntendu && <p className="mb-2 text-xs text-gray-500">Le téléphone a écrit « {analysis.draft.medicamentEntendu} ».</p>}
+                  <div className="grid gap-2">
+                    {analysis.draft.medicamentCandidates.map((candidate) => (
+                      <button key={candidate.id} type="button" onClick={() => void choisirMedicament(candidate.id, candidate.nom)} className="min-h-11 rounded-lg border border-gray-200 px-3 text-left text-sm font-semibold text-gray-800 hover:border-blue-400 hover:bg-blue-50">
+                        {candidate.nom}
+                      </button>
+                    ))}
+                  </div>
+                  {learningError && <p className="mt-2 text-xs text-orange-700">{learningError}</p>}
+                </div>
+              )}
               {analysis.outcome === "choose_action" && (
                 <div className="border-t border-gray-100 p-4">
                   <p className="mb-2 text-sm font-semibold text-gray-800">Que veux-tu ouvrir ?</p>

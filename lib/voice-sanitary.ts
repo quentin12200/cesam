@@ -14,6 +14,11 @@ export interface VoiceAnimalCandidate {
   nom: string | null;
 }
 
+export interface VoiceMedicationCandidate {
+  id: string;
+  nom: string;
+}
+
 export interface VoiceSanitaryDraft {
   transcript: string;
   target: VoiceTarget | null;
@@ -24,6 +29,8 @@ export interface VoiceSanitaryDraft {
   pattes: PatteParage[];
   ajouterAuParage: boolean;
   medicament: { id: string; nom: string } | null;
+  medicamentEntendu: string | null;
+  medicamentCandidates: VoiceMedicationCandidate[];
   voieAdministration: string | null;
   rappelDemande: boolean;
   traitementMentionne: boolean;
@@ -58,6 +65,9 @@ export function compactVoiceText(value: string): string {
 
 export function phonetiserMot(value: string): string {
   return compactVoiceText(value)
+    .replace(/th/g, "t")
+    .replace(/(?:ay|ai|ei)/g, "e")
+    .replace(/y/g, "i")
     .replace(/eaux?|aux?/g, "o")
     .replace(/ph/g, "f")
     .replace(/qu/g, "k")

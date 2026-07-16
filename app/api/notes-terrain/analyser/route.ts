@@ -102,40 +102,65 @@ function variantesMedicament(nom: string, dci: string | null) {
 
 function segmentsPhonetiques(texteNormalise: string) {
   const mots = texteNormalise.split(/\s+/).filter((mot) => /[a-z]/.test(mot));
-  const segments = new Set<string>();
+  const segments = new Map<string, string>();
   for (let debut = 0; debut < mots.length; debut++) {
     for (let taille = 1; taille <= 4 && debut + taille <= mots.length; taille++) {
-      segments.add(phonetiserMot(mots.slice(debut, debut + taille).join("")));
+      const brut = mots.slice(debut, debut + taille).join(" ");
+      segments.set(brut, phonetiserMot(brut));
     }
   }
-  return [...segments].filter(Boolean);
+  return [...segments].map(([brut, phonetique]) => ({ brut, phonetique })).filter((segment) => segment.phonetique);
 }
 
-function trouverMedicament(texteNormalise: string, medicaments: Array<{ id: string; nom: string; dci: string | null }>) {
+function trouverMedicament(
+  texteNormalise: string,
+  medicaments: Array<{ id: string; nom: string; dci: string | null }>,
+  aliases: Array<{ alias: string; transcription: string; medicament: { id: string; nom: string; dci: string | null; actif: boolean } }>,
+) {
   const phraseCompacte = compactVoiceText(texteNormalise);
+  const aliasConnu = aliases.find((item) => item.medicament.actif && phraseCompacte.includes(item.alias));
+  if (aliasConnu) {
+    return {
+      medicament: aliasConnu.medicament,
+      entendu: aliasConnu.transcription,
+      candidates: [],
+    };
+  }
+
   const segments = segmentsPhonetiques(texteNormalise);
-  const correspondances = medicaments.flatMap((medicament) => {
-    let meilleurScore = Number.POSITIVE_INFINITY;
-    let accepte = false;
+  const correspondances = medicaments.map((medicament) => {
+    let meilleurRatio = Number.POSITIVE_INFINITY;
+    let entendu = "";
     for (const variante of variantesMedicament(medicament.nom, medicament.dci)) {
       if (phraseCompacte.includes(variante)) {
-        meilleurScore = Math.min(meilleurScore, 0);
-        accepte = true;
+        meilleurRatio = 0;
+        entendu = variante;
         continue;
       }
       if (variante.length < 5) continue;
       const terme = phonetiserMot(variante);
-      const distance = Math.min(...segments.map((segment) => distanceEdition(segment, terme)));
-      const distanceMax = Math.max(1, Math.floor(terme.length * 0.28));
-      if (distance <= distanceMax) {
-        accepte = true;
-        meilleurScore = Math.min(meilleurScore, distance * 20 + Math.abs(terme.length - variante.length));
+      for (const segment of segments) {
+        const ratio = distanceEdition(segment.phonetique, terme) / Math.max(segment.phonetique.length, terme.length);
+        if (ratio < meilleurRatio) {
+          meilleurRatio = ratio;
+          entendu = segment.brut;
+        }
       }
     }
-    return accepte ? [{ medicament, score: meilleurScore }] : [];
+    return { medicament, ratio: meilleurRatio, entendu };
   });
-  correspondances.sort((a, b) => a.score - b.score || b.medicament.nom.length - a.medicament.nom.length);
-  return correspondances[0]?.medicament ?? null;
+  correspondances.sort((a, b) => a.ratio - b.ratio || b.medicament.nom.length - a.medicament.nom.length);
+  const meilleur = correspondances[0];
+  const accepte = meilleur && meilleur.ratio <= 0.28;
+  const candidats = correspondances
+    .filter((item) => item.ratio <= 0.5 && item.entendu.length >= 3)
+    .slice(0, 3)
+    .map((item) => ({ id: item.medicament.id, nom: item.medicament.nom }));
+  return {
+    medicament: accepte ? meilleur.medicament : null,
+    entendu: meilleur?.entendu || null,
+    candidates: accepte ? [] : candidats,
+  };
 }
 
 function trouverVoieAdministration(texteNormalise: string): string | null {
@@ -158,7 +183,7 @@ export async function POST(request: NextRequest) {
 
   const texteNormalise = normalizeSearch(transcript);
   const numeroDicte = extraireNumeroTravail(transcript);
-  const [animaux, groupes, types, medicaments] = await Promise.all([
+  const [animaux, groupes, types, medicaments, aliasesVocaux] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
       select: { nutrav: true, nobovi: true },
@@ -177,6 +202,13 @@ export async function POST(request: NextRequest) {
     prisma.medicament.findMany({
       where: { actif: true },
       select: { id: true, nom: true, dci: true },
+    }),
+    prisma.medicamentAliasVocal.findMany({
+      select: {
+        alias: true,
+        transcription: true,
+        medicament: { select: { id: true, nom: true, dci: true, actif: true } },
+      },
     }),
   ]);
 
@@ -211,7 +243,8 @@ export async function POST(request: NextRequest) {
 
   const temperature = extraireTemperature(texteNormalise);
   const event = trouverEvenement(texteNormalise, types, temperature);
-  const medicament = trouverMedicament(texteNormalise, medicaments);
+  const reconnaissanceMedicament = trouverMedicament(texteNormalise, medicaments, aliasesVocaux);
+  const medicament = reconnaissanceMedicament.medicament;
   const voieAdministration = trouverVoieAdministration(texteNormalise)
     ?? (medicament ? trouverVoieAdministration(normalizeSearch(medicament.nom)) : null);
   const pattes = extrairePattes(texteNormalise);
@@ -230,6 +263,8 @@ export async function POST(request: NextRequest) {
     pattes,
     ajouterAuParage,
     medicament: medicament ? { id: medicament.id, nom: medicament.nom } : null,
+    medicamentEntendu: reconnaissanceMedicament.entendu,
+    medicamentCandidates: reconnaissanceMedicament.candidates,
     voieAdministration,
     rappelDemande,
     traitementMentionne,
@@ -237,7 +272,7 @@ export async function POST(request: NextRequest) {
     suggestedActions: estBoiterie ? ["sanitaire", "parage"] : ["sanitaire"],
   };
 
-  const informationSanitaire = Boolean(event || temperature !== null || medicament || ajouterAuParage || rappelDemande || traitementMentionne);
+  const informationSanitaire = Boolean(event || temperature !== null || medicament || reconnaissanceMedicament.candidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
   if (candidates.length > 0 && informationSanitaire) {
     return NextResponse.json({ outcome: "confirm_animal", draft, candidates });
   }
