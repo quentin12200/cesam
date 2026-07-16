@@ -3,10 +3,11 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Save, ScanLine, Loader2, RefreshCw, Camera, Archive, Trash2, CheckCircle2, AlertCircle, FileText } from "lucide-react";
+import { Save, ScanLine, Loader2, RefreshCw, Camera, CheckCircle2, AlertCircle, FileText } from "lucide-react";
 import { fileToDocumentDataUrl } from "@/lib/image-client";
 import { uploadDataUrlToStorage } from "@/lib/firebase-client";
 import { formatDate } from "@/lib/utils";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 interface OrdonnanceData {
   id: string;
@@ -186,7 +187,6 @@ export default function OrdonnanceDetailClient({
   }
 
   async function supprimer() {
-    if (!confirm("Supprimer cette ordonnance ?")) return;
     const res = await fetch(`/api/ordonnances/${ordonnance.id}`, { method: "DELETE" });
     if (!res.ok) {
       const err = await res.json();
@@ -335,14 +335,18 @@ export default function OrdonnanceDetailClient({
             {saving ? "Enregistrement…" : "Enregistrer"}
           </button>
           {saved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={13} /> Enregistré</span>}
-          <button type="button" onClick={toggleArchive}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 border rounded-lg hover:bg-gray-50">
-            <Archive size={14} /> {ordonnance.statut === "ARCHIVE" ? "Désarchiver" : "Archiver"}
-          </button>
-          <button type="button" onClick={supprimer}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-500 border border-red-200 rounded-lg hover:bg-red-50">
-            <Trash2 size={14} /> Supprimer
-          </button>
+          <RecordActionsMenu actions={[
+            {
+              label: ordonnance.statut === "ARCHIVE" ? "Repasser à l’état précédent" : "Archiver",
+              onSelect: toggleArchive,
+            },
+            {
+              label: "Supprimer la saisie",
+              tone: "danger",
+              confirmMessage: "Supprimer cette ordonnance ?",
+              onSelect: supprimer,
+            },
+          ]} />
         </div>
       </div>
 

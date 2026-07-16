@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CheckCircle2, ChevronDown, Pencil, Settings2, Pill, Clock, AlertTriangle } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, Pencil, Pill, Clock, AlertTriangle } from "lucide-react";
 import { addDays } from "date-fns";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
@@ -11,7 +11,7 @@ import { getCategorieLabel } from "@/lib/evenements-sanitaires";
 import EvenementEditPanel from "./EvenementEditPanel";
 import TraitementForm from "./TraitementForm";
 import TraitementEditForm from "./TraitementEditForm";
-import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 export interface TraitementRow {
   id: string;
@@ -87,6 +87,11 @@ function TraitementCard({ t, affichageDelaiAttente, onTerminer, nested }: {
   const enAttente = attente.enAttenteViande && doitAfficherViande(affichageDelaiAttente);
   const enAttenteLait = attente.enAttenteLait && doitAfficherLait(affichageDelaiAttente);
 
+  async function supprimer() {
+    await fetch(`/api/traitements/${t.id}`, { method: "DELETE" });
+    router.refresh();
+  }
+
   return (
     <div className={`border rounded-lg p-3 text-sm ${
       nested ? "bg-white" : "border-l-4 border-l-blue-400"
@@ -154,23 +159,19 @@ function TraitementCard({ t, affichageDelaiAttente, onTerminer, nested }: {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {t.statut === "EN_COURS" && (
-            <button onClick={() => onTerminer(t.id)}
-              className="text-xs px-2 py-1 text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100">
-              Terminer
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setEditionOuverte((ouverte) => !ouverte)}
-            title="Modifier les informations du traitement"
-            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
-          >
-            <Pencil size={13} />
-          </button>
-          <ConfirmDeleteButton url={`/api/traitements/${t.id}`} confirmMessage="Confirmer la suppression de ce traitement ?" />
-        </div>
+        <RecordActionsMenu
+          onEdit={() => setEditionOuverte((ouverte) => !ouverte)}
+          editLabel="Modifier le traitement"
+          actions={[
+            ...(t.statut === "EN_COURS" ? [{ label: "Terminer", onSelect: () => onTerminer(t.id) }] : []),
+            {
+              label: "Supprimer la saisie",
+              tone: "danger" as const,
+              confirmMessage: "Confirmer la suppression de ce traitement ?",
+              onSelect: supprimer,
+            },
+          ]}
+        />
       </div>
       {editionOuverte && (
         <TraitementEditForm
@@ -209,6 +210,11 @@ function EvenementCard({ animalId, evt, affichageDelaiAttente, onTerminer }: {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function supprimer() {
+    await fetch(`/api/evenements/${evt.id}`, { method: "DELETE" });
+    router.refresh();
   }
 
   async function enregistrerTemp() {
@@ -277,7 +283,19 @@ function EvenementCard({ animalId, evt, affichageDelaiAttente, onTerminer }: {
           >
             {evt.resolu ? "Résolu" : "En cours"}
           </span>
-          <ConfirmDeleteButton url={`/api/evenements/${evt.id}`} />
+          <RecordActionsMenu
+            onEdit={() => setEditionOuverte((value) => !value)}
+            editLabel="Modifier l’événement"
+            actions={[
+              { label: evt.resolu ? "Repasser à l’état précédent" : "Marquer résolu", onSelect: toggleResolu },
+              {
+                label: "Supprimer la saisie",
+                tone: "danger",
+                confirmMessage: "Confirmer la suppression de cet événement ?",
+                onSelect: supprimer,
+              },
+            ]}
+          />
         </div>
       </div>
 
@@ -328,26 +346,11 @@ function EvenementCard({ animalId, evt, affichageDelaiAttente, onTerminer }: {
 
       <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-gray-100">
         <button
-          onClick={toggleResolu}
-          disabled={loading}
-          className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-        >
-          <CheckCircle2 size={12} />
-          {evt.resolu ? "Marquer non résolu" : "Marquer résolu"}
-        </button>
-        <button
           onClick={() => setAjoutTraitementOuvert((v) => !v)}
           className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
         >
           <Pill size={12} />
           {ajoutTraitementOuvert ? "Fermer" : "Médicament"}
-        </button>
-        <button
-          onClick={() => setEditionOuverte((v) => !v)}
-          className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50"
-        >
-          <Settings2 size={12} />
-          {editionOuverte ? "Fermer" : "Modifier"}
         </button>
       </div>
 

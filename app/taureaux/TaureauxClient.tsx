@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 interface Taureau {
   id: string;
@@ -77,14 +78,13 @@ export default function TaureauxClient({ initialTaureaux }: { initialTaureaux: T
               <div className="font-semibold text-gray-800">{t.nopere ?? <span className="text-gray-400 italic">Sans nom</span>}</div>
               <div className="text-xs text-gray-400">{t._count.saillies} saillie{t._count.saillies > 1 ? "s" : ""} enregistrée{t._count.saillies > 1 ? "s" : ""}</div>
             </div>
-            <button
-              onClick={() => handleDelete(t.id)}
-              disabled={deletingId === t.id || t._count.saillies > 0}
-              className="p-1.5 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-30"
-              title={t._count.saillies > 0 ? "Impossible : lié à des saillies" : "Supprimer"}
-            >
-              {deletingId === t.id ? "…" : <Trash2 size={15} />}
-            </button>
+            <RecordActionsMenu actions={[{
+              label: t._count.saillies > 0 ? "Suppression impossible : saillies liées" : "Supprimer le taureau",
+              tone: "danger",
+              disabled: deletingId === t.id || t._count.saillies > 0,
+              confirmMessage: `Supprimer le taureau ${t.nupere}${t.nopere ? ` · ${t.nopere}` : ""} ?`,
+              onSelect: () => handleDelete(t.id),
+            }]} />
           </div>
         ))}
       </div>

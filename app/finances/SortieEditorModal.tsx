@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { CAUSES_MORTALITE, CAUSES_MORTALITE_LABELS } from "@/lib/utils";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 export type SortieNature = "VENTE" | "MORT";
 export type SortieCategorie = "VEAU" | "GENISSE" | "VACHE" | "TAUREAU";
@@ -164,7 +165,7 @@ export default function SortieEditorModal({ title, initial, animalLabel, animals
   }
 
   async function supprimer() {
-    if (!onDelete || !confirm("Supprimer cette sortie ?")) return;
+    if (!onDelete) return;
     setLoading(true); setError(null);
     try { await onDelete(); }
     catch (err) { setError(err instanceof Error ? err.message : "Erreur inattendue"); }
@@ -179,7 +180,15 @@ export default function SortieEditorModal({ title, initial, animalLabel, animals
       <div className="relative bg-white w-full max-w-lg rounded-t-xl sm:rounded-lg shadow-2xl max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
           <div className="min-w-0"><h3 className="font-semibold text-gray-800">{title}</h3>{animalLabel && <p className="text-xs text-gray-500 truncate">{animalLabel}</p>}</div>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100" aria-label="Fermer"><X size={20} className="text-gray-500" /></button>
+          <div className="flex items-center gap-1">
+            {onDelete && <RecordActionsMenu actions={[{
+              label: "Supprimer la sortie",
+              tone: "danger",
+              confirmMessage: "Supprimer cette sortie ? L’animal redeviendra actif.",
+              onSelect: supprimer,
+            }]} />}
+            <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100" aria-label="Fermer"><X size={20} className="text-gray-500" /></button>
+          </div>
         </div>
         <form onSubmit={submit} className="p-4 space-y-4">
           {error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>}
@@ -202,7 +211,7 @@ export default function SortieEditorModal({ title, initial, animalLabel, animals
           {nature === "VENTE" && <><div><label className="block text-sm font-medium text-gray-700 mb-1">Acheteur</label><input value={acheteur} onChange={(e) => setAcheteur(e.target.value)} className={champ} /></div>{montantCalcule != null && <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm"><span className="text-gray-600">Total calculé : </span><span className="font-bold text-green-700 text-base">{montantCalcule.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT</span></div>}<div><label className="block text-sm font-medium text-gray-700 mb-1">Prix définitif HT (€)</label><input type="number" min="0" step="0.01" value={prixDefinitifHT} onChange={(e) => setPrixDefinitifHT(e.target.value)} placeholder={montantCalcule?.toFixed(2) ?? ""} className={champ} /></div></>}
           {nature === "MORT" && <div><label className="block text-sm font-medium text-red-700 mb-1">Cause de mortalité *</label><select value={causeMortalite} onChange={(e) => setCauseMortalite(e.target.value)} className={champ}><option value="">Sélectionner…</option>{CAUSES_MORTALITE.map((cause) => <option key={cause} value={cause}>{CAUSES_MORTALITE_LABELS[cause] ?? cause}</option>)}</select></div>}
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Notes</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500" /></div>
-          <div className="flex gap-3 pt-2">{onDelete && <button type="button" onClick={supprimer} disabled={loading} className="min-h-11 px-3 border border-red-200 text-red-600 rounded-lg text-sm font-medium">Supprimer</button>}<button type="button" onClick={onClose} className="min-h-11 flex-1 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium">Annuler</button><button type="submit" disabled={loading} className="min-h-11 flex-1 bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">{loading ? "Enregistrement…" : submitLabel}</button></div>
+          <div className="flex gap-3 pt-2"><button type="button" onClick={onClose} className="min-h-11 flex-1 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium">Annuler</button><button type="submit" disabled={loading} className="min-h-11 flex-1 bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">{loading ? "Enregistrement…" : submitLabel}</button></div>
         </form>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, ScanLine, Loader2, Archive, FileText, Save, X, Camera, ClipboardCheck } from "lucide-react";
 import { scanAndCreateExtraction, type OrdonnanceExtracted } from "@/lib/scan-ordonnance-client";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 export interface OrdonnanceItem {
   id: string;
@@ -236,14 +237,11 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
           )}
         </Link>
 
-        <button
-          onClick={archive}
-          disabled={archiving}
-          title={ord.statut === "ARCHIVE" ? "Désarchiver" : "Archiver"}
-          className="shrink-0 p-1.5 text-gray-300 hover:text-gray-500 border border-transparent hover:border-gray-200 rounded-lg transition-colors"
-        >
-          <Archive size={14} />
-        </button>
+        <RecordActionsMenu actions={[{
+          label: ord.statut === "ARCHIVE" ? "Repasser à l’état précédent" : "Archiver",
+          disabled: archiving,
+          onSelect: archive,
+        }]} />
       </div>
     </div>
   );

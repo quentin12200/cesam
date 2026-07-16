@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, ExternalLink, FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, ExternalLink, FileText, Loader2, Plus } from "lucide-react";
 import {
   medicamentsDepuisProposition,
   type MedicamentPropose,
   type PropositionOrdonnance,
 } from "@/lib/ordonnance-types";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 interface ExtractionInfo {
   id: string;
@@ -248,13 +249,12 @@ export default function VerificationOrdonnanceClient({
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-xs font-semibold text-gray-700">Médicament {i + 1}</span>
                     {medicaments.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => retirerMed(i)}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 size={13} /> Retirer
-                      </button>
+                      <RecordActionsMenu actions={[{
+                        label: "Retirer ce médicament",
+                        tone: "danger",
+                        confirmMessage: "Retirer ce médicament des informations détectées ?",
+                        onSelect: () => retirerMed(i),
+                      }]} />
                     )}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">

@@ -3,13 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, Loader2, Plus, X } from "lucide-react";
+import { ChevronDown, Loader2, Plus, Save, X } from "lucide-react";
 import BackButton from "@/app/components/BackButton";
 import AnimalPickerModal from "@/app/sanitaire/nouvel-evenement/AnimalPickerModal";
 import type { AnimalOption } from "@/app/sanitaire/nouvel-evenement/AnimalPicker";
 import PatteSelector from "@/components/PatteSelector";
 import { type PatteParage } from "@/lib/parage";
 import HoofPrintIcon from "@/components/HoofPrintIcon";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 export interface LigneParage {
   id: string;
@@ -40,12 +41,28 @@ function Ligne({
   historique,
   loading,
   onStatut,
+  onUpdate,
 }: {
   ligne: LigneParage;
   historique?: boolean;
   loading: boolean;
   onStatut: (id: string, statut: "A_VOIR" | "FAIT") => void;
+  onUpdate: (id: string, values: { motif: "BOITERIE" | "PARAGE"; pattes: PatteParage[]; note: string }) => Promise<void>;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [motif, setMotif] = useState<"BOITERIE" | "PARAGE">(ligne.motif === "BOITERIE" ? "BOITERIE" : "PARAGE");
+  const [pattes, setPattes] = useState(ligne.pattes);
+  const [note, setNote] = useState(ligne.notes ?? "");
+
+  async function enregistrer() {
+    try {
+      await onUpdate(ligne.id, { motif, pattes, note });
+      setEditing(false);
+    } catch {
+      // Le message d'erreur est affiché par la page parente.
+    }
+  }
+
   return (
     <article className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 shadow-sm">
       <div className="flex min-w-0 items-center gap-2">
@@ -67,22 +84,37 @@ function Ligne({
         {historique && ligne.dateFait && <span className="ml-auto text-green-700">Faite le {dateCourte(ligne.dateFait)}</span>}
       </div>
 
-      <div className="mt-1.5 flex items-end gap-2">
+      {editing ? (
+        <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
+          <div className="grid grid-cols-2 gap-2">
+            {(["PARAGE", "BOITERIE"] as const).map((value) => (
+              <button key={value} type="button" onClick={() => setMotif(value)} className={`min-h-10 rounded-lg border text-xs font-semibold ${motif === value ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 text-gray-600"}`}>
+                {value === "PARAGE" ? "Parage" : "Boiterie"}
+              </button>
+            ))}
+          </div>
+          <PatteSelector value={pattes} onChange={setPattes} />
+          <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Note optionnelle" />
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-600">Annuler</button>
+            <button type="button" disabled={loading || pattes.length === 0} onClick={() => void enregistrer()} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-green-700 px-3 text-xs font-semibold text-white disabled:opacity-50">
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Enregistrer
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-1.5 flex items-end gap-2">
           <p className="min-w-0 flex-1 text-xs text-gray-600">{ligne.notes || (historique ? "" : "Aucune note")}</p>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => onStatut(ligne.id, historique ? "A_VOIR" : "FAIT")}
-            className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold disabled:opacity-50 ${
-              historique
-                ? "border-gray-200 text-gray-600 hover:bg-gray-50"
-                : "border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
-            }`}
-          >
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-            {historique ? "Remettre à faire" : "Vu / fait"}
-          </button>
-      </div>
+          <RecordActionsMenu
+            onEdit={() => setEditing(true)}
+            actions={[{
+              label: historique ? "Repasser à l’état précédent" : "Marquer vu / fait",
+              disabled: loading,
+              onSelect: () => onStatut(ligne.id, historique ? "A_VOIR" : "FAIT"),
+            }]}
+          />
+        </div>
+      )}
     </article>
   );
 }
@@ -146,6 +178,26 @@ export default function ParageClient({
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "La mise à jour a échoué");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function modifierLigne(id: string, values: { motif: "BOITERIE" | "PARAGE"; pattes: PatteParage[]; note: string }) {
+    setUpdatingId(id);
+    setError("");
+    try {
+      const response = await fetch(`/api/parages/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "La modification a échoué");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "La modification a échoué");
+      throw err;
     } finally {
       setUpdatingId(null);
     }
@@ -242,7 +294,7 @@ export default function ParageClient({
         {aFaire.length === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-400">Aucune vache à montrer au pareur</div>
         ) : (
-          <div className="space-y-2">{aFaire.map((ligne) => <Ligne key={ligne.id} ligne={ligne} loading={updatingId === ligne.id} onStatut={changerStatut} />)}</div>
+          <div className="space-y-2">{aFaire.map((ligne) => <Ligne key={ligne.id} ligne={ligne} loading={updatingId === ligne.id} onStatut={changerStatut} onUpdate={modifierLigne} />)}</div>
         )}
       </section>
 
@@ -255,7 +307,7 @@ export default function ParageClient({
           {historique.length === 0 ? (
             <p className="px-2 py-6 text-center text-sm text-gray-400">Aucun parage terminé</p>
           ) : historique.map((ligne) => (
-            <Ligne key={ligne.id} ligne={ligne} historique loading={updatingId === ligne.id} onStatut={changerStatut} />
+            <Ligne key={ligne.id} ligne={ligne} historique loading={updatingId === ligne.id} onStatut={changerStatut} onUpdate={modifierLigne} />
           ))}
         </div>
       </details>

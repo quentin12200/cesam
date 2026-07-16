@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { X, Search, Trash2, UserPlus, Loader2 } from "lucide-react";
+import { X, Search, UserPlus, Loader2 } from "lucide-react";
 import { searchTypesEvenement, type RecherchableTypeEvenement } from "@/lib/fuzzy-search";
 import QuestionPanel, { type QuestionTemplateData } from "@/app/sanitaire/nouvel-evenement/QuestionPanel";
 import AnimalPickerModal from "@/app/sanitaire/nouvel-evenement/AnimalPickerModal";
 import type { AnimalOption } from "@/app/sanitaire/nouvel-evenement/AnimalPicker";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 interface SymptomeData {
   id: string;
@@ -197,10 +198,13 @@ export default function EvenementEditPanel({ evenementId, symptomes, reponses, o
           className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
           <UserPlus size={13} /> Ajouter à d&apos;autres animaux
         </button>
-        <button type="button" onClick={supprimerEvenement} disabled={suppression}
-          className="flex items-center gap-1 text-xs text-red-600 hover:underline disabled:opacity-50">
-          <Trash2 size={13} /> Retirer cet animal
-        </button>
+        <RecordActionsMenu actions={[{
+          label: "Retirer cet animal",
+          tone: "danger",
+          disabled: suppression,
+          confirmMessage: "Retirer cet événement de la fiche de cet animal ?",
+          onSelect: supprimerEvenement,
+        }]} />
       </div>
       {dupliquerMsg && <p className="text-xs text-green-600">{dupliquerMsg}</p>}
 

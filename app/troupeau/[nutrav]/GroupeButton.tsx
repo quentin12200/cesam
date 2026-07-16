@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Layers, Plus, Check, Trash2 } from "lucide-react";
+import { Layers, Plus, Check } from "lucide-react";
 import SelectionModal from "@/components/SelectionModal";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 interface Groupe {
   id: string;
@@ -67,8 +68,7 @@ export default function GroupeButton({ nutrav, groupeId, groupeNom, groupes }: P
     }
   }
 
-  async function deleteGroupe(gId: string, e: React.MouseEvent) {
-    e.stopPropagation();
+  async function deleteGroupe(gId: string) {
     await fetch(`/api/groupes?id=${gId}`, { method: "DELETE" });
     setLocalGroupes((prev) => prev.filter((g) => g.id !== gId));
     if (currentId === gId) {
@@ -130,13 +130,12 @@ export default function GroupeButton({ nutrav, groupeId, groupeNom, groupes }: P
                     )}
                     <span className="text-sm font-medium text-gray-800">{g.nom}</span>
                   </button>
-                  <button
-                    onClick={(e) => deleteGroupe(g.id, e)}
-                    className="text-gray-300 hover:text-red-400 p-0.5 rounded shrink-0 transition-colors"
-                    title="Supprimer ce groupe"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  <RecordActionsMenu actions={[{
+                    label: "Supprimer le groupe",
+                    tone: "danger",
+                    confirmMessage: `Supprimer le groupe « ${g.nom} » ?`,
+                    onSelect: () => deleteGroupe(g.id),
+                  }]} />
                 </div>
               ))}
 

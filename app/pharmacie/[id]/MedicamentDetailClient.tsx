@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save, CheckCircle2, Plus, Trash2, Pencil, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Save, CheckCircle2, Plus, AlertTriangle, ShieldCheck } from "lucide-react";
 import { CATEGORIES_MEDICAMENT } from "@/lib/medicament-categories";
 import PreconisationFields, { VoieSelect } from "./PreconisationFields";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 interface MedicamentData {
   id: string;
@@ -163,7 +164,6 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
   }
 
   async function supprimer(id: string) {
-    if (!confirm("Supprimer cette préconisation ?")) return;
     await fetch(`/api/preconisations/${id}`, { method: "DELETE" });
     router.refresh();
   }
@@ -332,14 +332,18 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
                         )}
                         {p.source && <div className="text-xs text-gray-300 mt-1">{p.source}</div>}
                       </div>
-                      <div className="flex flex-col gap-1 shrink-0">
-                        <button type="button" onClick={() => commencerEdition(p)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded">
-                          <Pencil size={13} />
-                        </button>
-                        <button type="button" onClick={() => supprimer(p.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
+                      <RecordActionsMenu
+                        onEdit={() => commencerEdition(p)}
+                        actions={[
+                          ...(p.statut !== "ARCHIVE" ? [{ label: "Archiver", onSelect: () => changerStatut(p.id, "ARCHIVE") }] : []),
+                          {
+                            label: "Supprimer la saisie",
+                            tone: "danger" as const,
+                            confirmMessage: "Supprimer cette préconisation ?",
+                            onSelect: () => supprimer(p.id),
+                          },
+                        ]}
+                      />
                     </div>
                     <div className="flex gap-1.5 mt-2">
                       {p.statut !== "VALIDE" && (
@@ -352,12 +356,6 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
                         <button type="button" onClick={() => changerStatut(p.id, "REJETE")}
                           className="text-xs px-2 py-1 rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100">
                           Rejeter
-                        </button>
-                      )}
-                      {p.statut !== "ARCHIVE" && (
-                        <button type="button" onClick={() => changerStatut(p.id, "ARCHIVE")}
-                          className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 bg-gray-50 hover:bg-gray-100">
-                          Archiver
                         </button>
                       )}
                     </div>

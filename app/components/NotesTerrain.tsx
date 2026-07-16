@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { X, CheckCircle2, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 interface Note {
   id: string;
@@ -21,11 +22,11 @@ function timeAgo(dateStr: string): string {
 }
 
 function NoteCard({ note, onDone, onDelete }: { note: Note; onDone: (id: string) => void; onDelete: (id: string) => void }) {
-  const [loading, setLoading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [savedTexte, setSavedTexte] = useState(note.texte);
+  const [texte, setTexte] = useState(note.texte);
 
   async function markDone() {
-    setLoading(true);
     await fetch(`/api/notes-terrain/${note.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -35,39 +36,46 @@ function NoteCard({ note, onDone, onDelete }: { note: Note; onDone: (id: string)
   }
 
   async function deleteNote() {
-    setDeleting(true);
     await fetch(`/api/notes-terrain/${note.id}`, { method: "DELETE" });
     onDelete(note.id);
+  }
+
+  async function saveNote() {
+    const next = texte.trim();
+    if (!next) return;
+    await fetch(`/api/notes-terrain/${note.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texte: next }),
+    });
+    setSavedTexte(next);
+    setEditing(false);
   }
 
   return (
     <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-gray-800 leading-snug">« {note.texte} »</p>
+        {editing ? (
+          <div className="flex gap-2">
+            <input value={texte} onChange={(event) => setTexte(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-2 text-sm" autoFocus />
+            <button type="button" onClick={() => void saveNote()} className="rounded-lg bg-green-700 px-3 text-xs font-semibold text-white">Enregistrer</button>
+            <button type="button" onClick={() => { setTexte(savedTexte); setEditing(false); }} className="rounded-lg border border-gray-300 px-2 text-xs text-gray-600">Annuler</button>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-800 leading-snug">« {savedTexte} »</p>
+        )}
         <div className="flex items-center gap-1 mt-1 text-xs text-amber-600">
           <Clock size={11} />
           {timeAgo(note.createdAt)}
         </div>
       </div>
-      <div className="flex items-center gap-1.5 shrink-0">
-        <button
-          onClick={markDone}
-          disabled={loading}
-          className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-green-100 text-green-800 hover:bg-green-200 transition-colors disabled:opacity-50"
-          title="Marquer comme traitée"
-        >
-          <CheckCircle2 size={13} />
-          {loading ? "…" : "Traité"}
-        </button>
-        <button
-          onClick={deleteNote}
-          disabled={deleting}
-          className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
-          title="Supprimer"
-        >
-          <X size={14} />
-        </button>
-      </div>
+      <RecordActionsMenu
+        onEdit={() => setEditing(true)}
+        actions={[
+          { label: "Marquer comme traitée", onSelect: markDone },
+          { label: "Supprimer la saisie", tone: "danger", confirmMessage: "Supprimer cette note ?", onSelect: deleteNote },
+        ]}
+      />
     </div>
   );
 }
