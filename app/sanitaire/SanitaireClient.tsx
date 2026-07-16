@@ -367,5 +367,815 @@ function VaccinsVeauxTab({ tousVeaux, protocoles, onRefresh }: { tousVeaux: Veau
                     <span className="text-sm font-semibold text-gray-800">{veau.nobovi ?? "Sans nom"}</span>
                     <span className="text-xs text-gray-400">{veau.ageLabel}</span>
                     <span className="text-xs text-gray-400">{veau.sexbov === "M" ? "â™‚" : "â™€"}</span>
-               ÷M»¶‰Ëkºwµç@€€€€€€ô¥ô4(€€€€€€€€€€ğ½M•Ñ¥½¸ø4(4(€€€€€€€€€ì¼¨Y•…Õàƒ€Ù…¥¹•È€¨½ô4(€€€€€€€€€€ñM•Ñ¥½¸4(€€€€€€€€€€€Ñ¥Ñ±”ô‰Y•…Õàƒ€Ù…¥¹•Èˆ4(€€€€€€€€€€€¥½¸õìñ±•ÉÑQÉ¥…¹±”Í¥é”õìÄÙô±…ÍÍ9…µ”ô‰Ñ•áĞµå•±±½Ü´ÔÀÀˆ€¼ùô4(€€€€€€€€€€€½Õ¹ĞõíÙ•…ÕáY…¥¹•È¹±•¹Ñ¡ô4(€€€€€€€€€€€½±½Èô‰Ñ•áĞµå•±±½Ü´àÀÀˆ4(€€€€€€€€€€€Í•Ñ¥½¹-•åÌõíÙ•…Õá-•åÍô4(€€€€€€€€€€€Í•±•Ñ•õíÍ•±•Ñ•‘ô4(€€€€€€€€€€€½¹Q½±•±°õíÑ½±•±±ô4(€€€€€€€€€€€Í•ÍÍ¥½¹5½‘”õíÍ•ÍÍ¥½¹5½‘•ô4(€€€€€€€€€€ø4(€€€€€€€€€€€íÙ•…ÕáY…¥¹•È¹±•¹Ñ €ôôô€À€ü€ 4(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ•áĞµ•¹Ñ•ÈÑ•áĞµÉ…ä´ĞÀÀÁä´Øˆø4(€€€€€€€€€€€€€€€€ñ¡•­¥É±”Í¥é”õìÈÑô±…ÍÍ9…µ”ô‰µàµ…ÕÑ¼µˆ´ÈÑ•áĞµÉ••¸´ÔÀÀˆ€¼ø4(€€€€€€€€€€€€€€€Q½ÕÌ±•ÌÁÉ½Ñ½½±•ÌÍ½¹Ğƒ€©½ÕÈ€„4(€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€¤€è€ 4(€€€€€€€€€€€€€Ù•…ÕáY…¥¹•È¹µ…À ¡…¹¥µ…°¤€ôøì4(€€€€€€€€€€€€€€€½¹ÍĞ•ÍÑUÉ•¹Ğ€ô…¹¥µ…°¹Ù…¥¹Í5…¹ÅÕ…¹ÑÌ¹Í½µ” ¡Ø¤€ôøØ¹ÕÉ•¹Ğ¤ì4(€€€€€€€€€€€€€€€É•ÑÕÉ¸Í•ÍÍ¥½¹5½‘”€ü€ 4(€€€€€€€€€€€€€€€€€€ñ‘¥Ø­•äõí…¹¥µ…°¹¥‘ô±…ÍÍ9…µ”ô‰ÍÁ…”µä´Äˆø4(€€€€€€€€€€€€€€€€€€€í…¹¥µ…°¹Ù…¥¹Í5…¹ÅÕ…¹ÑÌ¹µ…À ¡Ø¤€ôøì4(€€€€€€€€€€€€€€€€€€€€€½¹ÍĞ¬€ô­•ä¡…¹¥µ…°¹¹ÕÑÉ…Ø°Ø¹Ù…¥¸¤ì4(€€€€€€€€€€€€€€€€€€€€€É•ÑÕÉ¸€ 4(€€€€€€€€€€€€€€€€€€€€€€€€ñ¡•­I½Ü­•äõí­ô¬õí­ô4(€€€€€€€€€€€€€€€€€€€€€€€€€±…‰•°õí€‘í…¹¥µ…°¹¹ÕÑÉ…Ùô€‘í…¹¥µ…°¹¹½‰½Ù¤€üü€‰M…¹Ì¹½´‰ôƒŠP€‘íØ¹Ù…¥¹õô4(€€€€€€€€€€€€€€€€€€€€€€€€€‘•Ñ…¥°õí€‘í…¹¥µ…°¹…•1…‰•±ôƒ
-Ü€‘íØ¹É…¥Í½¹õô4(€€€€€€€€€€€€€€€€€€€€€€€€€ÕÉ•¹ĞõíØ¹ÕÉ•¹Ñô4(€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•õíÍ•±•Ñ•¹¡…Ì¡¬¥ô4(€€€€€€€€€€€€€€€€€€€€€€€€€½¹Q½±”õíÑ½±•ô4(€€€€€€€€€€€€€€€€€€€€€€€€¼ø4(€€€€€€€€€€€€€€€€€€€€€€¤ì4(€€€€€€€€€€€€€€€€€€€ô¥ô4(€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€¤€è€ 4(€€€€€€€€€€€€€€€€€€ñ‘¥Ø­•äõí…¹¥µ…°¹¥‘ô±…ÍÍ9…µ”õí‰½É‘•ÈÉ½Õ¹‘•µ±œÀ´Ì€‘í•ÍÑUÉ•¹Ğ€ü€‰‰½É‘•ÈµÉ•´ÈÀÀ‰œµÉ•´ÔÀˆ€è€‰‰½É‘•Èµå•±±½Ü´ÄÀÀ‰œµå•±±½Ü´ÔÀ‰õôø4(€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµÍÑ…ÉĞ©ÕÍÑ¥™äµ‰•Ñİ••¸…À´Èˆø4(€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à´Äµ¥¸µÜ´Àˆø4(€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È…À´Èˆø4(€€€€€€€€€€€€€€€€€€€€€€€€€€ñ1¥¹¬¡É•˜õí€½ÑÉ½ÕÁ•…Ô¼‘í…¹¥µ…°¹¹ÕÑÉ…Ùõô±…ÍÍ9…µ”ô‰™½¹Ğµµ½¹¼Ñ•áĞµáÌ‰œµİ¡¥Ñ”Áà´Ä¸ÔÁä´À¸ÔÉ½Õ¹‘•‰½É‘•È‰½É‘•ÈµÉ…ä´ÈÀÀˆùí…¹¥µ…°¹¹ÕÑÉ…Ùôğ½1¥¹¬ø4(€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áĞµÍ´™½¹Ğµµ•‘¥Õ´Ñ•áĞµÉ…ä´àÀÀˆùí…¹¥µ…°¹¹½‰½Ù¤€üü€‰M…¹Ì¹½´‰ôğ½ÍÁ…¸ø4(€€€€€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ•áĞµáÌÑ•áĞµÉ…ä´ÔÀÀµĞ´Äˆùí…¹¥µ…°¹…•1…‰•±ôğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à™±•àµİÉ…À…À´ÄµĞ´Èˆø4(€€€€€€€€€€€€€€€€€€€€€€€€€í…¹¥µ…°¹Ù…¥¹Í5…¹ÅÕ…¹ÑÌ¹µ…À ¡Ø¤€ôø€ 4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸­•äõíØ¹Ù…¥¹ô±…ÍÍ9…µ”õíÑ•áĞµáÌÁà´ÈÁä´À¸ÔÉ½Õ¹‘•µ™Õ±°™½¹Ğµµ•‘¥Õ´€‘íØ¹ÕÉ•¹Ğ€ü€‰‰œµÉ•´ÔÀÀÑ•áĞµİ¡¥Ñ”ˆ€è€‰‰œµå•±±½Ü´ĞÀÀÑ•áĞµ‰±…¬‰õôø4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€íØ¹Ù…¥¹ô4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ğ½ÍÁ…¸ø4(€€€€€€€€€€€€€€€€€€€€€€€€€€¤¥ô4(€€€€€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ•áĞµáÌÑ•áĞµÉ…ä´ĞÀÀµĞ´Äˆùí…¹¥µ…°¹Ù…¥¹Í5…¹ÅÕ…¹ÑÌ¹µ…À ¡Ø¤€ôøØ¹É…¥Í½¸¤¹©½¥¸ ˆƒŠˆ€ˆ¥ôğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à™±•àµ½°¥Ñ•µÌµ•¹…À´Ä¸Ô™±•àµÍ¡É¥¹¬´Àˆø4(€€€€€€€€€€€€€€€€€€€€€€€í•ÍÑUÉ•¹Ğ€˜˜€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áĞµáÌ‰œµÉ•´ÔÀÀÑ•áĞµİ¡¥Ñ”Áà´ÈÁä´ÄÉ½Õ¹‘•µ™Õ±°ˆùUI9Pğ½ÍÁ…¸ùô4(€€€€€€€€€€€€€€€€€€€€€€€í…¹¥µ…°¹Ù…¥¹Í5…¹ÅÕ…¹ÑÌ¹Í±¥” À°€È¤¹µ…À ¡Ø¤€ôø€ 4(€€€€€€€€€€€€€€€€€€€€€€€€€€ñY…¥¹•EÕ¥­	ÕÑÑ½¸­•äõíØ¹Ù…¥¹ô¹ÕÑÉ…Øõí…¹¥µ…°¹¹ÕÑÉ…ÙôÙ…¥¸õíØ¹Ù…¥¹ô±…‰•°õí€¬€‘íØ¹Ù…¥¹õô€¼ø4(€€€€€€€€€€€€€€€€€€€€€€€€¤¥ô4(€€€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€¤ì4(€€€€€€€€€€€€€ô¤4(€€€€€€€€€€€€¥ô4(€€€€€€€€€€ğ½M•Ñ¥½¸ø4(4(€€€€€€€€€ì¼¨µÁÑäÍÑ…Ñ”€¨½ô4(€€€€€€€€€íÑ½Ñ…±A•¹‘¥¹œ€ôôô€À€˜˜€ 4(€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰‰œµİ¡¥Ñ”É½Õ¹‘•µá°Í¡…‘½ÜÀ´àÑ•áĞµ•¹Ñ•Èˆø4(€€€€€€€€€€€€€€ñ¡•­¥É±”ÈÍ¥é”õìÌÙô±…ÍÍ9…µ”ô‰µàµ…ÕÑ¼µˆ´ÌÑ•áĞµÉ••¸´ÔÀÀˆ€¼ø4(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™½¹ĞµÍ•µ¥‰½±Ñ•áĞµÉ…ä´ÜÀÀˆùQ½ÕĞ•ÍĞƒ€©½ÕÈ€„ğ½‘¥Øø4(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ•áĞµÍ´Ñ•áĞµÉ…ä´ĞÀÀµĞ´ÄˆùÕÕ¸ÑÉ…¥Ñ•µ•¹Ğ•¸…ÑÑ•¹Ñ”ğ½‘¥Øø4(€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€¥ô4(€€€€€€€€ğ¼ø4(€€€€€€¥ô4(4(€€€€€ì¼¨ƒŠRŠR YUAHY%8ƒŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠR €¨½ô4(€€€€€íÙ¥•İ5½‘”€ôôô€‰ÑÉ…¥Ñ•µ•¹Ğˆ€˜˜€ 4(€€€€€€€€ğø4(€€€€€€€€€íÉ½ÕÁÍ	åY…¥¸¹Í¥é”€ôôô€À€ü€ 4(€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰‰œµİ¡¥Ñ”É½Õ¹‘•µá°Í¡…‘½ÜÀ´àÑ•áĞµ•¹Ñ•Èˆø4(€€€€€€€€€€€€€€ñ¡•­¥É±”ÈÍ¥é”õìÌÙô±…ÍÍ9…µ”ô‰µàµ…ÕÑ¼µˆ´ÌÑ•áĞµÉ••¸´ÔÀÀˆ€¼ø4(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™½¹ĞµÍ•µ¥‰½±Ñ•áĞµÉ…ä´ÜÀÀˆùQ½ÕĞ•ÍĞƒ€©½ÕÈ€„ğ½‘¥Øø4(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ•áĞµÍ´Ñ•áĞµÉ…ä´ĞÀÀµĞ´ÄˆùÕÕ¸ÑÉ…¥Ñ•µ•¹Ğ•¸…ÑÑ•¹Ñ”ğ½‘¥Øø4(€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€¤€è€ 4(€€€€€€€€€€€l¸¸¹É½ÕÁÍ	åY…¥¸¹•¹ÑÉ¥•Ì ¥t¹µ…À ¡mÙ…¥¸°…¹¥µ…±Ít¤€ôøì4(€€€€€€€€€€€€€½¹ÍĞÉ½ÕÁ-•åÌ€ô…¹¥µ…±Ì¹µ…À ¡„¤€ôø­•ä¡„¹¹ÕÑÉ…Ø°Ù…¥¸¤¤ì4(€€€€€€€€€€€€€½¹ÍĞ…±±M•°€ôÉ½ÕÁ-•åÌ¹•Ù•Éä ¡¬¤€ôøÍ•±•Ñ•¹¡…Ì¡¬¤¤ì4(€€€€€€€€€€€€€½¹ÍĞ¥ÍUÉ•¹ÑÉ½ÕÀ€ô…¹¥µ…±Ì¹Í½µ” ¡„¤€ôø„¹ÕÉ•¹Ğ¤ì4(€€€€€€€€€€€€€½¹ÍĞ‰!•…‘•È€ô¥ÍUÉ•¹ÑÉ½ÕÀ€ü€‰‰œµÉ•´ÔÀ‰½É‘•ÈµÉ•´ÈÀÀˆ€è€‰‰œµÉ…ä´ÔÀ‰½É‘•ÈµÉ…ä´ÈÀÀˆì4(€€€€€€€€€€€€€É•ÑÕÉ¸€ 4(€€€€€€€€€€€€€€€€ñ‘¥Ø­•äõíÙ…¥¹ô±…ÍÍ9…µ”ô‰‰œµİ¡¥Ñ”É½Õ¹‘•µá°Í¡…‘½Ü½Ù•É™±½Üµ¡¥‘‘•¸ˆø4(€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”õí™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•Ñİ••¸Áà´ĞÁä´Ì‰½É‘•Èµˆ€‘í‰!•…‘•Éõôø4(€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È…À´Èˆø4(€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”õíÑ•áĞµÍ´™½¹Ğµ‰½±Áà´È¸ÔÁä´ÄÉ½Õ¹‘•µ±œ€‘ì4(€€€€€€€€€€€€€€€€€€€€€€€¥ÍUÉ•¹ÑÉ½ÕÀ€ü€‰‰œµÉ•´ÔÀÀÑ•áĞµİ¡¥Ñ”ˆ€è4(€€€€€€€€€€€€€€€€€€€€€€€Ù…¥¸€ôôô€‰IeAQ<ˆñğÙ…¥¸€ôôô€‰I=QYˆ€ü€‰‰œµÁ¥¹¬´ÔÀÀÑ•áĞµİ¡¥Ñ”ˆ€è4(€€€€€€€€€€€€€€€€€€€€€€€Ù…¥¸€ôôô€‰	=1ULˆñğÙ…¥¸€ôôô€‰5QI	=0ˆ€ü€‰‰œµ…µ‰•È´ÔÀÀÑ•áĞµİ¡¥Ñ”ˆ€è4(€€€€€€€€€€€€€€€€€€€€€€€€‰‰œµÁÕÉÁ±”´ØÀÀÑ•áĞµİ¡¥Ñ”ˆ4(€€€€€€€€€€€€€€€€€€€€€õôùíÙ…¥¹ôğ½ÍÁ…¸ø4(€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áĞµÍ´Ñ•áĞµÉ…ä´ØÀÀˆùí…¹¥µ…±Ì¹±•¹Ñ €ø€Ä€ü€‘í…¹¥µ…±Ì¹±•¹Ñ¡ô…¹¥µ…Õá€€è€‘í…¹¥µ…±Ì¹±•¹Ñ¡ô…¹¥µ…±ôğ½ÍÁ…¸ø4(€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€íÍ•ÍÍ¥½¹5½‘”€˜˜€ 4(€€€€€€€€€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸4(€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôøÑ½±•±°¡É½ÕÁ-•åÌ°€……±±M•°¥ô4(€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”õíÑ•áĞµáÌ™½¹Ğµµ•‘¥Õ´Áà´ÌÁä´ÄÉ½Õ¹‘•µ±œ‰½É‘•ÈÑÉ…¹Í¥Ñ¥½¸µ½±½ÉÌ€‘ì4(€€€€€€€€€€€€€€€€€€€€€€€€€…±±M•°€ü€‰‰œµÉ••¸´ØÀÀÑ•áĞµİ¡¥Ñ”‰½É‘•ÈµÉ••¸´ØÀÀˆ€è€‰‰½É‘•ÈµÉ…ä´ÈÀÀÑ•áĞµÉ…ä´ØÀÀ¡½Ù•Èé‰½É‘•ÈµÉ••¸´ĞÀÀˆ4(€€€€€€€€€€€€€€€€€€€€€€€õô4(€€€€€€€€€€€€€€€€€€€€€€ø4(€€€€€€€€€€€€€€€€€€€€€€€í…±±M•°€ü€‰Q½ÕĞ“¥Ï¥°¸ˆ€è€‰Q½ÕĞÏ¥°¸‰ô4(€€€€€€€€€€€€€€€€€€€€€€ğ½‰ÕÑÑ½¸ø4(€€€€€€€€€€€€€€€€€€€€¥ô4(€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰‘¥Ù¥‘”µä‘¥Ù¥‘”µÉ…ä´ÔÀÁà´ÈÁä´ÈÍÁ…”µä´Äˆø4(€€€€€€€€€€€€€€€€€€€í…¹¥µ…±Ì¹µ…À ¡„¤€ôøì4(€€€€€€€€€€€€€€€€€€€€€½¹ÍĞ¬€ô­•ä¡„¹¹ÕÑÉ…Ø°Ù…¥¸¤ì4(€€€€€€€€€€€€€€€€€€€€€É•ÑÕÉ¸Í•ÍÍ¥½¹5½‘”€ü€ 4(€€€€€€€€€€€€€€€€€€€€€€€€ñ¡•­I½Ü­•äõí­ô¬õí­ô4(€€€€€€€€€€€€€€€€€€€€€€€€€±…‰•°õí€‘í„¹¹ÕÑÉ…Ùô€‘í„¹¹½‰½Ù¤€üü€‰M…¹Ì¹½´‰õô4(€€€€€€€€€€€€€€€€€€€€€€€€€‘•Ñ…¥°õí„¹‘•Ñ…¥±ô4(€€€€€€€€€€€€€€€€€€€€€€€€€ÕÉ•¹Ğõí„¹ÕÉ•¹Ñô4(€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•õíÍ•±•Ñ•¹¡…Ì¡¬¥ô4(€€€€€€€€€€€€€€€€€€€€€€€€€½¹Q½±”õíÑ½±•ô4(€€€€€€€€€€€€€€€€€€€€€€€€¼ø4(€€€€€€€€€€€€€€€€€€€€€€¤€è€ 4(€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø­•äõí­ô±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•Ñİ••¸Áä´ÈÁà´Èˆø4(€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Øø4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È…À´Èˆø4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ1¥¹¬¡É•˜õí€½ÑÉ½ÕÁ•…Ô¼‘í„¹¹ÕÑÉ…Ùõô±…ÍÍ9…µ”ô‰™½¹Ğµµ½¹¼Ñ•áĞµáÌ‰œµÉ…ä´ÄÀÀÁà´Ä¸ÔÁä´À¸ÔÉ½Õ¹‘•™½¹Ğµ‰½±ˆø4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€í„¹¹ÕÑÉ…Ùô4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ğ½1¥¹¬ø4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áĞµÍ´Ñ•áĞµÉ…ä´àÀÀˆùí„¹¹½‰½Ù¤€üü€‰M…¹Ì¹½´‰ôğ½ÍÁ…¸ø4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€í„¹ÕÉ•¹Ğ€˜˜€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áĞµáÌ‰œµÉ•´ÔÀÀÑ•áĞµİ¡¥Ñ”Áà´Ä¸ÔÁä´À¸ÔÉ½Õ¹‘•ˆùUI9Pğ½ÍÁ…¸ùô4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ•áĞµáÌÑ•áĞµÉ…ä´ĞÀÀµĞ´À¸Ôµ°´À¸Ôˆùí„¹‘•Ñ…¥±ôğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€€€€€€€ñY…¥¹•EÕ¥­	ÕÑÑ½¸¹ÕÑÉ…Øõí„¹¹ÕÑÉ…ÙôÙ…¥¸õíÙ…¥¹ô±…‰•°ôˆ¬Y…±¥‘•Èˆ€¼ø4(€€€€€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€€€¤ì4(€€€€€€€€€€€€€€€€€€€ô¥ô4(€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€¤ì4(€€€€€€€€€€€ô¤4(€€€€€€€€€€¥ô4(4(€€€€€€€€€ì¼¨Q½ÕĞÏ¥±•Ñ¥½¹¹•È±½‰…°€¨½ô4(€€€€€€€€€íÍ•ÍÍ¥½¹5½‘”€˜˜É½ÕÁÍ	åY…¥¸¹Í¥é”€ø€À€˜˜€ 4(€€€€€€€€€€€€ñ‰ÕÑÑ½¸4(€€€€€€€€€€€€€½¹±¥¬õì ¤€ôøÑ½±•±°¡…±±QÉ…¥Ñ•µ•¹Ñ-•åÌ°…±±QÉ…¥Ñ•µ•¹Ñ-•åÌ¹•Ù•Éä ¡¬¤€ôøÍ•±•Ñ•¹¡…Ì¡¬¤¤€ü™…±Í”€èÑÉÕ”¥ô4(€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°Áä´È¸Ô‰½É‘•È´È‰½É‘•Èµ‘…Í¡•‰½É‘•ÈµÉ…ä´ÌÀÀÉ½Õ¹‘•µá°Ñ•áĞµÍ´Ñ•áĞµÉ…ä´ÔÀÀ¡½Ù•Èé‰½É‘•ÈµÉ••¸´ĞÀÀ¡½Ù•ÈéÑ•áĞµÉ••¸´ÜÀÀÑÉ…¹Í¥Ñ¥½¸µ½±½ÉÌˆ4(€€€€€€€€€€€€ø4(€€€€€€€€€€€€€í…±±QÉ…¥Ñ•µ•¹Ñ-•åÌ¹•Ù•Éä ¡¬¤€ôøÍ•±•Ñ•¹¡…Ì¡¬¤¤€ü€‰Q½ÕĞ“¥Ï¥±•Ñ¥½¹¹•Èˆ€è€‰Q½ÕĞÏ¥±•Ñ¥½¹¹•È‰ô4(€€€€€€€€€€€€ğ½‰ÕÑÑ½¸ø4(€€€€€€€€€€¥ô4(€€€€€€€€ğ¼ø4(€€€€€€¥ô4(4(€€€€€ì¼¨Y…¥¹…Ñ¥½¹ÌË¥•¹Ñ•ÌƒŠPÙ¥Í¥‰±”ÍÕÈÑ½ÕÌ±•Ì½¹±•ÑÌ€¨½ô4(€€€€€íÙ…¥¹…Ñ¥½¹ÍI••¹Ñ•Ì¹±•¹Ñ €ø€À€˜˜€ 4(€€€€€€€€ñI••¹ÑM•Ñ¥½¸¥Ñ•µÌõíÙ…¥¹…Ñ¥½¹ÍI••¹Ñ•Íô½¹I•™É•Í õì ¤€ôøÉ½ÕÑ•È¹É•™É•Í  ¥ô€¼ø4(€€€€€€¥ô4(4(€€€€€ì¼¨¥¸½¹±•ĞÕÉ•¹Ğ€¨½ô4(€€€€€€ğ¼ø4(€€€€€€¥ô4(4(€€€€€ì¼¨ƒŠRŠR ±½…Ñ¥¹œÍ•±•Ñ¥½¸‰…ÈƒŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠR €¨½ô4(€€€€€íÍ•ÍÍ¥½¹5½‘”€˜˜Í•±•Ñ•¹Í¥é”€ø€À€˜˜€ 4(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™¥á•‰½ÑÑ½´´ÈÀ±•™Ğ´ÀÉ¥¡Ğ´Àè´ĞÀÁà´Ğˆø4(€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰‰œµÉ••¸´ÜÀÀÑ•áĞµİ¡¥Ñ”É½Õ¹‘•´Éá°Í¡…‘½Ü´Éá°Áà´ĞÁä´Ì™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•Ñİ••¸ˆø4(€€€€€€€€€€€€ñ‘¥Øø4(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™½¹Ğµ‰½±Ñ•áĞµ‰…Í”ˆùíÍ•±•Ñ•¹Í¥é•ôÑÉ…¥Ñ•µ•¹ÑíÍ•±•Ñ•¹Í¥é”€ø€Ä€ü€‰Ìˆ€è€ˆ‰ôÏ¥±•Ñ¥½¹»¥íÍ•±•Ñ•¹Í¥é”€ø€Ä€ü€‰Ìˆ€è€ˆ‰ôğ½‘¥Øø4(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ•áĞµáÌÑ•áĞµÉ••¸´ÈÀÀµĞ´À¸Ôˆø4(€€€€€€€€€€€€€€€íl¸¸¹¹•ÜM•Ğ¡l¸¸¹Í•±•Ñ•‘t¹µ…À ¡¬¤€ôøÁ…ÉÍ•-•ä¡¬¤¹Ù…¥¸¤¥t¹©½¥¸ ˆ°€ˆ¥ô4(€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È…À´Èˆø4(€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸4(€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôøÍ•ÑM•±•Ñ•¡¹•ÜM•Ğ ¤¥ô4(€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È…À´Ä¸ÔÁà´ÌÁä´È‰œµÉ••¸´ØÀÀÉ½Õ¹‘•µá°Ñ•áĞµÍ´™½¹Ğµµ•‘¥Õ´¡½Ù•Èé‰œµÉ••¸´ÔÀÀÑÉ…¹Í¥Ñ¥½¸µ½±½ÉÌˆ4(€€€€€€€€€€€€€€ø4(€€€€€€€€€€€€€€€€ñ`Í¥é”õìÄÕô€¼øQ½ÕĞ“¥½¡•È4(€€€€€€€€€€€€€€ğ½‰ÕÑÑ½¸ø4(€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸4(€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôøìÍ•Ñ	…Ñ¡…Ñ”¡Ñ½‘…ä¤ìÍ•ÑM¡½İ5½‘…°¡ÑÉÕ”¤ìõô4(€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰‰œµİ¡¥Ñ”Ñ•áĞµÉ••¸´ÜÀÀ™½¹Ğµ‰½±Áà´ĞÁä´ÈÉ½Õ¹‘•µá°Ñ•áĞµÍ´¡½Ù•Èé‰œµÉ••¸´ÔÀ…Ñ¥Ù”éÍ…±”´äÔÑÉ…¹Í¥Ñ¥½¸µ…±°ˆ4(€€€€€€€€€€€€€€ø4(€€€€€€€€€€€€€€€Y…±¥‘•ÈƒŠrL4(€€€€€€€€€€€€€€ğ½‰ÕÑÑ½¸ø4(€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€ğ½‘¥Øø4(€€€€€€¥ô4(4(€€€€€ì¼¨ƒŠRŠR 	…Ñ µ½‘…°ƒŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠRŠR €¨½ô4(€€€€€íÍ¡½İ5½‘…°€˜˜€ 4(€€€€€€€€ñ‘¥Ø4(€€€€€€€€€±…ÍÍ9…µ”ô‰™¥á•¥¹Í•Ğ´À‰œµ‰±…¬¼ÔÀè´ÔÀ™±•à¥Ñ•µÌµ•¹Í´é¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ•¹Ñ•Èˆ4(€€€€€€€€€½¹±¥¬õì¡”¤€ôøì¥˜€¡”¹ÕÉÉ•¹ÑQ…É•Ğ€ôôô”¹Ñ…É•Ğ¤Í•ÑM¡½İ5½‘…°¡™…±Í”¤ìõô4(€€€€€€€€ø4(€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰‰œµİ¡¥Ñ”Üµ™Õ±°Í´éµ…àµÜµÍ´É½Õ¹‘•µĞ´Éá°Í´éÉ½Õ¹‘•´Éá°Í¡…‘½Üµá°À´Ôˆø4(€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•Ñİ••¸µˆ´Ğˆø4(€€€€€€€€€€€€€€ñ Ì±…ÍÍ9…µ”ô‰™½¹Ğµ‰½±Ñ•áĞµÉ…ä´äÀÀÑ•áĞµ±œˆù½¹™¥Éµ•È±„Í•ÍÍ¥½¸ğ½ Ìø4(€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸½¹±¥¬õì ¤€ôøÍ•ÑM¡½İ5½‘…°¡™…±Í”¥ô±…ÍÍ9…µ”ô‰Ñ•áĞµÉ…ä´ĞÀÀ¡½Ù•ÈéÑ•áĞµÉ…ä´ØÀÀˆøñ`Í¥é”õìÈÁô€¼øğ½‰ÕÑÑ½¸ø4(€€€€€€€€€€€€ğ½‘¥Øø4(4(€€€€€€€€€€€ì¼¨K¥ÍÕ·¤€¨½ô4(€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰‰œµÉ••¸´ÔÀ‰½É‘•È‰½É‘•ÈµÉ••¸´ÈÀÀÉ½Õ¹‘•µá°À´Ìµˆ´Ğˆø4(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ•áĞµÍ´™½¹ĞµÍ•µ¥‰½±Ñ•áĞµÉ••¸´àÀÀµˆ´Èˆø4(€€€€€€€€€€€€€€€íÍ•±•Ñ•¹Í¥é•ôÑÉ…¥Ñ•µ•¹ÑíÍ•±•Ñ•¹Í¥é”€ø€Ä€ü€‰Ìˆ€è€ˆ‰ôƒ€•¹É•¥ÍÑÉ•È4(€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´Äˆø4(€€€€€€€€€€€€€€€íl¸¸¹É½ÕÁÍ	åY…¥¸¹•¹ÑÉ¥•Ì ¥t4(€€€€€€€€€€€€€€€€€€¹µ…À ¡mÙ…¥¸°…¹¥µ…±Ít¤€ôøì4(€€€€€€€€€€€€€€€€€€€½¹ÍĞ½Õ¹Ğ€ô…¹¥µ…±Ì¹™¥±Ñ•È ¡„¤€ôøÍ•±•Ñ•¹¡…Ì¡­•ä¡„¹¹ÕÑÉ…Ø°Ù…¥¸¤¤¤¹±•¹Ñ ì4(€€€€€€€€€€€€€€€€€€€¥˜€¡½Õ¹Ğ€ôôô€À¤É•ÑÕÉ¸¹Õ±°ì4(€€€€€€€€€€€€€€€€€€€É•ÑÕÉ¸€ 4(€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø­•äõíÙ…¥¹ô±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•Ñİ••¸Ñ•áĞµáÌÑ•áĞµÉ••¸´ÜÀÀˆø4(€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰™½¹Ğµµ•‘¥Õ´ˆùíÙ…¥¹ôğ½ÍÁ…¸ø4(€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸ùí½Õ¹Ğ€ø€Ä€ü€‘í½Õ¹Ñô…¹¥µ…Õá€€è€‘í½Õ¹Ñô…¹¥µ…±ôğ½ÍÁ…¸ø4(€€€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€€€€€€€¤ì4(€€€€€€€€€€€€€€€€€ô¤4(€€€€€€€€€€€€€€€€€€¹™¥±Ñ•È¡	½½±•…¸¥ô4(€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€ğ½‘¥Øø4(4(€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´Ìˆø4(€€€€€€€€€€€€€€ñ‘¥Øø4(€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰‰±½¬Ñ•áĞµáÌ™½¹Ğµµ•‘¥Õ´Ñ•áĞµÉ…ä´ÔÀÀµˆ´Äˆù…Ñ”‘”ÑÉ…¥Ñ•µ•¹Ğğ½±…‰•°ø4(€€€€€€€€€€€€€€€€ñ¥¹ÁÕĞ4(€€€€€€€€€€€€€€€€€ÑåÁ”ô‰‘…Ñ”ˆ4(€€€€€€€€€€€€€€€€€Ù…±Õ”õí‰…Ñ¡…Ñ•ô4(€€€€€€€€€€€€€€€€€µ…àõíÑ½‘…åô4(€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôøÍ•Ñ	…Ñ¡…Ñ”¡”¹Ñ…É•Ğ¹Ù…±Õ”¥ô4(€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰½É‘•È‰½É‘•ÈµÉ…ä´ÌÀÀÉ½Õ¹‘•µ±œÁà´ÌÁä´ÈÑ•áĞµÍ´™½ÕÌé½ÕÑ±¥¹”µ¹½¹”™½ÕÌéÉ¥¹œ´È™½ÕÌéÉ¥¹œµÉ••¸´ĞÀÀˆ4(€€€€€€€€€€€€€€€€¼ø4(€€€€€€€€€€€€€€€í‰…Ñ¡…Ñ”€˜˜€  ¤€ôøì4(€€€€€€€€€€€€€€€€€½¹ÍĞ‘…åÍ¼€ô5…Ñ ¹™±½½È ¡…Ñ”¹¹½Ü ¤€´¹•Ü…Ñ”¡‰…Ñ¡…Ñ”¤¹•ÑQ¥µ” ¤¤€¼€àØĞÀÀÀÀÀ¤ì4(€€€€€€€€€€€€€€€€€¥˜€¡‘…åÍ¼€ø€ÌÀ¤É•ÑÕÉ¸€ 4(€€€€€€€€€€€€€€€€€€€€ñÀ±…ÍÍ9…µ”ô‰Ñ•áĞµáÌÑ•áĞµ…µ‰•È´ØÀÀµĞ´Ä¸Ô™±•à¥Ñ•µÌµ•¹Ñ•È…À´Äˆø4(€€€€€€€€€€€€€€€€€€€€€ƒŠjƒ¾â<…Ñ”…¹¥•¹¹”€¡í‘…åÍ½ô©½ÕÉÌ¤ƒŠP±•Ì…¹¥µ…Õà‘¥ÍÁ…É‡¹ÑÉ½¹Ğ‰¥•¸‘”±„±¥ÍÑ”…ÁË¡Ì•¹É•¥ÍÑÉ•µ•¹Ğ¸4(€€€€€€€€€€€€€€€€€€€€ğ½Àø4(€€€€€€€€€€€€€€€€€€¤ì4(€€€€€€€€€€€€€€€€€É•ÑÕÉ¸¹Õ±°ì4(€€€€€€€€€€€€€€€ô¤ ¥ô4(€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€ñ‘¥Øø4(€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰‰±½¬Ñ•áĞµáÌ™½¹Ğµµ•‘¥Õ´Ñ•áĞµÉ…ä´ÔÀÀµˆ´ÄˆùY½¥”™…Á½Ìí…‘µ¥¹¥ÍÑÉ…Ñ¥½¸ğ½±…‰•°ø4(€€€€€€€€€€€€€€€€ñÍ•±•Ğ4(€€€€€€€€€€€€€€€€€Ù…±Õ”õí‰…Ñ¡Y½¥•ô4(€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôøÍ•Ñ	…Ñ¡Y½¥”¡”¹Ñ…É•Ğ¹Ù…±Õ”¥ô4(€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰½É‘•È‰½É‘•ÈµÉ…ä´ÌÀÀÉ½Õ¹‘•µ±œÁà´ÌÁä´ÈÑ•áĞµÍ´‰œµİ¡¥Ñ”™½ÕÌé½ÕÑ±¥¹”µ¹½¹”™½ÕÌéÉ¥¹œ´È™½ÕÌéÉ¥¹œµÉ••¸´ĞÀÀˆ4(€€€€€€€€€€€€€€€€ø4(€€€€€€€€€€€€€€€€€íY=%L¹µ…À ¡Ø¤€ôø€ñ½ÁÑ¥½¸­•äõíØ¹Ù…±Õ•ôÙ…±Õ”õíØ¹Ù…±Õ•ôùíØ¹±…‰•±ôğ½½ÁÑ¥½¸ø¥ô4(€€€€€€€€€€€€€€€€ğ½Í•±•Ğø4(€€€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸4(€€€€€€€€€€€€€€€½¹±¥¬õí¡…¹‘±•	…Ñ¡MÕ‰µ¥Ñô4(€€€€€€€€€€€€€€€‘¥Í…‰±•õíÍ…Ù¥¹œñğ€…‰…Ñ¡…Ñ•ô4(€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°Áä´Ì‰œµÉ••¸´ÜÀÀÑ•áĞµİ¡¥Ñ”É½Õ¹‘•µá°™½¹Ğµ‰½±Ñ•áĞµÍ´‘¥Í…‰±•é½Á…¥Ñä´ÔÀ…Ñ¥Ù”éÍ…±”´äàÑÉ…¹Í¥Ñ¥½¸µ…±°ˆ4(€€€€€€€€€€€€€€ø4(€€€€€€€€€€€€€€€íÍ…Ù¥¹œ€ü€ 4(€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ•¹Ñ•È…À´ÈˆøñI•™É•Í¡ÜÍ¥é”õìÄÙô±…ÍÍ9…µ”ô‰…¹¥µ…Ñ”µÍÁ¥¸ˆ€¼ø¹É•¥ÍÑÉ•µ•¹ÓŠ˜ğ½ÍÁ…¸ø4(€€€€€€€€€€€€€€€€¤€è€ 4(€€€€€€€€€€€€€€€€€¹É•¥ÍÑÉ•È€‘íÍ•±•Ñ•¹Í¥é•ôÑÉ…¥Ñ•µ•¹Ğ‘íÍ•±•Ñ•¹Í¥é”€ø€Ä€ü€‰Ìˆ€è€ˆ‰õ€4(€€€€€€€€€€€€€€€€¥ô4(€€€€€€€€€€€€€€ğ½‰ÕÑÑ½¸ø4(€€€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€€€ğ½‘¥Øø4(€€€€€€€€ğ½‘¥Øø4(€€€€€€¥ô4(€€€€ğ¼ø4(€€¤ì4)ô4(
+                  </div>
+
+                  {/* Ã‰tapes du protocole */}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {steps.map((step) => {
+                      if (step.status === "done") {
+                        return (
+                          <span key={step.vaccin} className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full font-medium border bg-green-50 text-green-700 border-green-200">
+                            <span className={`font-bold ${step.isRappel ? "text-purple-500" : "text-blue-500"}`}>{step.isRappel ? "R" : "P"}</span>
+                            âœ“ {step.label}
+                            {step.doneDate && <span className="opacity-60 ml-0.5">{formatDateShort(step.doneDate)}</span>}
+                          </span>
+                        );
+                      }
+                      if (step.status === "due") {
+                        return (
+                          <span key={step.vaccin} className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium border ${step.isUrgent ? "bg-red-100 text-red-700 border-red-300 animate-pulse" : "bg-orange-50 text-orange-700 border-orange-200"}`}>
+                            <span className={`font-bold ${step.isRappel ? "text-purple-600" : "text-blue-600"}`}>{step.isRappel ? "R" : "P"}</span>
+                            {step.isUrgent ? "âš " : "â†’"} {step.label}
+                            <span className="opacity-60">{step.voie}</span>
+                            {step.dueFrom && <span className="opacity-80 font-semibold">{formatDateShort(step.dueFrom)}</span>}
+                            <VaccineQuickButton nutrav={veau.nutrav} vaccin={step.vaccin} label={step.label} voie={step.voie} compact />
+                          </span>
+                        );
+                      }
+                      if (step.status === "pending") {
+                        return (
+                          <span key={step.vaccin} className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full font-medium border bg-gray-50 text-gray-400 border-gray-200">
+                            <span className="font-bold text-gray-300">{step.isRappel ? "R" : "P"}</span>
+                            â³ {step.label}
+                            {step.eligibleDate && <span className="opacity-70">{formatDateShort(step.eligibleDate)}</span>}
+                          </span>
+                        );
+                      }
+                      return (
+                        <span key={step.vaccin} className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full font-medium border bg-gray-50 text-gray-300 border-gray-100">
+                          â—‹ {step.label}
+                          {step.eligibleDate && <span className="opacity-70">{formatDateShort(step.eligibleDate)}</span>}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <StatutBadge statut={veau.statut} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// â”€â”€ Onglet Vaccins Vaches â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVaccinsItem[]; onRefresh: () => void }) {
+  const [filtre, setFiltre] = useState<"tous" | "a_faire" | "en_cours" | "complet">("tous");
+
+  const vachesAvecStatut = toutesVaches.map((v) => {
+    const allOk = v.hasCrypto && v.hasRotavec && v.hasBolus;
+    const noneOk = !v.hasCrypto && !v.hasRotavec && !v.hasBolus;
+    const statut: "complet" | "en_cours" | "a_faire" = allOk ? "complet" : noneOk ? "a_faire" : "en_cours";
+    return { ...v, statut };
+  });
+
+  const filtered = filtre === "tous" ? vachesAvecStatut : vachesAvecStatut.filter((v) => v.statut === filtre);
+  const counts = {
+    a_faire: vachesAvecStatut.filter((v) => v.statut === "a_faire").length,
+    en_cours: vachesAvecStatut.filter((v) => v.statut === "en_cours").length,
+    complet: vachesAvecStatut.filter((v) => v.statut === "complet").length,
+  };
+
+  if (toutesVaches.length === 0) {
+    return (
+      <div className="text-center text-gray-400 py-8">
+        <CheckCircle2 size={28} className="mx-auto mb-2 text-green-500" />
+        <div className="text-sm">Aucune vache gestante avec vaccins Ã  prÃ©voir</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Filtres visuels */}
+      <div className="flex gap-2 flex-wrap">
+        {([
+          { value: "tous", label: "Tous", count: toutesVaches.length, cls: "bg-gray-100 text-gray-700 border-gray-200" },
+          { value: "a_faire", label: "ğŸ”´ Ã€ faire", count: counts.a_faire, cls: "bg-red-50 text-red-700 border-red-200" },
+          { value: "en_cours", label: "ğŸŸ  En cours", count: counts.en_cours, cls: "bg-orange-50 text-orange-700 border-orange-200" },
+          { value: "complet", label: "ğŸŸ¢ Complet", count: counts.complet, cls: "bg-green-50 text-green-700 border-green-200" },
+        ] as const).map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setFiltre(opt.value)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+              filtre === opt.value ? "ring-2 ring-offset-1 ring-gray-400 " + opt.cls : opt.cls
+            }`}
+          >
+            {opt.label} ({opt.count})
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="text-center text-gray-400 py-8">
+          <CheckCircle2 size={28} className="mx-auto mb-2 text-green-500" />
+          <div className="text-sm">Aucun animal dans cette catÃ©gorie</div>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-500">Vaches gestantes Â· vaccins prÃ©-vÃ©lage (Crypto/Rotavec/Bolus)</p>
+      <div className="space-y-2">
+        {filtered.map((vache) => (
+          <div
+            key={vache.id}
+            className={`bg-white rounded-xl shadow p-4 border-l-4 ${
+              vache.statut === "complet" ? "border-green-400"
+              : vache.statut === "en_cours" ? "border-orange-400"
+              : "border-red-400"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link href={`/troupeau/${vache.nutrav}`} className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded font-bold">
+                    {vache.nutrav}
+                  </Link>
+                  <span className="text-sm font-semibold text-gray-800">{vache.nobovi ?? "Sans nom"}</span>
+                  <span className={`text-xs font-medium ${vache.joursAvantVelage <= 45 ? "text-red-500" : "text-gray-400"}`}>
+                    {vache.joursAvantVelage > 0 ? `J-${vache.joursAvantVelage}` : "Terme dÃ©passÃ©"}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+                  {[
+                    { vaccin: "CRYPTO", label: "Crypto", has: vache.hasCrypto },
+                    { vaccin: "ROTAVEC", label: "Rotavec", has: vache.hasRotavec },
+                    { vaccin: "BOLUS", label: "Bolus", has: vache.hasBolus },
+                  ].map((item) =>
+                    item.has ? (
+                      <span
+                        key={item.vaccin}
+                        className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border bg-green-50 text-green-700 border-green-200"
+                      >
+                        âœ“ {item.label}
+                      </span>
+                    ) : (
+                      <span
+                        key={item.vaccin}
+                        className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium border ${
+                          vache.joursAvantVelage <= 45
+                            ? "bg-red-100 text-red-700 border-red-300"
+                            : "bg-orange-50 text-orange-700 border-orange-200"
+                        }`}
+                      >
+                        {vache.joursAvantVelage <= 45 ? "âš " : "â—‹"} {item.label}
+                        <VaccineQuickButton
+                          nutrav={vache.nutrav}
+                          vaccin={item.vaccin}
+                          label={item.label}
+                          voie={item.vaccin === "BOLUS" ? "PO" : "IM"}
+                          compact
+                        />
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+              <StatutBadge statut={vache.statut} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes, protocoles, evenements, traitements, affichageDelaiAttente }: Props) {
+  const router = useRouter();
+  const [onglet, setOnglet] = useState<"evenements" | "vaccination" | "pharmacie" | "ordonnances">("evenements");
+  const [vaccinTab, setVaccinTab] = useState<"urgent" | "veaux" | "vaches">("urgent");
+  const [viewMode, setViewMode] = useState<"animal" | "traitement">("animal");
+  const [sessionMode, setSessionMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showModal, setShowModal] = useState(false);
+  const [batchDate, setBatchDate] = useState(today);
+  const [batchVoie, setBatchVoie] = useState("IM");
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // â”€â”€ Toggle session mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  function toggleSession() {
+    setSessionMode((v) => !v);
+    setSelected(new Set());
+  }
+
+  // â”€â”€ Selection helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  function toggle(k: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  }
+
+  function toggleAll(keys: string[], select: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      keys.forEach((k) => (select ? next.add(k) : next.delete(k)));
+      return next;
+    });
+  }
+
+  // â”€â”€ Precompute keys per section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const veauxKeys = useMemo(
+    () => veauxAVacciner.flatMap((a) => a.vaccinsManquants.map((v) => key(a.nutrav, v.vaccin))),
+    [veauxAVacciner]
+  );
+  const cryptoKeys = useMemo(
+    () =>
+      cryptoRotavec.flatMap((a) => [
+        ...(!a.hasCrypto ? [key(a.nutrav, "CRYPTO")] : []),
+        ...(!a.hasRotavec ? [key(a.nutrav, "ROTAVEC")] : []),
+      ]),
+    [cryptoRotavec]
+  );
+  const bolusKeys = useMemo(() => bolus.map((a) => key(a.nutrav, "BOLUS")), [bolus]);
+
+  // â”€â”€ Par traitement: group all items by vaccin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const groupsByVaccin = useMemo(() => {
+    const groups = new Map<string, { nutrav: string; nobovi: string | null; detail: string; urgent?: boolean }[]>();
+    for (const veau of veauxAVacciner) {
+      for (const v of veau.vaccinsManquants) {
+        if (!groups.has(v.vaccin)) groups.set(v.vaccin, []);
+        groups.get(v.vaccin)!.push({ nutrav: veau.nutrav, nobovi: veau.nobovi, detail: veau.ageLabel, urgent: v.urgent });
+      }
+    }
+    for (const v of cryptoRotavec) {
+      if (!v.hasCrypto) {
+        if (!groups.has("CRYPTO")) groups.set("CRYPTO", []);
+        groups.get("CRYPTO")!.push({ nutrav: v.nutrav, nobovi: v.nobovi, detail: `J-${v.joursAvantVelage} Â· ${v.dateLabel}` });
+      }
+      if (!v.hasRotavec) {
+        if (!groups.has("ROTAVEC")) groups.set("ROTAVEC", []);
+        groups.get("ROTAVEC")!.push({ nutrav: v.nutrav, nobovi: v.nobovi, detail: `J-${v.joursAvantVelage} Â· ${v.dateLabel}` });
+      }
+    }
+    for (const b of bolus) {
+      if (!groups.has("BOLUS")) groups.set("BOLUS", []);
+      groups.get("BOLUS")!.push({ nutrav: b.nutrav, nobovi: b.nobovi, detail: `J-${b.joursAvantVelage} Â· ${b.dateLabel}` });
+    }
+    return groups;
+  }, [veauxAVacciner, cryptoRotavec, bolus]);
+
+  const allTraitementKeys = useMemo(
+    () => [...groupsByVaccin.entries()].flatMap(([vaccin, animals]) => animals.map((a) => key(a.nutrav, vaccin))),
+    [groupsByVaccin]
+  );
+
+  // â”€â”€ Batch submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async function handleBatchSubmit() {
+    setSaving(true);
+    try {
+      const items = [...selected].map((k) => parseKey(k));
+      const res = await fetch("/api/vaccinations/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, date: batchDate, voie: batchVoie }),
+      });
+      if (!res.ok) throw new Error("Erreur serveur");
+      const { count } = await res.json();
+      setSuccessMsg(`âœ“ ${count} traitement${count > 1 ? "s" : ""} enregistrÃ©${count > 1 ? "s" : ""} !`);
+      setSelected(new Set());
+      setShowModal(false);
+      setSessionMode(false);
+      router.refresh();
+    } catch {
+      // ignore â€” retry
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const urgents = veauxAVacciner.filter((a) => a.vaccinsManquants.some((v) => v.urgent));
+  const totalPending = veauxKeys.length + cryptoKeys.length + bolusKeys.length;
+
+  return (
+    <>
+      {/* Navigation principale */}
+      <div className="grid grid-cols-4 gap-1 bg-white rounded-xl shadow overflow-hidden p-1">
+        {([
+          {
+            id: "evenements", label: "Ã‰vÃ©nements", icon: "ğŸ¥",
+            count: evenements.filter((e) => !e.resolu).length + traitements.filter((t) => t.enCours || t.enAttente).length,
+            urgent: evenements.some((e) => !e.resolu), href: null,
+          },
+          { id: "vaccination", label: "Vaccination", icon: "ğŸ’‰", count: urgents.length + cryptoRotavec.length + bolus.length, urgent: urgents.length > 0, href: null },
+          { id: "pharmacie", label: "Pharmacie", icon: "ğŸ’Š", count: 0, urgent: false, href: "/pharmacie" },
+          { id: "ordonnances", label: "Ordonnances", icon: "ğŸ“‹", count: 0, urgent: false, href: "/ordonnances" },
+        ] as const).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => (tab.href ? router.push(tab.href) : setOnglet(tab.id))}
+            className={`py-2.5 px-1 rounded-lg text-center transition-colors ${
+              onglet === tab.id
+                ? "bg-green-700 text-white"
+                : "text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <div className="text-base">{tab.icon}</div>
+            <div className="text-xs font-semibold mt-0.5 leading-tight">{tab.label}</div>
+            {tab.count > 0 && (
+              <div className={`text-xs font-bold mt-0.5 ${onglet === tab.id ? "text-green-100" : tab.urgent ? "text-red-600" : "text-gray-400"}`}>
+                {tab.count}
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Onglet Ã‰vÃ©nements â€” regroupe Ã©vÃ©nements sanitaires et traitements (en cours / historique) */}
+      {onglet === "evenements" && <EvenementsTab evenements={evenements} traitements={traitements} />}
+
+      {/* Onglet Vaccination â€” sous-navigation interne */}
+      {onglet === "vaccination" && (
+        <>
+          <div className="flex bg-white rounded-xl shadow overflow-hidden">
+            {([
+              { id: "urgent", label: "ğŸš¨ Urgent", count: urgents.length + cryptoRotavec.length + bolus.length },
+              { id: "veaux", label: "ğŸ„ Veaux", count: tousVeaux.length },
+              { id: "vaches", label: "ğŸ® Vaches", count: toutesVaches.length },
+            ] as const).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setVaccinTab(tab.id)}
+                className={`flex-1 py-3 text-xs font-semibold border-b-2 transition-colors ${
+                  vaccinTab === tab.id
+                    ? "border-green-600 text-green-700 bg-green-50"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {tab.label}
+                {tab.count > 0 && (
+                  <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                    tab.id === "urgent" && (urgents.length > 0 || cryptoRotavec.length > 0 || bolus.length > 0)
+                      ? "bg-red-100 text-red-700"
+                      : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          {vaccinTab === "veaux" && (
+            <VaccinsVeauxTab tousVeaux={tousVeaux} protocoles={protocoles} onRefresh={() => router.refresh()} />
+          )}
+          {vaccinTab === "vaches" && (
+            <VaccinsVachesTab toutesVaches={toutesVaches} onRefresh={() => router.refresh()} />
+          )}
+        </>
+      )}
+
+
+      {/* Onglet vaccination urgent â€” contenu existant */}
+      {onglet === "vaccination" && vaccinTab === "urgent" && (
+      <>
+      {/* Stats bar */}
+      <div className="grid grid-cols-4 gap-2">
+        <div className="bg-white rounded-xl shadow p-3 text-center">
+          <div className="text-xl font-bold text-red-600">{urgents.length}</div>
+          <div className="text-xs text-gray-500 mt-1">Urgents</div>
+        </div>
+        <div className="bg-white rounded-xl shadow p-3 text-center">
+          <div className="text-xl font-bold text-yellow-600">{veauxAVacciner.length}</div>
+          <div className="text-xs text-gray-500 mt-1">Ã€ vacciner</div>
+        </div>
+        <div className="bg-white rounded-xl shadow p-3 text-center">
+          <div className="text-xl font-bold text-pink-600">{cryptoRotavec.length}</div>
+          <div className="text-xs text-gray-500 mt-1">Crypto/Rotavec</div>
+        </div>
+        <div className="bg-white rounded-xl shadow p-3 text-center">
+          <div className="text-xl font-bold text-amber-600">{bolus.length}</div>
+          <div className="text-xs text-gray-500 mt-1">Bolus</div>
+        </div>
+      </div>
+
+      {/* Success banner */}
+      {successMsg && (
+        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl text-sm flex items-center justify-between">
+          <span>{successMsg}</span>
+          <button onClick={() => setSuccessMsg(null)} className="text-green-600 font-bold ml-2">Ã—</button>
+        </div>
+      )}
+
+      {/* Controls bar */}
+      <div className="bg-white rounded-xl shadow p-3 flex items-center justify-between gap-2 flex-wrap">
+        {/* View toggle */}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode("animal")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              viewMode === "animal" ? "bg-white text-gray-800 shadow" : "text-gray-500"
+            }`}
+          >
+            <List size={13} /> Par animal
+          </button>
+          <button
+            onClick={() => setViewMode("traitement")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              viewMode === "traitement" ? "bg-white text-gray-800 shadow" : "text-gray-500"
+            }`}
+          >
+            <LayoutGrid size={13} /> Par vaccin
+          </button>
+        </div>
+
+        {/* Session toggle */}
+        {totalPending > 0 && (
+          <button
+            onClick={toggleSession}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+              sessionMode
+                ? "bg-green-600 text-white border-green-600"
+                : "border-green-300 text-green-700 hover:bg-green-50"
+            }`}
+          >
+            {sessionMode ? <CheckSquare size={15} /> : <Square size={15} />}
+            {sessionMode ? "Session active" : "Mode session"}
+          </button>
+        )}
+      </div>
+
+      {/* Vaccination form (always available) */}
+      <VaccinationFormWrapper />
+
+      {/* â”€â”€ VUE PAR ANIMAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {viewMode === "animal" && (
+        <>
+          {/* Bolus */}
+          <Section
+            title="Bolus / MÃ©trabol prÃ©-vÃ©lage"
+            icon={<Pill size={16} className="text-amber-500" />}
+            count={bolus.length}
+            color="text-amber-800"
+            sectionKeys={bolusKeys}
+            selected={selected}
+            onToggleAll={toggleAll}
+            sessionMode={sessionMode}
+          >
+            {bolus.map((v) => {
+              const k = key(v.nutrav, "BOLUS");
+              return sessionMode ? (
+                <CheckRow
+                  key={k}
+                  k={k}
+                  label={`${v.nutrav} ${v.nobovi ?? "Sans nom"}`}
+                  detail={`VÃ©lage dans ${v.joursAvantVelage}j â€” ${v.dateLabel}`}
+                  selected={selected.has(k)}
+                  onToggle={toggle}
+                />
+              ) : (
+                <div key={v.id} className="border border-amber-100 rounded-lg p-3 bg-amber-50 flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/troupeau/${v.nutrav}`} className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{v.nutrav}</Link>
+                      <span className="text-sm font-medium text-gray-800">{v.nobovi ?? "Sans nom"}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">VÃ©lage dans {v.joursAvantVelage}j â€” {v.dateLabel}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <span className="text-xs bg-amber-400 text-white px-2 py-1 rounded-full">J-{v.joursAvantVelage}</span>
+                    <VaccineQuickButton nutrav={v.nutrav} vaccin="BOLUS" label="+ Bolus" />
+                    <VaccineQuickButton nutrav={v.nutrav} vaccin="METRABOL" label="+ MÃ©trabol" />
+                  </div>
+                </div>
+              );
+            })}
+          </Section>
+
+          {/* Crypto / Rotavec */}
+          <Section
+            title="Crypto / Rotavec prÃ©-vÃ©lage"
+            icon={<Syringe size={16} className="text-pink-500" />}
+            count={cryptoRotavec.length}
+            color="text-pink-800"
+            sectionKeys={cryptoKeys}
+            selected={selected}
+            onToggleAll={toggleAll}
+            sessionMode={sessionMode}
+          >
+            {cryptoRotavec.map((v) => {
+              const kc = key(v.nutrav, "CRYPTO");
+              const kr = key(v.nutrav, "ROTAVEC");
+              return sessionMode ? (
+                <div key={v.id} className="space-y-1">
+                  {!v.hasCrypto && (
+                    <CheckRow k={kc} label={`${v.nutrav} ${v.nobovi ?? "Sans nom"} â€” CRYPTO`}
+                      detail={`J-${v.joursAvantVelage} Â· ${v.dateLabel}`}
+                      selected={selected.has(kc)} onToggle={toggle} />
+                  )}
+                  {!v.hasRotavec && (
+                    <CheckRow k={kr} label={`${v.nutrav} ${v.nobovi ?? "Sans nom"} â€” ROTAVEC`}
+                      detail={`J-${v.joursAvantVelage} Â· ${v.dateLabel}`}
+                      selected={selected.has(kr)} onToggle={toggle} />
+                  )}
+                </div>
+              ) : (
+                <div key={v.id} className="border border-pink-100 rounded-lg p-3 bg-pink-50 flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/troupeau/${v.nutrav}`} className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{v.nutrav}</Link>
+                      <span className="text-sm font-medium text-gray-800">{v.nobovi ?? "Sans nom"}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">VÃ©lage dans {v.joursAvantVelage}j â€” {v.dateLabel}</div>
+                    <div className="flex gap-2 mt-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${v.hasCrypto ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                        {v.hasCrypto ? "âœ“" : "âœ—"} CRYPTO
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${v.hasRotavec ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                        {v.hasRotavec ? "âœ“" : "âœ—"} ROTAVEC
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <span className="text-xs bg-pink-400 text-white px-2 py-1 rounded-full">J-{v.joursAvantVelage}</span>
+                    {!v.hasCrypto && <VaccineQuickButton nutrav={v.nutrav} vaccin="CRYPTO" label="+ Crypto" />}
+                    {!v.hasRotavec && <VaccineQuickButton nutrav={v.nutrav} vaccin="ROTAVEC" label="+ Rotavec" />}
+                  </div>
+                </div>
+              );
+            })}
+          </Section>
+
+          {/* Veaux Ã  vacciner */}
+          <Section
+            title="Veaux Ã  vacciner"
+            icon={<AlertTriangle size={16} className="text-yellow-500" />}
+            count={veauxAVacciner.length}
+            color="text-yellow-800"
+            sectionKeys={veauxKeys}
+            selected={selected}
+            onToggleAll={toggleAll}
+            sessionMode={sessionMode}
+          >
+            {veauxAVacciner.length === 0 ? (
+              <div className="text-center text-gray-400 py-6">
+                <CheckCircle size={24} className="mx-auto mb-2 text-green-500" />
+                Tous les protocoles sont Ã  jour !
+              </div>
+            ) : (
+              veauxAVacciner.map((animal) => {
+                const estUrgent = animal.vaccinsManquants.some((v) => v.urgent);
+                return sessionMode ? (
+                  <div key={animal.id} className="space-y-1">
+                    {animal.vaccinsManquants.map((v) => {
+                      const k = key(animal.nutrav, v.vaccin);
+                      return (
+                        <CheckRow key={k} k={k}
+                          label={`${animal.nutrav} ${animal.nobovi ?? "Sans nom"} â€” ${v.vaccin}`}
+                          detail={`${animal.ageLabel} Â· ${v.raison}`}
+                          urgent={v.urgent}
+                          selected={selected.has(k)}
+                          onToggle={toggle}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div key={animal.id} className={`border rounded-lg p-3 ${estUrgent ? "border-red-200 bg-red-50" : "border-yellow-100 bg-yellow-50"}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Link href={`/troupeau/${animal.nutrav}`} className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{animal.nutrav}</Link>
+                          <span className="text-sm font-medium text-gray-800">{animal.nobovi ?? "Sans nom"}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">{animal.ageLabel}</div>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {animal.vaccinsManquants.map((v) => (
+                            <span key={v.vaccin} className={`text-xs px-2 py-0.5 rounded-full font-medium ${v.urgent ? "bg-red-500 text-white" : "bg-yellow-400 text-black"}`}>
+                              {v.vaccin}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">{animal.vaccinsManquants.map((v) => v.raison).join(" â€¢ ")}</div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                        {estUrgent && <span className="text-xs bg-red-500 text-white px-2 py-1 rounded-full">URGENT</span>}
+                        {animal.vaccinsManquants.slice(0, 2).map((v) => (
+                          <VaccineQuickButton key={v.vaccin} nutrav={animal.nutrav} vaccin={v.vaccin} label={`+ ${v.vaccin}`} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </Section>
+
+          {/* Empty state */}
+          {totalPending === 0 && (
+            <div className="bg-white rounded-xl shadow p-8 text-center">
+              <CheckCircle2 size={36} className="mx-auto mb-3 text-green-500" />
+              <div className="font-semibold text-gray-700">Tout est Ã  jour !</div>
+              <div className="text-sm text-gray-400 mt-1">Aucun traitement en attente</div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* â”€â”€ VUE PAR VACCIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {viewMode === "traitement" && (
+        <>
+          {groupsByVaccin.size === 0 ? (
+            <div className="bg-white rounded-xl shadow p-8 text-center">
+              <CheckCircle2 size={36} className="mx-auto mb-3 text-green-500" />
+              <div className="font-semibold text-gray-700">Tout est Ã  jour !</div>
+              <div className="text-sm text-gray-400 mt-1">Aucun traitement en attente</div>
+            </div>
+          ) : (
+            [...groupsByVaccin.entries()].map(([vaccin, animals]) => {
+              const groupKeys = animals.map((a) => key(a.nutrav, vaccin));
+              const allSel = groupKeys.every((k) => selected.has(k));
+              const isUrgentGroup = animals.some((a) => a.urgent);
+              const bgHeader = isUrgentGroup ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200";
+              return (
+                <div key={vaccin} className="bg-white rounded-xl shadow overflow-hidden">
+                  <div className={`flex items-center justify-between px-4 py-3 border-b ${bgHeader}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${
+                        isUrgentGroup ? "bg-red-500 text-white" :
+                        vaccin === "CRYPTO" || vaccin === "ROTAVEC" ? "bg-pink-500 text-white" :
+                        vaccin === "BOLUS" || vaccin === "METRABOL" ? "bg-amber-500 text-white" :
+                        "bg-purple-600 text-white"
+                      }`}>{vaccin}</span>
+                      <span className="text-sm text-gray-600">{animals.length > 1 ? `${animals.length} animaux` : `${animals.length} animal`}</span>
+                    </div>
+                    {sessionMode && (
+                      <button
+                        onClick={() => toggleAll(groupKeys, !allSel)}
+                        className={`text-xs font-medium px-3 py-1 rounded-lg border transition-colors ${
+                          allSel ? "bg-green-600 text-white border-green-600" : "border-gray-200 text-gray-600 hover:border-green-400"
+                        }`}
+                      >
+                        {allSel ? "Tout dÃ©sÃ©l." : "Tout sÃ©l."}
+                      </button>
+                    )}
+                  </div>
+                  <div className="divide-y divide-gray-50 px-2 py-2 space-y-1">
+                    {animals.map((a) => {
+                      const k = key(a.nutrav, vaccin);
+                      return sessionMode ? (
+                        <CheckRow key={k} k={k}
+                          label={`${a.nutrav} ${a.nobovi ?? "Sans nom"}`}
+                          detail={a.detail}
+                          urgent={a.urgent}
+                          selected={selected.has(k)}
+                          onToggle={toggle}
+                        />
+                      ) : (
+                        <div key={k} className="flex items-center justify-between py-2 px-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Link href={`/troupeau/${a.nutrav}`} className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded font-bold">
+                                {a.nutrav}
+                              </Link>
+                              <span className="text-sm text-gray-800">{a.nobovi ?? "Sans nom"}</span>
+                              {a.urgent && <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded">URGENT</span>}
+                            </div>
+                            <div className="text-xs text-gray-400 mt-0.5 ml-0.5">{a.detail}</div>
+                          </div>
+                          <VaccineQuickButton nutrav={a.nutrav} vaccin={vaccin} label="+ Valider" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          {/* Tout sÃ©lectionner global */}
+          {sessionMode && groupsByVaccin.size > 0 && (
+            <button
+              onClick={() => toggleAll(allTraitementKeys, allTraitementKeys.every((k) => selected.has(k)) ? false : true)}
+              className="w-full py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-green-400 hover:text-green-700 transition-colors"
+            >
+              {allTraitementKeys.every((k) => selected.has(k)) ? "Tout dÃ©sÃ©lectionner" : "Tout sÃ©lectionner"}
+            </button>
+          )}
+        </>
+      )}
+
+      {/* Vaccinations rÃ©centes â€” visible sur tous les onglets */}
+      {vaccinationsRecentes.length > 0 && (
+        <RecentSection items={vaccinationsRecentes} onRefresh={() => router.refresh()} />
+      )}
+
+      {/* Fin onglet urgent */}
+      </>
+      )}
+
+      {/* â”€â”€ Floating selection bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {sessionMode && selected.size > 0 && (
+        <div className="fixed bottom-20 left-0 right-0 z-40 px-4">
+          <div className="bg-green-700 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center justify-between">
+            <div>
+              <div className="font-bold text-base">{selected.size} traitement{selected.size > 1 ? "s" : ""} sÃ©lectionnÃ©{selected.size > 1 ? "s" : ""}</div>
+              <div className="text-xs text-green-200 mt-0.5">
+                {[...new Set([...selected].map((k) => parseKey(k).vaccin))].join(", ")}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelected(new Set())}
+                className="flex items-center gap-1.5 px-3 py-2 bg-green-600 rounded-xl text-sm font-medium hover:bg-green-500 transition-colors"
+              >
+                <X size={15} /> Tout dÃ©cocher
+              </button>
+              <button
+                onClick={() => { setBatchDate(today); setShowModal(true); }}
+                className="bg-white text-green-700 font-bold px-4 py-2 rounded-xl text-sm hover:bg-green-50 active:scale-95 transition-all"
+              >
+                Valider âœ“
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* â”€â”€ Batch modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {showModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center"
+          onClick={(e) => { if (e.currentTarget === e.target) setShowModal(false); }}
+        >
+          <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl shadow-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-900 text-lg">Confirmer la session</h3>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+
+            {/* RÃ©sumÃ© */}
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4">
+              <div className="text-sm font-semibold text-green-800 mb-2">
+                {selected.size} traitement{selected.size > 1 ? "s" : ""} Ã  enregistrer
+              </div>
+              <div className="space-y-1">
+                {[...groupsByVaccin.entries()]
+                  .map(([vaccin, animals]) => {
+                    const count = animals.filter((a) => selected.has(key(a.nutrav, vaccin))).length;
+                    if (count === 0) return null;
+                    return (
+                      <div key={vaccin} className="flex items-center justify-between text-xs text-green-700">
+                        <span className="font-medium">{vaccin}</span>
+                        <span>{count > 1 ? `${count} animaux` : `${count} animal`}</span>
+                      </div>
+                    );
+                  })
+                  .filter(Boolean)}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Date de traitement</label>
+                <input
+                  type="date"
+                  value={batchDate}
+                  max={today}
+                  onChange={(e) => setBatchDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                />
+                {batchDate && (() => {
+                  const daysAgo = Math.floor((Date.now() - new Date(batchDate).getTime()) / 86400000);
+                  if (daysAgo > 30) return (
+                    <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                      âš ï¸ Date ancienne ({daysAgo} jours) â€” les animaux disparaÃ®tront bien de la liste aprÃ¨s enregistrement.
+                    </p>
+                  );
+                  return null;
+                })()}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Voie d&apos;administration</label>
+                <select
+                  value={batchVoie}
+                  onChange={(e) => setBatchVoie(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-400"
+                >
+                  {VOIES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+                </select>
+              </div>
+              <button
+                onClick={handleBatchSubmit}
+                disabled={saving || !batchDate}
+                className="w-full py-3 bg-green-700 text-white rounded-xl font-bold text-sm disabled:opacity-50 active:scale-98 transition-all"
+              >
+                {saving ? (
+                  <span className="flex items-center justify-center gap-2"><RefreshCw size={16} className="animate-spin" /> Enregistrementâ€¦</span>
+                ) : (
+                  `Enregistrer ${selected.size} traitement${selected.size > 1 ? "s" : ""}`
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
