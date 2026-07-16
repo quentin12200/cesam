@@ -685,6 +685,7 @@ model MiseEnPage {
   profil      String
   module      String
   sections    String
+  raccourcis  String?
   updatedAt   DateTime @updatedAt
 
   @@unique([profil, module])

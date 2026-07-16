@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import HoofPrintIcon from "@/components/HoofPrintIcon";
 import QuickActionButton from "@/components/QuickActionButton";
 import type { ActionVisualKey } from "@/components/action-visuals";
 import AnimalPickerModal from "@/app/sanitaire/nouvel-evenement/AnimalPickerModal";
 import type { AnimalOption } from "@/app/sanitaire/nouvel-evenement/AnimalPicker";
+import AccueilShortcuts from "@/app/components/AccueilShortcuts";
 
 type ActionRapide = "chaleur" | "saillie" | "evenement";
 
@@ -73,14 +72,8 @@ export default function AccueilQuickActions() {
         ))}
       </section>
 
-      <div className="mt-2 flex justify-end">
-        <Link
-          href="/parage"
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-green-300 bg-white px-3 text-sm font-semibold text-green-700 shadow-sm hover:bg-green-50"
-        >
-          <HoofPrintIcon size={19} />
-          Parage
-        </Link>
+      <div className="mt-3">
+        <AccueilShortcuts />
       </div>
 
       {action && (
