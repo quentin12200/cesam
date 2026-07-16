@@ -43,7 +43,7 @@ interface SpeechRecognitionErrorEvent extends Event {
 
 type Status = "idle" | "listening" | "saving" | "saved" | "error";
 
-const SILENCE_TIMEOUT_MS = 5000;
+const SILENCE_TIMEOUT_MS = 30000;
 
 export default function VoiceButton() {
   const [supported, setSupported] = useState(false);
@@ -191,7 +191,7 @@ export default function VoiceButton() {
           {isListening && (
             <span className="text-amber-700 text-xs font-medium flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block" />
-              Parle… (arrêt auto dans 5s)
+              Parle… (arrêt auto dans 30s)
             </span>
           )}
           {transcript && !isListening && (

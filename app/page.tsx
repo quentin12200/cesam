@@ -839,6 +839,10 @@ export default async function Dashboard({ searchParams }: PageProps) {
     <div className="mx-auto max-w-2xl space-y-5 p-4 md:max-w-3xl lg:max-w-4xl">
       <AccueilQuickActions />
 
+      {notesTerrain.length > 0 && (
+        <NotesTerrain initialNotes={notesTerrain.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() }))} />
+      )}
+
       <AccueilTodoSection groups={todoGroups} />
 
       <details
@@ -870,10 +874,6 @@ export default async function Dashboard({ searchParams }: PageProps) {
               <div className="text-xs text-gray-600">Vaccins à prévoir</div>
             </Link>
           </div>
-
-          {notesTerrain.length > 0 && (
-            <NotesTerrain initialNotes={notesTerrain.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() }))} />
-          )}
 
           <div className="grid gap-2 sm:grid-cols-3">
             <Link href="/troupeau" className="rounded-lg border border-gray-200 px-3 py-2 text-center text-xs font-semibold text-gray-700">
