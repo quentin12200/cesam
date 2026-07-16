@@ -98,7 +98,7 @@ function LoginContent() {
     <div className="min-h-screen bg-green-700 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm flex flex-col items-center gap-6">
         <div className="flex flex-col items-center gap-3">
-          <Image src="/logo-cesam.svg" alt="CESAM" width={64} height={64} className="rounded-xl" />
+          <Image src="/logo-cesam.jpg" alt="CESAM" width={64} height={64} className="rounded-xl" />
           <h1 className="text-xl font-bold text-gray-800">GAEC CESAM</h1>
           <p className="text-sm text-gray-500 text-center">Connectez-vous pour accéder à l&apos;application</p>
         </div>
