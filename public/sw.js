@@ -18,8 +18,8 @@ messaging.onBackgroundMessage((payload) => {
   const { title, body } = payload.notification ?? {};
   self.registration.showNotification(title ?? "GAEC CESAM", {
     body: body ?? "",
-    icon: "/favicon.svg",
-    badge: "/favicon.svg",
+    icon: "/logo-cesam.jpg",
+    badge: "/logo-cesam.jpg",
     data: payload.data ?? {},
     tag: payload.data?.tag ?? "cesam-fcm",
     renotify: true,
@@ -36,8 +36,8 @@ self.addEventListener("push", (e) => {
   e.waitUntil(
     self.registration.showNotification(title, {
       body: data.body ?? "",
-      icon: "/favicon.svg",
-      badge: "/favicon.svg",
+      icon: "/logo-cesam.jpg",
+      badge: "/logo-cesam.jpg",
       data: { url: data.url ?? "/" },
       tag: "cesam-push",
       renotify: true,

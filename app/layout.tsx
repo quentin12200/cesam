@@ -26,8 +26,9 @@ export const metadata: Metadata = {
   description: "Gestion de troupeau - Samuel & Céline",
   manifest: "/manifest.json",
   icons: {
-    icon: "/favicon.svg",
-    apple: "/favicon.svg",
+    icon: "/logo-cesam.jpg",
+    shortcut: "/logo-cesam.jpg",
+    apple: "/logo-cesam.jpg",
   },
   appleWebApp: {
     capable: true,
@@ -49,7 +50,7 @@ export default function RootLayout({
           <div className="flex items-center justify-between px-4 py-2.5">
             <div className="flex items-center gap-2.5">
               <Image
-                src="/logo-cesam.svg"
+                src="/logo-cesam.jpg"
                 alt="CESAM"
                 width={28}
                 height={28}

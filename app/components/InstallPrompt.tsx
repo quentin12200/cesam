@@ -64,7 +64,7 @@ export default function InstallPrompt() {
     <div className="fixed bottom-16 left-0 right-0 z-50 px-3 pb-2 pointer-events-none">
       <div className="bg-green-800 text-white rounded-2xl shadow-2xl p-4 pointer-events-auto max-w-md mx-auto">
         <div className="flex items-start gap-3">
-          <Image src="/favicon.svg" alt="CESAM" width={40} height={40} className="rounded-xl shrink-0 mt-0.5" />
+          <Image src="/logo-cesam.jpg" alt="CESAM" width={40} height={40} className="rounded-xl shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="font-bold text-sm">Installer CESAM</p>
             {platform === "android" && (

@@ -9,15 +9,15 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/logo-cesam.jpg",
+      "sizes": "1254x1254",
+      "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/logo-cesam.jpg",
+      "sizes": "1254x1254",
+      "type": "image/jpeg",
       "purpose": "maskable"
     }
   ]
