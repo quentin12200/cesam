@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Loader2, Plus, Save, X } from "lucide-react";
@@ -11,6 +11,7 @@ import PatteSelector from "@/components/PatteSelector";
 import { type PatteParage } from "@/lib/parage";
 import HoofPrintIcon from "@/components/HoofPrintIcon";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
+import { VOICE_PARAGE_STORAGE_KEY, type VoiceParageDraft } from "@/lib/voice-actions";
 
 export interface LigneParage {
   id: string;
@@ -139,6 +140,40 @@ export default function ParageClient({
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [voiceDraft, setVoiceDraft] = useState<VoiceParageDraft | null>(null);
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem(VOICE_PARAGE_STORAGE_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(VOICE_PARAGE_STORAGE_KEY);
+    try {
+      const draft = JSON.parse(raw) as VoiceParageDraft;
+      const nutrav = draft.target.nutravs[0];
+      if (!nutrav || draft.target.nutravs.length !== 1) {
+        setError("Le parage vocal nécessite une seule vache");
+        return;
+      }
+      setVoiceDraft(draft);
+      setShowForm(true);
+      setDate(draft.date || today);
+      setMotif("BOITERIE");
+      setPattes(draft.pattes);
+      setNote(draft.note);
+      fetch("/api/animaux/picker")
+        .then((response) => response.json())
+        .then((liste: Array<{ id: string; nutrav: string; nobovi: string | null }>) => {
+          const animal = liste.find((item) => item.nutrav === nutrav);
+          if (!animal) {
+            setError(`La vache ${nutrav} est introuvable ou inactive`);
+            return;
+          }
+          setAnimaux([{ id: animal.id, nutrav: animal.nutrav, nom: animal.nobovi }]);
+        })
+        .catch(() => setError("Impossible de préremplir la vache"));
+    } catch {
+      setError("Le brouillon vocal de parage n’a pas pu être relu");
+    }
+  }, []);
 
   async function ajouter() {
     setError("");
@@ -237,6 +272,12 @@ export default function ParageClient({
 
       {showForm && (
         <section className="space-y-4 rounded-lg border border-green-200 bg-white p-4 shadow-sm">
+          {voiceDraft && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <p className="font-semibold">Brouillon vocal à vérifier</p>
+              <p className="mt-0.5 italic">« {voiceDraft.transcript} »</p>
+            </div>
+          )}
           <div>
             <span className="mb-1 block text-xs font-medium text-gray-600">Vache</span>
             <button type="button" onClick={() => setShowPicker(true)} className="min-h-11 w-full rounded-lg border border-gray-300 px-3 text-left text-sm text-gray-700 hover:border-green-500">

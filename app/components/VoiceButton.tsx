@@ -9,6 +9,13 @@ import {
   type VoiceAnalysisResponse,
   type VoiceSanitaryDraft,
 } from "@/lib/voice-sanitary";
+import {
+  VOICE_ACTIONS,
+  VOICE_PARAGE_STORAGE_KEY,
+  getVoiceAction,
+  type VoiceActionId,
+  type VoiceParageDraft,
+} from "@/lib/voice-actions";
 
 declare global {
   interface Window {
@@ -77,7 +84,7 @@ function ResumeBrouillon({ draft }: { draft: VoiceSanitaryDraft }) {
         <div className="flex gap-3"><dt className="w-20 shrink-0 text-gray-500">Quand</dt><dd>{draft.date} · {draft.moment.toLowerCase()}</dd></div>
         <div className="flex gap-3"><dt className="w-20 shrink-0 text-gray-500">Détecté</dt><dd>{details.length > 0 ? details.join(" · ") : "Aucune information sanitaire sûre"}</dd></div>
       </dl>
-      <p className="text-xs text-gray-500">Rien ne sera enregistré avant la validation finale dans le formulaire sanitaire.</p>
+      <p className="text-xs text-gray-500">Rien ne sera enregistré avant la validation finale dans le formulaire choisi.</p>
     </div>
   );
 }
@@ -91,6 +98,8 @@ export default function VoiceButton() {
   const [analysis, setAnalysis] = useState<Exclude<VoiceAnalysisResponse, { outcome: "note" }> | null>(null);
   const [editing, setEditing] = useState(false);
   const [editedText, setEditedText] = useState("");
+  const [chosenAction, setChosenAction] = useState<VoiceActionId | null>(null);
+  const [showAllActions, setShowAllActions] = useState(false);
   const recRef = useRef<SpeechRecognition | null>(null);
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -140,6 +149,8 @@ export default function VoiceButton() {
   async function analysePhrase(text: string) {
     setAnalysis(null);
     setEditing(false);
+    setChosenAction(null);
+    setShowAllActions(false);
     setTranscript(text);
     setStatus("analysing");
     setMessage("");
@@ -156,6 +167,7 @@ export default function VoiceButton() {
         return;
       }
       setAnalysis(resultat);
+      setChosenAction(resultat.draft.suggestedActions.length === 1 ? resultat.draft.suggestedActions[0] : null);
       setEditedText(text);
       setEditing(false);
       setStatus("idle");
@@ -227,20 +239,35 @@ export default function VoiceButton() {
 
   function choisirAnimal(nutrav: string, nom: string | null) {
     if (!analysis) return;
+    const draft = {
+      ...analysis.draft,
+      target: { kind: "animal" as const, label: `${nutrav}${nom ? ` · ${nom}` : ""}`, nutravs: [nutrav] },
+    };
     setAnalysis({
-      outcome: "draft",
-      draft: {
-        ...analysis.draft,
-        target: { kind: "animal", label: `${nutrav}${nom ? ` · ${nom}` : ""}`, nutravs: [nutrav] },
-      },
+      outcome: draft.suggestedActions.length > 1 ? "choose_action" : "draft",
+      draft,
     });
+    setChosenAction(draft.suggestedActions.length === 1 ? draft.suggestedActions[0] : null);
   }
 
   function ouvrirFormulaire() {
-    if (!analysis?.draft.target) return;
-    sessionStorage.setItem(VOICE_SANITARY_STORAGE_KEY, JSON.stringify(analysis.draft));
+    if (!analysis?.draft.target || !chosenAction) return;
+    const action = getVoiceAction(chosenAction);
+    if (!action) return;
+    if (chosenAction === "parage") {
+      const draftParage: VoiceParageDraft = {
+        transcript: analysis.draft.transcript,
+        target: analysis.draft.target,
+        date: analysis.draft.date,
+        pattes: analysis.draft.pattes,
+        note: analysis.draft.description,
+      };
+      sessionStorage.setItem(VOICE_PARAGE_STORAGE_KEY, JSON.stringify(draftParage));
+    } else {
+      sessionStorage.setItem(VOICE_SANITARY_STORAGE_KEY, JSON.stringify(analysis.draft));
+    }
     setAnalysis(null);
-    router.push("/sanitaire/nouvel-evenement?brouillonVocal=1");
+    router.push(action.href);
   }
 
   function dismiss() {
@@ -281,13 +308,13 @@ export default function VoiceButton() {
 
       {analysis && (
         <SelectionModal
-          title="Brouillon sanitaire à vérifier"
+          title="Action détectée — à vérifier"
           maxWidth="md"
           onClose={() => setAnalysis(null)}
           footer={(
             <div className="flex items-center justify-end gap-2 p-3">
               <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700"><Pencil size={16} /> Modifier</button>
-              <button type="button" disabled={!analysis.draft.target} onClick={ouvrirFormulaire} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40"><Check size={17} /> Valider</button>
+              <button type="button" disabled={!analysis.draft.target || !chosenAction} onClick={ouvrirFormulaire} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40"><Check size={17} /> Continuer</button>
             </div>
           )}
         >
@@ -300,6 +327,19 @@ export default function VoiceButton() {
           ) : (
             <>
               <ResumeBrouillon draft={analysis.draft} />
+              {analysis.outcome === "choose_action" && (
+                <div className="border-t border-gray-100 p-4">
+                  <p className="mb-2 text-sm font-semibold text-gray-800">Que veux-tu ouvrir ?</p>
+                  <div className="grid gap-2">
+                    {(showAllActions ? VOICE_ACTIONS : VOICE_ACTIONS.filter((action) => analysis.draft.suggestedActions.includes(action.id))).map((action) => (
+                      <button key={action.id} type="button" onClick={() => setChosenAction(action.id)} className={`min-h-11 rounded-lg border px-3 text-left text-sm font-semibold ${chosenAction === action.id ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 text-gray-700 hover:border-green-400"}`}>
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                  {!showAllActions && <button type="button" onClick={() => setShowAllActions(true)} className="mt-2 min-h-10 text-sm font-medium text-gray-500">Autre action…</button>}
+                </div>
+              )}
               {analysis.outcome === "confirm_animal" && (
                 <div className="border-t border-gray-100 p-4">
                   <p className="mb-2 text-sm font-semibold text-gray-800">Quel animal voulais-tu indiquer ?</p>

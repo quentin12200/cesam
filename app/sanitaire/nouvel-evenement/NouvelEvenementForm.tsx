@@ -20,6 +20,7 @@ import PatteSelector from "@/components/PatteSelector";
 import type { PatteParage } from "@/lib/parage";
 import HoofPrintIcon from "@/components/HoofPrintIcon";
 import { VOICE_SANITARY_STORAGE_KEY, type VoiceSanitaryDraft } from "@/lib/voice-sanitary";
+import { VOICE_PARAGE_STORAGE_KEY, type VoiceParageDraft } from "@/lib/voice-actions";
 
 interface Groupe {
   id: string;
@@ -78,7 +79,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
   const [traitementsDrafts, setTraitementsDrafts] = useState<TraitementDraft[]>([nouveauDraft()]);
 
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ count: number; warning: string } | null>(null);
+  const [result, setResult] = useState<{ count: number; warning: string; parageDraft: VoiceParageDraft | null } | null>(null);
   const [error, setError] = useState("");
   const [voiceDraft, setVoiceDraft] = useState<VoiceSanitaryDraft | null>(null);
 
@@ -319,7 +320,21 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
         throw new Error(err.error ?? "Erreur serveur");
       }
       const data = await res.json();
-      setResult({ count: data.count, warning: photoWarning });
+      const animalParage = animaux.length === 1 ? animaux[0] : null;
+      const parageDraft: VoiceParageDraft | null = aBoiterie && !ajouterAuParage && animalParage
+        ? {
+            transcript: voiceDraft?.transcript ?? `Boiterie enregistrée pour ${animalParage.nutrav}`,
+            target: {
+              kind: "animal",
+              label: `${animalParage.nutrav}${animalParage.nom ? ` · ${animalParage.nom}` : ""}`,
+              nutravs: [animalParage.nutrav],
+            },
+            date,
+            pattes: paragePattes,
+            note: parageNote || description,
+          }
+        : null;
+      setResult({ count: data.count, warning: photoWarning, parageDraft });
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur lors de l'enregistrement");
@@ -345,6 +360,12 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
     if (!presetNutrav && !presetNutravs?.length) setSelectedAnimaux([]);
   }
 
+  function ouvrirParageApresEvenement() {
+    if (!result?.parageDraft) return;
+    sessionStorage.setItem(VOICE_PARAGE_STORAGE_KEY, JSON.stringify(result.parageDraft));
+    router.push("/parage?depuisEvenement=1");
+  }
+
   if (result) {
     return (
       <div className="bg-white rounded-xl shadow p-6 text-center space-y-3">
@@ -353,6 +374,17 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
           Événement enregistré pour {result.count} animal{result.count > 1 ? "aux" : ""}
         </p>
         {result.warning && <p className="text-xs text-orange-600">{result.warning}</p>}
+
+        {result.parageDraft && (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-left">
+            <p className="font-semibold text-green-900">Voulez-vous ajouter cette vache à la liste de parage ?</p>
+            <p className="mt-1 text-xs text-green-800">La vache et les pattes indiquées seront reprises automatiquement.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setResult((actuel) => actuel ? { ...actuel, parageDraft: null } : actuel)} className="min-h-11 rounded-lg border border-green-300 bg-white text-sm font-medium text-green-800">Non</button>
+              <button type="button" onClick={ouvrirParageApresEvenement} className="min-h-11 rounded-lg bg-green-700 text-sm font-semibold text-white">Oui, ouvrir Parage</button>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 justify-center pt-2">
           <button onClick={nouveauEvenement} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">

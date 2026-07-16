@@ -218,6 +218,7 @@ export async function POST(request: NextRequest) {
   const ajouterAuParage = /\b(?:ajout(?:e|er)?|mettre|mets)\b.*\bparage\b|\bliste de parage\b/.test(texteNormalise);
   const rappelDemande = /\b(?:rappel|rappeler|rappelle|surveiller|surveillance)\b/.test(texteNormalise);
   const traitementMentionne = /\btraitement\b/.test(texteNormalise) || medicament !== null;
+  const estBoiterie = Boolean(event && normalizeSearch(event.nom) === "boiterie") || /\bboite(?:rie)?\b/.test(texteNormalise);
 
   const draft: VoiceSanitaryDraft = {
     transcript,
@@ -233,6 +234,7 @@ export async function POST(request: NextRequest) {
     rappelDemande,
     traitementMentionne,
     description: transcript,
+    suggestedActions: estBoiterie ? ["sanitaire", "parage"] : ["sanitaire"],
   };
 
   const informationSanitaire = Boolean(event || temperature !== null || medicament || ajouterAuParage || rappelDemande || traitementMentionne);
@@ -242,6 +244,9 @@ export async function POST(request: NextRequest) {
   if (!target || !informationSanitaire) {
     const reason = numeroDicte && !target ? `Animal ${numeroDicte} non trouvé : note vocale conservée` : "Phrase trop imprécise : note vocale conservée";
     return NextResponse.json({ outcome: "note", reason });
+  }
+  if (draft.suggestedActions.length > 1) {
+    return NextResponse.json({ outcome: "choose_action", draft });
   }
   return NextResponse.json({ outcome: "draft", draft });
 }

@@ -1,4 +1,5 @@
 import type { PatteParage } from "@/lib/parage";
+import type { VoiceActionId } from "@/lib/voice-actions";
 
 export const VOICE_SANITARY_STORAGE_KEY = "cesam:brouillon-vocal-sanitaire";
 
@@ -27,10 +28,12 @@ export interface VoiceSanitaryDraft {
   rappelDemande: boolean;
   traitementMentionne: boolean;
   description: string;
+  suggestedActions: VoiceActionId[];
 }
 
 export type VoiceAnalysisResponse =
   | { outcome: "draft"; draft: VoiceSanitaryDraft }
+  | { outcome: "choose_action"; draft: VoiceSanitaryDraft }
   | { outcome: "confirm_animal"; draft: VoiceSanitaryDraft; candidates: VoiceAnimalCandidate[] }
   | { outcome: "note"; reason: string };
 
