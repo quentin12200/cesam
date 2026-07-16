@@ -193,6 +193,7 @@ model EvenementSanitaire {
   symptomes   EvenementSymptome[]
   traitements Traitement[]
   reponses    QuestionReponse[]
+  parage      Parage?
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -275,15 +276,22 @@ model Pesee {
 }
 
 model Parage {
-  id         String   @id @default(cuid())
-  animalId   String
-  animal     Animal   @relation(fields: [animalId], references: [id])
-  date       DateTime
-  pattes     String
-  notes      String?
+  id           String               @id @default(cuid())
+  animalId     String
+  animal       Animal               @relation(fields: [animalId], references: [id])
+  evenementId  String?              @unique
+  evenement    EvenementSanitaire?  @relation(fields: [evenementId], references: [id], onDelete: SetNull)
+  date         DateTime
+  motif        String               @default("PARAGE")
+  pattes       String
+  notes        String?
+  statut       String               @default("A_VOIR")
+  dateFait     DateTime?
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([statut, date])
 }
 
 model ComplementAlim {

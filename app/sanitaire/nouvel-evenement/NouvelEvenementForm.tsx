@@ -16,6 +16,9 @@ import { getMomentActuel } from "@/lib/evenements-sanitaires";
 import { searchTypesEvenement, normalizeSearch, type RecherchableTypeEvenement } from "@/lib/fuzzy-search";
 import { fileToResizedDataUrl } from "@/lib/image-client";
 import { uploadEvenementPhoto } from "@/lib/firebase-client";
+import PatteSelector from "@/components/PatteSelector";
+import type { PatteParage } from "@/lib/parage";
+import HoofPrintIcon from "@/components/HoofPrintIcon";
 
 interface Groupe {
   id: string;
@@ -57,6 +60,9 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
   const [ajoutLibreEnCours, setAjoutLibreEnCours] = useState(false);
 
   const [temperature, setTemperature] = useState("");
+  const [ajouterAuParage, setAjouterAuParage] = useState(false);
+  const [paragePattes, setParagePattes] = useState<PatteParage[]>([]);
+  const [parageNote, setParageNote] = useState("");
 
   const [description, setDescription] = useState("");
   const [constatePar, setConstatePar] = useState("");
@@ -123,6 +129,14 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
   }, [recents, catalogue]);
 
   const aFievre = selectedTypes.some((t) => normalizeSearch(t.nom) === "fievre");
+  const aBoiterie = selectedTypes.some((t) => t.id === "boiterie" || normalizeSearch(t.nom) === "boiterie");
+
+  useEffect(() => {
+    if (aBoiterie) return;
+    setAjouterAuParage(false);
+    setParagePattes([]);
+    setParageNote("");
+  }, [aBoiterie]);
 
   async function fetchQuestions(typeId: string) {
     if (questionsByType[typeId] || typeId.startsWith("libre-")) return;
@@ -194,6 +208,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
     setError("");
     if (selectedTypes.length === 0) { setError("Sélectionne au moins un événement"); return; }
     if (!date) { setError("La date est requise"); return; }
+    if (ajouterAuParage && paragePattes.length === 0) { setError("Sélectionne au moins une patte pour la liste de parage"); return; }
 
     const animaux = selectedAnimaux;
     if (animaux.length === 0) { setError("Sélectionne au moins un animal"); return; }
@@ -254,6 +269,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
             delaiAttenteViandeJ: d.medicament!.delaiAttenteViandeJ ?? null,
             delaiAttenteLaitJ: d.medicament!.delaiAttenteLaitJ ?? null,
           })),
+          parage: ajouterAuParage ? { motif: "BOITERIE", pattes: paragePattes, note: parageNote || null } : null,
         }),
       });
       if (!res.ok) {
@@ -276,6 +292,9 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
     setAnswers({});
     setPanelOuvert(null);
     setTemperature("");
+    setAjouterAuParage(false);
+    setParagePattes([]);
+    setParageNote("");
     setDescription("");
     setPhotoFile(null);
     setPhotoPreview(null);
@@ -473,6 +492,39 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
                 onToggle={() => setPanelOuvert((prev) => (prev === t.id ? null : t.id))}
               />
             ))}
+          </div>
+        )}
+
+        {aBoiterie && (
+          <div className="mt-3 rounded-lg border border-green-200 bg-green-50/50 p-3">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold text-green-900">
+              <input
+                type="checkbox"
+                checked={ajouterAuParage}
+                onChange={(event) => setAjouterAuParage(event.target.checked)}
+                className="h-5 w-5 accent-green-700"
+              />
+              <HoofPrintIcon size={18} />
+              Ajouter à la liste de parage
+            </label>
+            {ajouterAuParage && (
+              <div className="mt-2 space-y-3 border-t border-green-200 pt-3">
+                <div>
+                  <span className="mb-1 block text-xs font-medium text-gray-600">Patte(s) concernée(s)</span>
+                  <PatteSelector value={paragePattes} onChange={setParagePattes} />
+                </div>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-gray-600">Note pour le pareur (optionnelle)</span>
+                  <textarea
+                    value={parageNote}
+                    onChange={(event) => setParageNote(event.target.value)}
+                    rows={2}
+                    className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                    placeholder="Observation complémentaire…"
+                  />
+                </label>
+              </div>
+            )}
           </div>
         )}
 

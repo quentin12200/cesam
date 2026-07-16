@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { normaliserPattes } from "@/lib/parage";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { animalIds, nutravs, date, moment, categorie, type, symptomes, reponses, temperature, description, photos, constatePar, traitements } = body;
+    const { animalIds, nutravs, date, moment, categorie, type, symptomes, reponses, temperature, description, photos, constatePar, traitements, parage } = body;
 
     if (!type?.trim() || !date) {
       return NextResponse.json({ error: "type et date requis" }, { status: 400 });
@@ -20,6 +21,11 @@ export async function POST(request: NextRequest) {
     const reponsesList: { questionId: string; valeur: string; libelleEnregistre: string }[] = Array.isArray(reponses)
       ? reponses.filter((r: { questionId?: string; valeur?: unknown }) => r?.questionId && r.valeur !== undefined)
       : [];
+
+    const paragePattes = parage ? normaliserPattes(parage.pattes) : [];
+    if (parage && paragePattes.length === 0) {
+      return NextResponse.json({ error: "Au moins une patte est requise pour le parage" }, { status: 400 });
+    }
 
     let resolvedCategorie: string | null = categorie ?? null;
     const premierTypeId = symptomesList[0]?.typeEvenementId;
@@ -121,8 +127,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let paragesCrees: { id: string }[] = [];
+    if (parage) {
+      paragesCrees = await Promise.all(
+        evenements.map((evenement) =>
+          prisma.parage.create({
+            data: {
+              animalId: evenement.animalId,
+              evenementId: evenement.id,
+              date: resolvedDate,
+              motif: parage.motif === "BOITERIE" ? "BOITERIE" : "PARAGE",
+              pattes: JSON.stringify(paragePattes),
+              notes: typeof parage.note === "string" && parage.note.trim() ? parage.note.trim() : null,
+              statut: "A_VOIR",
+            },
+            select: { id: true },
+          })
+        )
+      );
+    }
+
     const desc = `Événement sanitaire "${type.trim()}" enregistré pour ${evenements.length} animal(s)`
-      + (traitementsCrees.length > 0 ? ` avec ${traitementsCrees.length} traitement(s)` : "");
+      + (traitementsCrees.length > 0 ? ` avec ${traitementsCrees.length} traitement(s)` : "")
+      + (paragesCrees.length > 0 ? ` et ${paragesCrees.length} ajout(s) au parage` : "");
     let undoId = "";
     try {
       undoId = await logAction(
@@ -131,6 +158,7 @@ export async function POST(request: NextRequest) {
         [
           ...evenements.map((e) => ({ op: "delete" as const, model: "evenementSanitaire", id: e.id })),
           ...traitementsCrees.map((t) => ({ op: "delete" as const, model: "traitement", id: t.id })),
+          ...paragesCrees.map((p) => ({ op: "delete" as const, model: "parage", id: p.id })),
         ]
       );
     } catch {}
@@ -139,6 +167,7 @@ export async function POST(request: NextRequest) {
       count: evenements.length,
       evenements: evenements.map((e) => ({ id: e.id, animalId: e.animalId })),
       traitementsCount: traitementsCrees.length,
+      paragesCount: paragesCrees.length,
       _undoId: undoId,
       _undoDesc: desc,
     }, { status: 201 });
