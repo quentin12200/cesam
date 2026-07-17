@@ -190,7 +190,7 @@ function normaliserPhraseAiguillage(phrase: string) {
 
 function trouverTaureau(
   texteNormalise: string,
-  taureaux: Array<{ id: string; nupere: string; nopere: string | null }>,
+  taureaux: Array<{ id: string; nupere: string; nopere: string | null; present: boolean }>,
 ) {
   const directs = taureaux
     .map((taureau) => ({ taureau, nom: normalizeSearch(taureau.nopere ?? taureau.nupere) }))
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
       },
     }),
     prisma.taureau.findMany({
-      select: { id: true, nupere: true, nopere: true },
+      select: { id: true, nupere: true, nopere: true, present: true },
     }),
     prisma.voiceRoutingAlias.findMany({
       select: { phraseNormalisee: true, action: true },
@@ -347,7 +347,11 @@ export async function POST(request: NextRequest) {
     rappelDemande,
     traitementMentionne,
     reproductionType,
-    taureau: taureauReconnu ? { id: taureauReconnu.id, nom: taureauReconnu.nopere ?? taureauReconnu.nupere } : null,
+    taureau: taureauReconnu ? {
+      id: taureauReconnu.id,
+      nom: taureauReconnu.nopere ?? taureauReconnu.nupere,
+      present: taureauReconnu.present,
+    } : null,
     description: transcript,
     suggestedActions,
   };

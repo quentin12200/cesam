@@ -18,6 +18,7 @@ import {
   VOICE_REPRODUCTION_STORAGE_KEY,
   type VoiceReproductionDraft,
 } from "@/lib/voice-actions";
+import { normalizeSearch } from "@/lib/fuzzy-search";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
@@ -409,16 +410,24 @@ function ReproductionContent() {
         .filter((vache) => draft.target.nutravs.includes(vache.nutrav))
         .map((vache) => vache.id);
       if (animalIds.length === 0) return;
+      const taureauReconnu = draft.taureau
+        ? taureaux.find((taureau) => taureau.id === draft.taureau?.id)
+          ?? taureaux.find((taureau) => normalizeSearch(taureau.nopere ?? taureau.nupere) === normalizeSearch(draft.taureau?.nom ?? ""))
+        : null;
+      const taureauId = taureauReconnu?.id ?? draft.taureau?.id ?? "";
+      const typeReconnu = draft.type === "IA" || taureauReconnu?.present === false || draft.taureau?.present === false
+        ? "IA"
+        : "NATURELLE";
 
       brouillonVocalTraite.current = true;
       sessionStorage.removeItem(VOICE_REPRODUCTION_STORAGE_KEY);
       setSaillieAnimalIds(animalIds);
       setSaillieAnimalId("");
       setSaillieDate(draft.date || new Date().toISOString().split("T")[0]);
-      setSaillieType(draft.type);
-      setSaillieTaureauId(draft.type === "NATURELLE" ? draft.taureau?.id ?? "" : "");
+      setSaillieType(typeReconnu);
+      setSaillieTaureauId(typeReconnu === "NATURELLE" ? taureauId : "");
       setSaillieTaureauNom("");
-      setIaSelectedId(draft.type === "IA" ? draft.taureau?.id ?? "" : "");
+      setIaSelectedId(typeReconnu === "IA" ? taureauId : "");
       setIaNupere("");
       setIaNopere("");
       setIaTraper("");
@@ -507,6 +516,10 @@ function ReproductionContent() {
 
   const farmBulls = taureaux.filter((t) => t.present);
   const iaBulls = taureaux.filter((t) => !t.present);
+  const iaSelectedBull = taureaux.find((taureau) => taureau.id === iaSelectedId);
+  const iaBullsAffiches = iaSelectedBull && !iaBulls.some((taureau) => taureau.id === iaSelectedBull.id)
+    ? [iaSelectedBull, ...iaBulls]
+    : iaBulls;
   const now = new Date();
 
   const echoJoursEffectifs = echoUnite === "mois" ? Math.round(echoJours * 30.5) : echoJours;
@@ -1172,11 +1185,11 @@ function ReproductionContent() {
 
               {saillieType === "IA" && (
                 <div className="space-y-3">
-                  {iaBulls.length > 0 && (
+                  {iaBullsAffiches.length > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">IA déjà utilisés</label>
                       <div className="flex flex-wrap gap-2">
-                        {iaBulls.map((t) => (
+                        {iaBullsAffiches.map((t) => (
                           <button key={t.id} type="button"
                             onClick={() => { setIaSelectedId(iaSelectedId === t.id ? "" : t.id); setIaNupere(""); }}
                             className={`text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${iaSelectedId === t.id ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 text-gray-600 bg-white"}`}>

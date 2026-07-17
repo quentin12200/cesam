@@ -37,7 +37,7 @@ export interface VoiceSanitaryDraft {
   rappelDemande: boolean;
   traitementMentionne: boolean;
   reproductionType: "NATURELLE" | "IA" | null;
-  taureau: { id: string; nom: string } | null;
+  taureau: { id: string; nom: string; present: boolean } | null;
   description: string;
   suggestedActions: VoiceActionId[];
 }

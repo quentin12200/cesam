@@ -33,7 +33,7 @@ export interface VoiceReproductionDraft {
   date: string;
   moment: "Matin" | "Soir" | null;
   type: "NATURELLE" | "IA";
-  taureau: { id: string; nom: string } | null;
+  taureau: { id: string; nom: string; present: boolean } | null;
 }
 
 export function getVoiceAction(id: VoiceActionId) {
