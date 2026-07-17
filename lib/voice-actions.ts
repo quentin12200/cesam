@@ -6,12 +6,13 @@ export type VoiceActionId = "sanitaire" | "parage";
 export interface VoiceActionDefinition {
   id: VoiceActionId;
   label: string;
+  continueLabel: string;
   href: string;
 }
 
 export const VOICE_ACTIONS: VoiceActionDefinition[] = [
-  { id: "sanitaire", label: "Créer un événement sanitaire", href: "/sanitaire/nouvel-evenement?brouillonVocal=1" },
-  { id: "parage", label: "Ouvrir Parage", href: "/parage?brouillonVocal=1" },
+  { id: "sanitaire", label: "Nouvel événement sanitaire", continueLabel: "Continuer vers Sanitaire", href: "/sanitaire/nouvel-evenement?brouillonVocal=1" },
+  { id: "parage", label: "Parage", continueLabel: "Continuer vers Parage", href: "/parage?brouillonVocal=1" },
 ];
 
 export const VOICE_PARAGE_STORAGE_KEY = "cesam:brouillon-vocal-parage";

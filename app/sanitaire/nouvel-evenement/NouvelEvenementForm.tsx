@@ -93,7 +93,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
       setVoiceDraft(draft);
       setTargetMode(draft.target.nutravs.length > 1 ? "plusieurs" : "animal");
       setDate(draft.date || today);
-      setMoment(draft.moment);
+      setMoment(draft.moment ?? getMomentActuel());
       setTemperature(draft.temperature !== null ? String(draft.temperature) : "");
       setAjouterAuParage(draft.ajouterAuParage);
       setParagePattes(draft.pattes);

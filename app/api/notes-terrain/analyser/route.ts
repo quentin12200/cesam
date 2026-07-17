@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizeSearch, searchTypesEvenement, type RecherchableTypeEvenement } from "@/lib/fuzzy-search";
 import {
-  extraireNumeroTravail,
+  extraireNumerosTravail,
   extrairePattes,
   extraireTemperature,
   compactVoiceText,
@@ -49,14 +49,14 @@ function extraireDate(texte: string, texteNormalise: string) {
   if (/\bavant hier\b/.test(texteNormalise)) return dateFrance(-2);
   if (/\bhier\b/.test(texteNormalise)) return dateFrance(-1);
   if (/\bdemain\b/.test(texteNormalise)) return dateFrance(1);
-  return dateFrance();
+  if (/\baujourd[’']?hui\b/.test(texteNormalise)) return dateFrance();
+  return null;
 }
 
-function momentFrance(texteNormalise: string): "Matin" | "Soir" {
+function momentFrance(texteNormalise: string): "Matin" | "Soir" | null {
   if (/\bmatin\b/.test(texteNormalise)) return "Matin";
   if (/\bsoir\b/.test(texteNormalise)) return "Soir";
-  const heure = Number(new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", hour12: false }).format(new Date()));
-  return heure < 12 ? "Matin" : "Soir";
+  return null;
 }
 
 function trouverEvenement(texteNormalise: string, types: RecherchableTypeEvenement[], temperature: number | null) {
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
   if (!transcript) return NextResponse.json({ error: "texte requis" }, { status: 400 });
 
   const texteNormalise = normalizeSearch(transcript);
-  const numeroDicte = extraireNumeroTravail(transcript);
+  const numerosDictes = extraireNumerosTravail(transcript);
   const [animaux, groupes, types, medicaments, aliasesVocaux] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
@@ -215,17 +215,31 @@ export async function POST(request: NextRequest) {
   let target: VoiceTarget | null = null;
   let candidates: Array<{ nutrav: string; nom: string | null }> = [];
 
-  if (numeroDicte) {
-    const exacts = animaux.filter((animal) => normaliserNumeroTravail(animal.nutrav) === numeroDicte);
-    if (exacts.length === 1) {
-      const animal = exacts[0];
-      target = { kind: "animal", label: `${animal.nutrav}${animal.nobovi ? ` · ${animal.nobovi}` : ""}`, nutravs: [animal.nutrav] };
+  if (numerosDictes.length > 0) {
+    const exacts = numerosDictes
+      .map((numero) => animaux.find((animal) => normaliserNumeroTravail(animal.nutrav) === numero))
+      .filter((animal): animal is (typeof animaux)[number] => Boolean(animal));
+    if (exacts.length === numerosDictes.length) {
+      target = {
+        kind: "animal",
+        label: exacts.map((animal) => `${animal.nutrav}${animal.nobovi ? ` · ${animal.nobovi}` : ""}`).join(", "),
+        nutravs: exacts.map((animal) => animal.nutrav),
+      };
     } else {
-      const chiffresDictes = numeroDicte.replace(/^0+/, "") || "0";
-      candidates = animaux
-        .filter((animal) => animal.nutrav.replace(/^0+/, "").endsWith(chiffresDictes))
-        .map((animal) => ({ nutrav: animal.nutrav, nom: animal.nobovi }))
-        .slice(0, 8);
+      const nonTrouves = numerosDictes.filter((numero) => !exacts.some((animal) => normaliserNumeroTravail(animal.nutrav) === numero));
+      candidates = nonTrouves.flatMap((numero) => {
+        const chiffresDictes = numero.replace(/^0+/, "") || "0";
+        return animaux
+          .filter((animal) => animal.nutrav.replace(/^0+/, "").endsWith(chiffresDictes))
+          .map((animal) => ({ nutrav: animal.nutrav, nom: animal.nobovi }));
+      }).filter((candidate, index, liste) => liste.findIndex((item) => item.nutrav === candidate.nutrav) === index).slice(0, 8);
+      if (exacts.length > 0) {
+        target = {
+          kind: "animal",
+          label: exacts.map((animal) => `${animal.nutrav}${animal.nobovi ? ` · ${animal.nobovi}` : ""}`).join(", "),
+          nutravs: exacts.map((animal) => animal.nutrav),
+        };
+      }
     }
   } else {
     const demandeLot = /\b(?:lot|groupe)\b/.test(texteNormalise);
@@ -277,7 +291,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ outcome: "confirm_animal", draft, candidates });
   }
   if (!target || !informationSanitaire) {
-    const reason = numeroDicte && !target ? `Animal ${numeroDicte} non trouvé : note vocale conservée` : "Phrase trop imprécise : note vocale conservée";
+    const reason = numerosDictes.length > 0 && !target ? `Animal non trouvé : aucune saisie créée` : "Phrase trop imprécise : aucune saisie créée";
     return NextResponse.json({ outcome: "note", reason });
   }
   if (draft.suggestedActions.length > 1) {

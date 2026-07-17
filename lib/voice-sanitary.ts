@@ -23,8 +23,8 @@ export interface VoiceSanitaryDraft {
   transcript: string;
   target: VoiceTarget | null;
   event: { id: string; nom: string } | null;
-  date: string;
-  moment: "Matin" | "Soir";
+  date: string | null;
+  moment: "Matin" | "Soir" | null;
   temperature: number | null;
   pattes: PatteParage[];
   ajouterAuParage: boolean;
@@ -53,6 +53,14 @@ export function normaliserNumeroTravail(value: string): string | null {
 export function extraireNumeroTravail(texte: string): string | null {
   const match = texte.match(/(?:^|\s)((?:\d{1,2}\s+\d{1,2})|\d{1,4})(?![\d,./-])(?=\s|$|[,;])/i);
   return match ? normaliserNumeroTravail(match[1]) : null;
+}
+
+export function extraireNumerosTravail(texte: string): string[] {
+  const morceaux = texte.split(/\s*(?:;|\bet\b|,(?=\s))\s*/i);
+  const numeros = morceaux
+    .map(extraireNumeroTravail)
+    .filter((numero): numero is string => Boolean(numero));
+  return [...new Set(numeros)];
 }
 
 export function compactVoiceText(value: string): string {
