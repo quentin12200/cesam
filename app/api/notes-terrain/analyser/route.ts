@@ -50,13 +50,18 @@ function extraireDate(texte: string, texteNormalise: string) {
   if (/\bhier\b/.test(texteNormalise)) return dateFrance(-1);
   if (/\bdemain\b/.test(texteNormalise)) return dateFrance(1);
   if (/\baujourd[’']?hui\b/.test(texteNormalise)) return dateFrance();
-  return null;
+  return dateFrance();
 }
 
-function momentFrance(texteNormalise: string): "Matin" | "Soir" | null {
+function momentFrance(texteNormalise: string): "Matin" | "Soir" {
   if (/\bmatin\b/.test(texteNormalise)) return "Matin";
   if (/\bsoir\b/.test(texteNormalise)) return "Soir";
-  return null;
+  const heure = Number(new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris",
+    hour: "2-digit",
+    hour12: false,
+  }).format(new Date()));
+  return heure < 12 ? "Matin" : "Soir";
 }
 
 function trouverEvenement(texteNormalise: string, types: RecherchableTypeEvenement[], temperature: number | null) {
