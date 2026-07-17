@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, RotateCcw, Search, Stethoscope, X } from "lucide-react";
 import SelectionModal from "@/components/SelectionModal";
-import PatteSelector from "@/components/PatteSelector";
-import { normalizeSearch, searchTypesEvenement, type RecherchableTypeEvenement } from "@/lib/fuzzy-search";
+import { normalizeSearch, searchTypesEvenement } from "@/lib/fuzzy-search";
 import {
   VOICE_SANITARY_STORAGE_KEY,
   type VoiceAnalysisResponse,
@@ -93,7 +92,6 @@ export default function VoiceButton() {
   const [animalPickerOpen, setAnimalPickerOpen] = useState(false);
   const [animalQuery, setAnimalQuery] = useState("");
   const [animaux, setAnimaux] = useState<AnimalOption[]>([]);
-  const [typesEvenement, setTypesEvenement] = useState<RecherchableTypeEvenement[]>([]);
   const [medicamentPickerOpen, setMedicamentPickerOpen] = useState(false);
   const [medicamentQuery, setMedicamentQuery] = useState("");
   const [medicaments, setMedicaments] = useState<MedicamentOption[]>([]);
@@ -109,13 +107,10 @@ export default function VoiceButton() {
 
   useEffect(() => {
     if (!analysisOuverte) return;
-    Promise.all([
-      fetch("/api/animaux/picker").then((response) => response.json()),
-      fetch("/api/event-types").then((response) => response.json()),
-    ]).then(([listeAnimaux, listeTypes]) => {
-      setAnimaux(listeAnimaux);
-      setTypesEvenement(listeTypes);
-    }).catch(() => {});
+    fetch("/api/animaux/picker")
+      .then((response) => response.json())
+      .then(setAnimaux)
+      .catch(() => {});
   }, [analysisOuverte]);
 
   function clearSilenceTimer() {
@@ -367,6 +362,24 @@ export default function VoiceButton() {
     ? searchTypesEvenement(medicamentQuery, medicamentsRecherchables).slice(0, 20).map((resultat) => resultat.item)
     : medicamentsRecherchables;
   const parageAvecPlusieursAnimaux = chosenAction === "parage" && selectedNutravs.length !== 1;
+  const informationsReconnues = analysis ? [
+    analysis.draft.event?.nom ?? null,
+    analysis.draft.dateMentionnee && analysis.draft.date
+      ? new Date(`${analysis.draft.date}T12:00:00`).toLocaleDateString("fr-FR")
+      : null,
+    analysis.draft.momentMentionne ? analysis.draft.moment : null,
+    analysis.draft.temperature !== null ? `${String(analysis.draft.temperature).replace(".", ",")} °C` : null,
+    ...analysis.draft.pattes,
+    analysis.draft.medicament?.nom ?? null,
+    analysis.draft.voieAdministration ? `Voie ${analysis.draft.voieAdministration}` : null,
+    analysis.draft.ajouterAuParage ? "Ajouter au parage" : null,
+    analysis.draft.rappelDemande ? "Rappel demandé" : null,
+  ].filter((information): information is string => Boolean(information)) : [];
+  const medicamentAEteEntendu = Boolean(
+    analysis?.draft.medicament
+    || analysis?.draft.medicamentEntendu
+    || analysis?.draft.medicamentCandidates.length,
+  );
 
   return (
     <>
@@ -409,11 +422,11 @@ export default function VoiceButton() {
           )}
         >
           <div className="divide-y divide-gray-100">
-            <section className="p-4">
-              <div className="flex items-start gap-3">
+            <section className="p-3">
+              <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-semibold uppercase text-gray-400">Phrase entendue</p>
-                  <p className="mt-1 text-xs italic text-gray-600">« {analysis.draft.transcript} »</p>
+                  <p className="mt-0.5 truncate text-xs italic text-gray-600" title={analysis.draft.transcript}>« {analysis.draft.transcript} »</p>
                 </div>
                 <button type="button" onClick={relancerDictee} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-600">
                   <RotateCcw size={15} /> Redicter
@@ -421,7 +434,7 @@ export default function VoiceButton() {
               </div>
             </section>
 
-            <section className="p-4">
+            <section className="p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-gray-900">Animal{selectedNutravs.length > 1 ? "aux" : ""} détecté{selectedNutravs.length > 1 ? "s" : ""}</h3>
                 <button type="button" onClick={() => setAnimalPickerOpen((ouvert) => !ouvert)} className="min-h-9 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-green-700">
@@ -460,7 +473,7 @@ export default function VoiceButton() {
               )}
             </section>
 
-            <section className="p-4">
+            <section className="p-3">
               <h3 className="mb-2 text-sm font-semibold text-gray-900">Destination proposée</h3>
               <div className="grid gap-2 sm:grid-cols-2">
                 {(showAllActions ? VOICE_ACTIONS : VOICE_ACTIONS.filter((action) => analysis.draft.suggestedActions.includes(action.id))).map((action) => (
@@ -472,83 +485,42 @@ export default function VoiceButton() {
               {!showAllActions && <button type="button" onClick={() => setShowAllActions(true)} className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-gray-500">Autre <ChevronDown size={15} /></button>}
             </section>
 
-            <section className="space-y-3 p-4">
-              <h3 className="text-sm font-semibold text-gray-900">Informations reconnues</h3>
-              <label className="block text-xs font-medium text-gray-600">
-                Événement ou observation
-                <select value={analysis.draft.event?.id ?? ""} onChange={(event) => {
-                  const type = typesEvenement.find((item) => item.id === event.target.value);
-                  mettreAJourDraft({ event: type ? { id: type.id, nom: type.nom } : null });
-                }} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900">
-                  <option value="">Non reconnu</option>
-                  {typesEvenement.map((type) => <option key={type.id} value={type.id}>{type.nom}</option>)}
-                </select>
-              </label>
+            <section className="space-y-2 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-gray-900">Informations reconnues</h3>
+                <button type="button" onClick={() => void ouvrirRechercheMedicaments()} className="min-h-9 text-xs font-semibold text-blue-700">
+                  {medicamentAEteEntendu ? "Changer le médicament" : "Ajouter un médicament"}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {informationsReconnues.map((information) => (
+                  <span key={information} className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">{information}</span>
+                ))}
+              </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs font-medium text-gray-600">Date
-                  <input type="date" value={analysis.draft.date ?? ""} onChange={(event) => mettreAJourDraft({ date: event.target.value || null })} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-2 text-sm" />
-                </label>
-                <fieldset>
-                  <legend className="text-xs font-medium text-gray-600">Moment</legend>
-                  <div className="mt-1 grid grid-cols-2">
-                    {(["Matin", "Soir"] as const).map((moment) => <button key={moment} type="button" onClick={() => mettreAJourDraft({ moment })} className={`min-h-11 border text-xs font-semibold first:rounded-l-lg last:rounded-r-lg ${analysis.draft.moment === moment ? "border-green-600 bg-green-50 text-green-800" : "border-gray-300 text-gray-600"}`}>{moment}</button>)}
+              {!analysis.draft.medicament && analysis.draft.medicamentCandidates.length > 0 && (
+                <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-2">
+                  <p className="mb-1 text-[11px] text-gray-500">Médicament entendu : « {analysis.draft.medicamentEntendu} »</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {analysis.draft.medicamentCandidates.map((candidate) => <button key={candidate.id} type="button" onClick={() => void choisirMedicament(candidate.id, candidate.nom)} className="min-h-9 rounded-lg border border-blue-200 bg-white px-2.5 text-xs font-semibold text-blue-900">{candidate.nom}</button>)}
                   </div>
-                </fieldset>
-              </div>
-
-              <label className="block text-xs font-medium text-gray-600">Température
-                <div className="relative mt-1"><input type="number" step="0.1" value={analysis.draft.temperature ?? ""} onChange={(event) => mettreAJourDraft({ temperature: event.target.value ? Number(event.target.value) : null })} className="min-h-11 w-full rounded-lg border border-gray-300 px-3 pr-9 text-sm" placeholder="Non reconnue" /><span className="absolute right-3 top-3 text-sm text-gray-400">°C</span></div>
-              </label>
-
-              <div>
-                <p className="mb-1 text-xs font-medium text-gray-600">Patte concernée</p>
-                <PatteSelector value={analysis.draft.pattes} onChange={(pattes) => mettreAJourDraft({ pattes })} />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-gray-600">Médicament</p>
-                  <button type="button" onClick={() => void ouvrirRechercheMedicaments()} className="min-h-9 text-xs font-semibold text-blue-700">{analysis.draft.medicament ? "Changer" : "Rechercher"}</button>
                 </div>
-                {analysis.draft.medicament ? (
-                  <p className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">{analysis.draft.medicament.nom}{analysis.draft.voieAdministration ? ` · ${analysis.draft.voieAdministration}` : ""}</p>
-                ) : analysis.draft.medicamentCandidates.length > 0 ? (
-                  <div className="mt-1 grid gap-1.5">
-                    {analysis.draft.medicamentCandidates.map((candidate) => <button key={candidate.id} type="button" onClick={() => void choisirMedicament(candidate.id, candidate.nom)} className="min-h-10 rounded-lg border border-blue-200 px-3 text-left text-sm font-semibold text-blue-900">{candidate.nom}</button>)}
+              )}
+
+              {medicamentPickerOpen && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-2">
+                  <label className="flex min-h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3">
+                    <Search size={16} className="text-gray-400" />
+                    <input value={medicamentQuery} onChange={(event) => setMedicamentQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Écrire le nom du médicament" autoFocus />
+                  </label>
+                  <div className="mt-1 max-h-36 overflow-y-auto">
+                    {medicamentsFiltres.map((medicament) => <button key={medicament.id} type="button" onClick={() => void choisirMedicament(medicament.id, medicament.nom)} className="min-h-10 w-full rounded-md px-2 text-left text-sm font-semibold text-gray-800 hover:bg-blue-50">{medicament.nom}{medicament.dci ? <span className="ml-2 font-normal text-gray-400">{medicament.dci}</span> : null}</button>)}
+                    {medicamentsFiltres.length === 0 && <p className="p-3 text-center text-xs text-gray-500">Aucune correspondance</p>}
                   </div>
-                ) : <p className="rounded-lg border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-500">Non reconnu</p>}
-                {analysis.draft.medicamentEntendu && !analysis.draft.medicament && <p className="mt-1 text-[11px] text-gray-500">Le téléphone a écrit « {analysis.draft.medicamentEntendu} ».</p>}
-
-                {medicamentPickerOpen && (
-                  <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50/40 p-2">
-                    <label className="flex min-h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3">
-                      <Search size={16} className="text-gray-400" />
-                      <input value={medicamentQuery} onChange={(event) => setMedicamentQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Écrire le nom du médicament" autoFocus />
-                    </label>
-                    <div className="mt-2 max-h-44 overflow-y-auto">
-                      {medicamentsFiltres.map((medicament) => <button key={medicament.id} type="button" onClick={() => void choisirMedicament(medicament.id, medicament.nom)} className="min-h-10 w-full rounded-md px-2 text-left text-sm font-semibold text-gray-800 hover:bg-blue-50">{medicament.nom}{medicament.dci ? <span className="ml-2 font-normal text-gray-400">{medicament.dci}</span> : null}</button>)}
-                      {medicamentsFiltres.length === 0 && <p className="p-3 text-center text-xs text-gray-500">Aucune correspondance</p>}
-                    </div>
-                    <button type="button" onClick={medicamentIntrouvable} className="mt-1 min-h-10 w-full rounded-lg text-xs font-semibold text-gray-600">Médicament introuvable</button>
-                  </div>
-                )}
-                {learningError && <p className="mt-1 text-xs text-orange-700">{learningError}</p>}
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2">
-                <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700">
-                  <input type="checkbox" checked={analysis.draft.ajouterAuParage} onChange={(event) => mettreAJourDraft({ ajouterAuParage: event.target.checked })} className="h-4 w-4 accent-green-700" /> Ajouter au parage
-                </label>
-                <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700">
-                  <input type="checkbox" checked={analysis.draft.rappelDemande} onChange={(event) => mettreAJourDraft({ rappelDemande: event.target.checked })} className="h-4 w-4 accent-green-700" /> Rappel / surveillance
-                </label>
-              </div>
-
-              <label className="block text-xs font-medium text-gray-600">Observation
-                <textarea value={analysis.draft.description} onChange={(event) => mettreAJourDraft({ description: event.target.value })} rows={2} className="mt-1 w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-              </label>
-              <p className="text-[11px] text-gray-500">Aucune donnée n’est enregistrée ici. Le formulaire suivant reste entièrement modifiable.</p>
+                  <button type="button" onClick={medicamentIntrouvable} className="min-h-9 w-full text-xs font-semibold text-gray-600">Médicament introuvable</button>
+                </div>
+              )}
+              {learningError && <p className="text-xs text-orange-700">{learningError}</p>}
             </section>
           </div>
         </SelectionModal>

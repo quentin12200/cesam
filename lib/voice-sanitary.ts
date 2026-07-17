@@ -25,6 +25,8 @@ export interface VoiceSanitaryDraft {
   event: { id: string; nom: string } | null;
   date: string | null;
   moment: "Matin" | "Soir" | null;
+  dateMentionnee: boolean;
+  momentMentionne: boolean;
   temperature: number | null;
   pattes: PatteParage[];
   ajouterAuParage: boolean;

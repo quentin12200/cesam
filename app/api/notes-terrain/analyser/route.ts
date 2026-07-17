@@ -264,6 +264,14 @@ export async function POST(request: NextRequest) {
   const event = trouverEvenement(texteNormalise, types, temperature);
   const reconnaissanceMedicament = trouverMedicament(texteNormalise, medicaments, aliasesVocaux);
   const medicament = reconnaissanceMedicament.medicament;
+  const candidatConfondEvenement = Boolean(
+    !medicament
+    && event
+    && reconnaissanceMedicament.entendu
+    && compactVoiceText(event.nom) === compactVoiceText(reconnaissanceMedicament.entendu),
+  );
+  const medicamentCandidates = candidatConfondEvenement ? [] : reconnaissanceMedicament.candidates;
+  const medicamentEntendu = medicament || medicamentCandidates.length > 0 ? reconnaissanceMedicament.entendu : null;
   const voieAdministration = trouverVoieAdministration(texteNormalise)
     ?? (medicament ? trouverVoieAdministration(normalizeSearch(medicament.nom)) : null);
   const pattes = extrairePattes(texteNormalise);
@@ -278,12 +286,14 @@ export async function POST(request: NextRequest) {
     event: event ? { id: event.id, nom: event.nom } : null,
     date: extraireDate(transcript, texteNormalise),
     moment: momentFrance(texteNormalise),
+    dateMentionnee: Boolean(transcript.match(/\b\d{1,2}[\/.\-]\d{1,2}(?:[\/.\-]\d{2,4})?\b/) || /\b(?:avant hier|hier|demain|aujourd[’']?hui)\b/.test(texteNormalise)),
+    momentMentionne: /\b(?:matin|soir)\b/.test(texteNormalise),
     temperature,
     pattes,
     ajouterAuParage,
     medicament: medicament ? { id: medicament.id, nom: medicament.nom } : null,
-    medicamentEntendu: reconnaissanceMedicament.entendu,
-    medicamentCandidates: reconnaissanceMedicament.candidates,
+    medicamentEntendu,
+    medicamentCandidates,
     voieAdministration,
     rappelDemande,
     traitementMentionne,
@@ -291,7 +301,7 @@ export async function POST(request: NextRequest) {
     suggestedActions: estBoiterie ? ["sanitaire", "parage"] : ["sanitaire"],
   };
 
-  const informationSanitaire = Boolean(event || temperature !== null || medicament || reconnaissanceMedicament.candidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
+  const informationSanitaire = Boolean(event || temperature !== null || medicament || medicamentCandidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
   if (candidates.length > 0 && informationSanitaire) {
     return NextResponse.json({ outcome: "confirm_animal", draft, candidates });
   }
