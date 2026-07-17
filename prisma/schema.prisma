@@ -494,6 +494,18 @@ model MedicamentAliasVocal {
   @@index([medicamentId])
 }
 
+model VoiceRoutingAlias {
+  id               String   @id @default(cuid())
+  phrase           String
+  phraseNormalisee String   @unique
+  action           String
+  confirmations    Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([action])
+}
+
 /// Glossaire "En savoir +" associé à un médicament : termes techniques
 /// employés dans ses préconisations, avec une explication en langage clair.
 model MedicamentTerme {

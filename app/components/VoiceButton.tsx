@@ -13,9 +13,11 @@ import {
 import {
   VOICE_ACTIONS,
   VOICE_PARAGE_STORAGE_KEY,
+  VOICE_REPRODUCTION_STORAGE_KEY,
   getVoiceAction,
   type VoiceActionId,
   type VoiceParageDraft,
+  type VoiceReproductionDraft,
 } from "@/lib/voice-actions";
 
 declare global {
@@ -315,10 +317,19 @@ export default function VoiceButton() {
     }
   }
 
-  function ouvrirFormulaire() {
+  async function ouvrirFormulaire() {
     if (!analysis?.draft.target || !chosenAction) return;
     const action = getVoiceAction(chosenAction);
     if (!action) return;
+    if (!analysis.draft.suggestedActions.includes(chosenAction)) {
+      try {
+        await fetch("/api/voice-routing-alias", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phrase: analysis.draft.transcript, action: chosenAction }),
+        });
+      } catch {}
+    }
     if (chosenAction === "parage") {
       const draftParage: VoiceParageDraft = {
         transcript: analysis.draft.transcript,
@@ -328,6 +339,16 @@ export default function VoiceButton() {
         note: analysis.draft.description,
       };
       sessionStorage.setItem(VOICE_PARAGE_STORAGE_KEY, JSON.stringify(draftParage));
+    } else if (chosenAction === "saillie") {
+      const draftReproduction: VoiceReproductionDraft = {
+        transcript: analysis.draft.transcript,
+        target: analysis.draft.target,
+        date: analysis.draft.date ?? "",
+        moment: analysis.draft.moment,
+        type: analysis.draft.reproductionType ?? "NATURELLE",
+        taureau: analysis.draft.taureau,
+      };
+      sessionStorage.setItem(VOICE_REPRODUCTION_STORAGE_KEY, JSON.stringify(draftReproduction));
     } else {
       sessionStorage.setItem(VOICE_SANITARY_STORAGE_KEY, JSON.stringify(analysis.draft));
     }
@@ -363,15 +384,17 @@ export default function VoiceButton() {
     : medicamentsRecherchables;
   const parageAvecPlusieursAnimaux = chosenAction === "parage" && selectedNutravs.length !== 1;
   const informationsReconnues = analysis ? [
-    analysis.draft.event?.nom ?? null,
+    chosenAction === "sanitaire" ? analysis.draft.event?.nom ?? null : null,
+    chosenAction === "saillie" ? (analysis.draft.reproductionType === "IA" ? "Insémination" : "Saillie naturelle") : null,
+    chosenAction === "saillie" ? analysis.draft.taureau?.nom ?? null : null,
     analysis.draft.dateMentionnee && analysis.draft.date
       ? new Date(`${analysis.draft.date}T12:00:00`).toLocaleDateString("fr-FR")
       : null,
     analysis.draft.momentMentionne ? analysis.draft.moment : null,
     analysis.draft.temperature !== null ? `${String(analysis.draft.temperature).replace(".", ",")} °C` : null,
     ...analysis.draft.pattes,
-    analysis.draft.medicament?.nom ?? null,
-    analysis.draft.voieAdministration ? `Voie ${analysis.draft.voieAdministration}` : null,
+    chosenAction === "sanitaire" ? analysis.draft.medicament?.nom ?? null : null,
+    chosenAction === "sanitaire" && analysis.draft.voieAdministration ? `Voie ${analysis.draft.voieAdministration}` : null,
     analysis.draft.ajouterAuParage ? "Ajouter au parage" : null,
     analysis.draft.rappelDemande ? "Rappel demandé" : null,
   ].filter((information): information is string => Boolean(information)) : [];
@@ -415,7 +438,7 @@ export default function VoiceButton() {
           footer={(
             <div className="p-3">
               {parageAvecPlusieursAnimaux && <p className="mb-2 text-xs font-medium text-orange-700">Le parage accepte un seul animal. Retire les autres ou choisis Sanitaire.</p>}
-              <button type="button" disabled={!analysis.draft.target || !selectedAction || parageAvecPlusieursAnimaux} onClick={ouvrirFormulaire} className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40">
+              <button type="button" disabled={!analysis.draft.target || !selectedAction || parageAvecPlusieursAnimaux} onClick={() => void ouvrirFormulaire()} className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40">
                 <Check size={17} /> {selectedAction?.continueLabel ?? "Choisir une destination"}
               </button>
             </div>
@@ -488,9 +511,11 @@ export default function VoiceButton() {
             <section className="space-y-2 p-3">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-gray-900">Informations reconnues</h3>
-                <button type="button" onClick={() => void ouvrirRechercheMedicaments()} className="min-h-9 text-xs font-semibold text-blue-700">
-                  {medicamentAEteEntendu ? "Changer le médicament" : "Ajouter un médicament"}
-                </button>
+                {chosenAction === "sanitaire" && (
+                  <button type="button" onClick={() => void ouvrirRechercheMedicaments()} className="min-h-9 text-xs font-semibold text-blue-700">
+                    {medicamentAEteEntendu ? "Changer le médicament" : "Ajouter un médicament"}
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {informationsReconnues.map((information) => (
@@ -498,7 +523,7 @@ export default function VoiceButton() {
                 ))}
               </div>
 
-              {!analysis.draft.medicament && analysis.draft.medicamentCandidates.length > 0 && (
+              {chosenAction === "sanitaire" && !analysis.draft.medicament && analysis.draft.medicamentCandidates.length > 0 && (
                 <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-2">
                   <p className="mb-1 text-[11px] text-gray-500">Médicament entendu : « {analysis.draft.medicamentEntendu} »</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -507,7 +532,7 @@ export default function VoiceButton() {
                 </div>
               )}
 
-              {medicamentPickerOpen && (
+              {chosenAction === "sanitaire" && medicamentPickerOpen && (
                 <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-2">
                   <label className="flex min-h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3">
                     <Search size={16} className="text-gray-400" />

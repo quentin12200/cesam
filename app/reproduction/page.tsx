@@ -14,6 +14,10 @@ import type { EtatGestation as EtatGestationPartage } from "@/lib/utils";
 import ReproScrollRestorer from "./ReproScrollRestorer";
 import { ACTION_VISUALS } from "@/components/action-visuals";
 import TroupeauTabs from "@/components/TroupeauTabs";
+import {
+  VOICE_REPRODUCTION_STORAGE_KEY,
+  type VoiceReproductionDraft,
+} from "@/lib/voice-actions";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
@@ -392,6 +396,38 @@ function ReproductionContent() {
       setShowSaillieForm(true);
     }
   }, [searchParams]);
+
+  const brouillonVocalTraite = useRef(false);
+  useEffect(() => {
+    if (brouillonVocalTraite.current || loading || searchParams.get("brouillonVocal") !== "1") return;
+    const brut = sessionStorage.getItem(VOICE_REPRODUCTION_STORAGE_KEY);
+    if (!brut) return;
+
+    try {
+      const draft = JSON.parse(brut) as VoiceReproductionDraft;
+      const animalIds = vaches
+        .filter((vache) => draft.target.nutravs.includes(vache.nutrav))
+        .map((vache) => vache.id);
+      if (animalIds.length === 0) return;
+
+      brouillonVocalTraite.current = true;
+      sessionStorage.removeItem(VOICE_REPRODUCTION_STORAGE_KEY);
+      setSaillieAnimalIds(animalIds);
+      setSaillieAnimalId("");
+      setSaillieDate(draft.date || new Date().toISOString().split("T")[0]);
+      setSaillieType(draft.type);
+      setSaillieTaureauId(draft.type === "NATURELLE" ? draft.taureau?.id ?? "" : "");
+      setSaillieTaureauNom("");
+      setIaSelectedId(draft.type === "IA" ? draft.taureau?.id ?? "" : "");
+      setIaNupere("");
+      setIaNopere("");
+      setIaTraper("");
+      setSaillieError(null);
+      setShowSaillieForm(true);
+    } catch {
+      sessionStorage.removeItem(VOICE_REPRODUCTION_STORAGE_KEY);
+    }
+  }, [loading, searchParams, taureaux, vaches]);
 
   async function fetchData() {
     setLoading(true);

@@ -181,6 +181,33 @@ function trouverVoieAdministration(texteNormalise: string): string | null {
   return voies.find(([, expression]) => expression.test(texteNormalise))?.[0] ?? null;
 }
 
+function normaliserPhraseAiguillage(phrase: string) {
+  return normalizeSearch(phrase)
+    .replace(/\b\d+\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function trouverTaureau(
+  texteNormalise: string,
+  taureaux: Array<{ id: string; nupere: string; nopere: string | null }>,
+) {
+  const directs = taureaux
+    .map((taureau) => ({ taureau, nom: normalizeSearch(taureau.nopere ?? taureau.nupere) }))
+    .filter(({ nom }) => nom.length >= 3 && texteNormalise.includes(nom))
+    .sort((a, b) => b.nom.length - a.nom.length);
+  if (directs[0]) return directs[0].taureau;
+
+  const apresAvec = texteNormalise.match(/\bavec\s+([a-z0-9 -]+)$/)?.[1]?.trim();
+  if (!apresAvec) return null;
+  const resultat = searchTypesEvenement(apresAvec, taureaux.map((taureau) => ({
+    ...taureau,
+    nom: taureau.nopere ?? taureau.nupere,
+    synonymes: taureau.nupere,
+  })))[0];
+  return resultat && resultat.score >= 70 ? resultat.item : null;
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const transcript = typeof body.texte === "string" ? body.texte.trim() : "";
@@ -188,7 +215,7 @@ export async function POST(request: NextRequest) {
 
   const texteNormalise = normalizeSearch(transcript);
   const numerosDictes = extraireNumerosTravail(transcript);
-  const [animaux, groupes, types, medicaments, aliasesVocaux] = await Promise.all([
+  const [animaux, groupes, types, medicaments, aliasesVocaux, taureaux, aliasesAiguillage] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
       select: { nutrav: true, nobovi: true },
@@ -214,6 +241,12 @@ export async function POST(request: NextRequest) {
         transcription: true,
         medicament: { select: { id: true, nom: true, dci: true, actif: true } },
       },
+    }),
+    prisma.taureau.findMany({
+      select: { id: true, nupere: true, nopere: true },
+    }),
+    prisma.voiceRoutingAlias.findMany({
+      select: { phraseNormalisee: true, action: true },
     }),
   ]);
 
@@ -260,17 +293,25 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const phraseAiguillage = normaliserPhraseAiguillage(transcript);
+  const aliasAiguillage = aliasesAiguillage.find((alias) => alias.phraseNormalisee === phraseAiguillage);
+  const intentionSaillie = /\b(?:saillie|sailly|sailli|sailliee|insemination|inseminee|ia)\b/.test(texteNormalise)
+    || aliasAiguillage?.action === "saillie";
+  const taureauReconnu = intentionSaillie ? trouverTaureau(texteNormalise, taureaux) : null;
+  const reproductionType: "NATURELLE" | "IA" | null = intentionSaillie
+    ? (/\b(?:insemination|inseminee|ia)\b/.test(texteNormalise) ? "IA" : "NATURELLE")
+    : null;
   const temperature = extraireTemperature(texteNormalise);
   const event = trouverEvenement(texteNormalise, types, temperature);
   const reconnaissanceMedicament = trouverMedicament(texteNormalise, medicaments, aliasesVocaux);
-  const medicament = reconnaissanceMedicament.medicament;
+  const medicament = intentionSaillie ? null : reconnaissanceMedicament.medicament;
   const candidatConfondEvenement = Boolean(
     !medicament
     && event
     && reconnaissanceMedicament.entendu
     && compactVoiceText(event.nom) === compactVoiceText(reconnaissanceMedicament.entendu),
   );
-  const medicamentCandidates = candidatConfondEvenement ? [] : reconnaissanceMedicament.candidates;
+  const medicamentCandidates = intentionSaillie || candidatConfondEvenement ? [] : reconnaissanceMedicament.candidates;
   const medicamentEntendu = medicament || medicamentCandidates.length > 0 ? reconnaissanceMedicament.entendu : null;
   const voieAdministration = trouverVoieAdministration(texteNormalise)
     ?? (medicament ? trouverVoieAdministration(normalizeSearch(medicament.nom)) : null);
@@ -279,6 +320,14 @@ export async function POST(request: NextRequest) {
   const rappelDemande = /\b(?:rappel|rappeler|rappelle|surveiller|surveillance)\b/.test(texteNormalise);
   const traitementMentionne = /\btraitement\b/.test(texteNormalise) || medicament !== null;
   const estBoiterie = Boolean(event && normalizeSearch(event.nom) === "boiterie") || /\bboite(?:rie)?\b/.test(texteNormalise);
+  const actionApprise = aliasAiguillage && ["sanitaire", "parage", "saillie"].includes(aliasAiguillage.action)
+    ? aliasAiguillage.action as "sanitaire" | "parage" | "saillie"
+    : null;
+  const suggestedActions = intentionSaillie
+    ? ["saillie" as const]
+    : actionApprise
+      ? [actionApprise]
+      : estBoiterie ? ["sanitaire" as const, "parage" as const] : ["sanitaire" as const];
 
   const draft: VoiceSanitaryDraft = {
     transcript,
@@ -297,15 +346,17 @@ export async function POST(request: NextRequest) {
     voieAdministration,
     rappelDemande,
     traitementMentionne,
+    reproductionType,
+    taureau: taureauReconnu ? { id: taureauReconnu.id, nom: taureauReconnu.nopere ?? taureauReconnu.nupere } : null,
     description: transcript,
-    suggestedActions: estBoiterie ? ["sanitaire", "parage"] : ["sanitaire"],
+    suggestedActions,
   };
 
-  const informationSanitaire = Boolean(event || temperature !== null || medicament || medicamentCandidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
-  if (candidates.length > 0 && informationSanitaire) {
+  const informationMetier = Boolean(intentionSaillie || actionApprise || event || temperature !== null || medicament || medicamentCandidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
+  if (candidates.length > 0 && informationMetier) {
     return NextResponse.json({ outcome: "confirm_animal", draft, candidates });
   }
-  if (!target || !informationSanitaire) {
+  if (!target || !informationMetier) {
     const reason = numerosDictes.length > 0 && !target ? `Animal non trouvé : aucune saisie créée` : "Phrase trop imprécise : aucune saisie créée";
     return NextResponse.json({ outcome: "note", reason });
   }

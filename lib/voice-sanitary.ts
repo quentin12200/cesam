@@ -36,6 +36,8 @@ export interface VoiceSanitaryDraft {
   voieAdministration: string | null;
   rappelDemande: boolean;
   traitementMentionne: boolean;
+  reproductionType: "NATURELLE" | "IA" | null;
+  taureau: { id: string; nom: string } | null;
   description: string;
   suggestedActions: VoiceActionId[];
 }
