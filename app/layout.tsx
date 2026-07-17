@@ -7,7 +7,7 @@ import SplashScreen from "@/components/SplashScreen";
 import InstallPrompt from "@/app/components/InstallPrompt";
 import NotificationBell from "@/app/components/NotificationBell";
 import GlobalScanner from "@/app/components/GlobalScanner";
-import VoiceButton from "@/app/components/VoiceButton";
+import NoteVoiceButton from "@/app/components/NoteVoiceButton";
 import UndoProvider from "@/app/components/UndoProvider";
 import LogoutButton from "@/app/components/LogoutButton";
 import Image from "next/image";
@@ -60,7 +60,7 @@ export default function RootLayout({
             </div>
             <div className="flex items-center gap-2">
               <GlobalScanner />
-              <VoiceButton />
+              <NoteVoiceButton />
               <NotificationBell />
               <GlobalSettingsButton />
               <LogoutButton />

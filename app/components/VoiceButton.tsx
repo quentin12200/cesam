@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Mic, MicOff, Pencil, X } from "lucide-react";
+import { Check, Pencil, Stethoscope, X } from "lucide-react";
 import SelectionModal from "@/components/SelectionModal";
 import {
   VOICE_SANITARY_STORAGE_KEY,
@@ -61,7 +61,7 @@ interface SpeechRecognitionErrorEvent extends Event {
   error: string;
 }
 
-type Status = "idle" | "listening" | "analysing" | "note" | "error";
+type Status = "idle" | "listening" | "analysing" | "error";
 
 const SILENCE_TIMEOUT_MS = 30000;
 
@@ -79,7 +79,7 @@ function ResumeBrouillon({ draft }: { draft: VoiceSanitaryDraft }) {
 
   return (
     <div className="space-y-3 p-4">
-      <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm italic text-amber-900">« {draft.transcript} »</p>
+      <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm italic text-amber-900">Phrase entendue : « {draft.transcript} »</p>
       <dl className="space-y-2 text-sm">
         <div className="flex gap-3"><dt className="w-20 shrink-0 text-gray-500">Animal</dt><dd className="font-semibold text-gray-900">{draft.target?.label ?? "À confirmer"}</dd></div>
         <div className="flex gap-3"><dt className="w-20 shrink-0 text-gray-500">Quand</dt><dd>{draft.date} · {draft.moment.toLowerCase()}</dd></div>
@@ -130,24 +130,6 @@ export default function VoiceButton() {
     }, ms);
   }
 
-  async function saveNote(text: string, reason: string) {
-    try {
-      const response = await fetch("/api/notes-terrain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texte: text }),
-      });
-      if (!response.ok) throw new Error();
-      setStatus("note");
-      setMessage(reason);
-      clearAfter(6000);
-    } catch {
-      setStatus("error");
-      setMessage("Impossible de conserver la note vocale");
-      clearAfter(6000);
-    }
-  }
-
   async function analysePhrase(text: string) {
     setAnalysis(null);
     setEditing(false);
@@ -166,7 +148,9 @@ export default function VoiceButton() {
       if (!response.ok) throw new Error();
       const resultat = await response.json() as VoiceAnalysisResponse;
       if (resultat.outcome === "note") {
-        await saveNote(text, resultat.reason);
+        setStatus("error");
+        setMessage("Action non reconnue. Utilise le micro orange pour conserver une note libre.");
+        clearAfter(6500);
         return;
       }
       setAnalysis(resultat);
@@ -175,7 +159,9 @@ export default function VoiceButton() {
       setEditing(false);
       setStatus("idle");
     } catch {
-      await saveNote(text, "Analyse impossible : note vocale conservée");
+      setStatus("error");
+      setMessage("Analyse impossible. Rien n’a été enregistré.");
+      clearAfter(5000);
     }
   }
 
@@ -312,13 +298,13 @@ export default function VoiceButton() {
 
   return (
     <>
-      {(isListening || status === "analysing" || status === "note" || status === "error") && (
+      {(isListening || status === "analysing" || status === "error") && (
         <div className="fixed right-3 top-14 z-40 max-w-[290px] rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2.5 text-sm shadow-lg backdrop-blur-sm">
           {isListening && <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700"><span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />Parle… arrêt automatique dans 30 s</span>}
           {status === "analysing" && <span className="text-xs font-medium text-amber-700">Analyse de la phrase…</span>}
-          {(status === "note" || status === "error") && (
+          {status === "error" && (
             <div className="flex items-start gap-2">
-              <div className="min-w-0 flex-1"><p className="line-clamp-2 italic text-amber-900">« {transcript} »</p><p className={`mt-1 text-xs font-semibold ${status === "error" ? "text-red-600" : "text-green-700"}`}>{message}</p></div>
+              <div className="min-w-0 flex-1"><p className="line-clamp-2 italic text-amber-900">« {transcript} »</p><p className="mt-1 text-xs font-semibold text-red-600">{message}</p></div>
               <button type="button" onClick={dismiss} className="shrink-0 rounded p-1 text-amber-500" aria-label="Fermer"><X size={15} /></button>
             </div>
           )}
@@ -329,11 +315,11 @@ export default function VoiceButton() {
         type="button"
         onClick={toggle}
         disabled={status === "analysing"}
-        aria-label={isListening ? "Arrêter l’enregistrement" : "Dicter une note ou un événement sanitaire"}
-        title={isListening ? "Appuie pour arrêter" : "Dicter une note ou un événement sanitaire"}
-        className={`rounded-lg p-1.5 text-white transition-colors touch-manipulation disabled:opacity-60 ${isListening ? "animate-pulse bg-red-500" : status === "note" ? "bg-green-600" : "bg-amber-500 hover:bg-amber-400"}`}
+        aria-label={isListening ? "Arrêter la dictée" : "Dicter une action ou un événement"}
+        title={isListening ? "Appuie pour arrêter" : "Dicter une action ou un événement"}
+        className={`rounded-lg p-1.5 text-white transition-colors touch-manipulation disabled:opacity-60 ${isListening ? "animate-pulse bg-red-500" : "bg-green-600 hover:bg-green-500"}`}
       >
-        {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+        <Stethoscope size={18} />
       </button>
 
       {analysis && (
