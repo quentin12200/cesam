@@ -6,11 +6,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { animalId, animalIds: requestedAnimalIds, date, type, groupage, taureauId, tentative } = body;
+    const typeNormalise = typeof type === "string" ? type.trim().toUpperCase() : "";
     const animalIds = [...new Set<string>(
       Array.isArray(requestedAnimalIds) ? requestedAnimalIds.filter((id): id is string => typeof id === "string" && id.length > 0) : animalId ? [animalId] : []
     )];
 
-    if (animalIds.length === 0 || !date || !type) {
+    if (animalIds.length === 0 || !date || !["NATURELLE", "IA"].includes(typeNormalise)) {
       return NextResponse.json({ error: "Champs manquants: animalId(s), date, type requis" }, { status: 400 });
     }
 
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
           data: {
             animalId: id,
             date: new Date(date),
-            type,
+            type: typeNormalise,
             groupage: groupage ?? false,
             tentative: tentative ?? 1,
             taureauId: taureauId ?? null,

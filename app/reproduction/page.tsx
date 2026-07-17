@@ -1134,12 +1134,34 @@ function ReproductionContent() {
               {saillieType === "NATURELLE" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Taureau <span className="text-gray-400 font-normal">(optionnel)</span></label>
-                  <TaureauSearch
-                    taureaux={farmBulls}
-                    selectedId={saillieTaureauId}
-                    onSelect={(id, nom) => { setSaillieTaureauId(id ?? ""); setSaillieTaureauNom(id ? "" : nom); }}
-                    onClear={() => { setSaillieTaureauId(""); setSaillieTaureauNom(""); }}
-                  />
+                  {farmBulls.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {farmBulls.map((taureau) => (
+                        <button
+                          key={taureau.id}
+                          type="button"
+                          aria-pressed={saillieTaureauId === taureau.id}
+                          onClick={() => {
+                            setSaillieTaureauId((id) => id === taureau.id ? "" : taureau.id);
+                            setSaillieTaureauNom("");
+                          }}
+                          className={`flex min-h-20 flex-col items-center justify-center rounded-xl border-2 px-1 py-2 text-xs transition-all ${saillieTaureauId === taureau.id ? "border-green-700 bg-green-700 text-white" : "border-gray-200 text-gray-700"}`}
+                        >
+                          <span className="text-xl mb-0.5">🐂</span>
+                          <span className="font-bold">{taureau.nopere ?? taureau.nupere}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className={farmBulls.length > 0 ? "mt-3" : ""}>
+                    <p className="mb-1 text-xs font-medium text-gray-500">Rechercher ou ajouter un autre taureau</p>
+                    <TaureauSearch
+                      taureaux={farmBulls}
+                      selectedId={farmBulls.some((taureau) => taureau.id === saillieTaureauId) ? "" : saillieTaureauId}
+                      onSelect={(id, nom) => { setSaillieTaureauId(id ?? ""); setSaillieTaureauNom(id ? "" : nom); }}
+                      onClear={() => { setSaillieTaureauId(""); setSaillieTaureauNom(""); }}
+                    />
+                  </div>
                   {saillieTaureauNom && !saillieTaureauId && (
                     <p className="text-xs text-yellow-700 mt-1 bg-yellow-50 px-3 py-1.5 rounded-lg">
                       Le taureau « {saillieTaureauNom} » sera créé automatiquement.
