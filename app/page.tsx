@@ -26,6 +26,7 @@ import {
   Tag,
   Scissors,
   Activity,
+  HeartHandshake,
   } from "lucide-react";
 
 async function getDashboardData() {
@@ -838,6 +839,18 @@ export default async function Dashboard({ searchParams }: PageProps) {
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-4 md:max-w-3xl lg:max-w-4xl">
       <AccueilQuickActions />
+
+      <Link
+        href="/soutien"
+        className="flex min-h-14 items-center gap-3 rounded-lg border-l-4 border-l-green-600 bg-white px-4 py-3 shadow-sm transition active:bg-green-50"
+      >
+        <HeartHandshake size={22} className="shrink-0 text-green-700" />
+        <span className="min-w-0 flex-1">
+          <strong className="block text-sm text-gray-900">Soutien &amp; ressources</strong>
+          <span className="block text-xs text-gray-500">Écoute, aides et contacts utiles près de chez vous</span>
+        </span>
+        <span className="text-lg text-gray-300" aria-hidden="true">›</span>
+      </Link>
 
       {notesTerrain.length > 0 && (
         <NotesTerrain initialNotes={notesTerrain.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() }))} />
