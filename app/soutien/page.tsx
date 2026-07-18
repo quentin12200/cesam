@@ -166,7 +166,7 @@ const CONTACTS_SOCIAUX_MSA: ContactSocialMsa[] = [
 ];
 
 function extraireDepartement(adresse: string | null | undefined) {
-  const codePostal = adresse?.match(/\b(?:0[1-9]|[1-8]\d|9[0-5]|97[1-6])\d{3}\b/)?.[0];
+  const codePostal = adresse?.match(/\b(?:97[1-6]\d{2}|(?:0[1-9]|[1-8]\d|9[0-5])\d{3})\b/)?.[0];
   if (!codePostal) return null;
   if (codePostal.startsWith("97")) return codePostal.slice(0, 3);
   if (codePostal.startsWith("20")) return "2A / 2B";
