@@ -65,6 +65,7 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
   const [raccourcis, setRaccourcis] = useState<AccueilShortcutId[]>(DEFAULT_ACCUEIL_SHORTCUTS);
   const [brouillon, setBrouillon] = useState<AccueilShortcutId[]>(DEFAULT_ACCUEIL_SHORTCUTS);
   const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -144,7 +145,22 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
     return <div className="h-16 animate-pulse rounded-lg bg-gray-100" aria-label="Chargement des raccourcis" />;
   }
 
-  const nombreColonnes = raccourcis.length <= 4 ? raccourcis.length : Math.ceil(raccourcis.length / 2);
+  function afficherAction(id: AccueilShortcutId, fermer?: () => void) {
+    const item = SHORTCUTS[id];
+    const Icon = item.icon;
+    if (item.visual) {
+      return <QuickActionButton key={id} action={item.visual} onClick={() => { fermer?.(); onAction(id as ActionRapide); }} className="min-h-16 w-full flex-col text-center leading-tight" />;
+    }
+    return (
+      <Link key={id} href={item.href!} onClick={fermer} className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-center text-xs font-semibold leading-tight shadow-sm transition active:scale-[0.97] ${item.className}`}>
+        <Icon size={20} className="shrink-0" />
+        <span className="w-full whitespace-normal">{item.label}</span>
+      </Link>
+    );
+  }
+
+  const mobileActions = raccourcis.slice(0, raccourcis.length > 6 ? 5 : 6);
+  const desktopActions = raccourcis.slice(0, raccourcis.length > 12 ? 11 : 12);
 
   return (
     <section data-layout-section="accueil-actions-rapides" data-layout-label="Actions rapides" className="space-y-2">
@@ -160,30 +176,27 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
           + Ajouter une action
         </button>
       ) : (
-        <div
-          className="grid gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]"
-          style={{
-            gridTemplateColumns: `repeat(${nombreColonnes}, minmax(8.5rem, 1fr))`,
-            minWidth: `max(100%, ${nombreColonnes * 8.5}rem)`,
-          }}
-        >
-          {raccourcis.map((id) => {
-            const item = SHORTCUTS[id];
-            const Icon = item.icon;
-            if (item.visual) {
-              return <QuickActionButton key={id} action={item.visual} onClick={() => onAction(id as ActionRapide)} className="min-h-16 w-full flex-col text-center leading-tight" />;
-            }
-            return (
-              <Link key={id} href={item.href!} className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-center text-xs font-semibold leading-tight shadow-sm transition active:scale-[0.97] ${item.className}`}>
-                <Icon size={20} className="shrink-0" />
-                <span className="w-full whitespace-normal">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
+        <>
+          <div className="grid grid-cols-3 gap-2 sm:hidden">
+            {mobileActions.map((id) => afficherAction(id))}
+            {raccourcis.length > 6 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={20} />Plus</button>}
+          </div>
+          <div className="hidden grid-cols-6 gap-2 sm:grid">
+            {desktopActions.map((id) => afficherAction(id))}
+            {raccourcis.length > 12 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={20} />Plus</button>}
+          </div>
+        </>
       )}
 
       {error && !open && <p className="text-xs text-red-600">{error}</p>}
+
+      {showAll && (
+        <SelectionModal title="Toutes mes actions" onClose={() => setShowAll(false)}>
+          <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3">
+            {raccourcis.map((id) => afficherAction(id, () => setShowAll(false)))}
+          </div>
+        </SelectionModal>
+      )}
 
       {open && (
         <SelectionModal
