@@ -5,7 +5,7 @@ import { logAction } from "@/lib/action-log";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { vacheNutrav, veauNutrav, veauSexe, veauNom, date, qualificatif, sousType, capteur, pereNom } = body;
+    const { vacheNutrav, veauNutrav, veauSexe, veauNom, date, moment, qualificatif, sousType, capteur, pereNom } = body;
 
     if (!vacheNutrav || !date) {
       return NextResponse.json({ error: "vacheNutrav et date sont requis" }, { status: 400 });
@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
           vacheId: vache.id,
           veauId: veauId ?? null,
           date: new Date(date),
+          moment: moment ?? null,
           qualificatif: qualificatif ?? "NORMAL",
           sousType: sousType ?? null,
           capteur: capteur ?? null,

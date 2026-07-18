@@ -382,6 +382,16 @@ export default function VoiceButton() {
       router.push(`/troupeau/${encodeURIComponent(nutrav)}?onglet=identite&pesee=1${poids}`);
       return;
     }
+    if (chosenAction === "velage") {
+      const nutrav = analysis.draft.target.nutravs[0];
+      const params = new URLSearchParams({ nouveau: "1", mere: nutrav });
+      if (analysis.draft.dateMentionnee && analysis.draft.date) params.set("date", analysis.draft.date);
+      if (analysis.draft.momentMentionne && analysis.draft.moment) params.set("moment", analysis.draft.moment);
+      if (analysis.draft.veauSexe) params.set("sexe", analysis.draft.veauSexe);
+      setAnalysis(null);
+      router.push(`/velage?${params.toString()}`);
+      return;
+    }
     if (chosenAction === "parage") {
       const draftParage: VoiceParageDraft = {
         transcript: analysis.draft.transcript,
@@ -444,6 +454,7 @@ export default function VoiceButton() {
     : taureauxRecherchables;
   const parageAvecPlusieursAnimaux = chosenAction === "parage" && selectedNutravs.length !== 1;
   const peseeAvecPlusieursAnimaux = chosenAction === "pesee" && selectedNutravs.length !== 1;
+  const velageAvecPlusieursAnimaux = chosenAction === "velage" && selectedNutravs.length !== 1;
   const informationsReconnues = analysis ? [
     chosenAction === "sanitaire" ? analysis.draft.event?.nom ?? null : null,
     analysis.draft.dateMentionnee && analysis.draft.date
@@ -499,7 +510,8 @@ export default function VoiceButton() {
             <div className="p-3">
               {parageAvecPlusieursAnimaux && <p className="mb-2 text-xs font-medium text-orange-700">Le parage accepte un seul animal. Retire les autres ou choisis Sanitaire.</p>}
               {peseeAvecPlusieursAnimaux && <p className="mb-2 text-xs font-medium text-orange-700">La pesée accepte un seul animal.</p>}
-              <button type="button" disabled={!analysis.draft.target || !selectedAction || parageAvecPlusieursAnimaux || peseeAvecPlusieursAnimaux} onClick={() => void ouvrirFormulaire()} className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40">
+              {velageAvecPlusieursAnimaux && <p className="mb-2 text-xs font-medium text-orange-700">Le vêlage accepte une seule mère.</p>}
+              <button type="button" disabled={!analysis.draft.target || !selectedAction || parageAvecPlusieursAnimaux || peseeAvecPlusieursAnimaux || velageAvecPlusieursAnimaux} onClick={() => void ouvrirFormulaire()} className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40">
                 <Check size={17} /> {selectedAction?.continueLabel ?? "Choisir une destination"}
               </button>
             </div>

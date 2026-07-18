@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Plus } from "lucide-react";
 import { getMomentActuel } from "@/lib/evenements-sanitaires";
 
@@ -41,14 +41,23 @@ const SOUS_TYPES: Record<QualificatifPrincipal, { value: string; label: string }
   ],
 };
 
-export default function VelageFormWrapper() {
-  const [showForm, setShowForm] = useState(false);
-  const [vacheNutrav, setVacheNutrav] = useState("");
+interface Props {
+  initialOpen?: boolean;
+  initialMere?: string;
+  initialDate?: string;
+  initialMoment?: "Matin" | "Soir" | "";
+  initialSexe?: "M" | "F" | "";
+}
+
+export default function VelageFormWrapper({ initialOpen = false, initialMere = "", initialDate, initialMoment = "", initialSexe = "" }: Props) {
+  const [showForm, setShowForm] = useState(initialOpen);
+  const [vacheNutrav, setVacheNutrav] = useState(initialMere);
   const [vacheInfo, setVacheInfo] = useState<{ nobovi: string | null } | null>(null);
   const [veauNutrav, setVeauNutrav] = useState("");
-  const [veauSexe, setVeauSexe] = useState<"M" | "F" | "">("");
+  const [veauSexe, setVeauSexe] = useState<"M" | "F" | "">(initialSexe);
   const [veauNom, setVeauNom] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(initialDate === undefined ? new Date().toISOString().split("T")[0] : initialDate);
+  const [moment, setMoment] = useState<"Matin" | "Soir" | "">(initialMoment);
   const [qualificatif, setQualificatif] = useState<QualificatifPrincipal>("NORMAL");
   const [sousType, setSousType] = useState<string>("");
   const [capteur, setCapteur] = useState<string>("");
@@ -72,7 +81,7 @@ export default function VelageFormWrapper() {
     });
   }
 
-  async function fetchVacheInfo(nutrav: string) {
+  const fetchVacheInfo = useCallback(async (nutrav: string) => {
     if (nutrav.length < 3) { setVacheInfo(null); return; }
     try {
       const res = await fetch(`/api/animaux/${nutrav}`);
@@ -89,7 +98,11 @@ export default function VelageFormWrapper() {
         }
       }
     } catch {}
-  }
+  }, [pereAutoFilled, pereNom]);
+
+  useEffect(() => {
+    if (initialOpen && initialMere) void fetchVacheInfo(initialMere);
+  }, [fetchVacheInfo, initialMere, initialOpen]);
 
   function handleVacheChange(val: string) {
     setVacheNutrav(val.toUpperCase());
@@ -106,6 +119,7 @@ export default function VelageFormWrapper() {
     setComplications(new Set());
     setCapteur("");
     setDate(new Date().toISOString().split("T")[0]);
+    setMoment("");
     setMessage(null);
   }
 
@@ -122,6 +136,7 @@ export default function VelageFormWrapper() {
           veauSexe: veauSexe || undefined,
           veauNom: veauNom || undefined,
           date,
+          moment: moment || undefined,
           qualificatif,
           sousType: sousType || undefined,
           capteur: capteur ? parseInt(capteur, 10) : undefined,
@@ -278,6 +293,16 @@ export default function VelageFormWrapper() {
                   required
                   className="w-full border border-gray-200 rounded-lg p-3 text-base"
                 />
+              </div>
+
+              {/* Moment */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Moment</label>
+                <select value={moment} onChange={(e) => setMoment(e.target.value as "Matin" | "Soir" | "")} className="w-full border border-gray-200 rounded-lg p-3 text-base">
+                  <option value="">Non précisé</option>
+                  <option value="Matin">Matin</option>
+                  <option value="Soir">Soir</option>
+                </select>
               </div>
 
               {/* Qualificatif principal */}

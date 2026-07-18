@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizeSearch } from "@/lib/fuzzy-search";
 import type { VoiceActionId } from "@/lib/voice-actions";
 
-const ACTIONS: VoiceActionId[] = ["sanitaire", "parage", "saillie", "chaleur", "pesee"];
+const ACTIONS: VoiceActionId[] = ["sanitaire", "parage", "saillie", "chaleur", "pesee", "velage"];
 
 function normaliserPhraseAiguillage(phrase: string) {
   return normalizeSearch(phrase)

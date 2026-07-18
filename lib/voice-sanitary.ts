@@ -30,6 +30,7 @@ export interface VoiceSanitaryDraft {
   momentMentionne: boolean;
   temperature: number | null;
   poids: number | null;
+  veauSexe: "M" | "F" | null;
   pattes: PatteParage[];
   ajouterAuParage: boolean;
   medicament: { id: string; nom: string } | null;

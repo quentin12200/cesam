@@ -133,6 +133,7 @@ model Gestation {
 model Velage {
   id            String    @id @default(cuid())
   date          DateTime
+  moment        String?
   qualificatif  String    @default("NORMAL")
   sousType      String?
 
