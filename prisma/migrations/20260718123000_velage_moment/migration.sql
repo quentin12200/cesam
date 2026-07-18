@@ -1,0 +1,1 @@
+ALTER TABLE "Velage" ADD COLUMN "moment" TEXT;

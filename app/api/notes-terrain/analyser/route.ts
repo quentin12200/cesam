@@ -340,6 +340,12 @@ export async function POST(request: NextRequest) {
     ? target.nutravs.map((nutrav) => animaux.find((animal) => animal.nutrav === nutrav)).filter(Boolean)
     : [];
   const cibleFemelle = animauxCibles.length > 0 && animauxCibles.every((animal) => animal?.sexbov.toUpperCase().startsWith("F"));
+  const veauSexe: "M" | "F" | null = /\b(?:male|males)\b/.test(texteNormalise)
+    ? "M"
+    : /\b(?:femelle|femelles)\b/.test(texteNormalise) ? "F" : null;
+  const intentionVelageDirecte = /\b(?:velage|vele|velee|naissance)\b|\b(?:a fait son veau|a eu un veau|vient de veler|en train de veler)\b/.test(texteNormalise);
+  const intentionVelage = intentionVelageDirecte
+    || (/\bvillage\b/.test(texteNormalise) && cibleFemelle && (/\b(?:veau|naissance)\b/.test(texteNormalise) || veauSexe !== null));
   const deductionParContexte = cibleFemelle && taureauReconnu !== null;
   const intentionSaillie = actionReproduction.ia
     || actionReproduction.naturelle
@@ -367,11 +373,13 @@ export async function POST(request: NextRequest) {
   const rappelDemande = /\b(?:rappel|rappeler|rappelle|surveiller|surveillance)\b/.test(texteNormalise);
   const traitementMentionne = /\btraitement\b/.test(texteNormalise) || medicament !== null;
   const estBoiterie = Boolean(event && normalizeSearch(event.nom) === "boiterie") || /\bboite(?:rie)?\b/.test(texteNormalise);
-  const actionApprise = aliasAiguillage && ["sanitaire", "parage", "saillie", "chaleur", "pesee"].includes(aliasAiguillage.action)
-    ? aliasAiguillage.action as "sanitaire" | "parage" | "saillie" | "chaleur" | "pesee"
+  const actionApprise = aliasAiguillage && ["sanitaire", "parage", "saillie", "chaleur", "pesee", "velage"].includes(aliasAiguillage.action)
+    ? aliasAiguillage.action as "sanitaire" | "parage" | "saillie" | "chaleur" | "pesee" | "velage"
     : null;
-  const suggestedActions = intentionChaleur
-    ? ["chaleur" as const]
+  const suggestedActions = intentionVelage
+    ? ["velage" as const]
+    : intentionChaleur
+      ? ["chaleur" as const]
     : intentionPesee
       ? ["pesee" as const]
       : intentionSaillie
@@ -391,6 +399,7 @@ export async function POST(request: NextRequest) {
     momentMentionne: /\b(?:matin|soir)\b/.test(texteNormalise),
     temperature,
     poids,
+    veauSexe,
     pattes,
     ajouterAuParage,
     medicament: medicament ? { id: medicament.id, nom: medicament.nom } : null,
@@ -409,7 +418,7 @@ export async function POST(request: NextRequest) {
     suggestedActions,
   };
 
-  const informationMetier = Boolean(intentionChaleur || intentionPesee || intentionSaillie || actionApprise || event || temperature !== null || medicament || medicamentCandidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
+  const informationMetier = Boolean(intentionVelage || intentionChaleur || intentionPesee || intentionSaillie || actionApprise || event || temperature !== null || medicament || medicamentCandidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
   if (draft.numerosNonTrouves.length > 0 && informationMetier) {
     return NextResponse.json({ outcome: "confirm_animal", draft, candidates });
   }

@@ -33,7 +33,8 @@ async function getVelageData() {
   return { capteurs, gestationCalendar, velagesRecents };
 }
 
-export default async function VelagePage() {
+export default async function VelagePage({ searchParams }: { searchParams: Promise<{ nouveau?: string; mere?: string; date?: string; moment?: string; sexe?: string }> }) {
+  const params = await searchParams;
   const { capteurs, gestationCalendar, velagesRecents } = await getVelageData();
   const now = new Date();
 
@@ -46,7 +47,13 @@ export default async function VelagePage() {
       </div>
 
       {/* Action principale */}
-      <VelageFormWrapper />
+      <VelageFormWrapper
+        initialOpen={params.nouveau === "1"}
+        initialMere={params.mere ?? ""}
+        initialDate={params.nouveau === "1" ? params.date ?? "" : undefined}
+        initialMoment={params.moment === "Matin" || params.moment === "Soir" ? params.moment : ""}
+        initialSexe={params.sexe === "M" || params.sexe === "F" ? params.sexe : ""}
+      />
 
       {/* Calendrier de gestation */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
