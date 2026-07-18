@@ -1,419 +1,88 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { getMomentActuel } from "@/lib/evenements-sanitaires";
 
-const COMPLICATIONS = [
-  "Non-délivrance",
-  "Rétention placentaire",
-  "Retournement de matrice",
-  "Prolapsus vaginal",
+type Qualificatif = "NORMAL" | "DIFFICILE" | "AVORTEMENT" | "MORT_NEE";
+type Veau = { nutrav: string; sexe: "M" | "F" | ""; nom: string; statut: "VIVANT" | "MORT_NE" };
+type Capteur = { numero: number; actif: boolean; animalNutrav: string | null };
+const vide = (statut: Veau["statut"] = "VIVANT"): Veau => ({ nutrav: "", sexe: "", nom: "", statut });
+const COMPLICATIONS = ["Non-délivrance", "Rétention placentaire", "Retournement de matrice", "Prolapsus vaginal"];
+const QUALIFICATIFS: { value: Qualificatif; label: string; color: string }[] = [
+  { value: "NORMAL", label: "Normal", color: "bg-green-500 border-green-500" },
+  { value: "DIFFICILE", label: "Difficile", color: "bg-orange-400 border-orange-400" },
+  { value: "AVORTEMENT", label: "Avortement", color: "bg-red-500 border-red-500" },
+  { value: "MORT_NEE", label: "Mort-né", color: "bg-gray-600 border-gray-600" },
 ];
-
-type QualificatifPrincipal = "NORMAL" | "DIFFICILE" | "AVORTEMENT" | "MORT_NEE" | "JUMEAUX";
-
-const QUALIFICATIFS_PRINCIPAUX: { value: QualificatifPrincipal; label: string; color: string }[] = [
-  { value: "NORMAL", label: "Normal", color: "bg-green-500 text-white border-green-500" },
-  { value: "DIFFICILE", label: "Difficile", color: "bg-orange-400 text-white border-orange-400" },
-  { value: "AVORTEMENT", label: "Avortement", color: "bg-red-500 text-white border-red-500" },
-  { value: "MORT_NEE", label: "Mort-né", color: "bg-gray-600 text-white border-gray-600" },
-  { value: "JUMEAUX", label: "Jumeaux", color: "bg-purple-500 text-white border-purple-500" },
-];
-
-const SOUS_TYPES: Record<QualificatifPrincipal, { value: string; label: string }[]> = {
-  NORMAL: [
-    { value: "SEULE", label: "Seule" },
-    { value: "ASSISTEE", label: "Assistée" },
-  ],
-  DIFFICILE: [
-    { value: "MAUVAIS_POSITIONNEMENT", label: "Mauvais positionnement" },
-    { value: "GROS_VEAU", label: "Gros veau" },
-    { value: "VACHE_NON_PREPAREE", label: "Vache non préparée" },
-    { value: "CESARIENNE", label: "Césarienne" },
-  ],
-  AVORTEMENT: [],
-  MORT_NEE: [],
-  JUMEAUX: [
-    { value: "DEUX_VIVANTS", label: "2 vivants" },
-    { value: "UN_MORT", label: "1 vivant / 1 mort" },
-    { value: "DEUX_MORTS", label: "2 morts" },
-  ],
+const PRECISIONS: Record<Qualificatif, { value: string; label: string }[]> = {
+  NORMAL: [{ value: "SEULE", label: "Seule" }, { value: "ASSISTEE", label: "Assistée" }],
+  DIFFICILE: [{ value: "MAUVAIS_POSITIONNEMENT", label: "Mauvais positionnement" }, { value: "GROS_VEAU", label: "Gros veau" }, { value: "VACHE_NON_PREPAREE", label: "Vache non préparée" }, { value: "CESARIENNE", label: "Césarienne" }],
+  AVORTEMENT: [], MORT_NEE: [],
 };
 
-interface Props {
-  initialOpen?: boolean;
-  initialMere?: string;
-  initialDate?: string;
-  initialMoment?: "Matin" | "Soir" | "";
-  initialSexe?: "M" | "F" | "";
-}
+interface Props { initialOpen?: boolean; initialMere?: string; initialDate?: string; initialSexe?: "M" | "F" | ""; capteurs?: Capteur[] }
 
-export default function VelageFormWrapper({ initialOpen = false, initialMere = "", initialDate, initialMoment = "", initialSexe = "" }: Props) {
-  const [showForm, setShowForm] = useState(initialOpen);
-  const [vacheNutrav, setVacheNutrav] = useState(initialMere);
-  const [vacheInfo, setVacheInfo] = useState<{ nobovi: string | null } | null>(null);
-  const [veauNutrav, setVeauNutrav] = useState("");
-  const [veauSexe, setVeauSexe] = useState<"M" | "F" | "">(initialSexe);
-  const [veauNom, setVeauNom] = useState("");
-  const [date, setDate] = useState(initialDate === undefined ? new Date().toISOString().split("T")[0] : initialDate);
-  const [moment, setMoment] = useState<"Matin" | "Soir" | "">(initialMoment);
-  const [qualificatif, setQualificatif] = useState<QualificatifPrincipal>("NORMAL");
-  const [sousType, setSousType] = useState<string>("");
-  const [capteur, setCapteur] = useState<string>("");
-  const [pereNom, setPereNom] = useState("");
-  const [pereAutoFilled, setPereAutoFilled] = useState(false);
-  const [complications, setComplications] = useState<Set<string>>(new Set());
-  const [saving, setSaving] = useState(false);
+export default function VelageFormWrapper({ initialOpen = false, initialMere = "", initialDate, initialSexe = "", capteurs = [] }: Props) {
+  const today = new Date().toISOString().split("T")[0];
+  const [open, setOpen] = useState(initialOpen), [mere, setMere] = useState(initialMere);
+  const [mereNom, setMereNom] = useState<string | null>(null), [date, setDate] = useState(initialDate || today);
+  const [veaux, setVeaux] = useState<Veau[]>([{ ...vide(), sexe: initialSexe }]);
+  const [qualificatif, setQualificatif] = useState<Qualificatif>("NORMAL"), [precision, setPrecision] = useState("SEULE");
+  const [capteur, setCapteur] = useState(""), [pereNom, setPereNom] = useState(""), [pereAuto, setPereAuto] = useState(false);
+  const [complications, setComplications] = useState<Set<string>>(new Set()), [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
-  const vacheDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function handleQualificatifChange(q: QualificatifPrincipal) {
-    setQualificatif(q);
-    setSousType("");
-  }
-
-  function toggleComplication(c: string) {
-    setComplications((prev) => {
-      const next = new Set(prev);
-      if (next.has(c)) next.delete(c); else next.add(c);
-      return next;
-    });
-  }
-
-  const fetchVacheInfo = useCallback(async (nutrav: string) => {
-    if (nutrav.length < 3) { setVacheInfo(null); return; }
+  const chargerMere = useCallback(async (nutrav: string) => {
+    if (nutrav.length < 3) return setMereNom(null);
     try {
-      const res = await fetch(`/api/animaux/${nutrav}`);
-      if (!res.ok) { setVacheInfo(null); return; }
-      const data = await res.json();
-      setVacheInfo({ nobovi: data.nobovi });
-      // Auto-remplir le père depuis la dernière saillie
-      if (!pereAutoFilled || !pereNom) {
-        const saillies: { date: string; taureau?: { nopere?: string; nupere?: string } | null; pereNom?: string | null }[] = data.saillies ?? [];
-        if (saillies.length > 0) {
-          const last = saillies[0];
-          const nom = last.taureau?.nopere ?? last.pereNom ?? "";
-          if (nom) { setPereNom(nom); setPereAutoFilled(true); }
-        }
-      }
+      const res = await fetch(`/api/animaux/${nutrav}`); if (!res.ok) return setMereNom(null);
+      const data = await res.json(); setMereNom(data.nobovi);
+      const nom = data.saillies?.[0]?.taureau?.nopere ?? data.saillies?.[0]?.pereNom ?? "";
+      if (nom && (!pereAuto || !pereNom)) { setPereNom(nom); setPereAuto(true); }
+      const attribue = capteurs.find((c) => c.actif && c.animalNutrav === nutrav);
+      if (attribue) setCapteur(String(attribue.numero));
     } catch {}
-  }, [pereAutoFilled, pereNom]);
+  }, [capteurs, pereAuto, pereNom]);
+  useEffect(() => { if (initialOpen && initialMere) void chargerMere(initialMere); }, [chargerMere, initialMere, initialOpen]);
 
-  useEffect(() => {
-    if (initialOpen && initialMere) void fetchVacheInfo(initialMere);
-  }, [fetchVacheInfo, initialMere, initialOpen]);
-
-  function handleVacheChange(val: string) {
-    setVacheNutrav(val.toUpperCase());
-    setVacheInfo(null);
-    if (vacheDebounce.current) clearTimeout(vacheDebounce.current);
-    vacheDebounce.current = setTimeout(() => fetchVacheInfo(val.toUpperCase()), 500);
+  function changerMere(value: string) { const n = value.toUpperCase(); setMere(n); setMereNom(null); if (debounce.current) clearTimeout(debounce.current); debounce.current = setTimeout(() => void chargerMere(n), 500); }
+  function nombre(n: number) { n = Math.max(1, Math.min(10, n || 1)); setVeaux((v) => Array.from({ length: n }, (_, i) => v[i] ?? vide(qualificatif === "MORT_NEE" ? "MORT_NE" : "VIVANT"))); }
+  function modifierVeau(i: number, data: Partial<Veau>) { setVeaux((v) => v.map((x, j) => i === j ? { ...x, ...data } : x)); }
+  function changerQualificatif(q: Qualificatif) {
+    setQualificatif(q); setPrecision(q === "NORMAL" ? "SEULE" : ""); if (q !== "DIFFICILE") setComplications(new Set());
+    if (q === "AVORTEMENT") setVeaux([]); else if (q === "MORT_NEE") setVeaux((v) => (v.length ? v : [vide("MORT_NE")]).map((x) => ({ ...x, statut: "MORT_NE" })));
+    else if (!veaux.length) setVeaux([vide()]);
   }
+  function reset() { setMere(""); setMereNom(null); setDate(today); setVeaux([vide()]); setQualificatif("NORMAL"); setPrecision("SEULE"); setCapteur(""); setPereNom(""); setPereAuto(false); setComplications(new Set()); }
 
-  function resetForm() {
-    setVacheNutrav(""); setVacheInfo(null);
-    setVeauNutrav(""); setVeauSexe(""); setVeauNom("");
-    setQualificatif("NORMAL"); setSousType("");
-    setPereNom(""); setPereAutoFilled(false);
-    setComplications(new Set());
-    setCapteur("");
-    setDate(new Date().toISOString().split("T")[0]);
-    setMoment("");
-    setMessage(null);
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
+  async function enregistrer(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true);
     try {
-      const res = await fetch("/api/velages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vacheNutrav,
-          veauNutrav: veauNutrav || undefined,
-          veauSexe: veauSexe || undefined,
-          veauNom: veauNom || undefined,
-          date,
-          moment: moment || undefined,
-          qualificatif,
-          sousType: sousType || undefined,
-          capteur: capteur ? parseInt(capteur, 10) : undefined,
-          pereNom: pereNom || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Erreur");
-      }
-      const data = await res.json();
-
-      const typesASignaler = new Set(complications);
-      if (sousType === "CESARIENNE") typesASignaler.add("Césarienne");
-      if (typesASignaler.size > 0 && data.vacheId) {
-        await Promise.all(
-          Array.from(typesASignaler).map((type) =>
-            fetch("/api/evenements/batch", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                animalIds: [data.vacheId],
-                date,
-                moment: getMomentActuel(),
-                categorie: "INTERVENTION",
-                type,
-                description: `Suite au vélage du ${new Date(date).toLocaleDateString("fr-FR")}`,
-              }),
-            }).catch(() => {})
-          )
-        );
-      }
-
-      const txt = data._veauCree
-        ? `Vélage enregistré ! Veau ${data._veauCree} créé dans le troupeau — pense à ajouter son N° national.`
-        : "Vélage enregistré !";
-      setMessage({ text: txt, ok: true });
-      setShowForm(false);
-      resetForm();
-    } catch (err) {
-      setMessage({ text: String(err).replace("Error: ", ""), ok: false });
-    } finally {
-      setSaving(false);
-    }
+      const res = await fetch("/api/velages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vacheNutrav: mere, date, qualificatif, sousType: precision || undefined, capteur: capteur ? Number(capteur) : undefined, pereNom: pereNom || undefined, veaux }) });
+      const data = await res.json(); if (!res.ok) throw new Error(data.error ?? "Erreur");
+      if (qualificatif === "DIFFICILE") { const types = new Set(complications); if (precision === "CESARIENNE") types.add("Césarienne"); await Promise.all(Array.from(types).map((type) => fetch("/api/evenements/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ animalIds: [data.vacheId], date, moment: getMomentActuel(), categorie: "INTERVENTION", type, description: `Suite au vêlage du ${new Date(date).toLocaleDateString("fr-FR")}` }) }).catch(() => {}))); }
+      setOpen(false); reset(); setMessage({ text: "Vêlage enregistré !", ok: true });
+    } catch (err) { setMessage({ text: String(err).replace("Error: ", ""), ok: false }); } finally { setSaving(false); }
   }
 
-  const sousCats = SOUS_TYPES[qualificatif];
-
-  return (
-    <>
-      {message && (
-        <div className={`px-4 py-3 rounded-xl text-sm flex items-center justify-between border
-          ${message.ok
-            ? "bg-green-50 border-green-200 text-green-800"
-            : "bg-red-50 border-red-200 text-red-800"}`}>
-          {message.text}
-          <button onClick={() => setMessage(null)} className="font-bold ml-2 opacity-60 hover:opacity-100">×</button>
-        </div>
-      )}
-
-      <button
-        onClick={() => setShowForm(true)}
-        className="w-full flex items-center justify-center gap-2 bg-pink-500 text-white py-4 rounded-xl font-medium text-base"
-      >
-        <Plus size={20} /> Enregistrer un vélage
-      </button>
-
-      {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
-          <div className="bg-white rounded-t-2xl w-full p-6 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-800">Enregistrer un vélage</h3>
-              <button onClick={() => { setShowForm(false); resetForm(); }} className="text-gray-400 text-2xl leading-none px-2">×</button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-5">
-
-              {/* Message d'erreur visible dans le formulaire */}
-              {message && !message.ok && (
-                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800 flex items-start justify-between gap-2">
-                  <span>{message.text}</span>
-                  <button type="button" onClick={() => setMessage(null)} className="text-red-400 font-bold shrink-0">×</button>
-                </div>
-              )}
-
-              {/* Vache */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">NUTRAV de la vache</label>
-                <input
-                  type="text"
-                  value={vacheNutrav}
-                  onChange={(e) => handleVacheChange(e.target.value)}
-                  placeholder="ex: 0042"
-                  required
-                  className="w-full border border-gray-200 rounded-lg p-3 text-base font-mono"
-                />
-                {vacheInfo?.nobovi && (
-                  <p className="text-xs text-emerald-600 mt-1 font-medium">{vacheInfo.nobovi}</p>
-                )}
-              </div>
-
-              {/* Veau : nutrav + sexe + nom sur la même section */}
-              <div className="bg-sky-50 rounded-xl p-4 space-y-3">
-                <p className="text-sm font-semibold text-sky-800">Informations du veau</p>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">NUTRAV du veau (optionnel)</label>
-                  <input
-                    type="text"
-                    value={veauNutrav}
-                    onChange={(e) => setVeauNutrav(e.target.value.toUpperCase())}
-                    placeholder="ex: 0166"
-                    className="w-full border border-gray-200 rounded-lg p-3 text-base font-mono bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-2">Sexe</label>
-                  <div className="flex gap-2">
-                    {(["M", "F"] as const).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setVeauSexe(veauSexe === s ? "" : s)}
-                        className={`flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-colors
-                          ${veauSexe === s
-                            ? s === "M" ? "bg-sky-500 text-white border-sky-500" : "bg-pink-500 text-white border-pink-500"
-                            : "border-gray-200 text-gray-700 bg-white"}`}
-                      >
-                        {s === "M" ? "♂ Mâle" : "♀ Femelle"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Nom / surnom (optionnel)</label>
-                  <input
-                    type="text"
-                    value={veauNom}
-                    onChange={(e) => setVeauNom(e.target.value)}
-                    placeholder="ex: BOOSTIFLOR"
-                    className="w-full border border-gray-200 rounded-lg p-3 text-base bg-white"
-                  />
-                </div>
-              </div>
-
-              {/* Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date du vélage</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  required
-                  className="w-full border border-gray-200 rounded-lg p-3 text-base"
-                />
-              </div>
-
-              {/* Moment */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Moment</label>
-                <select value={moment} onChange={(e) => setMoment(e.target.value as "Matin" | "Soir" | "")} className="w-full border border-gray-200 rounded-lg p-3 text-base">
-                  <option value="">Non précisé</option>
-                  <option value="Matin">Matin</option>
-                  <option value="Soir">Soir</option>
-                </select>
-              </div>
-
-              {/* Qualificatif principal */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Qualificatif du vélage</label>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {QUALIFICATIFS_PRINCIPAUX.map((q) => (
-                    <button
-                      key={q.value}
-                      type="button"
-                      onClick={() => handleQualificatifChange(q.value)}
-                      className={`py-3 rounded-xl text-sm font-semibold border-2 transition-colors ${
-                        qualificatif === q.value ? q.color : "border-gray-200 text-gray-700 bg-white"
-                      }`}
-                    >
-                      {q.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Sous-type */}
-              {sousCats.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-2">Précision</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {sousCats.map((s) => (
-                      <button
-                        key={s.value}
-                        type="button"
-                        onClick={() => setSousType(sousType === s.value ? "" : s.value)}
-                        className={`py-2.5 rounded-lg text-sm border-2 transition-colors ${
-                          sousType === s.value
-                            ? "border-gray-600 bg-gray-100 text-gray-900 font-semibold"
-                            : "border-gray-200 text-gray-600 bg-white"
-                        }`}
-                      >
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Complications sanitaires */}
-              <div className="bg-red-50 rounded-xl p-4">
-                <label className="block text-sm font-semibold text-red-800 mb-2">Complications sanitaires (optionnel)</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {COMPLICATIONS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => toggleComplication(c)}
-                      className={`py-2.5 rounded-lg text-sm border-2 transition-colors text-left px-3 ${
-                        complications.has(c)
-                          ? "border-red-500 bg-red-100 text-red-800 font-semibold"
-                          : "border-gray-200 text-gray-600 bg-white"
-                      }`}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-red-700 mt-2">
-                  Chaque complication cochée sera enregistrée comme événement sanitaire pour la vache.
-                  {sousType === "CESARIENNE" && " La césarienne sera signalée automatiquement."}
-                </p>
-              </div>
-
-              {/* Père */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nom du père
-                  {pereAutoFilled && <span className="ml-2 text-xs text-emerald-500 font-normal">auto-rempli depuis la dernière saillie</span>}
-                </label>
-                <input
-                  type="text"
-                  value={pereNom}
-                  onChange={(e) => { setPereNom(e.target.value); setPereAutoFilled(false); }}
-                  placeholder="ex: ZEUS"
-                  className="w-full border border-gray-200 rounded-lg p-3 text-base"
-                />
-              </div>
-
-              {/* Capteur */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Capteur utilisé (optionnel)</label>
-                <select
-                  value={capteur}
-                  onChange={(e) => setCapteur(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg p-3 text-base"
-                >
-                  <option value="">Aucun capteur</option>
-                  <option value="1">Capteur 1</option>
-                  <option value="2">Capteur 2</option>
-                  <option value="3">Capteur 3</option>
-                  <option value="4">Capteur 4</option>
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full bg-pink-500 text-white py-4 rounded-xl font-semibold text-base disabled:opacity-50"
-              >
-                {saving ? "Enregistrement…" : "Enregistrer le vélage"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
-  );
+  return <>
+    {message && <div className={`px-4 py-3 rounded-xl text-sm border ${message.ok ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"}`}>{message.text}</div>}
+    <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-2 bg-pink-500 text-white py-4 rounded-xl font-medium"><Plus size={20} /> Enregistrer un vêlage</button>
+    {open && <div className="fixed inset-0 bg-black/50 z-50 flex items-end"><div className="bg-white rounded-t-2xl w-full p-6 max-h-[92vh] overflow-y-auto"><div className="flex justify-between mb-4"><h3 className="text-lg font-bold">Enregistrer un vêlage</h3><button onClick={() => { setOpen(false); reset(); }} className="text-2xl text-gray-400">×</button></div>
+      <form onSubmit={enregistrer} className="space-y-5">
+        <div><label className="block text-sm font-medium mb-1">NUTRAV de la vache</label><input value={mere} onChange={(e) => changerMere(e.target.value)} required className="w-full border rounded-lg p-3 font-mono" />{mereNom && <p className="text-xs text-emerald-600 mt-1">{mereNom}</p>}</div>
+        <div><label className="block text-sm font-medium mb-1">Date du vêlage</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full border rounded-lg p-3" /></div>
+        <div><label className="block text-sm font-medium mb-2">Déroulement</label><div className="grid grid-cols-2 gap-2">{QUALIFICATIFS.map((q) => <button key={q.value} type="button" onClick={() => changerQualificatif(q.value)} className={`py-3 rounded-xl text-sm font-semibold border-2 ${qualificatif === q.value ? `${q.color} text-white` : "border-gray-200 bg-white"}`}>{q.label}</button>)}</div></div>
+        {!!PRECISIONS[qualificatif].length && <div><label className="block text-sm text-gray-500 mb-2">Précision</label><div className="grid grid-cols-2 gap-2">{PRECISIONS[qualificatif].map((p) => <button key={p.value} type="button" onClick={() => setPrecision(p.value)} className={`py-2.5 rounded-lg text-sm border-2 ${precision === p.value ? "border-gray-600 bg-gray-100 font-semibold" : "border-gray-200"}`}>{p.label}</button>)}</div></div>}
+        {qualificatif !== "AVORTEMENT" && <div className="space-y-3"><div className="flex items-end gap-2"><div className="flex-1"><label className="block text-sm font-medium mb-1">Nombre total de veaux</label><input type="number" min={1} max={10} value={veaux.length} onChange={(e) => nombre(Number(e.target.value))} className="w-full border rounded-lg p-3" /></div><button type="button" onClick={() => nombre(2)} className="border border-purple-300 text-purple-700 rounded-lg px-4 py-3">Jumeaux</button></div>
+          {veaux.map((veau, i) => <div key={i} className="bg-sky-50 rounded-xl p-4 space-y-3"><p className="font-semibold text-sky-800">Veau {i + 1}</p><div className="grid grid-cols-2 gap-2"><button type="button" disabled={qualificatif === "MORT_NEE"} onClick={() => modifierVeau(i, { statut: "VIVANT" })} className={`py-2 rounded-lg border-2 ${veau.statut === "VIVANT" ? "bg-green-500 text-white border-green-500" : "bg-white border-gray-200"}`}>Vivant</button><button type="button" onClick={() => modifierVeau(i, { statut: "MORT_NE" })} className={`py-2 rounded-lg border-2 ${veau.statut === "MORT_NE" ? "bg-gray-600 text-white border-gray-600" : "bg-white border-gray-200"}`}>Mort-né</button></div><input value={veau.nutrav} onChange={(e) => modifierVeau(i, { nutrav: e.target.value.toUpperCase() })} placeholder="NUTRAV (optionnel)" className="w-full border rounded-lg p-3 font-mono bg-white" /><div className="grid grid-cols-2 gap-2">{(["M", "F"] as const).map((s) => <button key={s} type="button" onClick={() => modifierVeau(i, { sexe: s })} className={`py-2 rounded-lg border-2 ${veau.sexe === s ? (s === "M" ? "bg-sky-500 text-white border-sky-500" : "bg-pink-500 text-white border-pink-500") : "bg-white border-gray-200"}`}>{s === "M" ? "♂ Mâle" : "♀ Femelle"}</button>)}</div><input value={veau.nom} onChange={(e) => modifierVeau(i, { nom: e.target.value })} placeholder="Nom / surnom (optionnel)" className="w-full border rounded-lg p-3 bg-white" /></div>)}
+        </div>}
+        {qualificatif === "DIFFICILE" && <div className="bg-red-50 rounded-xl p-4"><label className="block text-sm font-semibold text-red-800 mb-2">Complications sanitaires (optionnel)</label><div className="grid grid-cols-2 gap-2">{COMPLICATIONS.map((c) => <button key={c} type="button" onClick={() => setComplications((p) => { const n = new Set(p); n.has(c) ? n.delete(c) : n.add(c); return n; })} className={`py-2 rounded-lg text-sm border-2 ${complications.has(c) ? "border-red-500 bg-red-100" : "border-gray-200 bg-white"}`}>{c}</button>)}</div></div>}
+        <div><label className="block text-sm font-medium mb-1">Nom du père</label><input value={pereNom} onChange={(e) => { setPereNom(e.target.value); setPereAuto(false); }} className="w-full border rounded-lg p-3" />{pereAuto && <p className="text-xs text-emerald-500 mt-1">Prérempli depuis la dernière saillie</p>}</div>
+        <div><label className="block text-sm font-medium mb-1">Capteur utilisé (optionnel)</label><select value={capteur} onChange={(e) => setCapteur(e.target.value)} className="w-full border rounded-lg p-3"><option value="">Aucun capteur</option>{capteurs.map((c) => <option key={c.numero} value={c.numero}>Capteur {c.numero}{c.actif && c.animalNutrav ? ` — ${c.animalNutrav}` : ""}</option>)}</select></div>
+        <button disabled={saving} className="w-full bg-pink-500 text-white py-4 rounded-xl font-semibold disabled:opacity-50">{saving ? "Enregistrement…" : "Enregistrer le vêlage"}</button>
+      </form></div></div>}
+  </>;
 }

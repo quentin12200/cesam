@@ -97,6 +97,7 @@ async function getAnimal(nutrav: string) {
         orderBy: { date: "desc" },
         include: {
           veau: { select: { nutrav: true, nobovi: true, sexbov: true, statut: true } },
+          veauxDetails: { include: { animal: { select: { nutrav: true, nobovi: true, sexbov: true, statut: true } } } },
         },
       },
       velageVeau: {
@@ -838,7 +839,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                             </span>
                           </div>
                         </div>
-                        {velage.veau && (
+                        {velage.veau && velage.veauxDetails.length === 0 && (
                           <div className="flex items-center gap-2 mt-1.5">
                             <Link
                               href={`/troupeau/${velage.veau.nutrav}`}
@@ -861,10 +862,23 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                             </span>
                           </div>
                         )}
+                        {velage.veauxDetails.length > 0 && (
+                          <div className="mt-1.5 space-y-1">
+                            {velage.veauxDetails.map((veau, index) => (
+                              <div key={veau.id} className="flex items-center gap-2 text-xs text-gray-600">
+                                <span>Veau {index + 1}:</span>
+                                {veau.animal ? <Link href={`/troupeau/${veau.animal.nutrav}`} className="font-mono font-bold text-green-700 hover:underline">{veau.animal.nutrav}</Link> : <span className="font-mono">{veau.nutrav ?? veau.nom ?? "sans numéro"}</span>}
+                                <span>{veau.sexe === "M" ? "♂ Mâle" : veau.sexe === "F" ? "♀ Femelle" : "Sexe inconnu"}</span>
+                                <span className={veau.statut === "MORT_NE" ? "text-gray-700 font-medium" : "text-green-700"}>{veau.statut === "MORT_NE" ? "Mort-né" : "Vivant"}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {velage.pereNom && (
                           <div className="text-xs text-gray-500 mt-1">Père: {velage.pereNom}</div>
                         )}
-                        {!velage.veau && (
+                        {velage.capteur && <div className="text-xs text-gray-500 mt-1">Capteur utilisé : {velage.capteur}</div>}
+                        {!velage.veau && velage.veauxDetails.length === 0 && (
                           <LierVeauButton velageId={velage.id} />
                         )}
                         <DeleteHistoriqueButton

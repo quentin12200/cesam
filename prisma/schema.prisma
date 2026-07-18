@@ -55,6 +55,7 @@ model Animal {
   saillies        Saillie[]
   velagesVache    Velage[]        @relation("VelageVache")
   velageVeau      Velage?         @relation("VelageVeau")
+  veauxVelage     VeauVelage[]
   pesees          Pesee[]
   vaccinations    Vaccination[]
   evenements      EvenementSanitaire[]
@@ -150,6 +151,8 @@ model Velage {
   pereNom       String?
   pereNunati    String?
   jumeaux       Boolean   @default(false)
+  nombreVeaux   Int       @default(1)
+  veauxDetails  VeauVelage[]
 
   notes         String?
 
@@ -293,6 +296,21 @@ model Parage {
   updatedAt  DateTime @updatedAt
 
   @@index([statut, date])
+}
+
+model VeauVelage {
+  id        String   @id @default(cuid())
+  velageId  String
+  velage    Velage   @relation(fields: [velageId], references: [id], onDelete: Cascade)
+  animalId  String?  @unique
+  animal    Animal?  @relation(fields: [animalId], references: [id])
+  nutrav    String?
+  nom       String?
+  sexe      String?
+  statut    String
+  createdAt DateTime @default(now())
+
+  @@index([velageId])
 }
 
 model ComplementAlim {
