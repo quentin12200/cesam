@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { numeroNationalDuLot } from "@/lib/identification";
+import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
 
 type VeauSaisi = { nutrav?: string; nunati?: string; sexe?: "M" | "F"; nom?: string; statut?: "VIVANT" | "MORT_NE" };
 
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
     if (!vache) return NextResponse.json({ error: `Vache ${vacheNutrav} non trouvée` }, { status: 404 });
     const prevTarieFaite = vache.tarieFaite;
     const identificationConfig = await prisma.exploitationConfig.findUnique({ where: { id: "singleton" } });
-    const lotActif = await prisma.lotBoucles.findFirst({ where: { actif: true }, orderBy: { createdAt: "desc" } });
+    const lotActif = await obtenirLotBouclesActif();
 
     let veaux: VeauSaisi[] = Array.isArray(body.veaux) ? body.veaux : [];
     if (!body.veaux && body.veauNutrav) veaux = [{ nutrav: body.veauNutrav, sexe: body.veauSexe, nom: body.veauNom, statut: "VIVANT" }];
@@ -78,7 +79,11 @@ export async function POST(request: NextRequest) {
     if (capteur) await prisma.capteurVelage.updateMany({ where: { numero: capteur }, data: { actif: false, animalNutrav: null, animalNom: null, dateAttribution: null } });
     if (lotActif) {
       const indexes = veaux.flatMap((veau) => numerosDuLot.find((numero) => numero.nunati === veau.nunati && numero.nutrav === veau.nutrav)?.index ?? []).filter((index) => index >= lotActif.prochainIndex);
-      if (indexes.length) await prisma.lotBoucles.update({ where: { id: lotActif.id }, data: { prochainIndex: Math.max(...indexes) + 1 } });
+      if (indexes.length) {
+        const prochainIndex = Math.max(...indexes) + 1;
+        await prisma.lotBoucles.update({ where: { id: lotActif.id }, data: { prochainIndex, actif: prochainIndex < lotActif.quantite } });
+        if (prochainIndex >= lotActif.quantite) await obtenirLotBouclesActif();
+      }
     }
     let undoId = "";
     try {

@@ -3,11 +3,13 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { numeroNationalDuLot, propositionLot } from "@/lib/identification";
+import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
 
 async function lire() {
   const config = await prisma.exploitationConfig.upsert({ where: { id: "singleton" }, create: { id: "singleton" }, update: {} });
-  const lotActif = await prisma.lotBoucles.findFirst({ where: { actif: true }, orderBy: { createdAt: "desc" } });
-  return { config, lotActif, proposition: lotActif && lotActif.prochainIndex < lotActif.quantite ? propositionLot(lotActif, 4, true) : null };
+  const lotActif = await obtenirLotBouclesActif();
+  const lotsEnAttente = await prisma.lotBoucles.findMany({ where: { actif: false }, orderBy: { createdAt: "asc" } });
+  return { config, lotActif, lotsEnAttente: lotsEnAttente.filter((lot) => lot.prochainIndex < lot.quantite), proposition: lotActif ? propositionLot(lotActif, 4, true) : null };
 }
 
 export async function GET() { return NextResponse.json(await lire()); }
@@ -30,9 +32,9 @@ export async function POST(request: Request) {
   ]);
   if (animalUtilise || veauUtilise) return NextResponse.json({ error: `Un numéro du lot est déjà utilisé (${animalUtilise?.nutrav ?? veauUtilise?.nutrav ?? animalUtilise?.numeroNational ?? veauUtilise?.nunati})` }, { status: 409 });
 
+  const lotActif = await obtenirLotBouclesActif();
   await prisma.$transaction([
-    prisma.lotBoucles.updateMany({ where: { actif: true }, data: { actif: false } }),
-    prisma.lotBoucles.create({ data: { reference: String(body.reference ?? "").trim() || null, premierNutrav, premierNunati, quantite, prochainIndex: 0, actif: true } }),
+    prisma.lotBoucles.create({ data: { reference: null, premierNutrav, premierNunati, quantite, prochainIndex: 0, actif: !lotActif } }),
     prisma.exploitationConfig.upsert({ where: { id: "singleton" }, create: { id: "singleton", identificationMode: "TRAVAIL_ET_NATIONAL", nutravNbChiffres: 4, nutravZerosGauche: true, propositionAutoNumero: true, serieCommuneSexes: true }, update: { identificationMode: "TRAVAIL_ET_NATIONAL", nutravNbChiffres: 4, nutravZerosGauche: true, propositionAutoNumero: true, serieCommuneSexes: true } }),
   ]);
   return NextResponse.json(await lire(), { status: 201 });

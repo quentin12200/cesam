@@ -9,6 +9,7 @@ import { getGestationCalendar } from "@/lib/gestation-calendar";
 import GestationCalendarSection from "@/app/components/GestationCalendarSection";
 import TroupeauTabs from "@/components/TroupeauTabs";
 import { propositionLot } from "@/lib/identification";
+import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
 
 async function getVelageData() {
   const now = new Date();
@@ -32,7 +33,7 @@ async function getVelageData() {
     }),
     prisma.animal.findMany({ select: { nutrav: true, numeroNational: true } }),
     prisma.veauVelage.findMany({ select: { nutrav: true, nunati: true } }),
-    prisma.lotBoucles.findFirst({ where: { actif: true }, orderBy: { createdAt: "desc" } }),
+    obtenirLotBouclesActif(),
   ]);
 
   const numerosUtilises = [...new Set([...numerosAnimaux.map((animal) => animal.nutrav), ...numerosVeaux.flatMap((veau) => veau.nutrav ? [veau.nutrav] : [])])];

@@ -12,6 +12,7 @@ import ChecklistSection, {
   type SubItem,
 } from "@/app/components/ChecklistSection";
 import AccueilQuickActions from "@/app/components/AccueilQuickActions";
+import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
 import AccueilTodoSection, { type AccueilTodoGroup } from "@/app/components/AccueilTodoSection";
 import NotesTerrain from "@/app/components/NotesTerrain";
 import RapportGestationButton from "@/app/components/RapportGestationButton";
@@ -341,7 +342,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
   const [data, notesTerrain, lotBoucles] = await Promise.all([
     getDashboardData(),
     getNotesTerrain(),
-    prisma.lotBoucles.findFirst({ where: { actif: true }, orderBy: { createdAt: "desc" } }),
+    obtenirLotBouclesActif(),
   ]);
   const capteursActifs = data.capteurs.filter((c) => c.actif);
   const capteursActifsNutravs = new Set(capteursActifs.map((c) => c.animalNutrav).filter(Boolean));
