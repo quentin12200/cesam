@@ -101,7 +101,69 @@ const CAISSES_MSA = [
   { codes: ["06", "13", "83"], nom: "MSA Provence-Azur", url: "https://provenceazur.msa.fr/" },
   { codes: ["40", "64"], nom: "MSA Sud Aquitaine", url: "https://sudaquitaine.msa.fr/" },
   { codes: ["10", "52"], nom: "MSA Sud Champagne", url: "https://sudchampagne.msa.fr/" },
+  { codes: ["971"], nom: "CGSS Guadeloupe", url: "https://www.cgss-guadeloupe.fr/" },
+  { codes: ["972"], nom: "CGSS Martinique", url: "https://cgss-martinique.fr/" },
+  { codes: ["973"], nom: "CGSS Guyane", url: "https://www.cgss-guyane.fr/agriculteurs/" },
+  { codes: ["974"], nom: "CGSS La Réunion", url: "https://www.cgss.re/" },
+  { codes: ["975"], nom: "CPS Saint-Pierre-et-Miquelon", url: "https://www.secuspm.com/" },
+  { codes: ["976"], nom: "CSS Mayotte", url: "https://www.cssm.fr/" },
 ] as const;
+
+type ContactSocialMsa = {
+  codes: readonly string[];
+  numero: string;
+  sourceUrl: string;
+  aidesUrl: string;
+  email?: string;
+  ligneDirecte?: boolean;
+};
+
+const CONTACTS_SOCIAUX_MSA: ContactSocialMsa[] = [
+  { codes: ["01", "69"], numero: "04 74 45 98 30", sourceUrl: "https://ain-rhone.msa.fr/lfp/472", aidesUrl: "https://ain-rhone.msa.fr/lfp/action-sociale", ligneDirecte: true },
+  { codes: ["38"], numero: "04 76 88 76 20", sourceUrl: "https://alpesdunord.msa.fr/lfp/nous-contacter", aidesUrl: "https://alpesdunord.msa.fr/lfp/solidarite/ass/aides-exceptionnelles", ligneDirecte: true },
+  { codes: ["73", "74"], numero: "04 79 62 89 21", sourceUrl: "https://alpesdunord.msa.fr/lfp/nous-contacter", aidesUrl: "https://alpesdunord.msa.fr/lfp/solidarite/ass/aides-exceptionnelles", ligneDirecte: true },
+  { codes: ["04", "05", "84"], numero: "04 90 13 60 98", sourceUrl: "https://alpes-vaucluse.msa.fr/lfp/les-aides-financi%C3%A8res-de-la-msa-alpes-vaucluse", aidesUrl: "https://alpes-vaucluse.msa.fr/lfp/les-aides-financi%C3%A8res-de-la-msa-alpes-vaucluse", ligneDirecte: true },
+  { codes: ["67", "68"], numero: "03 88 81 75 17", sourceUrl: "https://alsace.msa.fr/lfp/cpass", aidesUrl: "https://alsace.msa.fr/lfp/cpass", email: "actionsociale@alsace.msa.fr", ligneDirecte: true },
+  { codes: ["07", "26", "42"], numero: "04 75 75 68 95", sourceUrl: "https://ardechedromeloire.msa.fr/lfp/comment-contacter-la-msa-adl", aidesUrl: "https://ardechedromeloire.msa.fr/lfp/action-sociale", ligneDirecte: true },
+  { codes: ["22", "29"], numero: "02 98 85 79 79", sourceUrl: "https://armorique.msa.fr/lfp/action-sanitaire-et-sociale", aidesUrl: "https://armorique.msa.fr/lfp/action-sanitaire-et-sociale" },
+  { codes: ["03", "15", "43", "63"], numero: "04 71 64 46 64", sourceUrl: "https://auvergne.msa.fr/lfp/action-sociale-msa-auvergne", aidesUrl: "https://auvergne.msa.fr/lfp/action-sociale-msa-auvergne", ligneDirecte: true },
+  { codes: ["18", "28", "45"], numero: "02 37 99 99 99", sourceUrl: "https://bcl.msa.fr/lfp/le-service-social-specialise-de-la-msa-bcl", aidesUrl: "https://bcl.msa.fr/lfp/le-service-social-specialise-de-la-msa-bcl", email: "contactass.blf@bcl.msa.fr", ligneDirecte: true },
+  { codes: ["36", "37", "41"], numero: "02 54 29 45 34", sourceUrl: "https://berry-touraine.msa.fr/lfp/contact-particulier", aidesUrl: "https://berry-touraine.msa.fr/lfp/action-sociale", ligneDirecte: true },
+  { codes: ["21", "58", "71", "89"], numero: "03 80 63 22 73", sourceUrl: "https://bourgogne.msa.fr/lfp/contact-partenaire-de-l-action-sociale", aidesUrl: "https://bourgogne.msa.fr/lfp/action-sociale", ligneDirecte: true },
+  { codes: ["16", "17"], numero: "05 46 97 50 50", sourceUrl: "https://charentes.msa.fr/lfp/demande-aides-autonomie", aidesUrl: "https://charentes.msa.fr/lfp/action-sociale", email: "tech.ass@charentes.msa.fr" },
+  { codes: ["2A / 2B"], numero: "04 95 29 27 26", sourceUrl: "https://corse.msa.fr/lfp/prestations-et-actions-msa-corse", aidesUrl: "https://corse.msa.fr/lfp/prestations-et-actions-msa-corse", email: "ass.blf@msa20.msa.fr", ligneDirecte: true },
+  { codes: ["14", "50"], numero: "02 31 25 38 80", sourceUrl: "https://cotesnormandes.msa.fr/lfp/l-action-sociale-en-faveur-des-jeunes1", aidesUrl: "https://cotesnormandes.msa.fr/lfp/formulaires-action-sanitaire-et-sociale-msa-cotes-normandes" },
+  { codes: ["24", "47"], numero: "05 53 67 78 47", sourceUrl: "https://dlg.msa.fr/lfp/vos-interlocuteurs-en-msa-dlg", aidesUrl: "https://dlg.msa.fr/lfp/action-sociale", email: "contact_ass.blf@dlg.msa.fr", ligneDirecte: true },
+  { codes: ["25", "39", "70", "90"], numero: "03 84 96 31 01", sourceUrl: "https://franchecomte.msa.fr/lfp/la-bourse-solidarite-vacances", aidesUrl: "https://franchecomte.msa.fr/lfp/ass", ligneDirecte: true },
+  { codes: ["33"], numero: "05 57 98 25 10", sourceUrl: "https://gironde.msa.fr/lfp/action-sociale", aidesUrl: "https://gironde.msa.fr/lfp/action-sociale", email: "accueilsocial.blf@msa33.msa.fr", ligneDirecte: true },
+  { codes: ["11", "66"], numero: "04 68 55 11 66", sourceUrl: "https://grandsud.msa.fr/lfp/dncb-la-msa-aux-cotes-des-eleveurs", aidesUrl: "https://grandsud.msa.fr/lfp/action-sociale", email: "asd.blf@grandsud.msa.fr", ligneDirecte: true },
+  { codes: ["27", "76"], numero: "02 35 600 600", sourceUrl: "https://hautenormandie.msa.fr/lfp/l-action-sociale-en-haute-normandie", aidesUrl: "https://hautenormandie.msa.fr/lfp/l-action-sociale-en-haute-normandie" },
+  { codes: ["75", "77", "78", "91", "92", "93", "94", "95"], numero: "01 30 63 88 80", sourceUrl: "https://iledefrance.msa.fr/lfp/famille/aide-poursuite-etudes", aidesUrl: "https://iledefrance.msa.fr/lfp/action-sociale" },
+  { codes: ["30", "34", "48"], numero: "04 99 58 30 00", sourceUrl: "https://languedoc.msa.fr/lfp/contact-partenaire-action-sociale", aidesUrl: "https://languedoc.msa.fr/lfp/action-sociale" },
+  { codes: ["19", "23", "87"], numero: "05 44 00 04 04", sourceUrl: "https://limousin.msa.fr/lfp/agri-ecoute-un-numero-d-ecoute-en-cas-de-detresse", aidesUrl: "https://limousin.msa.fr/lfp/action-sociale" },
+  { codes: ["44", "85"], numero: "02 40 41 39 94", sourceUrl: "https://loire-atlantique-vendee.msa.fr/lfp/contact-particulier", aidesUrl: "https://loire-atlantique-vendee.msa.fr/lfp/action-sociale", ligneDirecte: true },
+  { codes: ["54", "57", "88"], numero: "03 83 50 35 20", sourceUrl: "https://lorraine.msa.fr/lfp/contacter-la-msa-lorraine", aidesUrl: "https://lorraine.msa.fr/lfp/action-sociale", ligneDirecte: true },
+  { codes: ["49"], numero: "02 41 31 75 85", sourceUrl: "https://maineetloire.msa.fr/lfp/soutien/aide-au-repit-burnout", aidesUrl: "https://maineetloire.msa.fr/lfp/plan-d-action-sanitaire-et-sociale", email: "ass.grprec@msa49.msa.fr", ligneDirecte: true },
+  { codes: ["08", "51", "55"], numero: "03 26 40 80 17", sourceUrl: "https://marne-ardennes-meuse.msa.fr/lfp/accompagnement-agriculteurs-en-difficulte", aidesUrl: "https://marne-ardennes-meuse.msa.fr/lfp/action-sociale", ligneDirecte: true },
+  { codes: ["53", "72"], numero: "02 43 39 81 45", sourceUrl: "https://mayenne-orne-sarthe.msa.fr/lfp/le-departement-action-sanitaire-et-sociale-de-la-msa", aidesUrl: "https://mayenne-orne-sarthe.msa.fr/lfp/notre-action-sociale", ligneDirecte: true },
+  { codes: ["61"], numero: "02 33 31 41 71", sourceUrl: "https://mayenne-orne-sarthe.msa.fr/lfp/le-departement-action-sanitaire-et-sociale-de-la-msa", aidesUrl: "https://mayenne-orne-sarthe.msa.fr/lfp/notre-action-sociale", ligneDirecte: true },
+  { codes: ["12", "46", "81", "82"], numero: "05 63 21 61 39", sourceUrl: "https://mpn.msa.fr/lfp/contact-travailleurs-sociaux", aidesUrl: "https://mpn.msa.fr/lfp/prestations-extra-legales", email: "mpnass.blf@mpn.msa.fr", ligneDirecte: true },
+  { codes: ["09", "31", "32", "65"], numero: "05 61 10 40 40", sourceUrl: "https://mps.msa.fr/lfp/l-aide-au-repit-pour-epuisement-professionnel-de-la-msa-midi-pyrenees-sud", aidesUrl: "https://mps.msa.fr/lfp/prendre-en-charge-les-situations", ligneDirecte: true },
+  { codes: ["59", "62"], numero: "03 20 00 21 68", sourceUrl: "https://nord-pasdecalais.msa.fr/lfp/action-sociale", aidesUrl: "https://nord-pasdecalais.msa.fr/lfp/famille-logement", email: "actionsociale@msa59-62.msa.fr", ligneDirecte: true },
+  { codes: ["02", "60", "80"], numero: "03 22 80 60 02", sourceUrl: "https://picardie.msa.fr/lfp/action-sociale", aidesUrl: "https://picardie.msa.fr/lfp/action-sociale", ligneDirecte: true },
+  { codes: ["79"], numero: "05 49 44 56 19", sourceUrl: "https://poitou.msa.fr/lfp/service-social-msa-poitou", aidesUrl: "https://poitou.msa.fr/lfp/service-social-msa-poitou", email: "secretariat_ass.blf@poitou.msa.fr", ligneDirecte: true },
+  { codes: ["86"], numero: "05 49 43 86 85", sourceUrl: "https://poitou.msa.fr/lfp/service-social-msa-poitou", aidesUrl: "https://poitou.msa.fr/lfp/service-social-msa-poitou", email: "secretariat_ass.blf@poitou.msa.fr", ligneDirecte: true },
+  { codes: ["35", "56"], numero: "02 97 46 56 38", sourceUrl: "https://portesdebretagne.msa.fr/lfp", aidesUrl: "https://portesdebretagne.msa.fr/lfp/action-sanitaire-et-sociale", email: "secretariatass.blf@portesdebretagne.msa.fr", ligneDirecte: true },
+  { codes: ["06", "13", "83"], numero: "04 91 16 58 39", sourceUrl: "https://provenceazur.msa.fr/lfp/action-sociale", aidesUrl: "https://provenceazur.msa.fr/lfp/action-sociale", email: "msapa_actionsociale.blf@provence-azur.msa.fr", ligneDirecte: true },
+  { codes: ["40", "64"], numero: "05 58 06 54 76", sourceUrl: "https://sudaquitaine.msa.fr/lfp/aides-social-vacances", aidesUrl: "https://sudaquitaine.msa.fr/lfp/famille-logement" },
+  { codes: ["10", "52"], numero: "03 25 30 26 48", sourceUrl: "https://sudchampagne.msa.fr/lfp/contact-particulier", aidesUrl: "https://sudchampagne.msa.fr/lfp/action-sociale", ligneDirecte: true },
+  { codes: ["971"], numero: "05 90 93 45 11", sourceUrl: "https://www.cgss-guadeloupe.fr/17-prevention-sante-sociale/44-service-social.html", aidesUrl: "https://www.cgss-guadeloupe.fr/17-prevention-sante-sociale/44-service-social.html", ligneDirecte: true },
+  { codes: ["972"], numero: "05 96 66 51 55", sourceUrl: "https://cgss-martinique.fr/contactez-la-cgss-martinique/action-sociale/", aidesUrl: "https://cgss-martinique.fr/contactez-la-cgss-martinique/action-sociale/", email: "gsc@cgss-martinique.fr", ligneDirecte: true },
+  { codes: ["973"], numero: "36 46", sourceUrl: "https://www.cgss-guyane.fr/nous-contacter/contact-agriculteurs/", aidesUrl: "https://www.cgss-guyane.fr/agriculteurs/soutien-aux-agriculteurs/le-pass-agri/" },
+  { codes: ["974"], numero: "02 62 40 33 25", sourceUrl: "https://www.cgss.re/actualites/modalites-daccueil-du-public-exceptionnelles", aidesUrl: "https://www.cgss.re/", email: "info.nsa@cgss.re" },
+  { codes: ["975"], numero: "05 08 41 15 70", sourceUrl: "https://www.secuspm.com/index.php/fr/la-cps/nos-horaires", aidesUrl: "https://www.secuspm.com/", email: "accueil.cps@secuspm.com" },
+  { codes: ["976"], numero: "02 69 61 91 91", sourceUrl: "https://www.cssm.fr/page/accueil", aidesUrl: "https://www.cssm.fr/page/accueil", email: "social@css-mayotte.fr", ligneDirecte: true },
+];
 
 function extraireDepartement(adresse: string | null | undefined) {
   const codePostal = adresse?.match(/\b(?:0[1-9]|[1-8]\d|9[0-5]|97[1-6])\d{3}\b/)?.[0];
@@ -113,6 +175,12 @@ function extraireDepartement(adresse: string | null | undefined) {
 
 function trouverMsa(departement: string | null) {
   return departement ? CAISSES_MSA.find((caisse) => caisse.codes.some((code) => code === departement)) ?? null : null;
+}
+
+function trouverContactSocial(departement: string | null) {
+  return departement
+    ? CONTACTS_SOCIAUX_MSA.find((contact) => contact.codes.includes(departement)) ?? null
+    : null;
 }
 
 async function getLocalisation() {
@@ -138,8 +206,11 @@ function LienExterne({ href, children }: { href: string; children: React.ReactNo
 export default async function SoutienPage() {
   const localisation = await getLocalisation();
   const msa = trouverMsa(localisation.departement);
-  const contactActionSociale = msa?.nom === ACTION_SOCIALE_MPN.caisse
-    ? await chargerContactActionSocialeMpn()
+  const contactSocial = trouverContactSocial(localisation.departement);
+  const contactActionSociale = contactSocial
+    ? msa?.nom === ACTION_SOCIALE_MPN.caisse
+      ? await chargerContactActionSocialeMpn()
+      : { numero: contactSocial.numero, actualiseDepuisMsa: false }
     : null;
 
   return (
@@ -214,20 +285,24 @@ export default async function SoutienPage() {
                 </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <a href={`tel:${contactActionSociale.numero.replace(/\s/g, "")}`} className="flex min-h-14 items-center justify-center gap-2 rounded-lg bg-green-700 px-4 text-center font-bold text-white active:bg-green-800">
-                    <Phone size={19} /> Action sociale · {contactActionSociale.numero}
+                    <Phone size={19} /> {contactSocial?.ligneDirecte ? "Action sociale" : "Accueil MSA"} · {contactActionSociale.numero}
                   </a>
-                  <a href={`mailto:${ACTION_SOCIALE_MPN.email}`} className="flex min-h-14 items-center justify-center gap-2 rounded-lg border-2 border-green-700 bg-white px-4 text-center font-semibold text-green-800 active:bg-green-50">
-                    <Mail size={18} /> Écrire au service social
-                  </a>
+                  {contactSocial?.email ? (
+                    <a href={`mailto:${contactSocial.email}`} className="flex min-h-14 items-center justify-center gap-2 rounded-lg border-2 border-green-700 bg-white px-4 text-center font-semibold text-green-800 active:bg-green-50">
+                      <Mail size={18} /> Écrire au service social
+                    </a>
+                  ) : (
+                    <LienExterne href={contactSocial?.sourceUrl ?? msa?.url ?? LIENS.msa}>Contacter ce service</LienExterne>
+                  )}
                 </div>
                 <p className="mt-3 text-sm font-semibold text-gray-800">Ce service peut notamment aider pour :</p>
                 <p className="mt-1 text-sm text-gray-600">épuisement et besoin de répit, difficultés financières ou administratives, maladie ou accident, séparation, deuil, accès aux droits et orientation vers le bon interlocuteur.</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <LienExterne href={ACTION_SOCIALE_MPN.aidesUrl}>Voir les aides de ma MSA</LienExterne>
-                  <LienExterne href={ACTION_SOCIALE_MPN.accompagnementUrl}>Comprendre l’accompagnement</LienExterne>
+                  <LienExterne href={contactSocial?.aidesUrl ?? msa?.url ?? LIENS.msa}>Voir les aides de ma MSA</LienExterne>
+                  <LienExterne href={contactSocial?.sourceUrl ?? msa?.url ?? LIENS.msa}>Voir la source officielle</LienExterne>
                 </div>
                 <p className="mt-2 text-xs text-gray-500">
-                  Numéro contrôlé chaque semaine depuis la page officielle de la MSA. {contactActionSociale.actualiseDepuisMsa ? "Source disponible aujourd’hui." : "Le site MSA est momentanément indisponible : dernier numéro officiel connu affiché."}
+                  Coordonnées vérifiées sur le site officiel de la caisse. {contactSocial?.ligneDirecte ? "Ligne directe du service social." : "Accueil officiel à utiliser pour demander le service social."} {contactActionSociale.actualiseDepuisMsa ? "Numéro recontrôlé automatiquement cette semaine." : ""}
                 </p>
               </>
             ) : (
