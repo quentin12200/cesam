@@ -12,7 +12,7 @@ import {
   type VoiceSanitaryDraft,
   type VoiceTarget,
 } from "@/lib/voice-sanitary";
-import { analyserIntentionsVocales } from "@/lib/voice-intent";
+import { analyserIntentionsVocales, interpreterSexeVeau } from "@/lib/voice-intent";
 
 const ALIASES_EVENEMENTS: Array<[RegExp, string]> = [
   [/\bboite(?:rie)?\b/, "boiterie"],
@@ -339,9 +339,6 @@ export async function POST(request: NextRequest) {
     ? target.nutravs.map((nutrav) => animaux.find((animal) => animal.nutrav === nutrav)).filter(Boolean)
     : [];
   const cibleFemelle = animauxCibles.length > 0 && animauxCibles.every((animal) => animal?.sexbov.toUpperCase().startsWith("F"));
-  const veauSexe: "M" | "F" | null = /\b(?:male|males)\b/.test(texteNormalise)
-    ? "M"
-    : /\b(?:femelle|femelles)\b/.test(texteNormalise) ? "F" : null;
   const deductionParContexte = cibleFemelle && taureauReconnu !== null;
   const intentionSaillie = actionReproduction.ia
     || actionReproduction.naturelle
@@ -372,7 +369,7 @@ export async function POST(request: NextRequest) {
   const actionApprise = aliasAiguillage && ["sanitaire", "parage", "saillie", "chaleur", "pesee", "velage"].includes(aliasAiguillage.action)
     ? aliasAiguillage.action as "sanitaire" | "parage" | "saillie" | "chaleur" | "pesee" | "velage"
     : null;
-  const analyseIntentions = analyserIntentionsVocales({
+  const contexteIntentions = {
     texte: texteNormalise,
     cibleTrouvee: Boolean(target),
     cibleFemelle,
@@ -382,12 +379,18 @@ export async function POST(request: NextRequest) {
     evenementTrouve: event !== null,
     poidsTrouve: poids !== null,
     temperatureTrouvee: temperature !== null,
-    sexeTrouve: veauSexe !== null,
+    sexeTrouve: false,
     pattesTrouvees: pattes.length > 0,
     traitementMentionne,
     ajouterAuParage,
     actionApprise,
-  });
+  };
+  const analysePreliminaire = analyserIntentionsVocales(contexteIntentions);
+  const veauSexe = interpreterSexeVeau(
+    texteNormalise,
+    analysePreliminaire.scores.velage >= 4 || actionApprise === "velage",
+  );
+  const analyseIntentions = analyserIntentionsVocales({ ...contexteIntentions, sexeTrouve: veauSexe !== null });
   const suggestedActions = analyseIntentions.actions.length > 0
     ? analyseIntentions.actions
     : estBoiterie ? ["sanitaire" as const, "parage" as const] : [];
