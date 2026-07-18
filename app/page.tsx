@@ -338,7 +338,11 @@ interface PageProps {
 export default async function Dashboard({ searchParams }: PageProps) {
   const { imprimer } = await searchParams;
   const printMode = Boolean(imprimer);
-  const [data, notesTerrain] = await Promise.all([getDashboardData(), getNotesTerrain()]);
+  const [data, notesTerrain, lotBoucles] = await Promise.all([
+    getDashboardData(),
+    getNotesTerrain(),
+    prisma.lotBoucles.findFirst({ where: { actif: true }, orderBy: { createdAt: "desc" } }),
+  ]);
   const capteursActifs = data.capteurs.filter((c) => c.actif);
   const capteursActifsNutravs = new Set(capteursActifs.map((c) => c.animalNutrav).filter(Boolean));
 
@@ -851,6 +855,12 @@ export default async function Dashboard({ searchParams }: PageProps) {
         </span>
         <span className="text-lg text-gray-300" aria-hidden="true">›</span>
       </Link>
+
+      {lotBoucles && lotBoucles.prochainIndex >= Math.ceil(lotBoucles.quantite * 0.75) && (
+        <div className={`rounded-xl border px-3 py-2 text-sm ${lotBoucles.prochainIndex >= lotBoucles.quantite ? "border-red-300 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+          {lotBoucles.prochainIndex >= lotBoucles.quantite ? "Le lot de boucles est épuisé. Ajoutez un nouveau lot dans les Paramètres." : "Le lot de boucles arrive bientôt à sa fin. Pensez à commander un nouveau lot."}
+        </div>
+      )}
 
       {notesTerrain.length > 0 && (
         <NotesTerrain initialNotes={notesTerrain.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() }))} />

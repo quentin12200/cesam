@@ -12,6 +12,6 @@ export function numeroNationalDuLot(premier: string, index: number) {
 
 export function propositionLot(lot: { premierNutrav: string; premierNunati: string; prochainIndex: number }, chiffres: number, zerosGauche: boolean, decalage = 0) {
   const index = lot.prochainIndex + decalage;
-  const nutrav = normaliserNutrav(String(Number(lot.premierNutrav) + index), chiffres, zerosGauche);
-  return { nutrav, nunati: numeroNationalDuLot(lot.premierNunati, index) };
+  const nunati = numeroNationalDuLot(lot.premierNunati, index);
+  return { nutrav: nunati.slice(-4), nunati };
 }

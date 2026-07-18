@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { numeroNationalDuLot } from "@/lib/identification";
 
 type VeauSaisi = { nutrav?: string; nunati?: string; sexe?: "M" | "F"; nom?: string; statut?: "VIVANT" | "MORT_NE" };
 
@@ -22,7 +23,13 @@ export async function POST(request: NextRequest) {
     if (qualificatif === "AVORTEMENT") veaux = [];
     if (qualificatif === "MORT_NEE") veaux = (veaux.length ? veaux : [{}]).map((v) => ({ ...v, statut: "MORT_NE" }));
     veaux = veaux.slice(0, 10).map((v) => ({ ...v, nutrav: v.nutrav?.trim().toUpperCase() || undefined, nunati: v.nunati?.trim().toUpperCase() || undefined, nom: v.nom?.trim() || undefined, statut: v.statut === "MORT_NE" ? "MORT_NE" : "VIVANT" }));
-    if (identificationConfig?.identificationMode === "NATIONAL_OBLIGATOIRE" && veaux.some((v) => !v.nunati)) return NextResponse.json({ error: "Le numéro national est obligatoire" }, { status: 400 });
+    if (veaux.some((v) => v.nutrav && !/^\d{4}$/.test(v.nutrav))) return NextResponse.json({ error: "Le numéro de travail doit contenir 4 chiffres" }, { status: 400 });
+    if (veaux.some((v) => v.nunati && v.nutrav !== v.nunati.slice(-4))) return NextResponse.json({ error: "Le numéro de travail doit correspondre aux 4 derniers chiffres du numéro national" }, { status: 400 });
+    const numerosDuLot = lotActif ? Array.from({ length: lotActif.quantite }, (_, index) => {
+      const nunati = numeroNationalDuLot(lotActif.premierNunati, index);
+      return { index, nunati, nutrav: nunati.slice(-4) };
+    }) : [];
+    if (lotActif && veaux.some((v) => v.nutrav && (!v.nunati || !numerosDuLot.some((numero) => numero.nutrav === v.nutrav && numero.nunati === v.nunati)))) return NextResponse.json({ error: "Cette boucle n'appartient pas au lot actif. Ajoutez un nouveau lot dans les Paramètres." }, { status: 400 });
     if (new Set(veaux.flatMap((v) => v.nutrav ? [v.nutrav] : [])).size !== veaux.filter((v) => v.nutrav).length) return NextResponse.json({ error: "Un numéro de travail est utilisé plusieurs fois" }, { status: 409 });
     if (new Set(veaux.flatMap((v) => v.nunati ? [v.nunati] : [])).size !== veaux.filter((v) => v.nunati).length) return NextResponse.json({ error: "Un numéro national est utilisé plusieurs fois" }, { status: 409 });
     for (const saisi of veaux.filter((v) => v.statut === "MORT_NE")) {
@@ -70,8 +77,7 @@ export async function POST(request: NextRequest) {
 
     if (capteur) await prisma.capteurVelage.updateMany({ where: { numero: capteur }, data: { actif: false, animalNutrav: null, animalNom: null, dateAttribution: null } });
     if (lotActif) {
-      const premier = Number(lotActif.premierNutrav);
-      const indexes = veaux.flatMap((veau) => /^\d+$/.test(veau.nutrav ?? "") ? [Number(veau.nutrav) - premier] : []).filter((index) => index >= lotActif.prochainIndex && index < lotActif.quantite);
+      const indexes = veaux.flatMap((veau) => numerosDuLot.find((numero) => numero.nunati === veau.nunati && numero.nutrav === veau.nutrav)?.index ?? []).filter((index) => index >= lotActif.prochainIndex);
       if (indexes.length) await prisma.lotBoucles.update({ where: { id: lotActif.id }, data: { prochainIndex: Math.max(...indexes) + 1 } });
     }
     let undoId = "";
