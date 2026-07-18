@@ -547,7 +547,7 @@ function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVacc
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotavec, bolus, toutesVaches, vaccinationsRecentes, protocoles, evenements, traitements, affichageDelaiAttente }: Props) {
   const router = useRouter();
-  const [onglet, setOnglet] = useState<"evenements" | "vaccination" | "pharmacie" | "ordonnances">("evenements");
+  const [onglet, setOnglet] = useState<"evenements" | "vaccination">("evenements");
   const [vaccinTab, setVaccinTab] = useState<"urgent" | "veaux" | "vaches">("urgent");
   const [viewMode, setViewMode] = useState<"animal" | "traitement">("animal");
   const [sessionMode, setSessionMode] = useState(false);
@@ -657,20 +657,18 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
   return (
     <>
       {/* Navigation principale */}
-      <div className="grid grid-cols-4 gap-1 bg-white rounded-xl shadow overflow-hidden p-1">
+      <div className="grid grid-cols-2 gap-1 bg-white rounded-xl shadow overflow-hidden p-1">
         {([
           {
             id: "evenements", label: "Événements", icon: "🏥",
             count: evenements.filter((e) => !e.resolu).length + traitements.filter((t) => t.enCours || t.enAttente).length,
-            urgent: evenements.some((e) => !e.resolu), href: null,
+            urgent: evenements.some((e) => !e.resolu),
           },
-          { id: "vaccination", label: "Vaccination", icon: "💉", count: urgents.length + cryptoRotavec.length + bolus.length, urgent: urgents.length > 0, href: null },
-          { id: "pharmacie", label: "Pharmacie", icon: "💊", count: 0, urgent: false, href: "/pharmacie" },
-          { id: "ordonnances", label: "Ordonnances", icon: "📋", count: 0, urgent: false, href: "/ordonnances" },
+          { id: "vaccination", label: "Vaccination", icon: "💉", count: urgents.length + cryptoRotavec.length + bolus.length, urgent: urgents.length > 0 },
         ] as const).map((tab) => (
           <button
             key={tab.id}
-            onClick={() => (tab.href ? router.push(tab.href) : setOnglet(tab.id))}
+            onClick={() => setOnglet(tab.id)}
             className={`py-2.5 px-1 rounded-lg text-center transition-colors ${
               onglet === tab.id
                 ? "bg-green-700 text-white"
