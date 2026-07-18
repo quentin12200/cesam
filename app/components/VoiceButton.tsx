@@ -81,6 +81,13 @@ interface MedicamentOption {
   actif: boolean;
 }
 
+interface TaureauOption {
+  id: string;
+  nupere: string;
+  nopere: string | null;
+  present: boolean;
+}
+
 export default function VoiceButton() {
   const router = useRouter();
   const [supported, setSupported] = useState(false);
@@ -97,6 +104,9 @@ export default function VoiceButton() {
   const [medicamentPickerOpen, setMedicamentPickerOpen] = useState(false);
   const [medicamentQuery, setMedicamentQuery] = useState("");
   const [medicaments, setMedicaments] = useState<MedicamentOption[]>([]);
+  const [taureauPickerOpen, setTaureauPickerOpen] = useState(false);
+  const [taureauQuery, setTaureauQuery] = useState("");
+  const [taureaux, setTaureaux] = useState<TaureauOption[]>([]);
   const recRef = useRef<SpeechRecognition | null>(null);
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,6 +151,7 @@ export default function VoiceButton() {
     setLearningError("");
     setAnimalPickerOpen(false);
     setMedicamentPickerOpen(false);
+    setTaureauPickerOpen(false);
     setTranscript(text);
     setStatus("analysing");
     setMessage("");
@@ -283,6 +294,32 @@ export default function VoiceButton() {
     setLearningError("Médicament introuvable : tu pourras le rechercher à nouveau dans le formulaire sanitaire.");
   }
 
+  async function ouvrirRechercheTaureaux() {
+    setTaureauPickerOpen(true);
+    setTaureauQuery(analysis?.draft.taureau?.nom ?? "");
+    if (taureaux.length > 0) return;
+    try {
+      const response = await fetch("/api/taureaux");
+      const resultat = await response.json() as { taureaux: TaureauOption[] };
+      setTaureaux(resultat.taureaux);
+    } catch {
+      setLearningError("La liste des taureaux n’a pas pu être chargée.");
+    }
+  }
+
+  function choisirTaureau(taureau: TaureauOption) {
+    mettreAJourDraft({
+      taureau: {
+        id: taureau.id,
+        nom: taureau.nopere ?? taureau.nupere,
+        present: taureau.present,
+      },
+      reproductionType: taureau.present ? "NATURELLE" : "IA",
+    });
+    setTaureauPickerOpen(false);
+    setTaureauQuery("");
+  }
+
   function relancerDictee() {
     setAnalysis(null);
     setTimeout(() => toggle(), 0);
@@ -382,11 +419,17 @@ export default function VoiceButton() {
   const medicamentsFiltres = medicamentQuery.trim()
     ? searchTypesEvenement(medicamentQuery, medicamentsRecherchables).slice(0, 20).map((resultat) => resultat.item)
     : medicamentsRecherchables;
+  const taureauxRecherchables = taureaux.map((taureau) => ({
+    ...taureau,
+    nom: taureau.nopere ?? taureau.nupere,
+    synonymes: taureau.nupere,
+  }));
+  const taureauxFiltres = taureauQuery.trim()
+    ? searchTypesEvenement(taureauQuery, taureauxRecherchables).slice(0, 20).map((resultat) => resultat.item)
+    : taureauxRecherchables;
   const parageAvecPlusieursAnimaux = chosenAction === "parage" && selectedNutravs.length !== 1;
   const informationsReconnues = analysis ? [
     chosenAction === "sanitaire" ? analysis.draft.event?.nom ?? null : null,
-    chosenAction === "saillie" ? (analysis.draft.reproductionType === "IA" ? "Insémination" : "Saillie naturelle") : null,
-    chosenAction === "saillie" ? analysis.draft.taureau?.nom ?? null : null,
     analysis.draft.dateMentionnee && analysis.draft.date
       ? new Date(`${analysis.draft.date}T12:00:00`).toLocaleDateString("fr-FR")
       : null,
@@ -522,6 +565,44 @@ export default function VoiceButton() {
                   <span key={information} className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">{information}</span>
                 ))}
               </div>
+
+              {chosenAction === "saillie" && (
+                <div className="space-y-2 rounded-lg border border-green-100 bg-green-50/40 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-gray-600">Action</span>
+                    <div className="flex gap-1">
+                      <button type="button" onClick={() => mettreAJourDraft({ reproductionType: "NATURELLE" })} className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold ${analysis.draft.reproductionType !== "IA" ? "border-green-600 bg-white text-green-800" : "border-gray-200 bg-white text-gray-600"}`}>Saillie naturelle</button>
+                      <button type="button" onClick={() => mettreAJourDraft({ reproductionType: "IA" })} className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold ${analysis.draft.reproductionType === "IA" ? "border-green-600 bg-white text-green-800" : "border-gray-200 bg-white text-gray-600"}`}>IA</button>
+                    </div>
+                  </div>
+                  <div className="flex min-h-9 items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-gray-600">Taureau</span>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <strong className="truncate text-sm text-gray-900">{analysis.draft.taureau?.nom ?? "Non reconnu"}</strong>
+                      <button type="button" onClick={() => void ouvrirRechercheTaureaux()} className="min-h-9 shrink-0 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-semibold text-green-700">Modifier</button>
+                    </div>
+                  </div>
+
+                  {taureauPickerOpen && (
+                    <div className="rounded-lg border border-green-200 bg-white p-2">
+                      <label className="flex min-h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3">
+                        <Search size={16} className="text-gray-400" />
+                        <input value={taureauQuery} onChange={(event) => setTaureauQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Nom ou numéro du taureau" autoFocus />
+                      </label>
+                      <div className="mt-1 max-h-36 overflow-y-auto">
+                        {taureauxFiltres.map((taureau) => (
+                          <button key={taureau.id} type="button" onClick={() => choisirTaureau(taureau)} className="flex min-h-10 w-full items-center justify-between gap-2 rounded-md px-2 text-left text-sm hover:bg-green-50">
+                            <span className="truncate font-semibold text-gray-800">{taureau.nopere ?? taureau.nupere}</span>
+                            <span className="shrink-0 text-xs text-gray-400">{taureau.present ? "Naturelle" : "IA"}</span>
+                          </button>
+                        ))}
+                        {taureauxFiltres.length === 0 && <p className="p-3 text-center text-xs text-gray-500">Aucun taureau trouvé</p>}
+                      </div>
+                      <button type="button" onClick={() => { mettreAJourDraft({ taureau: null }); setTaureauPickerOpen(false); }} className="min-h-9 w-full text-xs font-semibold text-gray-600">Aucun taureau</button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {chosenAction === "sanitaire" && !analysis.draft.medicament && analysis.draft.medicamentCandidates.length > 0 && (
                 <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-2">

@@ -193,19 +193,48 @@ function trouverTaureau(
   taureaux: Array<{ id: string; nupere: string; nopere: string | null; present: boolean }>,
 ) {
   const directs = taureaux
-    .map((taureau) => ({ taureau, nom: normalizeSearch(taureau.nopere ?? taureau.nupere) }))
-    .filter(({ nom }) => nom.length >= 3 && texteNormalise.includes(nom))
+    .flatMap((taureau) => [taureau.nopere, taureau.nupere]
+      .filter((nom): nom is string => Boolean(nom))
+      .map((nom) => ({ taureau, nom: normalizeSearch(nom) })))
+    .filter(({ nom }) => nom.length >= 3 && ` ${texteNormalise} `.includes(` ${nom} `))
     .sort((a, b) => b.nom.length - a.nom.length);
   if (directs[0]) return directs[0].taureau;
 
-  const apresAvec = texteNormalise.match(/\bavec\s+([a-z0-9 -]+)$/)?.[1]?.trim();
-  if (!apresAvec) return null;
-  const resultat = searchTypesEvenement(apresAvec, taureaux.map((taureau) => ({
-    ...taureau,
-    nom: taureau.nopere ?? taureau.nupere,
-    synonymes: taureau.nupere,
-  })))[0];
-  return resultat && resultat.score >= 70 ? resultat.item : null;
+  const motsIgnores = new Set(["la", "le", "les", "avec", "taureau", "vache", "une", "un", "est", "fait", "faire", "sa", "a", "au"]);
+  const mots = texteNormalise.split(/\s+/).filter((mot) => /[a-z]/.test(mot) && !motsIgnores.has(mot));
+  const segments: string[] = [];
+  for (let debut = 0; debut < mots.length; debut++) {
+    for (let taille = 1; taille <= 3 && debut + taille <= mots.length; taille++) {
+      segments.push(mots.slice(debut, debut + taille).join(" "));
+    }
+  }
+
+  const correspondances = taureaux.flatMap((taureau) => [taureau.nopere, taureau.nupere]
+    .filter((nom): nom is string => Boolean(nom))
+    .map((nom) => {
+      const nomPhonetique = phonetiserMot(normalizeSearch(nom));
+      const meilleurRatio = segments.reduce((meilleur, segment) => {
+        const segmentPhonetique = phonetiserMot(segment);
+        if (!segmentPhonetique || !nomPhonetique) return meilleur;
+        const ratio = distanceEdition(segmentPhonetique, nomPhonetique) / Math.max(segmentPhonetique.length, nomPhonetique.length);
+        return Math.min(meilleur, ratio);
+      }, Number.POSITIVE_INFINITY);
+      return { taureau, ratio: meilleurRatio };
+    }));
+  correspondances.sort((a, b) => a.ratio - b.ratio);
+  return correspondances[0] && correspondances[0].ratio <= 0.28 ? correspondances[0].taureau : null;
+}
+
+function reconnaitreActionReproduction(texteNormalise: string) {
+  const ia = /\b(?:ia|i a|insemin(?:ation|ee|e|er)|j ai fait l ia)\b/.test(texteNormalise);
+  const naturelleDirecte = /\b(?:saillie|sailli|sailly|sailliee|ca y est|avec le taureau)\b/.test(texteNormalise);
+  const sailliePhonetique = phonetiserMot("saillie");
+  const naturellePhonetique = texteNormalise.split(/\s+/).some((mot) => {
+    if (mot.length < 3 || !/[a-z]/.test(mot)) return false;
+    const motPhonetique = phonetiserMot(mot);
+    return Boolean(motPhonetique && distanceEdition(motPhonetique, sailliePhonetique) / Math.max(motPhonetique.length, sailliePhonetique.length) <= 0.3);
+  });
+  return { ia, naturelle: naturelleDirecte || naturellePhonetique };
 }
 
 export async function POST(request: NextRequest) {
@@ -218,7 +247,7 @@ export async function POST(request: NextRequest) {
   const [animaux, groupes, types, medicaments, aliasesVocaux, taureaux, aliasesAiguillage] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
-      select: { nutrav: true, nobovi: true },
+      select: { nutrav: true, nobovi: true, sexbov: true },
       orderBy: { nutrav: "asc" },
     }),
     prisma.groupe.findMany({
@@ -295,11 +324,19 @@ export async function POST(request: NextRequest) {
 
   const phraseAiguillage = normaliserPhraseAiguillage(transcript);
   const aliasAiguillage = aliasesAiguillage.find((alias) => alias.phraseNormalisee === phraseAiguillage);
-  const intentionSaillie = /\b(?:saillie|sailly|sailli|sailliee|insemination|inseminee|ia)\b/.test(texteNormalise)
-    || aliasAiguillage?.action === "saillie";
-  const taureauReconnu = intentionSaillie ? trouverTaureau(texteNormalise, taureaux) : null;
+  const actionReproduction = reconnaitreActionReproduction(texteNormalise);
+  const taureauReconnu = trouverTaureau(texteNormalise, taureaux);
+  const animauxCibles = target?.kind === "animal"
+    ? target.nutravs.map((nutrav) => animaux.find((animal) => animal.nutrav === nutrav)).filter(Boolean)
+    : [];
+  const cibleFemelle = animauxCibles.length > 0 && animauxCibles.every((animal) => animal?.sexbov.toUpperCase().startsWith("F"));
+  const deductionParContexte = cibleFemelle && taureauReconnu !== null;
+  const intentionSaillie = actionReproduction.ia
+    || actionReproduction.naturelle
+    || aliasAiguillage?.action === "saillie"
+    || deductionParContexte;
   const reproductionType: "NATURELLE" | "IA" | null = intentionSaillie
-    ? (/\b(?:insemination|inseminee|ia)\b/.test(texteNormalise) ? "IA" : "NATURELLE")
+    ? (actionReproduction.ia || taureauReconnu?.present === false ? "IA" : "NATURELLE")
     : null;
   const temperature = extraireTemperature(texteNormalise);
   const event = trouverEvenement(texteNormalise, types, temperature);
