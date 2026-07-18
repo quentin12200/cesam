@@ -62,6 +62,15 @@ function meilleurIndice(texte: string, action: VoiceActionId): number {
   return Math.max(...CUES[action].map((indice) => scorePhonetique(texte, indice)));
 }
 
+export function interpreterSexeVeau(texte: string, contexteVelage: boolean): "M" | "F" | null {
+  if (!contexteVelage) return null;
+  const scoreMale = Math.max(scorePhonetique(texte, "male"), scorePhonetique(texte, "un male"));
+  const scoreFemelle = Math.max(scorePhonetique(texte, "femelle"), scorePhonetique(texte, "une femelle"));
+  if (scoreMale < 2 && scoreFemelle < 2) return null;
+  if (Math.abs(scoreMale - scoreFemelle) < 1) return null;
+  return scoreMale > scoreFemelle ? "M" : "F";
+}
+
 export function analyserIntentionsVocales(contexte: VoiceIntentContext): VoiceIntentAnalysis {
   const scores: Record<VoiceActionId, number> = {
     sanitaire: 0,
