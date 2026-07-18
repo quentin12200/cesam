@@ -20,9 +20,9 @@ export default function LogoutButton() {
     <button
       onClick={handleLogout}
       title="Se déconnecter"
-      className="p-1 rounded-lg transition-colors text-green-200 hover:bg-green-600 hover:text-white"
+      className="inline-flex h-9 w-9 items-center justify-center text-green-100 transition-colors hover:text-white"
     >
-      <LogOut size={16} />
+      <LogOut size={19} />
     </button>
   );
 }

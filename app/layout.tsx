@@ -5,7 +5,6 @@ import "./globals.css";
 import TopNav from "@/components/TopNav";
 import SplashScreen from "@/components/SplashScreen";
 import InstallPrompt from "@/app/components/InstallPrompt";
-import NotificationBell from "@/app/components/NotificationBell";
 import GlobalScanner from "@/app/components/GlobalScanner";
 import NoteVoiceButton from "@/app/components/NoteVoiceButton";
 import UndoProvider from "@/app/components/UndoProvider";
@@ -61,7 +60,6 @@ export default function RootLayout({
             <div className="flex items-center gap-1.5">
               <GlobalScanner />
               <NoteVoiceButton />
-              <NotificationBell />
               <GlobalSettingsButton />
               <LogoutButton />
             </div>

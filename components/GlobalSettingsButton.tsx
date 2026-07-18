@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Settings, X, UserRound, Mic, Loader2 } from "lucide-react";
 import { useUserPreferences, type CesamProfile } from "@/components/UserPreferencesProvider";
+import NotificationBell from "@/app/components/NotificationBell";
 
 const PROFILES: CesamProfile[] = ["Céline", "Samuel"];
 
@@ -52,9 +53,9 @@ export default function GlobalSettingsButton() {
         onClick={() => setOpen(true)}
         aria-label="Paramètres"
         title="Paramètres"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-100 hover:bg-green-600 hover:text-white"
+        className="inline-flex h-9 w-9 items-center justify-center text-green-100 transition-colors hover:text-white"
       >
-        <Settings size={17} />
+        <Settings size={19} />
       </button>
 
       {open && (
@@ -101,6 +102,11 @@ export default function GlobalSettingsButton() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="mt-5 border-t border-gray-100 pt-4">
+              <h3 className="mb-2 text-sm font-bold text-gray-800">Notifications</h3>
+              <NotificationBell />
             </div>
 
             <div className="mt-5">
