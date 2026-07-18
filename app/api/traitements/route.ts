@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const {
     animalId, evenementId, medicamentId, medicamentNom, dateDebut, dureeJours, voie, frequence,
-    dose, doseRecommandee, uniteDosage, poidsUtilise, motif, veterinaire,
+    dose, doseRecommandee, uniteDosage, poidsUtilise, motif, veterinaire, doseUnique,
     ordonnanceNumero, ordonnanceId, ordonnanceAAssocier, delaiAttenteViandeJ, delaiAttenteLaitJ, notes,
   } = body;
 
@@ -61,9 +61,10 @@ export async function POST(request: NextRequest) {
       medicamentId: medicamentId ?? null,
       medicamentNom: medicamentNom.trim(),
       dateDebut: new Date(dateDebut),
-      dureeJours: dureeJours ?? 1,
+      dureeJours: doseUnique ? 1 : dureeJours ?? 1,
+      doseUnique: doseUnique === true,
       voie: voie?.trim() || null,
-      frequence: frequence?.trim() || null,
+      frequence: doseUnique ? null : frequence?.trim() || null,
       dose: dose ?? null,
       doseRecommandee: doseRecommandee ?? null,
       uniteDosage: uniteDosage?.trim() || null,
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
       delaiAttenteViandeJ: delaiAttenteViandeJ ?? null,
       delaiAttenteLaitJ: delaiAttenteLaitJ ?? null,
       notes: notes?.trim() || null,
-      statut: "EN_COURS",
+      statut: doseUnique ? "TERMINE" : "EN_COURS",
     },
     include: {
       animal: { select: { id: true, nutrav: true, nobovi: true } },

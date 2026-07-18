@@ -200,11 +200,12 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
 
   const traitements: TraitementItem[] = traitementsRaw.map((t) => {
     const dateDebut = new Date(t.dateDebut);
-    const dateFin = addDays(dateDebut, t.dureeJours);
+    const traitementRepete = !t.doseUnique && (t.dureeJours > 1 || Boolean(t.frequence));
+    const dateFin = traitementRepete ? addDays(dateDebut, t.dureeJours) : null;
     const attente = getAttenteInfoForTraitement(t, now);
     const delaiViande = t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
     const dateFinAttente = attente.dateFinAttenteViande;
-    const enCours = now < dateFin;
+    const enCours = traitementRepete && t.statut === "EN_COURS" && dateFin !== null && now < dateFin;
     const enAttente = attente.enAttente;
     const joursRestantsAttente = dateFinAttente ? differenceInDays(dateFinAttente, now) : null;
 
@@ -215,7 +216,7 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
       medicamentNom: t.medicamentNom,
       medicamentId: t.medicamentId,
       dateDebut: dateDebut.toISOString(),
-      dateFin: dateFin.toISOString(),
+      dateFin: dateFin?.toISOString() ?? null,
       dureeJours: t.dureeJours,
       voie: t.voie,
       dose: t.dose,

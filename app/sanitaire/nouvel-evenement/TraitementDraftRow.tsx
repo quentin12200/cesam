@@ -13,6 +13,9 @@ export interface TraitementDraft {
   dose: string;
   uniteDosage: string;
   motif: string;
+  doseUnique: boolean;
+  frequence: string;
+  dureeJours: string;
 }
 
 interface Props {
@@ -108,6 +111,14 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ex: Mammite" />
         </div>
       </div>
+      <label className="flex min-h-11 items-center gap-2 rounded-lg border bg-white px-3 text-sm">
+        <input type="checkbox" checked={draft.doseUnique} onChange={(e) => set("doseUnique", e.target.checked)} className="h-4 w-4 accent-green-700" />
+        Dose unique
+      </label>
+      {!draft.doseUnique && <div className="grid grid-cols-2 gap-2.5">
+        <div><label className="text-xs text-gray-500 block mb-1">Fréquence</label><input value={draft.frequence} onChange={(e) => set("frequence", e.target.value)} placeholder="ex : matin et soir" className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+        <div><label className="text-xs text-gray-500 block mb-1">Durée (jours)</label><input type="number" min={2} value={draft.dureeJours} onChange={(e) => set("dureeJours", e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+      </div>}
     </div>
   );
 }

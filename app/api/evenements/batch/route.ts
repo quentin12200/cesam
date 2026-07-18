@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
       uniteDosage?: string | null;
       frequence?: string | null;
       dureeJours?: number | null;
+      doseUnique?: boolean;
       motif?: string | null;
       delaiAttenteViandeJ?: number | null;
       delaiAttenteLaitJ?: number | null;
@@ -108,7 +109,8 @@ export async function POST(request: NextRequest) {
                 medicamentId: t.medicamentId || null,
                 medicamentNom: t.medicamentNom.trim(),
                 dateDebut: resolvedDate,
-                dureeJours: t.dureeJours ?? 1,
+                dureeJours: t.doseUnique ? 1 : Math.max(1, t.dureeJours ?? 1),
+                doseUnique: t.doseUnique === true,
                 voie: t.voie || null,
                 frequence: t.frequence || null,
                 dose: t.doseParAnimal?.[animalId] ?? t.dose ?? null,
@@ -118,7 +120,7 @@ export async function POST(request: NextRequest) {
                 moment: moment ?? null,
                 delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? null,
                 delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? null,
-                statut: "EN_COURS",
+                statut: t.doseUnique ? "TERMINE" : "EN_COURS",
               },
               select: { id: true },
             })

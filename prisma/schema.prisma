@@ -589,6 +589,7 @@ model Traitement {
   medicamentNom String
   dateDebut     DateTime
   dureeJours    Int         @default(1)
+  doseUnique    Boolean     @default(false)
   voie          String?
   frequence     String?
   doseRecommandee Float?

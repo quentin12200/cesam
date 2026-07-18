@@ -38,7 +38,7 @@ type TargetMode = "animal" | "plusieurs";
 const today = new Date().toISOString().slice(0, 10);
 
 function nouveauDraft(): TraitementDraft {
-  return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", executant: "", dose: "", uniteDosage: "ml", motif: "" };
+  return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", executant: "", dose: "", uniteDosage: "ml", motif: "", doseUnique: true, frequence: "", dureeJours: "" };
 }
 
 export default function NouvelEvenementForm({ presetNutrav, presetNutravs, presetMedicamentId }: { presetNutrav?: string; presetNutravs?: string[]; presetMedicamentId?: string }) {
@@ -309,6 +309,9 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
             dose: d.dose !== "" ? Number(d.dose) : null,
             uniteDosage: d.uniteDosage || null,
             motif: d.motif || null,
+            doseUnique: d.doseUnique,
+            frequence: d.doseUnique ? null : d.frequence || null,
+            dureeJours: d.doseUnique ? null : Number(d.dureeJours || 1),
             delaiAttenteViandeJ: d.medicament!.delaiAttenteViandeJ ?? null,
             delaiAttenteLaitJ: d.medicament!.delaiAttenteLaitJ ?? null,
           })),

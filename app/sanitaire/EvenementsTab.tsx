@@ -25,7 +25,7 @@ export interface TraitementItem {
   medicamentNom: string;
   medicamentId: string | null;
   dateDebut: string;
-  dateFin: string;
+  dateFin: string | null;
   dureeJours: number;
   voie: string | null;
   dose: number | null;
@@ -96,7 +96,7 @@ function TraitementRow({ t, onTerminer }: { t: TraitementItem; onTerminer: (id: 
           {t.motif && <div className="text-xs text-gray-500 mt-1">Motif : {t.motif}</div>}
 
           <div className="mt-2 flex flex-wrap gap-2 text-xs">
-            {t.enCours && (
+            {t.enCours && t.dateFin && (
               <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
                 <Clock size={11} /> Traitement jusqu&apos;au {formatDate(new Date(t.dateFin))}
               </span>
@@ -145,8 +145,8 @@ function TraitementRowMuted({ t }: { t: TraitementItem }) {
 
 function EnCoursTab({ evenements, traitements, onRefresh }: { evenements: EvenementItem[]; traitements: TraitementItem[]; onRefresh: () => void }) {
   const router = useRouter();
-  const evtsEnCours = evenements.filter((e) => !e.resolu);
-  const trtEnCours = traitements.filter((t) => t.enCours || t.enAttente);
+  const evtsEnCours: EvenementItem[] = [];
+  const trtEnCours = traitements.filter((t) => t.enCours);
 
   async function terminer(id: string) {
     await fetch(`/api/traitements/${id}`, {
@@ -197,8 +197,8 @@ function EnCoursTab({ evenements, traitements, onRefresh }: { evenements: Evenem
 }
 
 function HistoriqueTab({ evenements, traitements }: { evenements: EvenementItem[]; traitements: TraitementItem[] }) {
-  const evtsResolus = evenements.filter((e) => e.resolu);
-  const trtTermines = traitements.filter((t) => !t.enCours && !t.enAttente);
+  const evtsResolus = evenements;
+  const trtTermines = traitements.filter((t) => !t.enCours);
 
   if (evtsResolus.length === 0 && trtTermines.length === 0) {
     return (
@@ -242,9 +242,9 @@ export default function EvenementsTab({ evenements, traitements }: { evenements:
   const [onglet, setOnglet] = useState<"encours" | "historique">("encours");
   const [, forceRefresh] = useState(0);
 
-  const enCoursCount = evenements.filter((e) => !e.resolu).length + traitements.filter((t) => t.enCours || t.enAttente).length;
+  const enCoursCount = traitements.filter((t) => t.enCours).length;
   const attenteCount = traitements.filter((t) => t.enAttente && t.joursRestantsAttente && t.joursRestantsAttente > 0).length;
-  const historiqueCount = evenements.filter((e) => e.resolu).length + traitements.filter((t) => !t.enCours && !t.enAttente).length;
+  const historiqueCount = evenements.length + traitements.filter((t) => !t.enCours).length;
 
   return (
     <div>

@@ -661,8 +661,8 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
         {([
           {
             id: "evenements", label: "Événements", icon: "🏥",
-            count: evenements.filter((e) => !e.resolu).length + traitements.filter((t) => t.enCours || t.enAttente).length,
-            urgent: evenements.some((e) => !e.resolu),
+            count: traitements.filter((t) => t.enCours).length,
+            urgent: false,
           },
           { id: "vaccination", label: "Vaccination", icon: "💉", count: urgents.length + cryptoRotavec.length + bolus.length, urgent: urgents.length > 0 },
         ] as const).map((tab) => (

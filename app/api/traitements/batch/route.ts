@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      targets, medicamentId, medicamentNom, dateDebut, dureeJours, voie, frequence,
+      targets, medicamentId, medicamentNom, dateDebut, dureeJours, voie, frequence, doseUnique,
       uniteDosage, motif, veterinaire, ordonnanceNumero, ordonnanceId, ordonnanceAAssocier,
       delaiAttenteViandeJ, delaiAttenteLaitJ, notes,
     } = body;
@@ -35,9 +35,10 @@ export async function POST(request: NextRequest) {
             medicamentId: medicamentId || null,
             medicamentNom: medicamentNom.trim(),
             dateDebut: resolvedDate,
-            dureeJours: dureeJours ?? 1,
+            dureeJours: doseUnique ? 1 : dureeJours ?? 1,
+            doseUnique: doseUnique === true,
             voie: voie?.trim() || null,
-            frequence: frequence?.trim() || null,
+            frequence: doseUnique ? null : frequence?.trim() || null,
             doseRecommandee: t.doseRecommandee ?? null,
             dose: t.dose ?? t.doseRecommandee ?? null,
             uniteDosage: uniteDosage?.trim() || null,
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
             delaiAttenteViandeJ: delaiAttenteViandeJ ?? null,
             delaiAttenteLaitJ: delaiAttenteLaitJ ?? null,
             notes: notes?.trim() || null,
-            statut: "EN_COURS",
+            statut: doseUnique ? "TERMINE" : "EN_COURS",
           },
         })
       )

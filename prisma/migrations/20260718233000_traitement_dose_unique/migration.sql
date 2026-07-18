@@ -1,0 +1,1 @@
+ALTER TABLE "Traitement" ADD COLUMN "doseUnique" BOOLEAN NOT NULL DEFAULT false;
