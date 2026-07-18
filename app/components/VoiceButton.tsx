@@ -496,9 +496,9 @@ export default function VoiceButton() {
         disabled={status === "analysing"}
         aria-label={isListening ? "Arrêter la dictée" : "Dicter une action ou un événement"}
         title={isListening ? "Appuie pour arrêter" : "Dicter une action ou un événement"}
-        className={`rounded-lg p-1.5 text-white transition-colors touch-manipulation disabled:opacity-60 ${isListening ? "animate-pulse bg-red-500" : "bg-green-600 hover:bg-green-500"}`}
+        className={`rounded-xl p-2.5 text-white shadow-sm ring-1 ring-white/20 transition-colors touch-manipulation disabled:opacity-60 ${isListening ? "animate-pulse bg-red-500" : "bg-green-600 hover:bg-green-500"}`}
       >
-        <Stethoscope size={18} />
+        <Stethoscope size={23} />
       </button>
 
       {analysis && (

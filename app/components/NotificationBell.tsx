@@ -142,13 +142,13 @@ export default function NotificationBell() {
       onClick={toggleSubscription}
       disabled={loading}
       title={subscribed ? "Désactiver les notifications" : "Activer les notifications push"}
-      className={`p-1.5 rounded-lg transition-colors ${
+      className={`p-1 rounded-lg transition-colors ${
         subscribed
           ? "bg-green-600 text-white hover:bg-green-500"
           : "bg-green-800 text-green-300 hover:bg-green-600 hover:text-white"
       } disabled:opacity-50`}
     >
-      {subscribed ? <Bell size={18} /> : <BellOff size={18} />}
+      {subscribed ? <Bell size={16} /> : <BellOff size={16} />}
     </button>
   );
 }

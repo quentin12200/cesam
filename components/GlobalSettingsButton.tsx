@@ -52,9 +52,9 @@ export default function GlobalSettingsButton() {
         onClick={() => setOpen(true)}
         aria-label="Paramètres"
         title="Paramètres"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-green-50 hover:bg-green-600 hover:text-white"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-100 hover:bg-green-600 hover:text-white"
       >
-        <Settings size={21} />
+        <Settings size={17} />
       </button>
 
       {open && (

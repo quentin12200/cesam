@@ -149,11 +149,11 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
     const item = SHORTCUTS[id];
     const Icon = item.icon;
     if (item.visual) {
-      return <QuickActionButton key={id} action={item.visual} onClick={() => { fermer?.(); onAction(id as ActionRapide); }} className="min-h-16 w-full flex-col text-center leading-tight" />;
+      return <QuickActionButton key={id} action={item.visual} onClick={() => { fermer?.(); onAction(id as ActionRapide); }} className="min-h-14 w-full flex-col gap-0.5 px-1 py-1 text-center text-xs leading-tight [&_svg]:h-4 [&_svg]:w-4" />;
     }
     return (
-      <Link key={id} href={item.href!} onClick={fermer} className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-center text-xs font-semibold leading-tight shadow-sm transition active:scale-[0.97] ${item.className}`}>
-        <Icon size={20} className="shrink-0" />
+      <Link key={id} href={item.href!} onClick={fermer} className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-1 text-center text-xs font-semibold leading-tight shadow-sm transition active:scale-[0.97] ${item.className}`}>
+        <Icon size={16} className="shrink-0" />
         <span className="w-full whitespace-normal">{item.label}</span>
       </Link>
     );
@@ -163,10 +163,10 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
   const desktopActions = raccourcis.slice(0, raccourcis.length > 12 ? 11 : 12);
 
   return (
-    <section data-layout-section="accueil-actions-rapides" data-layout-label="Actions rapides" className="space-y-2">
+    <section data-layout-section="accueil-actions-rapides" data-layout-label="Actions rapides" className="space-y-1.5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-bold text-gray-800">Actions rapides</h2>
-        <button type="button" onClick={ouvrir} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+        <button type="button" onClick={ouvrir} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-600 hover:bg-gray-50">
           <Plus size={15} /> Gérer
         </button>
       </div>
@@ -177,13 +177,13 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
         </button>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-2 sm:hidden">
+          <div className="grid grid-cols-3 gap-1.5 sm:hidden">
             {mobileActions.map((id) => afficherAction(id))}
-            {raccourcis.length > 6 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={20} />Plus</button>}
+            {raccourcis.length > 6 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-gray-200 bg-white px-1 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={16} />Plus</button>}
           </div>
-          <div className="hidden grid-cols-6 gap-2 sm:grid">
+          <div className="hidden grid-cols-6 gap-1.5 sm:grid">
             {desktopActions.map((id) => afficherAction(id))}
-            {raccourcis.length > 12 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={20} />Plus</button>}
+            {raccourcis.length > 12 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-gray-200 bg-white px-1 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={16} />Plus</button>}
           </div>
         </>
       )}

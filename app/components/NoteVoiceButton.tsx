@@ -130,8 +130,8 @@ export default function NoteVoiceButton() {
           )}
         </div>
       )}
-      <button type="button" onClick={toggle} aria-label={listening ? "Arrêter la note vocale" : "Dicter une note libre"} title="Dicter une note libre" className={`rounded-lg p-1.5 text-white transition ${listening ? "animate-pulse bg-red-500" : "bg-amber-500 hover:bg-amber-400"}`}>
-        {listening ? <MicOff size={18} /> : <Mic size={18} />}
+      <button type="button" onClick={toggle} aria-label={listening ? "Arrêter la note vocale" : "Dicter une note libre"} title="Dicter une note libre" className={`rounded-xl p-2.5 text-white shadow-sm ring-1 ring-white/20 transition ${listening ? "animate-pulse bg-red-500" : "bg-amber-500 hover:bg-amber-400"}`}>
+        {listening ? <MicOff size={23} /> : <Mic size={23} />}
       </button>
     </>
   );

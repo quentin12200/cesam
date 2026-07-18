@@ -47,7 +47,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-gray-100">
         <UserPreferencesProvider>
         <header className="print:hidden bg-green-700 text-white shadow-md sticky top-0 z-30">
-          <div className="flex items-center justify-between px-4 py-2.5">
+          <div className="flex items-center justify-between px-3 py-1.5 sm:px-4">
             <div className="flex items-center gap-2.5">
               <Image
                 src="/logo-cesam.jpg"
@@ -56,9 +56,9 @@ export default function RootLayout({
                 height={28}
                 className="rounded-lg"
               />
-              <h1 className="text-base font-bold tracking-wide">GAEC CESAM — Samuel &amp; Céline</h1>
+              <h1 className="hidden text-base font-bold tracking-wide sm:block">GAEC CESAM — Samuel &amp; Céline</h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <GlobalScanner />
               <NoteVoiceButton />
               <NotificationBell />
