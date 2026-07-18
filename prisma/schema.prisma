@@ -628,6 +628,7 @@ model ExploitationConfig {
   propositionAutoNumero  Boolean  @default(true)
   serieCommuneSexes      Boolean  @default(true)
   serviceDeclaration     String   @default("AUCUN")
+  departementSoutien     String?
   updatedAt              DateTime @updatedAt
 }
 

@@ -16,11 +16,11 @@ import {
 } from "lucide-react";
 import BackButton from "@/app/components/BackButton";
 import { prisma } from "@/lib/prisma";
+import ReseauReagir from "./ReseauReagir";
 
 const LIENS = {
   agriecoute: "https://agriecoute.fr/",
   msa: "https://www.msa.fr/lfp/contact/coordonnees-msa",
-  chambres: "https://chambres-agriculture.fr/le-reseau-chambres/qui-sommes-nous/annuaire-des-chambres",
   solidaritePaysans: "https://solidaritepaysans.org/qui-sommes-nous/les-missions-du-reseau",
   ministere: "https://agriculture.gouv.fr/agriculteurs-en-difficulte-plusieurs-structures-daide-peuvent-vous-accompagner",
   urgence3114: "https://3114.fr/",
@@ -187,11 +187,16 @@ async function getLocalisation() {
   try {
     const config = await prisma.exploitationConfig.findUnique({
       where: { id: "singleton" },
-      select: { adresse: true },
+      select: { adresse: true, departementSoutien: true },
     });
-    return { adresse: config?.adresse ?? null, departement: extraireDepartement(config?.adresse) };
+    const departementDetecte = extraireDepartement(config?.adresse);
+    return {
+      adresse: config?.adresse ?? null,
+      departement: departementDetecte,
+      departementSoutien: config?.departementSoutien ?? departementDetecte,
+    };
   } catch {
-    return { adresse: null, departement: null };
+    return { adresse: null, departement: null, departementSoutien: null };
   }
 }
 
@@ -319,12 +324,7 @@ export default async function SoutienPage() {
             <p className="mt-1 text-sm text-gray-600">Écoute et accompagnement humain, administratif, économique ou juridique.</p>
             <div className="mt-3"><LienExterne href={LIENS.solidaritePaysans}>Trouver une association</LienExterne></div>
           </article>
-          <article className="rounded-lg border border-gray-200 p-3">
-            <Building2 size={19} className="text-green-700" />
-            <h3 className="mt-2 font-bold text-gray-900">Chambre d’agriculture</h3>
-            <p className="mt-1 text-sm text-gray-600">Un interlocuteur local pour les difficultés professionnelles et l’accompagnement de l’exploitation.</p>
-            <div className="mt-3"><LienExterne href={LIENS.chambres}>Ouvrir l’annuaire</LienExterne></div>
-          </article>
+          <ReseauReagir departementInitial={localisation.departementSoutien} />
           <article className="rounded-lg border border-gray-200 p-3">
             <HandHeart size={19} className="text-green-700" />
             <h3 className="mt-2 font-bold text-gray-900">Aides aux exploitants</h3>
@@ -351,4 +351,3 @@ export default async function SoutienPage() {
     </div>
   );
 }
-
