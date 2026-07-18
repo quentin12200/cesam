@@ -22,6 +22,7 @@ export interface VoiceMedicationCandidate {
 export interface VoiceSanitaryDraft {
   transcript: string;
   target: VoiceTarget | null;
+  numerosNonTrouves: string[];
   event: { id: string; nom: string } | null;
   date: string | null;
   moment: "Matin" | "Soir" | null;
@@ -59,12 +60,35 @@ export function extraireNumeroTravail(texte: string): string | null {
   return match ? normaliserNumeroTravail(match[1]) : null;
 }
 
-export function extraireNumerosTravail(texte: string): string[] {
-  const morceaux = texte.split(/\s*(?:;|\bet\b|,(?=\s))\s*/i);
-  const numeros = morceaux
-    .map(extraireNumeroTravail)
-    .filter((numero): numero is string => Boolean(numero));
-  return [...new Set(numeros)];
+export function extraireNumerosTravail(texte: string, numerosTroupeau: string[] = []): string[] {
+  const troupeau = new Set(numerosTroupeau.map(normaliserNumeroTravail).filter((numero): numero is string => Boolean(numero)));
+  const suitesChiffrees = texte.match(/\d{1,4}(?:\s+\d{1,4})*/g) ?? [];
+  const numeros: string[] = [];
+
+  for (const suite of suitesChiffrees) {
+    const groupes = suite.match(/\d{1,4}/g) ?? [];
+    const solutions = new Array<{ score: number; numeros: string[] } | null>(groupes.length + 1).fill(null);
+    solutions[groupes.length] = { score: 0, numeros: [] };
+
+    for (let debut = groupes.length - 1; debut >= 0; debut--) {
+      let chiffres = "";
+      for (let fin = debut; fin < groupes.length; fin++) {
+        chiffres += groupes[fin];
+        if (chiffres.length > 4) break;
+        const numero = normaliserNumeroTravail(chiffres);
+        const suiteSolution = solutions[fin + 1];
+        if (!numero || !suiteSolution) continue;
+        const score = (troupeau.has(numero) ? 100 : 0) + chiffres.length * chiffres.length + suiteSolution.score;
+        if (!solutions[debut] || score > solutions[debut]!.score) {
+          solutions[debut] = { score, numeros: [numero, ...suiteSolution.numeros] };
+        }
+      }
+    }
+
+    numeros.push(...(solutions[0]?.numeros ?? []));
+  }
+
+  return numeros.filter((numero, index) => numeros.indexOf(numero) === index);
 }
 
 export function compactVoiceText(value: string): string {

@@ -518,6 +518,17 @@ export default function VoiceButton() {
                 </div>
               ) : <p className="text-xs text-orange-700">Aucun animal confirmé.</p>}
 
+              {analysis.draft.numerosNonTrouves.length > 0 && (
+                <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-2.5">
+                  <p className="text-xs font-semibold text-orange-800">Numéro{analysis.draft.numerosNonTrouves.length > 1 ? "s" : ""} non trouvé{analysis.draft.numerosNonTrouves.length > 1 ? "s" : ""}</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {analysis.draft.numerosNonTrouves.map((numero) => (
+                      <span key={numero} className="rounded-md bg-white px-2 py-1 font-mono text-xs font-semibold text-orange-800">{numero}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {animalPickerOpen && (
                 <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-2">
                   <label className="flex min-h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3">
