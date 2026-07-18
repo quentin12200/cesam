@@ -12,7 +12,7 @@ import TroupeauTabs from "@/components/TroupeauTabs";
 async function getVelageData() {
   const now = new Date();
 
-  const [capteurs, gestationCalendar, velagesRecents] = await Promise.all([
+  const [capteurs, gestationCalendar, velagesRecents, dernierVeauDetail, dernierVeauHistorique, numerosAnimaux] = await Promise.all([
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
     getGestationCalendar(),
     prisma.velage.findMany({
@@ -29,14 +29,34 @@ async function getVelageData() {
       orderBy: { date: "desc" },
       take: 20,
     }),
+    prisma.veauVelage.findFirst({
+      where: { nutrav: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: { nutrav: true, createdAt: true },
+    }),
+    prisma.velage.findFirst({
+      where: { veauId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, veau: { select: { nutrav: true } } },
+    }),
+    prisma.animal.findMany({ select: { nutrav: true } }),
   ]);
 
-  return { capteurs, gestationCalendar, velagesRecents };
+  const numerosUtilises = numerosAnimaux.map((animal) => animal.nutrav);
+  const detailRecent = dernierVeauDetail && (!dernierVeauHistorique || dernierVeauDetail.createdAt >= dernierVeauHistorique.createdAt);
+  const candidat = detailRecent ? dernierVeauDetail?.nutrav : dernierVeauHistorique?.veau?.nutrav;
+  const dernierNumero = candidat && /^\d+$/.test(candidat) ? candidat : undefined;
+  let suivant = dernierNumero ? Number(dernierNumero) + 1 : 1;
+  const longueur = dernierNumero?.length ?? 4;
+  const dejaUtilises = new Set(numerosUtilises);
+  while (dejaUtilises.has(String(suivant).padStart(longueur, "0"))) suivant += 1;
+
+  return { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numeroVeauPropose: String(suivant).padStart(longueur, "0") };
 }
 
 export default async function VelagePage({ searchParams }: { searchParams: Promise<{ nouveau?: string; mere?: string; date?: string; sexe?: string }> }) {
   const params = await searchParams;
-  const { capteurs, gestationCalendar, velagesRecents } = await getVelageData();
+  const { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numeroVeauPropose } = await getVelageData();
   const now = new Date();
 
   return (
@@ -54,6 +74,8 @@ export default async function VelagePage({ searchParams }: { searchParams: Promi
         initialDate={params.date}
         initialSexe={params.sexe === "M" || params.sexe === "F" ? params.sexe : ""}
         capteurs={capteurs.map((c) => ({ numero: c.numero, actif: c.actif, animalNutrav: c.animalNutrav }))}
+        numeroVeauPropose={numeroVeauPropose}
+        numerosUtilises={numerosUtilises}
       />
 
       {/* Calendrier de gestation */}
