@@ -12,6 +12,7 @@ import {
   type VoiceSanitaryDraft,
   type VoiceTarget,
 } from "@/lib/voice-sanitary";
+import { analyserIntentionsVocales } from "@/lib/voice-intent";
 
 const ALIASES_EVENEMENTS: Array<[RegExp, string]> = [
   [/\bboite(?:rie)?\b/, "boiterie"],
@@ -333,8 +334,6 @@ export async function POST(request: NextRequest) {
   const phraseAiguillage = normaliserPhraseAiguillage(transcript);
   const aliasAiguillage = aliasesAiguillage.find((alias) => alias.phraseNormalisee === phraseAiguillage);
   const actionReproduction = reconnaitreActionReproduction(texteNormalise);
-  const intentionChaleur = /\bchaleurs?\b/.test(texteNormalise);
-  const intentionPesee = /\b(?:peser|pesee|pese|poids)\b/.test(texteNormalise);
   const taureauReconnu = trouverTaureau(texteNormalise, taureaux);
   const animauxCibles = target?.kind === "animal"
     ? target.nutravs.map((nutrav) => animaux.find((animal) => animal.nutrav === nutrav)).filter(Boolean)
@@ -343,7 +342,6 @@ export async function POST(request: NextRequest) {
   const veauSexe: "M" | "F" | null = /\b(?:male|males)\b/.test(texteNormalise)
     ? "M"
     : /\b(?:femelle|femelles)\b/.test(texteNormalise) ? "F" : null;
-  const intentionVelage = cibleFemelle && /\b(?:velage|vele|velee|village|naissance)\b|\b(?:a (?:villy|vile)|a fait son veau|a eu un veau|vient de veler|en train de veler)\b/.test(texteNormalise);
   const deductionParContexte = cibleFemelle && taureauReconnu !== null;
   const intentionSaillie = actionReproduction.ia
     || actionReproduction.naturelle
@@ -374,17 +372,25 @@ export async function POST(request: NextRequest) {
   const actionApprise = aliasAiguillage && ["sanitaire", "parage", "saillie", "chaleur", "pesee", "velage"].includes(aliasAiguillage.action)
     ? aliasAiguillage.action as "sanitaire" | "parage" | "saillie" | "chaleur" | "pesee" | "velage"
     : null;
-  const suggestedActions = intentionVelage
-    ? ["velage" as const]
-    : intentionChaleur
-      ? ["chaleur" as const]
-    : intentionPesee
-      ? ["pesee" as const]
-      : intentionSaillie
-        ? ["saillie" as const]
-    : actionApprise
-      ? [actionApprise]
-      : estBoiterie ? ["sanitaire" as const, "parage" as const] : ["sanitaire" as const];
+  const analyseIntentions = analyserIntentionsVocales({
+    texte: texteNormalise,
+    cibleTrouvee: Boolean(target),
+    cibleFemelle,
+    taureauTrouve: taureauReconnu !== null,
+    medicamentTrouve: medicament !== null,
+    medicamentIncertain: medicamentCandidates.length > 0,
+    evenementTrouve: event !== null,
+    poidsTrouve: poids !== null,
+    temperatureTrouvee: temperature !== null,
+    sexeTrouve: veauSexe !== null,
+    pattesTrouvees: pattes.length > 0,
+    traitementMentionne,
+    ajouterAuParage,
+    actionApprise,
+  });
+  const suggestedActions = analyseIntentions.actions.length > 0
+    ? analyseIntentions.actions
+    : estBoiterie ? ["sanitaire" as const, "parage" as const] : [];
 
   const draft: VoiceSanitaryDraft = {
     transcript,
@@ -416,7 +422,7 @@ export async function POST(request: NextRequest) {
     suggestedActions,
   };
 
-  const informationMetier = Boolean(intentionVelage || intentionChaleur || intentionPesee || intentionSaillie || actionApprise || event || temperature !== null || medicament || medicamentCandidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
+  const informationMetier = suggestedActions.length > 0;
   if (draft.numerosNonTrouves.length > 0 && informationMetier) {
     return NextResponse.json({ outcome: "confirm_animal", draft, candidates });
   }
