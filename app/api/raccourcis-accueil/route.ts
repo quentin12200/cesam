@@ -13,7 +13,9 @@ function profilValide(profil: unknown): profil is string {
 function lireRaccourcis(value: string | null | undefined) {
   if (!value) return DEFAULT_ACCUEIL_SHORTCUTS;
   try {
-    return normaliserAccueilShortcuts(JSON.parse(value));
+    const parsed = JSON.parse(value);
+    if (parsed && !Array.isArray(parsed) && parsed.version === 2) return normaliserAccueilShortcuts(parsed.ids);
+    return normaliserAccueilShortcuts(["chaleur", "saillie", "evenement", ...normaliserAccueilShortcuts(parsed)]);
   } catch {
     return DEFAULT_ACCUEIL_SHORTCUTS;
   }
@@ -40,8 +42,8 @@ export async function PUT(request: Request) {
   const raccourcis = normaliserAccueilShortcuts(body.raccourcis);
   await prisma.miseEnPage.upsert({
     where: { profil_module: { profil: body.profil, module: "accueil" } },
-    create: { profil: body.profil, module: "accueil", sections: "[]", raccourcis: JSON.stringify(raccourcis) },
-    update: { raccourcis: JSON.stringify(raccourcis) },
+    create: { profil: body.profil, module: "accueil", sections: "[]", raccourcis: JSON.stringify({ version: 2, ids: raccourcis }) },
+    update: { raccourcis: JSON.stringify({ version: 2, ids: raccourcis }) },
   });
 
   return NextResponse.json({ ok: true, raccourcis });

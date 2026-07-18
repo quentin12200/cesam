@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import QuickActionButton from "@/components/QuickActionButton";
-import type { ActionVisualKey } from "@/components/action-visuals";
 import AnimalPickerModal from "@/app/sanitaire/nouvel-evenement/AnimalPickerModal";
 import type { AnimalOption } from "@/app/sanitaire/nouvel-evenement/AnimalPicker";
 import AccueilShortcuts from "@/app/components/AccueilShortcuts";
@@ -14,12 +12,6 @@ interface Groupe {
   id: string;
   nom: string;
 }
-
-const actions = [
-  { id: "chaleur", visual: "chaleur" },
-  { id: "saillie", visual: "saillieIA" },
-  { id: "evenement", visual: "evenementSanitaire" },
-] satisfies { id: ActionRapide; visual: ActionVisualKey }[];
 
 export default function AccueilQuickActions() {
   const router = useRouter();
@@ -56,25 +48,7 @@ export default function AccueilQuickActions() {
 
   return (
     <>
-      <section
-        data-layout-section="accueil-actions-rapides"
-        data-layout-label="Actions rapides"
-        aria-label="Actions rapides"
-        className="grid grid-cols-3 gap-2 sm:gap-3"
-      >
-        {actions.map(({ id, visual }) => (
-          <QuickActionButton
-            key={id}
-            action={visual}
-            onClick={() => ouvrir(id)}
-            className="w-full"
-          />
-        ))}
-      </section>
-
-      <div className="mt-3">
-        <AccueilShortcuts />
-      </div>
+      <AccueilShortcuts onAction={ouvrir} />
 
       {action && (
         <AnimalPickerModal

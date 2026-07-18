@@ -1,4 +1,7 @@
 export const ACCUEIL_SHORTCUT_IDS = [
+  "chaleur",
+  "saillie",
+  "evenement",
   "parage",
   "troupeau",
   "reproduction",
@@ -15,8 +18,8 @@ export const ACCUEIL_SHORTCUT_IDS = [
 
 export type AccueilShortcutId = (typeof ACCUEIL_SHORTCUT_IDS)[number];
 
-export const DEFAULT_ACCUEIL_SHORTCUTS: AccueilShortcutId[] = ["parage"];
-export const MAX_ACCUEIL_SHORTCUTS = 6;
+export const DEFAULT_ACCUEIL_SHORTCUTS: AccueilShortcutId[] = ["chaleur", "saillie", "evenement", "parage"];
+export const MAX_ACCUEIL_SHORTCUTS = ACCUEIL_SHORTCUT_IDS.length;
 
 const IDS = new Set<string>(ACCUEIL_SHORTCUT_IDS);
 

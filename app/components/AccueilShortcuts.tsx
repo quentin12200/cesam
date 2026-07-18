@@ -19,6 +19,8 @@ import {
   Users,
 } from "lucide-react";
 import HoofPrintIcon from "@/components/HoofPrintIcon";
+import QuickActionButton from "@/components/QuickActionButton";
+import { ACTION_VISUALS, type ActionVisualKey } from "@/components/action-visuals";
 import SelectionModal from "@/components/SelectionModal";
 import { useUserPreferences } from "@/components/UserPreferencesProvider";
 import {
@@ -33,12 +35,16 @@ type ShortcutIcon = ComponentType<{ size?: number; className?: string }>;
 
 interface ShortcutDefinition {
   label: string;
-  href: string;
+  href?: string;
   icon: ShortcutIcon;
   className: string;
+  visual?: ActionVisualKey;
 }
 
 const SHORTCUTS: Record<AccueilShortcutId, ShortcutDefinition> = {
+  chaleur: { label: ACTION_VISUALS.chaleur.label, icon: ACTION_VISUALS.chaleur.icon, className: ACTION_VISUALS.chaleur.className, visual: "chaleur" },
+  saillie: { label: ACTION_VISUALS.saillieIA.label, icon: ACTION_VISUALS.saillieIA.icon, className: ACTION_VISUALS.saillieIA.className, visual: "saillieIA" },
+  evenement: { label: ACTION_VISUALS.evenementSanitaire.label, icon: ACTION_VISUALS.evenementSanitaire.icon, className: ACTION_VISUALS.evenementSanitaire.className, visual: "evenementSanitaire" },
   parage: { label: "Parage", href: "/parage", icon: HoofPrintIcon, className: "border-green-200 bg-green-50 text-green-800" },
   troupeau: { label: "Troupeau", href: "/troupeau", icon: Users, className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
   reproduction: { label: "Reproduction", href: "/reproduction", icon: HeartPulse, className: "border-pink-200 bg-pink-50 text-pink-800" },
@@ -61,7 +67,9 @@ function deplacer(ids: AccueilShortcutId[], index: number, direction: -1 | 1) {
   return next;
 }
 
-export default function AccueilShortcuts() {
+type ActionRapide = "chaleur" | "saillie" | "evenement";
+
+export default function AccueilShortcuts({ onAction }: { onAction: (action: ActionRapide) => void }) {
   const { profile, ready } = useUserPreferences();
   const [raccourcis, setRaccourcis] = useState<AccueilShortcutId[]>(DEFAULT_ACCUEIL_SHORTCUTS);
   const [brouillon, setBrouillon] = useState<AccueilShortcutId[]>(DEFAULT_ACCUEIL_SHORTCUTS);
@@ -130,10 +138,12 @@ export default function AccueilShortcuts() {
     return <div className="h-16 animate-pulse rounded-lg bg-gray-100" aria-label="Chargement des raccourcis" />;
   }
 
+  const nombreColonnes = raccourcis.length <= 4 ? raccourcis.length : Math.ceil(raccourcis.length / 2);
+
   return (
-    <section data-layout-section="accueil-raccourcis" data-layout-label="Mes raccourcis" className="space-y-2">
+    <section data-layout-section="accueil-actions-rapides" data-layout-label="Actions rapides" className="space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-bold text-gray-800">Mes raccourcis</h2>
+        <h2 className="text-sm font-bold text-gray-800">Actions rapides</h2>
         <button type="button" onClick={ouvrir} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50">
           <Plus size={15} /> Gérer
         </button>
@@ -141,17 +151,26 @@ export default function AccueilShortcuts() {
 
       {raccourcis.length === 0 ? (
         <button type="button" onClick={ouvrir} className="min-h-14 w-full rounded-lg border border-dashed border-gray-300 bg-white text-sm font-medium text-gray-500">
-          + Ajouter un raccourci
+          + Ajouter une action
         </button>
       ) : (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        <div
+          className="grid gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]"
+          style={{
+            gridTemplateColumns: `repeat(${nombreColonnes}, minmax(8.5rem, 1fr))`,
+            minWidth: `max(100%, ${nombreColonnes * 8.5}rem)`,
+          }}
+        >
           {raccourcis.map((id) => {
             const item = SHORTCUTS[id];
             const Icon = item.icon;
+            if (item.visual) {
+              return <QuickActionButton key={id} action={item.visual} onClick={() => onAction(id as ActionRapide)} className="min-h-16 w-full flex-col text-center leading-tight" />;
+            }
             return (
-              <Link key={id} href={item.href} className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-2 text-center text-xs font-semibold shadow-sm transition active:scale-[0.97] ${item.className}`}>
+              <Link key={id} href={item.href!} className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-center text-xs font-semibold leading-tight shadow-sm transition active:scale-[0.97] ${item.className}`}>
                 <Icon size={20} className="shrink-0" />
-                <span className="w-full truncate">{item.label}</span>
+                <span className="w-full whitespace-normal">{item.label}</span>
               </Link>
             );
           })}
@@ -162,9 +181,9 @@ export default function AccueilShortcuts() {
 
       {open && (
         <SelectionModal
-          title="Mes raccourcis"
+          title="Actions rapides"
           onClose={() => setOpen(false)}
-          controls={<p className="px-4 py-2 text-xs text-gray-500">{brouillon.length} / {MAX_ACCUEIL_SHORTCUTS} raccourcis sélectionnés</p>}
+          controls={<p className="px-4 py-2 text-xs text-gray-500">{brouillon.length} action{brouillon.length > 1 ? "s" : ""} sélectionnée{brouillon.length > 1 ? "s" : ""}</p>}
           footer={(
             <div className="flex items-center justify-end gap-2 p-3">
               <button type="button" onClick={() => setOpen(false)} className="min-h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700">Annuler</button>
