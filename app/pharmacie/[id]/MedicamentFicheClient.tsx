@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Star, Pencil, ChevronDown, ChevronUp, Stethoscope, ArrowLeft } from "lucide-react";
+import { Star, Pencil, ChevronDown, ChevronUp, Stethoscope, ArrowLeft, Package, Milk, Beef } from "lucide-react";
 import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 import {
   getCategorieMedicament,
@@ -14,6 +14,8 @@ import {
   isVisibleEnConsultation,
 } from "@/lib/medicament-categories";
 import MedicamentDetailClient from "./MedicamentDetailClient";
+import PreconisationFields from "./PreconisationFields";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 interface MedicamentData {
   id: string;
@@ -95,30 +97,41 @@ const STATUT_CLASSES: Record<string, string> = {
   "Archivé": "bg-gray-100 text-gray-400",
 };
 
-function PreconisationCard({ p }: { p: PreconisationData }) {
+function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicamentId: string }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<Record<string, string>>({
+    indicationMotif: p.indicationMotif ?? "", categorieAnimaux: p.categorieAnimaux ?? "", agePoidsConcerne: p.agePoidsConcerne ?? "", dose: p.dose != null ? String(p.dose) : "", unite: p.unite ?? "", doseBase: p.doseBase ?? "ANIMAL", voie: p.voie ?? "", frequence: p.frequence ?? "", dureeValeur: p.dureeValeur != null ? String(p.dureeValeur) : "", dureeUnite: p.dureeUnite ?? "JOUR", nombreAdministrations: p.nombreAdministrations != null ? String(p.nombreAdministrations) : "", precautions: p.precautions ?? "", delaiAttenteViandeJ: p.delaiAttenteViandeJ != null ? String(p.delaiAttenteViandeJ) : "", delaiAttenteLaitTraites: p.delaiAttenteLaitTraites != null ? String(p.delaiAttenteLaitTraites) : "",
+  });
   const statutLabel = formatStatutConsultation(p.statut);
   const precautionsTexte = formatPrecautions(p.precautions);
   const animauxTexte = [p.categorieAnimaux, p.agePoidsConcerne].filter(Boolean).join(" · ");
 
+  async function enregistrer() { await fetch(`/api/preconisations/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); setEditing(false); router.refresh(); }
+  async function dupliquer() { await fetch("/api/preconisations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, medicamentId, statut: "A_VERIFIER", source: "Duplication" }) }); router.refresh(); }
+  async function archiver() { await fetch(`/api/preconisations/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ statut: "ARCHIVE" }) }); router.refresh(); }
+  async function supprimer() { await fetch(`/api/preconisations/${p.id}`, { method: "DELETE" }); router.refresh(); }
+
+  if (editing) return <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 space-y-3"><PreconisationFields form={form} onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))} /><div className="flex gap-2"><button type="button" onClick={() => void enregistrer()} className="min-h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white">Enregistrer</button><button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg border bg-white px-4 text-sm">Annuler</button></div></div>;
+
   return (
-    <div className="border border-gray-100 rounded-lg p-3 text-sm space-y-1.5">
+    <div className="border border-gray-200 bg-white rounded-xl p-3 text-sm shadow-sm space-y-2">
       <div className="flex items-start justify-between gap-2">
         <span className="font-medium text-gray-800">{p.indicationMotif || "Sans indication précisée"}</span>
-        <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${STATUT_CLASSES[statutLabel]}`}>{statutLabel}</span>
+        <div className="flex items-center"><span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${STATUT_CLASSES[statutLabel]}`}>{statutLabel}</span><RecordActionsMenu onEdit={() => setEditing(true)} actions={[{ label: "Dupliquer", onSelect: dupliquer }, ...(p.statut !== "ARCHIVE" ? [{ label: "Archiver", onSelect: archiver }] : []), { label: "Supprimer", tone: "danger", confirmMessage: "Supprimer cette préconisation ?", onSelect: supprimer }]} /></div>
       </div>
-      <div className="text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-0.5">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-gray-600 sm:grid-cols-3">
         {animauxTexte && <span>{animauxTexte}</span>}
-        {p.dose != null && <span>{p.dose} {p.unite} {formatDoseBase(p.doseBase)}</span>}
-        {p.voie && <span>{formatVoie(p.voie)}</span>}
-        {p.frequence && <span>{p.frequence}</span>}
-        {p.dureeValeur != null && <span>{p.dureeValeur} {p.dureeUnite === "48H" ? "× 48h" : "jour(s)"}</span>}
+        {p.dose != null && <span><b className="block text-gray-400 font-medium">Dose</b>{p.dose} {p.unite} {formatDoseBase(p.doseBase)}</span>}
+        {p.voie && <span><b className="block text-gray-400 font-medium">Voie</b>{formatVoie(p.voie)}</span>}
+        <span><b className="block text-gray-400 font-medium">Fréquence</b>{p.frequence || "Dose unique"}</span>
+        {p.dureeValeur != null && <span><b className="block text-gray-400 font-medium">Durée</b>{p.dureeValeur} {p.dureeUnite === "48H" ? "× 48h" : "jour(s)"}</span>}
         {p.nombreAdministrations != null && <span>{p.nombreAdministrations} administration{p.nombreAdministrations > 1 ? "s" : ""}</span>}
       </div>
       {(p.delaiAttenteViandeJ != null || p.delaiAttenteLaitTraites != null) && (
-        <div className="text-xs text-gray-600">
-          {p.delaiAttenteViandeJ != null && `Délai d'attente viande : ${p.delaiAttenteViandeJ} j`}
-          {p.delaiAttenteViandeJ != null && p.delaiAttenteLaitTraites != null ? " · " : ""}
-          {p.delaiAttenteLaitTraites != null && `Délai d'attente lait : ${p.delaiAttenteLaitTraites} traite(s)`}
+        <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs text-gray-600">
+          {p.delaiAttenteViandeJ != null && <span className="flex items-center gap-1.5"><Beef size={14} className="text-red-500" /> Viande : {p.delaiAttenteViandeJ} j</span>}
+          {p.delaiAttenteLaitTraites != null && <span className="flex items-center gap-1.5"><Milk size={14} className="text-blue-500" /> Lait : {p.delaiAttenteLaitTraites} traite(s)</span>}
         </div>
       )}
       {precautionsTexte && <div className="text-xs text-orange-700">{precautionsTexte}</div>}
@@ -162,15 +175,12 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
     <div className="space-y-4">
       {/* Header */}
       <div className="bg-white rounded-xl shadow p-4 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-start gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             <button onClick={toggleFavori} disabled={savingFavori} className="mt-0.5 shrink-0" aria-label="Favori">
               <Star size={22} className={medicament.favori ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} />
             </button>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">{medicament.nom}</h3>
-              {medicament.dci && <p className="text-sm text-gray-500">{medicament.dci}</p>}
-            </div>
+            {medicament.dci && <p className="text-sm text-gray-500">{medicament.dci}</p>}
           </div>
           <button onClick={() => setEditMode(true)}
             className="shrink-0 flex items-center gap-1 text-xs px-3 py-1.5 border rounded-lg text-gray-600 hover:bg-gray-50">
@@ -185,11 +195,13 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
           {medicament.prescriptionRequise && (
             <span className="text-xs font-medium px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">Ordonnance requise</span>
           )}
-          {!medicament.actif && <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">Inactif</span>}
+          <span className={`text-xs px-2 py-1 rounded-full ${medicament.actif ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>{medicament.actif ? "Actif" : "Inactif"}</span>
         </div>
 
+        <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm"><span className="flex items-center gap-2 text-gray-500"><Package size={16} /> Stock</span><span className="font-semibold text-gray-900">{medicament.stockActuel ?? "—"} {medicament.stockUnite ?? ""}{medicament.stockSeuilAlert != null && <small className="ml-2 rounded-full bg-orange-100 px-2 py-1 font-medium text-orange-700">Seuil : {medicament.stockSeuilAlert}</small>}</span></div>
+
         <Link href={`/sanitaire/nouvel-evenement?medicament=${medicament.id}`}
-          className="inline-flex items-center gap-1.5 text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700">
           <Stethoscope size={14} /> Créer un événement sanitaire avec ce médicament
         </Link>
       </div>
@@ -230,7 +242,7 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
           <p className="text-sm text-gray-400 text-center py-3">Aucune préconisation enregistrée</p>
         )}
         <div className="space-y-2">
-          {preconisationsVisibles.map((p) => <PreconisationCard key={p.id} p={p} />)}
+          {preconisationsVisibles.map((p) => <PreconisationCard key={p.id} p={p} medicamentId={medicament.id} />)}
         </div>
       </div>
 

@@ -52,7 +52,7 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
         <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex items-center gap-2">
           <Pill size={20} className="text-blue-600" />
-          <h2 className="text-xl font-bold text-gray-800">{medicament.nom}</h2>
+          <div><h2 className="text-xl font-bold text-gray-800">{medicament.nom}</h2><p className="text-xs text-gray-500">Médicament</p></div>
         </div>
       </div>
 

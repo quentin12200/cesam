@@ -73,10 +73,11 @@ const emptyPreco = {
   precautions: "", delaiAttenteViandeJ: "", delaiAttenteLaitTraites: "",
 };
 
-export default function MedicamentDetailClient({ medicament, preconisations }: { medicament: MedicamentData; preconisations: PreconisationData[] }) {
+export default function MedicamentDetailClient({ medicament, preconisations, ficheSeulement = false }: { medicament: MedicamentData; preconisations: PreconisationData[]; ficheSeulement?: boolean }) {
   const router = useRouter();
 
   const [form, setForm] = useState({
+    nom: medicament.nom,
     dci: medicament.dci ?? "",
     forme: medicament.forme ?? "",
     categorie: medicament.categorie,
@@ -106,6 +107,7 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        nom: form.nom,
         dci: form.dci || null,
         forme: form.forme || null,
         categorie: form.categorie,
@@ -185,6 +187,7 @@ export default function MedicamentDetailClient({ medicament, preconisations }: {
       {/* Fiche médicament */}
       <form onSubmit={saveFiche} className="bg-white rounded-xl shadow p-4 space-y-3">
         <h3 className="font-semibold text-gray-800 text-sm border-b pb-2">Fiche médicament</h3>
+        <div><label className="text-xs text-gray-500 block mb-1">Nom</label><input required value={form.nom} onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm font-semibold" /></div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-gray-500 block mb-1">Substance active</label>
