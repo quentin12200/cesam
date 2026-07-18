@@ -5,6 +5,7 @@ import { Settings, X, UserRound, Mic, Loader2 } from "lucide-react";
 import { useUserPreferences, type CesamProfile } from "@/components/UserPreferencesProvider";
 import NotificationBell from "@/app/components/NotificationBell";
 import IdentificationSettings from "@/components/IdentificationSettings";
+import PreconisationReferentielsSettings from "@/components/PreconisationReferentielsSettings";
 
 const PROFILES: CesamProfile[] = ["Céline", "Samuel"];
 
@@ -111,6 +112,7 @@ export default function GlobalSettingsButton() {
             </div>
 
             <IdentificationSettings />
+            <PreconisationReferentielsSettings />
 
             <div className="mt-5">
               <button

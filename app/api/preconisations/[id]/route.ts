@@ -35,6 +35,7 @@ export async function PATCH(
       data[field] = val;
     }
   }
+  if (body.frequence === "DOSE_UNIQUE") { data.dureeValeur = null; data.dureeUnite = null; data.nombreAdministrations = 1; }
 
   const preconisation = await prisma.preconisation.update({ where: { id }, data });
 

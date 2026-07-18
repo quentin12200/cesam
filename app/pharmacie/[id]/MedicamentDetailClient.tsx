@@ -68,7 +68,7 @@ const DUREE_UNITE_LABEL: Record<string, string> = {
 
 const emptyPreco = {
   indicationMotif: "", categorieAnimaux: "", agePoidsConcerne: "",
-  dose: "", unite: "ml", doseBase: "ANIMAL", voie: "", frequence: "",
+  dose: "", unite: "ml", doseBase: "ANIMAL", voie: "", frequence: "DOSE_UNIQUE",
   dureeValeur: "", dureeUnite: "JOUR", nombreAdministrations: "",
   precautions: "", delaiAttenteViandeJ: "", delaiAttenteLaitTraites: "",
 };

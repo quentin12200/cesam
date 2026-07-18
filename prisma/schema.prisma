@@ -300,6 +300,19 @@ model Parage {
   @@index([statut, date])
 }
 
+model ValeurReferentielPreconisation {
+  id        String   @id @default(cuid())
+  type      String
+  code      String
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, code])
+  @@index([type, actif])
+}
+
 model VeauVelage {
   id        String   @id @default(cuid())
   velageId  String

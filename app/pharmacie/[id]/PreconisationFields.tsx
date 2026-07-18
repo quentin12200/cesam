@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Option {
   value: string;
@@ -14,6 +14,7 @@ interface SelectAvecAjoutProps {
   placeholder: string;
   autreLabel: string;
   autrePlaceholder: string;
+  referentielType?: string;
 }
 
 const VOIES: readonly Option[] = [
@@ -41,14 +42,13 @@ const UNITES: readonly Option[] = [
 ];
 
 const FREQUENCES: readonly Option[] = [
-  { value: "Dose unique", label: "Dose unique" },
-  { value: "1 fois / jour", label: "1 fois / jour" },
-  { value: "2 fois / jour", label: "2 fois / jour" },
-  { value: "3 fois / jour", label: "3 fois / jour" },
-  { value: "1 fois / 48 h", label: "1 fois / 48 h" },
-  { value: "1 fois / semaine", label: "1 fois / semaine" },
-  { value: "1 fois / mois", label: "1 fois / mois" },
-  { value: "Selon besoin", label: "Selon besoin" },
+  { value: "DOSE_UNIQUE", label: "Dose unique" },
+  { value: "1_PAR_JOUR", label: "Donner 1 fois par jour" },
+  { value: "2_PAR_JOUR", label: "Donner 2 fois par jour" },
+  { value: "3_PAR_JOUR", label: "Donner 3 fois par jour" },
+  { value: "1_PAR_24H", label: "Donner 1 fois par 24 h" },
+  { value: "1_PAR_48H", label: "Donner 1 fois par 48 h" },
+  { value: "1_PAR_SEMAINE", label: "Donner 1 fois par semaine" },
 ];
 
 const CATEGORIES_ANIMAUX: readonly Option[] = [
@@ -67,6 +67,7 @@ function SelectAvecAjout({
   placeholder,
   autreLabel,
   autrePlaceholder,
+  referentielType,
 }: SelectAvecAjoutProps) {
   const valeurConnue = options.some((option) => option.value === value);
   const [saisieLibre, setSaisieLibre] = useState(Boolean(value && !valeurConnue));
@@ -98,6 +99,7 @@ function SelectAvecAjout({
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={() => { if (referentielType && value.trim()) void fetch("/api/referentiels-preconisation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: referentielType, libelle: value }) }).then((r) => r.json()).then((saved) => saved.code && onChange(saved.code)); }}
           autoFocus
           placeholder={autrePlaceholder}
           className="w-full border border-blue-300 rounded-lg px-2.5 py-2 text-sm bg-white"
@@ -111,10 +113,12 @@ export function VoieSelect({
   value,
   onChange,
   label = "Voie d’administration",
+  options = VOIES,
 }: {
   value: string;
   onChange: (value: string) => void;
   label?: string;
+  options?: readonly Option[];
 }) {
   return (
     <label className="block">
@@ -122,10 +126,11 @@ export function VoieSelect({
       <SelectAvecAjout
         value={value}
         onChange={onChange}
-        options={VOIES}
+        options={options}
         placeholder="Sélectionner une voie"
         autreLabel="+ Ajouter une nouvelle voie…"
         autrePlaceholder="Nom de la nouvelle voie"
+        referentielType="VOIE"
       />
     </label>
   );
@@ -137,8 +142,12 @@ interface PreconisationFieldsProps {
 }
 
 export default function PreconisationFields({ form, onChange }: PreconisationFieldsProps) {
+  const [ajouts, setAjouts] = useState<Record<string, { value: string; label: string }[]>>({});
+  useEffect(() => { void fetch("/api/referentiels-preconisation").then((r) => r.ok ? r.json() : []).then((rows: { type: string; code: string; libelle: string; actif: boolean }[]) => { const groupes: Record<string, { value: string; label: string }[]> = {}; for (const row of rows.filter((item) => item.actif)) (groupes[row.type] ??= []).push({ value: row.code, label: row.libelle }); setAjouts(groupes); }); }, []);
+  const options = (type: string, standards: readonly Option[]) => [...standards, ...(ajouts[type] ?? [])];
+  const doseUnique = form.frequence === "DOSE_UNIQUE" || form.frequence === "Dose unique";
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <label className="block">
         <span className="text-xs text-gray-500 block mb-1">Indication / motif</span>
         <input
@@ -149,7 +158,7 @@ export default function PreconisationFields({ form, onChange }: PreconisationFie
         />
       </label>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <span className="text-xs text-gray-500 block mb-1">Catégorie d’animaux</span>
           <SelectAvecAjout
@@ -170,13 +179,14 @@ export default function PreconisationFields({ form, onChange }: PreconisationFie
             className="w-full border rounded-lg px-2.5 py-2 text-sm"
           />
         </label>
-        <VoieSelect
+        <div className="col-span-2"><VoieSelect
           value={form.voie}
           onChange={(value) => onChange("voie", value)}
-        />
+          options={options("VOIE", VOIES)}
+        /></div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <span className="text-xs text-gray-500 block mb-1">Quantité</span>
           <input
@@ -194,40 +204,31 @@ export default function PreconisationFields({ form, onChange }: PreconisationFie
           <SelectAvecAjout
             value={form.unite}
             onChange={(value) => onChange("unite", value)}
-            options={UNITES}
+            options={options("UNITE", UNITES)}
             placeholder="Sélectionner"
             autreLabel="+ Autre unité…"
             autrePlaceholder="Nouvelle unité"
           />
         </label>
-        <label className="block">
+        <label className="col-span-2 block">
           <span className="text-xs text-gray-500 block mb-1">Base de dosage</span>
-          <select
-            value={form.doseBase}
-            onChange={(event) => onChange("doseBase", event.target.value)}
-            className="w-full border rounded-lg px-2.5 py-2 text-sm bg-white"
-          >
-            <option value="ANIMAL">par animal</option>
-            <option value="KG">par kg</option>
-            <option value="100KG">par 100 kg</option>
-            <option value="QUARTIER">par quartier</option>
-          </select>
+          <SelectAvecAjout value={form.doseBase} onChange={(value) => onChange("doseBase", value)} options={options("BASE_DOSAGE", [{ value: "ANIMAL", label: "par animal" }, { value: "KG", label: "par kg" }, { value: "100KG", label: "par 100 kg" }, { value: "QUARTIER", label: "par quartier" }])} placeholder="Sélectionner" autreLabel="+ Ajouter une valeur" autrePlaceholder="Nouvelle base de dosage" referentielType="BASE_DOSAGE" />
         </label>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-        <label className="block">
+      <div className="grid grid-cols-2 gap-2">
+        <label className="col-span-2 block">
           <span className="text-xs text-gray-500 block mb-1">Fréquence</span>
           <SelectAvecAjout
             value={form.frequence}
-            onChange={(value) => onChange("frequence", value)}
-            options={FREQUENCES}
+            onChange={(value) => { onChange("frequence", value); const prises = value.match(/^(\d+)_PAR_/)?.[1]; if (prises) onChange("nombreAdministrations", prises); }}
+            options={options("FREQUENCE", FREQUENCES)}
             placeholder="Sélectionner"
             autreLabel="+ Autre fréquence…"
             autrePlaceholder="Nouvelle fréquence"
           />
         </label>
-        <label className="block">
+        {!doseUnique && <label className="block">
           <span className="text-xs text-gray-500 block mb-1">Durée</span>
           <input
             type="number"
@@ -237,8 +238,8 @@ export default function PreconisationFields({ form, onChange }: PreconisationFie
             placeholder="0"
             className="w-full border rounded-lg px-2.5 py-2 text-sm"
           />
-        </label>
-        <label className="block">
+        </label>}
+        {!doseUnique && <label className="block">
           <span className="text-xs text-gray-500 block mb-1">Unité de durée</span>
           <select
             value={form.dureeUnite}
@@ -251,8 +252,8 @@ export default function PreconisationFields({ form, onChange }: PreconisationFie
             <option value="SEMAINE">semaine(s)</option>
             <option value="MOIS">mois</option>
           </select>
-        </label>
-        <label className="block">
+        </label>}
+        {!doseUnique && <label className="hidden">
           <span className="text-xs text-gray-500 block mb-1">Nb d’administrations</span>
           <input
             type="number"
@@ -262,10 +263,10 @@ export default function PreconisationFields({ form, onChange }: PreconisationFie
             placeholder="1"
             className="w-full border rounded-lg px-2.5 py-2 text-sm"
           />
-        </label>
+        </label>}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <span className="text-xs text-gray-500 block mb-1">Délai d’attente viande (jours)</span>
           <input

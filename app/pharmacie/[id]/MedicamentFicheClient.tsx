@@ -96,6 +96,7 @@ const STATUT_CLASSES: Record<string, string> = {
   "Vérifié": "bg-green-100 text-green-700",
   "Archivé": "bg-gray-100 text-gray-400",
 };
+const FREQUENCE_LABELS: Record<string, string> = { DOSE_UNIQUE: "Dose unique", "1_PAR_JOUR": "1 fois / jour", "2_PAR_JOUR": "2 fois / jour", "3_PAR_JOUR": "3 fois / jour", "1_PAR_24H": "1 fois / 24 h", "1_PAR_48H": "1 fois / 48 h", "1_PAR_SEMAINE": "1 fois / semaine" };
 
 function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicamentId: string }) {
   const router = useRouter();
@@ -125,7 +126,7 @@ function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicame
         {animauxTexte && <span>{animauxTexte}</span>}
         {p.dose != null && <span><b className="block text-gray-400 font-medium">Dose</b>{p.dose} {p.unite} {formatDoseBase(p.doseBase)}</span>}
         {p.voie && <span><b className="block text-gray-400 font-medium">Voie</b>{formatVoie(p.voie)}</span>}
-        <span><b className="block text-gray-400 font-medium">Fréquence</b>{p.frequence || "Dose unique"}</span>
+        <span><b className="block text-gray-400 font-medium">Fréquence</b>{FREQUENCE_LABELS[p.frequence ?? ""] ?? p.frequence ?? "Dose unique"}</span>
         {p.dureeValeur != null && <span><b className="block text-gray-400 font-medium">Durée</b>{p.dureeValeur} {p.dureeUnite === "48H" ? "× 48h" : "jour(s)"}</span>}
         {p.nombreAdministrations != null && <span>{p.nombreAdministrations} administration{p.nombreAdministrations > 1 ? "s" : ""}</span>}
       </div>
