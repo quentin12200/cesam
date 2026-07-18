@@ -48,7 +48,7 @@ import type { EtatGestation } from "@/lib/utils";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
-  searchParams: Promise<{ onglet?: string }>;
+  searchParams: Promise<{ onglet?: string; pesee?: string; poids?: string }>;
 }
 
 async function getGroupes() {
@@ -115,7 +115,7 @@ async function getAnimal(nutrav: string) {
 
 export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const { nutrav } = await params;
-  const { onglet = "identite" } = await searchParams;
+  const { onglet = "identite", pesee, poids } = await searchParams;
   const [animal, groupes, protocoles, affichageDelaiAttente] = await Promise.all([
     getAnimal(nutrav), getGroupes(), getProtocoles(), getAffichageDelaiAttente(),
   ]);
@@ -428,7 +428,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 <p className="text-sm text-gray-400 italic mb-2">Aucune pesée enregistrée</p>
               )}
               <div className="mt-2">
-                <PeseeInlineForm nutrav={animal.nutrav} />
+                <PeseeInlineForm nutrav={animal.nutrav} initialOpen={pesee === "1"} initialPoids={poids && /^\d+(?:[.,]\d+)?$/.test(poids) ? poids.replace(",", ".") : ""} />
               </div>
             </div>
 

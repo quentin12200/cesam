@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X, Save } from "lucide-react";
 
-export default function PeseeInlineForm({ nutrav }: { nutrav: string }) {
+export default function PeseeInlineForm({ nutrav, initialOpen = false, initialPoids = "" }: { nutrav: string; initialOpen?: boolean; initialPoids?: string }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [poids, setPoids] = useState("");
+  const [poids, setPoids] = useState(initialPoids);
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
