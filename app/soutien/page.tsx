@@ -1,12 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 import {
   Building2,
   ExternalLink,
   HandHeart,
   HeartHandshake,
   MapPin,
+  Mail,
   Phone,
   ShieldCheck,
   TriangleAlert,
@@ -23,6 +25,45 @@ const LIENS = {
   ministere: "https://agriculture.gouv.fr/agriculteurs-en-difficulte-plusieurs-structures-daide-peuvent-vous-accompagner",
   urgence3114: "https://3114.fr/",
 };
+
+const ACTION_SOCIALE_MPN = {
+  caisse: "MSA Midi-Pyrénées Nord",
+  contactUrl: "https://mpn.msa.fr/lfp/contact-travailleurs-sociaux",
+  aidesUrl: "https://mpn.msa.fr/lfp/prestations-extra-legales",
+  accompagnementUrl: "https://mpn.msa.fr/lfp/soutien/accompagnement-proximite",
+  email: "mpnass.blf@mpn.msa.fr",
+  numeroSecours: "05 63 21 61 39",
+};
+
+function extraireNumeroActionSociale(html: string) {
+  const texte = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ");
+  const texteNormalise = texte.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const debut = texteNormalise.indexOf("service action sanitaire et sociale");
+  if (debut === -1) return null;
+  return texte.slice(debut, debut + 350).match(/0[1-9](?:[ .-]?\d{2}){4}/)?.[0]?.replace(/[.-]/g, " ") ?? null;
+}
+
+const chargerContactActionSocialeMpn = unstable_cache(
+  async () => {
+    try {
+      const reponse = await fetch(ACTION_SOCIALE_MPN.contactUrl, { signal: AbortSignal.timeout(5000) });
+      if (!reponse.ok) throw new Error("Source MSA indisponible");
+      const numero = extraireNumeroActionSociale(await reponse.text());
+      if (!numero) throw new Error("Numéro non trouvé");
+      return { numero, actualiseDepuisMsa: true };
+    } catch {
+      return { numero: ACTION_SOCIALE_MPN.numeroSecours, actualiseDepuisMsa: false };
+    }
+  },
+  ["contact-action-sociale-msa-mpn"],
+  { revalidate: 60 * 60 * 24 * 7 },
+);
 
 const CAISSES_MSA = [
   { codes: ["01", "69"], nom: "MSA Ain-Rhône", url: "https://ain-rhone.msa.fr/" },
@@ -97,6 +138,9 @@ function LienExterne({ href, children }: { href: string; children: React.ReactNo
 export default async function SoutienPage() {
   const localisation = await getLocalisation();
   const msa = trouverMsa(localisation.departement);
+  const contactActionSociale = msa?.nom === ACTION_SOCIALE_MPN.caisse
+    ? await chargerContactActionSocialeMpn()
+    : null;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 pb-24">
@@ -160,11 +204,39 @@ export default async function SoutienPage() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <article className="rounded-lg border border-gray-200 p-3">
+          <article className={`rounded-lg border border-gray-200 p-3 ${contactActionSociale ? "sm:col-span-2" : ""}`}>
             <Building2 size={19} className="text-green-700" />
             <h3 className="mt-2 font-bold text-gray-900">{msa?.nom ?? "Ma MSA"}</h3>
-            <p className="mt-1 text-sm text-gray-600">Accompagnement social, santé, répit et cellule de prévention du mal-être.</p>
-            <div className="mt-3"><LienExterne href={msa?.url ?? LIENS.msa}>{msa ? "Contacter ma MSA" : "Trouver ma caisse"}</LienExterne></div>
+            {contactActionSociale ? (
+              <>
+                <p className="mt-1 text-sm text-gray-600">
+                  Des travailleurs sociaux vous écoutent en toute confidentialité, font le point avec vous et cherchent des solutions adaptées aux difficultés personnelles, familiales, administratives, financières ou professionnelles.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <a href={`tel:${contactActionSociale.numero.replace(/\s/g, "")}`} className="flex min-h-14 items-center justify-center gap-2 rounded-lg bg-green-700 px-4 text-center font-bold text-white active:bg-green-800">
+                    <Phone size={19} /> Action sociale · {contactActionSociale.numero}
+                  </a>
+                  <a href={`mailto:${ACTION_SOCIALE_MPN.email}`} className="flex min-h-14 items-center justify-center gap-2 rounded-lg border-2 border-green-700 bg-white px-4 text-center font-semibold text-green-800 active:bg-green-50">
+                    <Mail size={18} /> Écrire au service social
+                  </a>
+                </div>
+                <p className="mt-3 text-sm font-semibold text-gray-800">Ce service peut notamment aider pour :</p>
+                <p className="mt-1 text-sm text-gray-600">épuisement et besoin de répit, difficultés financières ou administratives, maladie ou accident, séparation, deuil, accès aux droits et orientation vers le bon interlocuteur.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <LienExterne href={ACTION_SOCIALE_MPN.aidesUrl}>Voir les aides de ma MSA</LienExterne>
+                  <LienExterne href={ACTION_SOCIALE_MPN.accompagnementUrl}>Comprendre l’accompagnement</LienExterne>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Numéro contrôlé chaque semaine depuis la page officielle de la MSA. {contactActionSociale.actualiseDepuisMsa ? "Source disponible aujourd’hui." : "Le site MSA est momentanément indisponible : dernier numéro officiel connu affiché."}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-sm text-gray-600">Accompagnement social, santé, répit et cellule de prévention du mal-être.</p>
+                <div className="mt-3"><LienExterne href={msa?.url ?? LIENS.msa}>{msa ? "Contacter ma MSA" : "Trouver ma caisse"}</LienExterne></div>
+                {msa && <p className="mt-2 text-xs text-gray-500">Le numéro direct du service social de cette caisse n’est pas encore vérifié dans CESAM.</p>}
+              </>
+            )}
           </article>
           <article className="rounded-lg border border-gray-200 p-3">
             <Users size={19} className="text-green-700" />
@@ -204,3 +276,4 @@ export default async function SoutienPage() {
     </div>
   );
 }
+
