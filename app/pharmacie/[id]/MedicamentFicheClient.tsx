@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Star, Pencil, ChevronDown, ChevronUp, Stethoscope, ArrowLeft, Package, Milk, Beef } from "lucide-react";
+import { Star, Pencil, ChevronDown, ChevronUp, Stethoscope, ArrowLeft, Package, Milk, Beef, Syringe } from "lucide-react";
 import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 import {
   getCategorieMedicament,
@@ -115,7 +115,8 @@ function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicame
   if (editing) return <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 space-y-3"><PreconisationFields form={form} onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))} /><div className="flex gap-2"><button type="button" onClick={() => void enregistrer()} className="min-h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white">Enregistrer</button><button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg border bg-white px-4 text-sm">Annuler</button></div></div>;
 
   return (
-    <div className="border border-gray-200 bg-white rounded-xl p-3 text-sm shadow-sm space-y-2">
+    <div className="relative min-h-32 border border-gray-200 bg-white rounded-xl py-3 pr-3 pl-24 text-sm shadow-sm space-y-2">
+      <div className={`absolute bottom-3 left-3 top-3 flex w-16 flex-col items-center justify-center rounded-xl text-lg font-bold ${p.voie === "SC" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"}`}><Syringe size={24} /><span className="mt-1">{p.voie || "—"}</span></div>
       <div className="flex items-start justify-between gap-2">
         <span className="font-medium text-gray-800">{p.indicationMotif || "Sans indication précisée"}</span>
         <div className="flex items-center"><span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${STATUT_CLASSES[statutLabel]}`}>{statutLabel}</span><RecordActionsMenu onEdit={() => setEditing(true)} actions={[{ label: "Dupliquer", onSelect: dupliquer }, ...(p.statut !== "ARCHIVE" ? [{ label: "Archiver", onSelect: archiver }] : []), { label: "Supprimer", tone: "danger", confirmMessage: "Supprimer cette préconisation ?", onSelect: supprimer }]} /></div>
@@ -174,18 +175,14 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-white rounded-xl shadow p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
+      <div className="grid grid-cols-[1fr_auto] gap-3 rounded-xl bg-white p-4 shadow">
+        <div className="col-span-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <button onClick={toggleFavori} disabled={savingFavori} className="mt-0.5 shrink-0" aria-label="Favori">
               <Star size={22} className={medicament.favori ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} />
             </button>
             {medicament.dci && <p className="text-sm text-gray-500">{medicament.dci}</p>}
           </div>
-          <button onClick={() => setEditMode(true)}
-            className="shrink-0 flex items-center gap-1 text-xs px-3 py-1.5 border rounded-lg text-gray-600 hover:bg-gray-50">
-            <Pencil size={13} /> Modifier la fiche
-          </button>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -198,13 +195,14 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
           <span className={`text-xs px-2 py-1 rounded-full ${medicament.actif ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>{medicament.actif ? "Actif" : "Inactif"}</span>
         </div>
 
-        <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm"><span className="flex items-center gap-2 text-gray-500"><Package size={16} /> Stock</span><span className="font-semibold text-gray-900">{medicament.stockActuel ?? "—"} {medicament.stockUnite ?? ""}{medicament.stockSeuilAlert != null && <small className="ml-2 rounded-full bg-orange-100 px-2 py-1 font-medium text-orange-700">Seuil : {medicament.stockSeuilAlert}</small>}</span></div>
+        <div className="border-l pl-4 text-sm"><span className="flex items-center gap-1.5 text-xs text-gray-500"><Package size={14} /> Stock</span><strong className="block whitespace-nowrap text-base text-gray-900">{medicament.stockActuel ?? "—"} {medicament.stockUnite ?? ""}</strong>{medicament.stockSeuilAlert != null && <small className="mt-1 block whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 font-medium text-orange-700">Seuil : {medicament.stockSeuilAlert}</small>}</div>
+      </div>
 
-        <Link href={`/sanitaire/nouvel-evenement?medicament=${medicament.id}`}
+      <Link href={`/sanitaire/nouvel-evenement?medicament=${medicament.id}`}
           className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700">
           <Stethoscope size={14} /> Créer un événement sanitaire avec ce médicament
-        </Link>
-      </div>
+      </Link>
+      <button onClick={() => setEditMode(true)} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border bg-white text-sm font-medium text-blue-600 shadow-sm"><Pencil size={14} /> Modifier la fiche</button>
 
       {/* Actions / En savoir + */}
       {actionsList.length > 0 && (
@@ -236,15 +234,15 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
       )}
 
       {/* Préconisations */}
-      <div className="bg-white rounded-xl shadow p-4 space-y-3">
-        <h3 className="font-semibold text-gray-800 text-sm">Préconisations</h3>
+      <section className="space-y-3">
+        <h3 className="px-1 font-semibold text-gray-800">Préconisations</h3>
         {preconisationsVisibles.length === 0 && (
           <p className="text-sm text-gray-400 text-center py-3">Aucune préconisation enregistrée</p>
         )}
         <div className="space-y-2">
           {preconisationsVisibles.map((p) => <PreconisationCard key={p.id} p={p} medicamentId={medicament.id} />)}
         </div>
-      </div>
+      </section>
 
       {/* Ordonnances associées */}
       <div className="bg-white rounded-xl shadow p-4 space-y-1">
