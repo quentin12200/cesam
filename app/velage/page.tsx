@@ -8,11 +8,12 @@ import CapteurManager from "./CapteurManager";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
 import GestationCalendarSection from "@/app/components/GestationCalendarSection";
 import TroupeauTabs from "@/components/TroupeauTabs";
+import { normaliserNutrav, propositionLot } from "@/lib/identification";
 
 async function getVelageData() {
   const now = new Date();
 
-  const [capteurs, gestationCalendar, velagesRecents, dernierVeauDetail, dernierVeauHistorique, numerosAnimaux] = await Promise.all([
+  const [capteurs, gestationCalendar, velagesRecents, dernierVeauDetail, dernierVeauHistorique, numerosAnimaux, numerosVeaux, identificationConfig, lotActif] = await Promise.all([
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
     getGestationCalendar(),
     prisma.velage.findMany({
@@ -39,24 +40,40 @@ async function getVelageData() {
       orderBy: { createdAt: "desc" },
       select: { createdAt: true, veau: { select: { nutrav: true } } },
     }),
-    prisma.animal.findMany({ select: { nutrav: true } }),
+    prisma.animal.findMany({ select: { nutrav: true, numeroNational: true } }),
+    prisma.veauVelage.findMany({ select: { nutrav: true, nunati: true } }),
+    prisma.exploitationConfig.findUnique({ where: { id: "singleton" } }),
+    prisma.lotBoucles.findFirst({ where: { actif: true }, orderBy: { createdAt: "desc" } }),
   ]);
 
-  const numerosUtilises = numerosAnimaux.map((animal) => animal.nutrav);
+  const numerosUtilises = [...new Set([...numerosAnimaux.map((animal) => animal.nutrav), ...numerosVeaux.flatMap((veau) => veau.nutrav ? [veau.nutrav] : [])])];
+  const numerosNationauxUtilises = [...new Set([...numerosAnimaux.flatMap((animal) => animal.numeroNational ? [animal.numeroNational] : []), ...numerosVeaux.flatMap((veau) => veau.nunati ? [veau.nunati] : [])])];
+  const config = identificationConfig ?? { identificationMode: "TRAVAIL_ET_NATIONAL", nutravNbChiffres: 4, nutravZerosGauche: true, propositionAutoNumero: true, serieCommuneSexes: true, serviceDeclaration: "AUCUN" };
   const detailRecent = dernierVeauDetail && (!dernierVeauHistorique || dernierVeauDetail.createdAt >= dernierVeauHistorique.createdAt);
   const candidat = detailRecent ? dernierVeauDetail?.nutrav : dernierVeauHistorique?.veau?.nutrav;
   const dernierNumero = candidat && /^\d+$/.test(candidat) ? candidat : undefined;
   let suivant = dernierNumero ? Number(dernierNumero) + 1 : 1;
-  const longueur = dernierNumero?.length ?? 4;
+  const longueur = config.nutravNbChiffres;
   const dejaUtilises = new Set(numerosUtilises);
-  while (dejaUtilises.has(String(suivant).padStart(longueur, "0"))) suivant += 1;
+  while (dejaUtilises.has(normaliserNutrav(String(suivant), longueur, config.nutravZerosGauche))) suivant += 1;
 
-  return { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numeroVeauPropose: String(suivant).padStart(longueur, "0") };
+  let proposition = { nutrav: normaliserNutrav(String(suivant), longueur, config.nutravZerosGauche), nunati: "" };
+  if (lotActif && lotActif.prochainIndex < lotActif.quantite && config.propositionAutoNumero) {
+    let decalage = 0;
+    proposition = propositionLot(lotActif, longueur, config.nutravZerosGauche, decalage);
+    while ((dejaUtilises.has(proposition.nutrav) || numerosNationauxUtilises.includes(proposition.nunati)) && lotActif.prochainIndex + decalage < lotActif.quantite) {
+      decalage += 1;
+      proposition = propositionLot(lotActif, longueur, config.nutravZerosGauche, decalage);
+    }
+    if (lotActif.prochainIndex + decalage >= lotActif.quantite) proposition = { nutrav: normaliserNutrav(String(suivant), longueur, config.nutravZerosGauche), nunati: "" };
+  }
+
+  return { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numerosNationauxUtilises, proposition, config };
 }
 
 export default async function VelagePage({ searchParams }: { searchParams: Promise<{ nouveau?: string; mere?: string; date?: string; sexe?: string }> }) {
   const params = await searchParams;
-  const { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numeroVeauPropose } = await getVelageData();
+  const { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numerosNationauxUtilises, proposition, config } = await getVelageData();
   const now = new Date();
 
   return (
@@ -74,8 +91,11 @@ export default async function VelagePage({ searchParams }: { searchParams: Promi
         initialDate={params.date}
         initialSexe={params.sexe === "M" || params.sexe === "F" ? params.sexe : ""}
         capteurs={capteurs.map((c) => ({ numero: c.numero, actif: c.actif, animalNutrav: c.animalNutrav }))}
-        numeroVeauPropose={numeroVeauPropose}
+        numeroVeauPropose={config.propositionAutoNumero ? proposition.nutrav : ""}
+        numeroNationalPropose={config.identificationMode === "TRAVAIL_SEUL" ? "" : proposition.nunati}
         numerosUtilises={numerosUtilises}
+        numerosNationauxUtilises={numerosNationauxUtilises}
+        identification={{ mode: config.identificationMode, chiffres: config.nutravNbChiffres, zerosGauche: config.nutravZerosGauche }}
       />
 
       {/* Calendrier de gestation */}

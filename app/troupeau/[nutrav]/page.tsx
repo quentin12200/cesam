@@ -193,7 +193,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               </span>
               <span className="text-sm font-semibold text-gray-700">{formatAge(animal.danais)}</span>
             </div>
-            <p className="mt-1 font-mono text-xs text-gray-400 break-all">{animal.nunati}</p>
+            <p className="mt-1 font-mono text-xs text-gray-400 break-all">{animal.numeroNational ?? "Numéro national à compléter"}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <EditAnimalDrawer
@@ -205,6 +205,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               sexbov={animal.sexbov}
               notes={animal.notes ?? null}
               boucleFaite={animal.boucleFaite}
+              numeroNational={animal.numeroNational}
             />
             <Link
               href={`/troupeau/${animal.nutrav}/arbre`}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 
-type VeauSaisi = { nutrav?: string; sexe?: "M" | "F"; nom?: string; statut?: "VIVANT" | "MORT_NE" };
+type VeauSaisi = { nutrav?: string; nunati?: string; sexe?: "M" | "F"; nom?: string; statut?: "VIVANT" | "MORT_NE" };
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,27 +14,41 @@ export async function POST(request: NextRequest) {
     const vache = await prisma.animal.findUnique({ where: { nutrav: vacheNutrav } });
     if (!vache) return NextResponse.json({ error: `Vache ${vacheNutrav} non trouvée` }, { status: 404 });
     const prevTarieFaite = vache.tarieFaite;
+    const identificationConfig = await prisma.exploitationConfig.findUnique({ where: { id: "singleton" } });
+    const lotActif = await prisma.lotBoucles.findFirst({ where: { actif: true }, orderBy: { createdAt: "desc" } });
 
     let veaux: VeauSaisi[] = Array.isArray(body.veaux) ? body.veaux : [];
     if (!body.veaux && body.veauNutrav) veaux = [{ nutrav: body.veauNutrav, sexe: body.veauSexe, nom: body.veauNom, statut: "VIVANT" }];
     if (qualificatif === "AVORTEMENT") veaux = [];
     if (qualificatif === "MORT_NEE") veaux = (veaux.length ? veaux : [{}]).map((v) => ({ ...v, statut: "MORT_NE" }));
-    veaux = veaux.slice(0, 10).map((v) => ({ ...v, nutrav: v.nutrav?.trim().toUpperCase() || undefined, nom: v.nom?.trim() || undefined, statut: v.statut === "MORT_NE" ? "MORT_NE" : "VIVANT" }));
+    veaux = veaux.slice(0, 10).map((v) => ({ ...v, nutrav: v.nutrav?.trim().toUpperCase() || undefined, nunati: v.nunati?.trim().toUpperCase() || undefined, nom: v.nom?.trim() || undefined, statut: v.statut === "MORT_NE" ? "MORT_NE" : "VIVANT" }));
+    if (identificationConfig?.identificationMode === "NATIONAL_OBLIGATOIRE" && veaux.some((v) => !v.nunati)) return NextResponse.json({ error: "Le numéro national est obligatoire" }, { status: 400 });
+    if (new Set(veaux.flatMap((v) => v.nutrav ? [v.nutrav] : [])).size !== veaux.filter((v) => v.nutrav).length) return NextResponse.json({ error: "Un numéro de travail est utilisé plusieurs fois" }, { status: 409 });
+    if (new Set(veaux.flatMap((v) => v.nunati ? [v.nunati] : [])).size !== veaux.filter((v) => v.nunati).length) return NextResponse.json({ error: "Un numéro national est utilisé plusieurs fois" }, { status: 409 });
+    for (const saisi of veaux.filter((v) => v.statut === "MORT_NE")) {
+      if (saisi.nutrav && await prisma.veauVelage.findFirst({ where: { nutrav: saisi.nutrav } })) return NextResponse.json({ error: `Le numéro ${saisi.nutrav} est déjà utilisé` }, { status: 409 });
+      if (saisi.nunati && (await prisma.veauVelage.findFirst({ where: { nunati: saisi.nunati } }) || await prisma.animal.findUnique({ where: { numeroNational: saisi.nunati } }))) return NextResponse.json({ error: `Le numéro national ${saisi.nunati} est déjà utilisé` }, { status: 409 });
+    }
 
-    const resolus: { saisi: VeauSaisi; animalId: string | null; cree: boolean; precedent?: { sexbov: string; nobovi: string | null; mereId: string | null; danais: Date | null } }[] = [];
+    const resolus: { saisi: VeauSaisi; animalId: string | null; cree: boolean; precedent?: { sexbov: string; nobovi: string | null; mereId: string | null; danais: Date | null; numeroNational: string | null } }[] = [];
     for (const saisi of veaux) {
       if (saisi.statut === "MORT_NE" || !saisi.nutrav) { resolus.push({ saisi, animalId: null, cree: false }); continue; }
       const dejaLie = await prisma.veauVelage.findFirst({ where: { animal: { nutrav: saisi.nutrav } }, include: { velage: true } });
       if (dejaLie) return NextResponse.json({ error: `Le veau ${saisi.nutrav} est déjà lié à un vêlage` }, { status: 409 });
       let animal = await prisma.animal.findUnique({ where: { nutrav: saisi.nutrav } });
+      const nationalExistant = saisi.nunati ? await prisma.animal.findUnique({ where: { numeroNational: saisi.nunati } }) : null;
+      const nationalVelageExistant = saisi.nunati ? await prisma.veauVelage.findFirst({ where: { nunati: saisi.nunati } }) : null;
+      if ((nationalExistant && nationalExistant.id !== animal?.id) || nationalVelageExistant) return NextResponse.json({ error: `Le numéro national ${saisi.nunati} est déjà utilisé` }, { status: 409 });
       let cree = false, precedent;
       if (!animal) {
         const sexe = saisi.sexe ?? "F";
-        animal = await prisma.animal.create({ data: { nutrav: saisi.nutrav, nunati: `AUTO${saisi.nutrav}`, nobovi: saisi.nom ?? null, danais: new Date(date), sexbov: sexe, statut: "ACTIF", estGenisse: sexe === "F", categorie: sexe === "F" ? "VELLE" : null, mereId: vache.id } });
+        animal = await prisma.animal.create({ data: { nutrav: saisi.nutrav, nunati: saisi.nunati ?? `AUTO${saisi.nutrav}`, numeroNational: saisi.nunati ?? null, nobovi: saisi.nom ?? null, danais: new Date(date), sexbov: sexe, statut: "ACTIF", estGenisse: sexe === "F", categorie: sexe === "F" ? "VELLE" : null, mereId: vache.id, declarationsAdministratives: { create: { type: "NAISSANCE", statut: "A_DECLARER", service: identificationConfig?.serviceDeclaration ?? "AUCUN" } } } });
         cree = true;
       } else {
-        precedent = { sexbov: animal.sexbov, nobovi: animal.nobovi, mereId: animal.mereId, danais: animal.danais };
-        await prisma.animal.update({ where: { id: animal.id }, data: { mereId: vache.id, danais: new Date(date), ...(saisi.sexe ? { sexbov: saisi.sexe } : {}), ...(saisi.nom ? { nobovi: saisi.nom } : {}) } });
+        precedent = { sexbov: animal.sexbov, nobovi: animal.nobovi, mereId: animal.mereId, danais: animal.danais, numeroNational: animal.numeroNational };
+        await prisma.animal.update({ where: { id: animal.id }, data: { mereId: vache.id, danais: new Date(date), ...(saisi.sexe ? { sexbov: saisi.sexe } : {}), ...(saisi.nom ? { nobovi: saisi.nom } : {}), ...(saisi.nunati ? { numeroNational: saisi.nunati } : {}) } });
+        const declaration = await prisma.declarationAdministrative.findFirst({ where: { animalId: animal.id, type: "NAISSANCE" } });
+        if (!declaration) await prisma.declarationAdministrative.create({ data: { animalId: animal.id, type: "NAISSANCE", statut: "A_DECLARER", service: identificationConfig?.serviceDeclaration ?? "AUCUN" } });
       }
       resolus.push({ saisi, animalId: animal.id, cree, precedent });
     }
@@ -47,7 +61,7 @@ export async function POST(request: NextRequest) {
         sousType: sousType ?? (qualificatif === "NORMAL" ? "SEULE" : null), capteur: capteur ?? null,
         pereNom: pereNom ?? null, pereNunati: gestation?.saillie.taureau?.nupere ?? null,
         jumeaux: veaux.length === 2, nombreVeaux: veaux.length, gestationId: gestation?.id ?? null,
-        veauxDetails: { create: resolus.map((v) => ({ animalId: v.animalId, nutrav: v.saisi.nutrav ?? null, nom: v.saisi.nom ?? null, sexe: v.saisi.sexe ?? null, statut: v.saisi.statut ?? "VIVANT" })) },
+        veauxDetails: { create: resolus.map((v) => ({ animalId: v.animalId, nutrav: v.saisi.nutrav ?? null, nunati: v.saisi.nunati ?? null, nom: v.saisi.nom ?? null, sexe: v.saisi.sexe ?? null, statut: v.saisi.statut ?? "VIVANT" })) },
       } });
       if (gestation) await tx.gestation.update({ where: { id: gestation.id }, data: { etat: "VELAGE" } });
       await tx.animal.update({ where: { id: vache.id }, data: { tarieFaite: false } });
@@ -55,6 +69,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (capteur) await prisma.capteurVelage.updateMany({ where: { numero: capteur }, data: { actif: false, animalNutrav: null, animalNom: null, dateAttribution: null } });
+    if (lotActif) {
+      const premier = Number(lotActif.premierNutrav);
+      const indexes = veaux.flatMap((veau) => /^\d+$/.test(veau.nutrav ?? "") ? [Number(veau.nutrav) - premier] : []).filter((index) => index >= lotActif.prochainIndex && index < lotActif.quantite);
+      if (indexes.length) await prisma.lotBoucles.update({ where: { id: lotActif.id }, data: { prochainIndex: Math.max(...indexes) + 1 } });
+    }
     let undoId = "";
     try {
       const ops: import("@/lib/action-log").RevertStep[] = [{ op: "delete", model: "velage", id: velage.id }, { op: "update", model: "animal", where: { nutrav: vacheNutrav }, data: { tarieFaite: prevTarieFaite } }];

@@ -78,6 +78,7 @@ export async function PATCH(
   if ("categorie"     in body) prevFields.categorie     = animal.categorie;
   if ("groupeId"      in body) prevFields.groupeId      = animal.groupeId;
   if ("aEchographier" in body) prevFields.aEchographier = animal.aEchographier;
+  if ("numeroNational" in body) prevFields.numeroNational = animal.numeroNational;
 
   // Read mère's tarie BEFORE cascade update
   let merePrevTarieFaite: boolean | undefined;
@@ -111,6 +112,7 @@ export async function PATCH(
   if ("categorie"    in body) data.categorie    = body.categorie ?? null;
   if ("groupeId"     in body) data.groupeId     = body.groupeId ?? null;
   if ("aEchographier" in body) data.aEchographier = Boolean(body.aEchographier);
+  if ("numeroNational" in body) data.numeroNational = body.numeroNational?.trim().toUpperCase() || null;
 
   const updated = await prisma.animal.update({ where: { nutrav }, data });
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Settings, X, UserRound, Mic, Loader2 } from "lucide-react";
 import { useUserPreferences, type CesamProfile } from "@/components/UserPreferencesProvider";
 import NotificationBell from "@/app/components/NotificationBell";
+import IdentificationSettings from "@/components/IdentificationSettings";
 
 const PROFILES: CesamProfile[] = ["Céline", "Samuel"];
 
@@ -65,7 +66,7 @@ export default function GlobalSettingsButton() {
             aria-modal="true"
             aria-labelledby="settings-title"
             onMouseDown={(event) => event.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-white p-4 text-gray-900 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 text-gray-900 shadow-2xl"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -108,6 +109,8 @@ export default function GlobalSettingsButton() {
               <h3 className="mb-2 text-sm font-bold text-gray-800">Notifications</h3>
               <NotificationBell />
             </div>
+
+            <IdentificationSettings />
 
             <div className="mt-5">
               <button

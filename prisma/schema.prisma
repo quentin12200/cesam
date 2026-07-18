@@ -10,6 +10,7 @@ model Animal {
   id            String    @id @default(cuid())
   copaip        String    @default("FR")
   nunati        String    @unique
+  numeroNational String?  @unique
   nutrav        String    @unique
   nobovi        String?
   danais        DateTime
@@ -56,6 +57,7 @@ model Animal {
   velagesVache    Velage[]        @relation("VelageVache")
   velageVeau      Velage?         @relation("VelageVeau")
   veauxVelage     VeauVelage[]
+  declarationsAdministratives DeclarationAdministrative[]
   pesees          Pesee[]
   vaccinations    Vaccination[]
   evenements      EvenementSanitaire[]
@@ -305,6 +307,7 @@ model VeauVelage {
   animalId  String?  @unique
   animal    Animal?  @relation(fields: [animalId], references: [id])
   nutrav    String?
+  nunati    String?
   nom       String?
   sexe      String?
   statut    String
@@ -619,7 +622,41 @@ model ExploitationConfig {
   veterinaireTel         String?
   ordonnancierNo         String?
   affichageDelaiAttente  String   @default("LES_DEUX")
+  identificationMode     String   @default("TRAVAIL_ET_NATIONAL")
+  nutravNbChiffres       Int      @default(4)
+  nutravZerosGauche      Boolean  @default(true)
+  propositionAutoNumero  Boolean  @default(true)
+  serieCommuneSexes      Boolean  @default(true)
+  serviceDeclaration     String   @default("AUCUN")
   updatedAt              DateTime @updatedAt
+}
+
+model LotBoucles {
+  id                  String   @id @default(cuid())
+  reference           String?
+  premierNutrav       String
+  premierNunati       String
+  quantite            Int
+  prochainIndex       Int      @default(0)
+  actif               Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model DeclarationAdministrative {
+  id                String   @id @default(cuid())
+  animalId          String
+  animal            Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  type              String   @default("NAISSANCE")
+  statut            String   @default("A_DECLARER")
+  service           String   @default("AUCUN")
+  referenceExterne  String?
+  erreur            String?
+  donneesTransmises String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([animalId, statut])
 }
 
 /// Liste mémorisée des personnes pouvant administrer un traitement

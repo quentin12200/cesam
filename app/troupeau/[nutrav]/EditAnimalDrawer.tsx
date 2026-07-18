@@ -13,10 +13,11 @@ interface EditAnimalDrawerProps {
   sexbov: string;
   notes: string | null;
   boucleFaite: boolean;
+  numeroNational: string | null;
 }
 
 export default function EditAnimalDrawer({
-  nutrav, nobovi, danais, statut, estGenisse, sexbov, notes, boucleFaite,
+  nutrav, nobovi, danais, statut, estGenisse, sexbov, notes, boucleFaite, numeroNational,
 }: EditAnimalDrawerProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -30,6 +31,7 @@ export default function EditAnimalDrawer({
     estGenisse,
     notes:       notes ?? "",
     boucleFaite,
+    numeroNational: numeroNational ?? "",
   });
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
@@ -83,6 +85,11 @@ export default function EditAnimalDrawer({
             )}
 
             {/* Nom */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Numéro national</label>
+              <input type="text" value={form.numeroNational} onChange={(e) => set("numeroNational", e.target.value.toUpperCase())} placeholder="À compléter" className="w-full border border-gray-200 rounded-lg p-2.5 text-sm font-mono" />
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
               <input

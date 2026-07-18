@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
       data: {
         nutrav: nutrav.trim(),
         nunati: nunati.trim(),
+        numeroNational: nunati.trim(),
         nobovi: nobovi?.trim() || null,
         danais: new Date(danais),
         sexbov,
