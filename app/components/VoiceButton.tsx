@@ -367,6 +367,21 @@ export default function VoiceButton() {
         });
       } catch {}
     }
+    if (chosenAction === "chaleur") {
+      const ids = analysis.draft.target.nutravs
+        .map((nutrav) => animaux.find((animal) => animal.nutrav === nutrav)?.id)
+        .filter((id): id is string => Boolean(id));
+      setAnalysis(null);
+      router.push(`/reproduction?action=chaleur&animaux=${encodeURIComponent(ids.join(","))}`);
+      return;
+    }
+    if (chosenAction === "pesee") {
+      const nutrav = analysis.draft.target.nutravs[0];
+      const poids = analysis.draft.poids === null ? "" : `&poids=${encodeURIComponent(String(analysis.draft.poids))}`;
+      setAnalysis(null);
+      router.push(`/troupeau/${encodeURIComponent(nutrav)}?onglet=identite&pesee=1${poids}`);
+      return;
+    }
     if (chosenAction === "parage") {
       const draftParage: VoiceParageDraft = {
         transcript: analysis.draft.transcript,
@@ -428,6 +443,7 @@ export default function VoiceButton() {
     ? searchTypesEvenement(taureauQuery, taureauxRecherchables).slice(0, 20).map((resultat) => resultat.item)
     : taureauxRecherchables;
   const parageAvecPlusieursAnimaux = chosenAction === "parage" && selectedNutravs.length !== 1;
+  const peseeAvecPlusieursAnimaux = chosenAction === "pesee" && selectedNutravs.length !== 1;
   const informationsReconnues = analysis ? [
     chosenAction === "sanitaire" ? analysis.draft.event?.nom ?? null : null,
     analysis.draft.dateMentionnee && analysis.draft.date
@@ -435,6 +451,7 @@ export default function VoiceButton() {
       : null,
     analysis.draft.momentMentionne ? analysis.draft.moment : null,
     analysis.draft.temperature !== null ? `${String(analysis.draft.temperature).replace(".", ",")} °C` : null,
+    chosenAction === "pesee" && analysis.draft.poids !== null ? `${String(analysis.draft.poids).replace(".", ",")} kg` : null,
     ...analysis.draft.pattes,
     chosenAction === "sanitaire" ? analysis.draft.medicament?.nom ?? null : null,
     chosenAction === "sanitaire" && analysis.draft.voieAdministration ? `Voie ${analysis.draft.voieAdministration}` : null,
@@ -481,7 +498,8 @@ export default function VoiceButton() {
           footer={(
             <div className="p-3">
               {parageAvecPlusieursAnimaux && <p className="mb-2 text-xs font-medium text-orange-700">Le parage accepte un seul animal. Retire les autres ou choisis Sanitaire.</p>}
-              <button type="button" disabled={!analysis.draft.target || !selectedAction || parageAvecPlusieursAnimaux} onClick={() => void ouvrirFormulaire()} className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40">
+              {peseeAvecPlusieursAnimaux && <p className="mb-2 text-xs font-medium text-orange-700">La pesée accepte un seul animal.</p>}
+              <button type="button" disabled={!analysis.draft.target || !selectedAction || parageAvecPlusieursAnimaux || peseeAvecPlusieursAnimaux} onClick={() => void ouvrirFormulaire()} className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-40">
                 <Check size={17} /> {selectedAction?.continueLabel ?? "Choisir une destination"}
               </button>
             </div>

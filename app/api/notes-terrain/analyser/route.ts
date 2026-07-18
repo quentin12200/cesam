@@ -237,6 +237,11 @@ function reconnaitreActionReproduction(texteNormalise: string) {
   return { ia, naturelle: naturelleDirecte || naturellePhonetique };
 }
 
+function extrairePoids(texteNormalise: string): number | null {
+  const match = texteNormalise.match(/\b(?:pese|poids(?: de)?)\s+(\d{2,4}(?:[,.]\d+)?)\s*(?:kg|kilo(?:s|grammes?)?)\b/);
+  return match ? Number(match[1].replace(",", ".")) : null;
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const transcript = typeof body.texte === "string" ? body.texte.trim() : "";
@@ -277,7 +282,10 @@ export async function POST(request: NextRequest) {
       select: { phraseNormalisee: true, action: true },
     }),
   ]);
-  const numerosDictes = extraireNumerosTravail(transcript, animaux.map((animal) => animal.nutrav));
+  const poids = extrairePoids(texteNormalise);
+  const numeroPoids = poids === null ? null : normaliserNumeroTravail(String(Math.trunc(poids)));
+  const numerosDictes = extraireNumerosTravail(transcript, animaux.map((animal) => animal.nutrav))
+    .filter((numero) => numero !== numeroPoids);
 
   let target: VoiceTarget | null = null;
   let candidates: Array<{ nutrav: string; nom: string | null }> = [];
@@ -325,6 +333,8 @@ export async function POST(request: NextRequest) {
   const phraseAiguillage = normaliserPhraseAiguillage(transcript);
   const aliasAiguillage = aliasesAiguillage.find((alias) => alias.phraseNormalisee === phraseAiguillage);
   const actionReproduction = reconnaitreActionReproduction(texteNormalise);
+  const intentionChaleur = /\bchaleurs?\b/.test(texteNormalise);
+  const intentionPesee = /\b(?:peser|pesee|pese|poids)\b/.test(texteNormalise);
   const taureauReconnu = trouverTaureau(texteNormalise, taureaux);
   const animauxCibles = target?.kind === "animal"
     ? target.nutravs.map((nutrav) => animaux.find((animal) => animal.nutrav === nutrav)).filter(Boolean)
@@ -357,11 +367,15 @@ export async function POST(request: NextRequest) {
   const rappelDemande = /\b(?:rappel|rappeler|rappelle|surveiller|surveillance)\b/.test(texteNormalise);
   const traitementMentionne = /\btraitement\b/.test(texteNormalise) || medicament !== null;
   const estBoiterie = Boolean(event && normalizeSearch(event.nom) === "boiterie") || /\bboite(?:rie)?\b/.test(texteNormalise);
-  const actionApprise = aliasAiguillage && ["sanitaire", "parage", "saillie"].includes(aliasAiguillage.action)
-    ? aliasAiguillage.action as "sanitaire" | "parage" | "saillie"
+  const actionApprise = aliasAiguillage && ["sanitaire", "parage", "saillie", "chaleur", "pesee"].includes(aliasAiguillage.action)
+    ? aliasAiguillage.action as "sanitaire" | "parage" | "saillie" | "chaleur" | "pesee"
     : null;
-  const suggestedActions = intentionSaillie
-    ? ["saillie" as const]
+  const suggestedActions = intentionChaleur
+    ? ["chaleur" as const]
+    : intentionPesee
+      ? ["pesee" as const]
+      : intentionSaillie
+        ? ["saillie" as const]
     : actionApprise
       ? [actionApprise]
       : estBoiterie ? ["sanitaire" as const, "parage" as const] : ["sanitaire" as const];
@@ -376,6 +390,7 @@ export async function POST(request: NextRequest) {
     dateMentionnee: Boolean(transcript.match(/\b\d{1,2}[\/.\-]\d{1,2}(?:[\/.\-]\d{2,4})?\b/) || /\b(?:avant hier|hier|demain|aujourd[’']?hui)\b/.test(texteNormalise)),
     momentMentionne: /\b(?:matin|soir)\b/.test(texteNormalise),
     temperature,
+    poids,
     pattes,
     ajouterAuParage,
     medicament: medicament ? { id: medicament.id, nom: medicament.nom } : null,
@@ -394,7 +409,7 @@ export async function POST(request: NextRequest) {
     suggestedActions,
   };
 
-  const informationMetier = Boolean(intentionSaillie || actionApprise || event || temperature !== null || medicament || medicamentCandidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
+  const informationMetier = Boolean(intentionChaleur || intentionPesee || intentionSaillie || actionApprise || event || temperature !== null || medicament || medicamentCandidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
   if (draft.numerosNonTrouves.length > 0 && informationMetier) {
     return NextResponse.json({ outcome: "confirm_animal", draft, candidates });
   }

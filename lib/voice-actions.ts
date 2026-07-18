@@ -1,7 +1,7 @@
 import type { PatteParage } from "@/lib/parage";
 import type { VoiceTarget } from "@/lib/voice-sanitary";
 
-export type VoiceActionId = "sanitaire" | "parage" | "saillie";
+export type VoiceActionId = "sanitaire" | "parage" | "saillie" | "chaleur" | "pesee";
 
 export interface VoiceActionDefinition {
   id: VoiceActionId;
@@ -14,6 +14,8 @@ export const VOICE_ACTIONS: VoiceActionDefinition[] = [
   { id: "sanitaire", label: "Nouvel événement sanitaire", continueLabel: "Continuer vers Sanitaire", href: "/sanitaire/nouvel-evenement?brouillonVocal=1" },
   { id: "parage", label: "Parage", continueLabel: "Continuer vers Parage", href: "/parage?brouillonVocal=1" },
   { id: "saillie", label: "Saillie / IA", continueLabel: "Continuer vers Reproduction", href: "/reproduction?brouillonVocal=1" },
+  { id: "chaleur", label: "Chaleur", continueLabel: "Continuer vers Chaleur", href: "/reproduction?action=chaleur" },
+  { id: "pesee", label: "Pesée", continueLabel: "Continuer vers Pesée", href: "/troupeau" },
 ];
 
 export const VOICE_PARAGE_STORAGE_KEY = "cesam:brouillon-vocal-parage";
