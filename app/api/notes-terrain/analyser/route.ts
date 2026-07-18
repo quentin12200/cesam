@@ -243,7 +243,6 @@ export async function POST(request: NextRequest) {
   if (!transcript) return NextResponse.json({ error: "texte requis" }, { status: 400 });
 
   const texteNormalise = normalizeSearch(transcript);
-  const numerosDictes = extraireNumerosTravail(transcript);
   const [animaux, groupes, types, medicaments, aliasesVocaux, taureaux, aliasesAiguillage] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
@@ -278,6 +277,7 @@ export async function POST(request: NextRequest) {
       select: { phraseNormalisee: true, action: true },
     }),
   ]);
+  const numerosDictes = extraireNumerosTravail(transcript, animaux.map((animal) => animal.nutrav));
 
   let target: VoiceTarget | null = null;
   let candidates: Array<{ nutrav: string; nom: string | null }> = [];
@@ -369,6 +369,7 @@ export async function POST(request: NextRequest) {
   const draft: VoiceSanitaryDraft = {
     transcript,
     target,
+    numerosNonTrouves: numerosDictes.filter((numero) => !animaux.some((animal) => normaliserNumeroTravail(animal.nutrav) === numero)),
     event: event ? { id: event.id, nom: event.nom } : null,
     date: extraireDate(transcript, texteNormalise),
     moment: momentFrance(texteNormalise),
@@ -394,7 +395,7 @@ export async function POST(request: NextRequest) {
   };
 
   const informationMetier = Boolean(intentionSaillie || actionApprise || event || temperature !== null || medicament || medicamentCandidates.length > 0 || ajouterAuParage || rappelDemande || traitementMentionne);
-  if (candidates.length > 0 && informationMetier) {
+  if (draft.numerosNonTrouves.length > 0 && informationMetier) {
     return NextResponse.json({ outcome: "confirm_animal", draft, candidates });
   }
   if (!target || !informationMetier) {
