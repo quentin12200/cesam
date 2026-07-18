@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import Link from "next/link";
 import {
-  ArrowDown,
-  ArrowUp,
   Baby,
   BarChart3,
   CalendarDays,
@@ -12,6 +10,7 @@ import {
   Euro,
   FileText,
   HeartPulse,
+  GripVertical,
   Pill,
   Plus,
   Stethoscope,
@@ -59,14 +58,6 @@ const SHORTCUTS: Record<AccueilShortcutId, ShortcutDefinition> = {
   taureaux: { label: "Taureaux", href: "/taureaux", icon: BarChart3, className: "border-gray-200 bg-gray-50 text-gray-800" },
 };
 
-function deplacer(ids: AccueilShortcutId[], index: number, direction: -1 | 1) {
-  const cible = index + direction;
-  if (cible < 0 || cible >= ids.length) return ids;
-  const next = [...ids];
-  [next[index], next[cible]] = [next[cible], next[index]];
-  return next;
-}
-
 type ActionRapide = "chaleur" | "saillie" | "evenement";
 
 export default function AccueilShortcuts({ onAction }: { onAction: (action: ActionRapide) => void }) {
@@ -77,6 +68,8 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [draggedId, setDraggedId] = useState<AccueilShortcutId | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<AccueilShortcutId | "__end__" | null>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -113,6 +106,19 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
 
   function retirer(id: AccueilShortcutId) {
     setBrouillon((ids) => ids.filter((value) => value !== id));
+  }
+
+  function deposerAvant(targetId: AccueilShortcutId | "__end__") {
+    if (!draggedId) return;
+    setBrouillon((ids) => {
+      const next = ids.filter((id) => id !== draggedId);
+      const cible = targetId === "__end__" ? next.length : next.indexOf(targetId);
+      if (cible < 0) return ids;
+      next.splice(cible, 0, draggedId);
+      return next;
+    });
+    setDraggedId(null);
+    setDropTargetId(null);
   }
 
   async function enregistrer() {
@@ -197,19 +203,46 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
             {brouillon.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-xs font-bold uppercase text-gray-500">Sélectionnés</h3>
-                {brouillon.map((id, index) => {
+                <p className="text-xs text-gray-400">Faites glisser les lignes. Le trait vert indique l’emplacement exact.</p>
+                {brouillon.map((id) => {
                   const item = SHORTCUTS[id];
                   const Icon = item.icon;
                   return (
-                    <div key={id} className="flex min-h-12 items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-2">
+                    <div
+                      key={id}
+                      data-shortcut-drop={id}
+                      draggable
+                      onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggedId(id); setDropTargetId(null); }}
+                      onDragEnd={() => { setDraggedId(null); setDropTargetId(null); }}
+                      onDragOver={(event) => { event.preventDefault(); if (draggedId !== id) setDropTargetId(id); }}
+                      onDrop={(event) => { event.preventDefault(); deposerAvant(id); }}
+                      className={`relative flex min-h-12 items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-2 ${draggedId === id ? "opacity-50" : ""} ${dropTargetId === id ? "before:absolute before:-top-[7px] before:left-1 before:right-1 before:h-1 before:rounded-full before:bg-green-600" : ""}`}
+                    >
+                      <GripVertical
+                        size={18}
+                        className="shrink-0 cursor-grab touch-none text-gray-400 active:cursor-grabbing"
+                        onTouchStart={() => { setDraggedId(id); setDropTargetId(null); }}
+                        onTouchMove={(event) => {
+                          event.preventDefault();
+                          const touch = event.touches[0];
+                          const cible = document.elementFromPoint(touch.clientX, touch.clientY)?.closest<HTMLElement>("[data-shortcut-drop]")?.dataset.shortcutDrop;
+                          if (cible && cible !== id) setDropTargetId(cible as AccueilShortcutId | "__end__");
+                        }}
+                        onTouchEnd={() => { if (dropTargetId) deposerAvant(dropTargetId); else { setDraggedId(null); setDropTargetId(null); } }}
+                      />
                       <Icon size={17} className="shrink-0 text-green-700" />
                       <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800">{item.label}</span>
-                      <button type="button" disabled={index === 0} onClick={() => setBrouillon((ids) => deplacer(ids, index, -1))} className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 disabled:opacity-25" aria-label={`Monter ${item.label}`} title="Monter"><ArrowUp size={16} /></button>
-                      <button type="button" disabled={index === brouillon.length - 1} onClick={() => setBrouillon((ids) => deplacer(ids, index, 1))} className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 disabled:opacity-25" aria-label={`Descendre ${item.label}`} title="Descendre"><ArrowDown size={16} /></button>
                       <button type="button" onClick={() => retirer(id)} className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-red-600 hover:bg-red-50"><Check size={15} /> Retirer</button>
                     </div>
                   );
                 })}
+                <div
+                  data-shortcut-drop="__end__"
+                  onDragOver={(event) => { event.preventDefault(); setDropTargetId("__end__"); }}
+                  onDrop={(event) => { event.preventDefault(); deposerAvant("__end__"); }}
+                  className={`relative h-2 ${dropTargetId === "__end__" ? "after:absolute after:bottom-0 after:left-1 after:right-1 after:h-1 after:rounded-full after:bg-green-600" : ""}`}
+                  aria-hidden="true"
+                />
               </div>
             )}
 
