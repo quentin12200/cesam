@@ -343,9 +343,7 @@ export async function POST(request: NextRequest) {
   const veauSexe: "M" | "F" | null = /\b(?:male|males)\b/.test(texteNormalise)
     ? "M"
     : /\b(?:femelle|femelles)\b/.test(texteNormalise) ? "F" : null;
-  const intentionVelageDirecte = /\b(?:velage|vele|velee|naissance)\b|\b(?:a fait son veau|a eu un veau|vient de veler|en train de veler)\b/.test(texteNormalise);
-  const intentionVelage = intentionVelageDirecte
-    || (/\bvillage\b/.test(texteNormalise) && cibleFemelle && (/\b(?:veau|naissance)\b/.test(texteNormalise) || veauSexe !== null));
+  const intentionVelage = cibleFemelle && /\b(?:velage|vele|velee|village|naissance)\b|\b(?:a (?:villy|vile)|a fait son veau|a eu un veau|vient de veler|en train de veler)\b/.test(texteNormalise);
   const deductionParContexte = cibleFemelle && taureauReconnu !== null;
   const intentionSaillie = actionReproduction.ia
     || actionReproduction.naturelle
