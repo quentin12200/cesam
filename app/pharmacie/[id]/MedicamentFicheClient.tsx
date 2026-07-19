@@ -176,34 +176,23 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="grid grid-cols-[1fr_auto] gap-3 rounded-xl bg-white p-4 shadow">
-        <div className="col-span-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <button onClick={toggleFavori} disabled={savingFavori} className="mt-0.5 shrink-0" aria-label="Favori">
-              <Star size={22} className={medicament.favori ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} />
-            </button>
-            {medicament.dci && <p className="text-sm text-gray-500">{medicament.dci}</p>}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="space-y-2 rounded-xl bg-white p-3 shadow">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs font-medium px-2 py-1 rounded-full" style={{ background: cat.bg, color: cat.text }}>
             {cat.label}
           </span>
-          {medicament.prescriptionRequise && (
-            <span className="text-xs font-medium px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">Ordonnance requise</span>
-          )}
           <span className={`text-xs px-2 py-1 rounded-full ${medicament.actif ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>{medicament.actif ? "Actif" : "Inactif"}</span>
+          <button onClick={toggleFavori} disabled={savingFavori} className="ml-auto p-1" aria-label="Favori"><Star size={17} className={medicament.favori ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} /></button>
+          <button onClick={() => setEditMode(true)} className="flex items-center gap-1 px-1.5 py-1 text-xs text-gray-500"><Pencil size={12} /> Modifier la fiche</button>
         </div>
-
-        <div className="border-l pl-4 text-sm"><span className="flex items-center gap-1.5 text-xs text-gray-500"><Package size={14} /> Stock</span><strong className="block whitespace-nowrap text-base text-gray-900">{medicament.stockActuel ?? "—"} {medicament.stockUnite ?? ""}</strong>{medicament.stockSeuilAlert != null && <small className="mt-1 block whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 font-medium text-orange-700">Seuil : {medicament.stockSeuilAlert}</small>}</div>
+        {(medicament.dci || medicament.forme || medicament.prescriptionRequise) && <p className="text-xs text-gray-500">{[medicament.dci, medicament.forme, medicament.prescriptionRequise ? "Ordonnance requise" : null].filter(Boolean).join(" · ")}</p>}
+        <div className="flex items-center gap-1.5 border-t pt-2 text-xs text-gray-700"><Package size={14} className="text-gray-400" /><span><b>Stock :</b> {medicament.stockActuel ?? "—"} {medicament.stockUnite ?? ""}{medicament.stockSeuilAlert != null && <> · <b>Alerte :</b> {medicament.stockSeuilAlert} {medicament.stockUnite ?? ""}</>}</span></div>
       </div>
 
       <Link href={`/sanitaire/nouvel-evenement?medicament=${medicament.id}`}
           className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700">
           <Stethoscope size={14} /> Créer un événement sanitaire avec ce médicament
       </Link>
-      <button onClick={() => setEditMode(true)} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border bg-white text-sm font-medium text-blue-600 shadow-sm"><Pencil size={14} /> Modifier la fiche</button>
 
       {/* Actions / En savoir + */}
       {actionsList.length > 0 && (
