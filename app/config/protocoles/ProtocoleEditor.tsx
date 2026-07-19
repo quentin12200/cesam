@@ -10,7 +10,7 @@ type MedicamentEtape = { medicamentId: string; voie: string; alternative: boolea
 type Etape = { label: string; cycle: string; reference: string; debutValeur: string; debutUnite: string; debutPosition: string; finValeur: string; finUnite: string; finPosition: string; recurrenceMois: string; obligatoire: boolean; medicaments: MedicamentEtape[] };
 type Formulaire = { nom: string; label: string; description: string; categories: string[]; ageMinJours: string; ageMaxJours: string; sexeCible: string; stadeReproduction: string; gestante: string; rangVelageMin: string; rangVelageMax: string; lotCible: string; etapes: Etape[] };
 type Protocole = any;
-type Bloc = "qui" | "quand" | "etapes" | "lots";
+type Bloc = "medicament" | "qui" | "quand" | "etapes" | "lots";
 
 const CATEGORIES = [{ code: "VEAU", label: "Veaux", cls: "bg-sky-100 text-sky-800" }, { code: "GENISSE", label: "Génisses", cls: "bg-violet-100 text-violet-800" }, { code: "VACHE", label: "Vaches", cls: "bg-pink-100 text-pink-800" }, { code: "TAUREAU", label: "Taureaux", cls: "bg-amber-100 text-amber-800" }];
 const UNITES = ["JOUR", "SEMAINE", "MOIS"];
@@ -26,14 +26,14 @@ function ResumeBloc({ titre, resume, ouvert, onClick, children }: { titre: strin
 export default function ProtocoleEditor({ protocoles, medicaments }: { protocoles: Protocole[]; medicaments: Medicament[] }) {
   const router = useRouter();
   const [form, setForm] = useState<Formulaire>(formulaireVide());
-  const [ouvert, setOuvert] = useState(false), [bloc, setBloc] = useState<Bloc>("qui"), [editingId, setEditingId] = useState<string | null>(null), [saving, setSaving] = useState(false), [choixCategories, setChoixCategories] = useState(false);
+  const [ouvert, setOuvert] = useState(false), [bloc, setBloc] = useState<Bloc>("medicament"), [editingId, setEditingId] = useState<string | null>(null), [saving, setSaving] = useState(false), [choixCategories, setChoixCategories] = useState(false), [affiner, setAffiner] = useState(false), [personnaliser, setPersonnaliser] = useState(false);
 
   const setEtape = (index: number, data: Partial<Etape>) => setForm((f) => ({ ...f, etapes: f.etapes.map((e, i) => i === index ? { ...e, ...data } : e) }));
-  const ouvrirCreation = () => { setEditingId(null); setForm(formulaireVide()); setBloc("qui"); setOuvert(true); };
+  const ouvrirCreation = () => { setEditingId(null); setForm(formulaireVide()); setBloc("medicament"); setAffiner(false); setPersonnaliser(false); setOuvert(true); };
   function ouvrirEdition(p: Protocole) {
     setEditingId(p.id);
     setForm({ nom: p.nom, label: p.label, description: p.description ?? "", categories: p.categoriesJson ? JSON.parse(p.categoriesJson) : [], ageMinJours: String(p.ageMinJours ?? ""), ageMaxJours: String(p.ageMaxJours ?? ""), sexeCible: p.sexeCible ?? "", stadeReproduction: p.stadeReproduction ?? "", gestante: p.gestante == null ? "" : String(p.gestante), rangVelageMin: String(p.rangVelageMin ?? ""), rangVelageMax: String(p.rangVelageMax ?? ""), lotCible: p.lotCible ?? "", etapes: p.etapes?.length ? p.etapes.map((e: any) => ({ ...e, debutValeur: String(e.debutValeur), finValeur: String(e.finValeur), recurrenceMois: String(e.recurrenceMois ?? ""), medicaments: e.medicaments.map((m: any) => ({ medicamentId: m.medicamentId, voie: m.voie ?? "", alternative: m.alternative, conditionnements: medicaments.find((med) => med.id === m.medicamentId)?.conditionnements.map((c) => c.doses).join(", ") || PACKS_DEFAUT })) })) : [etapeVide()] });
-    setBloc("qui"); setOuvert(true);
+    setBloc("medicament"); setOuvert(true);
   }
   async function enregistrer() {
     setSaving(true);
@@ -53,17 +53,32 @@ export default function ProtocoleEditor({ protocoles, medicaments }: { protocole
   const resumeQuand = form.etapes[0]?.reference === "VELAGE" ? `${form.etapes[0].debutValeur} à ${form.etapes[0].finValeur} ${form.etapes[0].finUnite.toLowerCase()} autour du vêlage` : form.ageMinJours || form.ageMaxJours ? `Âge ${form.ageMinJours || "0"} à ${form.ageMaxJours || "∞"} jours` : "Définir la fenêtre";
   const resumeEtapes = form.etapes.map((e) => e.label).join(" → ");
   const medsChoisis = [...new Set(form.etapes.flatMap((e) => e.medicaments.map((m) => m.medicamentId).filter(Boolean)))];
+  const premierMedicament = medicaments.find((m) => m.id === form.etapes[0]?.medicaments[0]?.medicamentId);
+  function choisirPremierMedicament(id: string) {
+    const med = medicaments.find((m) => m.id === id);
+    if (!med) return;
+    const code = med.nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+    setForm((f) => ({ ...f, nom: f.nom || code, label: f.label || med.nom, etapes: f.etapes.map((e, index) => index === 0 ? { ...e, medicaments: [{ medicamentId: med.id, voie: med.voie || "IM", alternative: false, conditionnements: med.conditionnements.map((c) => c.doses).join(", ") || PACKS_DEFAUT }] } : e) }));
+    setBloc("qui");
+  }
 
   return <div className="space-y-3">
     <button onClick={ouvrirCreation} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-green-700 text-sm font-semibold text-white"><Plus size={17} /> Créer un protocole</button>
     {ouvert && <div className="space-y-3 rounded-xl bg-gray-50 p-2 shadow-inner">
-      <div className="flex items-center gap-2 px-1"><input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Nom du protocole" className="min-w-0 flex-1 border-0 bg-transparent text-lg font-bold outline-none" /><button onClick={() => setOuvert(false)}><X size={20} /></button></div>
-      <div className="grid grid-cols-2 gap-2"><input value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value.toUpperCase() })} placeholder="Code unique" className="rounded-lg border px-3 py-2 text-sm" /><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Note facultative" className="rounded-lg border px-3 py-2 text-sm" /></div>
+      <div className="flex items-center gap-2 px-1"><h3 className="min-w-0 flex-1 truncate text-lg font-bold">{form.label || "Nouveau protocole"}</h3><button onClick={() => setOuvert(false)}><X size={20} /></button></div>
+
+      <ResumeBloc titre="Médicament" resume={premierMedicament?.nom || "À choisir en premier"} ouvert={bloc === "medicament"} onClick={() => setBloc("medicament")}>
+        <label className="block text-xs font-medium text-gray-500">Quel médicament utiliser ?</label>
+        <select value={premierMedicament?.id || ""} onChange={(e) => choisirPremierMedicament(e.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-green-300 bg-white px-3 text-base font-semibold"><option value="">Sélectionner dans la pharmacie</option>{medicaments.map((med) => <option key={med.id} value={med.id}>{med.nom}</option>)}</select>
+        {premierMedicament && <button type="button" onClick={() => setPersonnaliser(true)} className="mt-2 text-xs text-gray-500">Modifier le nom ou ajouter une note</button>}
+        {personnaliser && <div className="mt-2 grid grid-cols-2 gap-2"><input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Nom du protocole" className="rounded-lg border px-2 py-2 text-sm" /><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Note facultative" className="rounded-lg border px-2 py-2 text-sm" /></div>}
+      </ResumeBloc>
 
       <ResumeBloc titre="Qui ?" resume={resumeQui} ouvert={bloc === "qui"} onClick={() => setBloc("qui")}>
         <div className="relative"><button type="button" onClick={() => setChoixCategories((v) => !v)} className="flex min-h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"><span>Catégories d’animaux</span><ChevronDown size={15} /></button>{choixCategories && <div className="absolute z-20 mt-1 w-full rounded-lg border bg-white p-2 shadow-xl">{CATEGORIES.map((c) => <label key={c.code} className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={form.categories.includes(c.code)} onChange={() => setForm((f) => ({ ...f, categories: f.categories.includes(c.code) ? f.categories.filter((x) => x !== c.code) : [...f.categories, c.code] }))} />{c.label}</label>)}</div>}</div>
         <div className="mt-2 flex flex-wrap gap-1">{form.categories.map((code) => { const c = CATEGORIES.find((x) => x.code === code); return <span key={code} className={`rounded-full px-2 py-1 text-xs font-medium ${c?.cls}`}>{c?.label}</span>; })}</div>
-        <div className="mt-2 grid grid-cols-2 gap-2"><select value={form.sexeCible} onChange={(e) => setForm({ ...form, sexeCible: e.target.value })} className="rounded-lg border px-2 py-2 text-sm"><option value="">Tous les sexes</option><option value="M">Mâles</option><option value="F">Femelles</option></select><select value={form.gestante} onChange={(e) => setForm({ ...form, gestante: e.target.value })} className="rounded-lg border px-2 py-2 text-sm"><option value="">Toutes gestations</option><option value="true">Gestantes</option><option value="false">Non gestantes</option></select><input type="number" value={form.ageMinJours} onChange={(e) => setForm({ ...form, ageMinJours: e.target.value })} placeholder="Âge min. (jours)" className="rounded-lg border px-3 py-2 text-sm" /><input type="number" value={form.ageMaxJours} onChange={(e) => setForm({ ...form, ageMaxJours: e.target.value })} placeholder="Âge max. (jours)" className="rounded-lg border px-3 py-2 text-sm" /><input value={form.lotCible} onChange={(e) => setForm({ ...form, lotCible: e.target.value })} placeholder="Lot facultatif" className="col-span-2 rounded-lg border px-3 py-2 text-sm" /></div>
+        {!affiner && <button type="button" onClick={() => setAffiner(true)} className="mt-2 text-xs font-medium text-green-700">+ Affiner par sexe, âge, gestation ou lot</button>}
+        {affiner && <div className="mt-2 grid grid-cols-2 gap-2"><select value={form.sexeCible} onChange={(e) => setForm({ ...form, sexeCible: e.target.value })} className="rounded-lg border px-2 py-2 text-sm"><option value="">Tous les sexes</option><option value="M">Mâles</option><option value="F">Femelles</option></select><select value={form.gestante} onChange={(e) => setForm({ ...form, gestante: e.target.value })} className="rounded-lg border px-2 py-2 text-sm"><option value="">Toutes gestations</option><option value="true">Gestantes</option><option value="false">Non gestantes</option></select><input type="number" value={form.ageMinJours} onChange={(e) => setForm({ ...form, ageMinJours: e.target.value })} placeholder="Âge min. (jours)" className="rounded-lg border px-3 py-2 text-sm" /><input type="number" value={form.ageMaxJours} onChange={(e) => setForm({ ...form, ageMaxJours: e.target.value })} placeholder="Âge max. (jours)" className="rounded-lg border px-3 py-2 text-sm" /><input value={form.lotCible} onChange={(e) => setForm({ ...form, lotCible: e.target.value })} placeholder="Lot facultatif" className="col-span-2 rounded-lg border px-3 py-2 text-sm" /></div>}
       </ResumeBloc>
 
       <ResumeBloc titre="Quand ?" resume={resumeQuand} ouvert={bloc === "quand"} onClick={() => setBloc("quand")}>
