@@ -483,6 +483,16 @@ model ProtocoleVaccin {
   voieRappel         String   @default("IM")
   rappelAnnuel       Boolean  @default(false)
   actif              Boolean  @default(true)
+  description        String?
+  categoriesJson     String?
+  sexeCible          String?
+  stadeReproduction  String?
+  gestante           Boolean?
+  rangVelageMin      Int?
+  rangVelageMax      Int?
+  lotCible           String?
+  ageMaxJours        Int?
+  etapes             EtapeProtocoleVaccin[]
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
@@ -512,8 +522,55 @@ model Medicament {
   preconisations      Preconisation[]
   termes              MedicamentTerme[]
   aliasesVocaux       MedicamentAliasVocal[]
+  etapesProtocoles    EtapeProtocoleMedicament[]
+  conditionnements    ConditionnementMedicament[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
+}
+
+model EtapeProtocoleVaccin {
+  id             String   @id @default(cuid())
+  protocoleId    String
+  protocole      ProtocoleVaccin @relation(fields: [protocoleId], references: [id], onDelete: Cascade)
+  label          String
+  ordre          Int      @default(0)
+  cycle          String   @default("INITIAL")
+  reference      String   @default("NAISSANCE")
+  debutValeur    Int      @default(0)
+  debutUnite     String   @default("JOUR")
+  debutPosition  String   @default("APRES")
+  finValeur      Int      @default(0)
+  finUnite       String   @default("JOUR")
+  finPosition    String   @default("APRES")
+  dateFixe       DateTime?
+  recurrenceMois Int?
+  obligatoire    Boolean  @default(true)
+  medicaments    EtapeProtocoleMedicament[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([protocoleId, ordre])
+}
+
+model EtapeProtocoleMedicament {
+  id              String   @id @default(cuid())
+  etapeId         String
+  etape           EtapeProtocoleVaccin @relation(fields: [etapeId], references: [id], onDelete: Cascade)
+  medicamentId    String
+  medicament      Medicament @relation(fields: [medicamentId], references: [id])
+  voie            String?
+  preconisationId String?
+  alternative     Boolean  @default(false)
+  @@unique([etapeId, medicamentId])
+}
+
+model ConditionnementMedicament {
+  id           String   @id @default(cuid())
+  medicamentId String
+  medicament   Medicament @relation(fields: [medicamentId], references: [id], onDelete: Cascade)
+  doses        Int
+  actif        Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  @@unique([medicamentId, doses])
 }
 
 model MedicamentAliasVocal {

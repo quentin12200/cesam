@@ -1,0 +1,15 @@
+ALTER TABLE "ProtocoleVaccin" ADD COLUMN "description" TEXT;
+ALTER TABLE "ProtocoleVaccin" ADD COLUMN "categoriesJson" TEXT;
+ALTER TABLE "ProtocoleVaccin" ADD COLUMN "sexeCible" TEXT;
+ALTER TABLE "ProtocoleVaccin" ADD COLUMN "stadeReproduction" TEXT;
+ALTER TABLE "ProtocoleVaccin" ADD COLUMN "gestante" BOOLEAN;
+ALTER TABLE "ProtocoleVaccin" ADD COLUMN "rangVelageMin" INTEGER;
+ALTER TABLE "ProtocoleVaccin" ADD COLUMN "rangVelageMax" INTEGER;
+ALTER TABLE "ProtocoleVaccin" ADD COLUMN "lotCible" TEXT;
+ALTER TABLE "ProtocoleVaccin" ADD COLUMN "ageMaxJours" INTEGER;
+CREATE TABLE "EtapeProtocoleVaccin" ("id" TEXT NOT NULL PRIMARY KEY, "protocoleId" TEXT NOT NULL, "label" TEXT NOT NULL, "ordre" INTEGER NOT NULL DEFAULT 0, "cycle" TEXT NOT NULL DEFAULT 'INITIAL', "reference" TEXT NOT NULL DEFAULT 'NAISSANCE', "debutValeur" INTEGER NOT NULL DEFAULT 0, "debutUnite" TEXT NOT NULL DEFAULT 'JOUR', "debutPosition" TEXT NOT NULL DEFAULT 'APRES', "finValeur" INTEGER NOT NULL DEFAULT 0, "finUnite" TEXT NOT NULL DEFAULT 'JOUR', "finPosition" TEXT NOT NULL DEFAULT 'APRES', "dateFixe" DATETIME, "recurrenceMois" INTEGER, "obligatoire" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL, CONSTRAINT "EtapeProtocoleVaccin_protocoleId_fkey" FOREIGN KEY ("protocoleId") REFERENCES "ProtocoleVaccin" ("id") ON DELETE CASCADE ON UPDATE CASCADE);
+CREATE INDEX "EtapeProtocoleVaccin_protocoleId_ordre_idx" ON "EtapeProtocoleVaccin"("protocoleId", "ordre");
+CREATE TABLE "EtapeProtocoleMedicament" ("id" TEXT NOT NULL PRIMARY KEY, "etapeId" TEXT NOT NULL, "medicamentId" TEXT NOT NULL, "voie" TEXT, "preconisationId" TEXT, "alternative" BOOLEAN NOT NULL DEFAULT false, CONSTRAINT "EtapeProtocoleMedicament_etapeId_fkey" FOREIGN KEY ("etapeId") REFERENCES "EtapeProtocoleVaccin" ("id") ON DELETE CASCADE ON UPDATE CASCADE, CONSTRAINT "EtapeProtocoleMedicament_medicamentId_fkey" FOREIGN KEY ("medicamentId") REFERENCES "Medicament" ("id") ON DELETE RESTRICT ON UPDATE CASCADE);
+CREATE UNIQUE INDEX "EtapeProtocoleMedicament_etapeId_medicamentId_key" ON "EtapeProtocoleMedicament"("etapeId", "medicamentId");
+CREATE TABLE "ConditionnementMedicament" ("id" TEXT NOT NULL PRIMARY KEY, "medicamentId" TEXT NOT NULL, "doses" INTEGER NOT NULL, "actif" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "ConditionnementMedicament_medicamentId_fkey" FOREIGN KEY ("medicamentId") REFERENCES "Medicament" ("id") ON DELETE CASCADE ON UPDATE CASCADE);
+CREATE UNIQUE INDEX "ConditionnementMedicament_medicamentId_doses_key" ON "ConditionnementMedicament"("medicamentId", "doses");

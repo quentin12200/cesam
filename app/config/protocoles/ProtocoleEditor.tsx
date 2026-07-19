@@ -2,289 +2,47 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save, X, Pencil } from "lucide-react";
-import type { ProtocoleVaccinConfig } from "@/lib/utils";
+import { Copy, Pencil, Plus, Trash2, X } from "lucide-react";
+import { VOIES_ADMINISTRATION } from "@/lib/medicament-categories";
 
-interface Props {
-  protocoles: ProtocoleVaccinConfig[];
-}
+type Medicament = { id: string; nom: string; voie: string | null; conditionnements: { doses: number }[] };
+type MedicamentEtape = { medicamentId: string; voie: string; alternative: boolean; conditionnements: string };
+type Etape = { label: string; cycle: string; reference: string; debutValeur: string; debutUnite: string; debutPosition: string; finValeur: string; finUnite: string; finPosition: string; recurrenceMois: string; obligatoire: boolean; medicaments: MedicamentEtape[] };
+type Protocole = any;
 
-interface EditState {
-  label: string;
-  ageMinJours: string;
-  urgenceJours: string;
-  delaiRappelJours: string;
-  urgenceRappelJours: string;
-  voiePrimo: string;
-  voieRappel: string;
-  rappelAnnuel: boolean;
-}
+const etapeVide = (): Etape => ({ label: "Primo-injection", cycle: "INITIAL", reference: "NAISSANCE", debutValeur: "0", debutUnite: "JOUR", debutPosition: "APRES", finValeur: "30", finUnite: "JOUR", finPosition: "APRES", recurrenceMois: "", obligatoire: true, medicaments: [] });
+const formulaireVide = () => ({ nom: "", label: "", description: "", categories: [] as string[], ageMinJours: "", ageMaxJours: "", sexeCible: "", stadeReproduction: "", gestante: "", rangVelageMin: "", rangVelageMax: "", lotCible: "", etapes: [etapeVide()] });
 
-export default function ProtocoleEditor({ protocoles }: Props) {
+export default function ProtocoleEditor({ protocoles, medicaments }: { protocoles: Protocole[]; medicaments: Medicament[] }) {
   const router = useRouter();
-  const [editing, setEditing] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState>({
-    label: "",
-    ageMinJours: "",
-    urgenceJours: "",
-    delaiRappelJours: "",
-    urgenceRappelJours: "",
-    voiePrimo: "IM",
-    voieRappel: "IM",
-    rappelAnnuel: false,
-  });
-  const [saving, setSaving] = useState(false);
+  const [ouvert, setOuvert] = useState(false), [editingId, setEditingId] = useState<string | null>(null), [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(formulaireVide());
+  const categories = ["VEAU", "VELLE", "GENISSE", "VACHE", "TAUREAU"];
 
-  function startEdit(p: ProtocoleVaccinConfig) {
-    setEditing(p.id);
-    setEditState({
-      label: p.label,
-      ageMinJours: String(p.ageMinJours),
-      urgenceJours: p.urgenceJours != null ? String(p.urgenceJours) : "",
-      delaiRappelJours: p.delaiRappelJours != null ? String(p.delaiRappelJours) : "",
-      urgenceRappelJours: p.urgenceRappelJours != null ? String(p.urgenceRappelJours) : "",
-      voiePrimo: p.voiePrimo ?? "IM",
-      voieRappel: p.voieRappel ?? "IM",
-      rappelAnnuel: p.rappelAnnuel ?? false,
-    });
-  }
+  function modifierEtape(index: number, data: Partial<Etape>) { setForm((f) => ({ ...f, etapes: f.etapes.map((e, i) => i === index ? { ...e, ...data } : e) })); }
+  function ouvrirCreation() { setEditingId(null); setForm(formulaireVide()); setOuvert(true); }
+  function ouvrirEdition(p: Protocole) { setEditingId(p.id); setForm({ nom: p.nom, label: p.label, description: p.description ?? "", categories: p.categoriesJson ? JSON.parse(p.categoriesJson) : [], ageMinJours: String(p.ageMinJours ?? ""), ageMaxJours: String(p.ageMaxJours ?? ""), sexeCible: p.sexeCible ?? "", stadeReproduction: p.stadeReproduction ?? "", gestante: p.gestante == null ? "" : String(p.gestante), rangVelageMin: String(p.rangVelageMin ?? ""), rangVelageMax: String(p.rangVelageMax ?? ""), lotCible: p.lotCible ?? "", etapes: p.etapes?.length ? p.etapes.map((e: any) => ({ ...e, debutValeur: String(e.debutValeur), finValeur: String(e.finValeur), recurrenceMois: String(e.recurrenceMois ?? ""), medicaments: e.medicaments.map((m: any) => ({ medicamentId: m.medicamentId, voie: m.voie ?? "", alternative: m.alternative, conditionnements: medicaments.find((med) => med.id === m.medicamentId)?.conditionnements.map((c) => c.doses).join(", ") ?? "" })) })) : [etapeVide()] }); setOuvert(true); }
 
-  async function saveEdit(id: string) {
+  async function enregistrer() {
     setSaving(true);
-    await fetch(`/api/protocoles/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        label: editState.label,
-        ageMinJours: Number(editState.ageMinJours) || 0,
-        urgenceJours: editState.urgenceJours !== "" ? Number(editState.urgenceJours) : null,
-        delaiRappelJours: editState.delaiRappelJours !== "" ? Number(editState.delaiRappelJours) : null,
-        urgenceRappelJours: editState.urgenceRappelJours !== "" ? Number(editState.urgenceRappelJours) : null,
-        voiePrimo: editState.voiePrimo,
-        voieRappel: editState.voieRappel,
-        rappelAnnuel: editState.rappelAnnuel,
-      }),
-    });
+    const body = { ...form, ageMinJours: form.ageMinJours ? Number(form.ageMinJours) : 0, ageMaxJours: form.ageMaxJours ? Number(form.ageMaxJours) : null, gestante: form.gestante === "" ? null : form.gestante === "true", rangVelageMin: form.rangVelageMin ? Number(form.rangVelageMin) : null, rangVelageMax: form.rangVelageMax ? Number(form.rangVelageMax) : null };
+    const res = await fetch(editingId ? `/api/protocoles/${editingId}` : "/api/protocoles", { method: editingId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (res.ok) { for (const e of form.etapes) for (const m of e.medicaments) { const doses = m.conditionnements.split(/[,; ]+/).map(Number).filter((n) => n > 0); if (doses.length) await fetch(`/api/medicaments/${m.medicamentId}/conditionnements`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doses }) }); } setOuvert(false); router.refresh(); }
     setSaving(false);
-    setEditing(null);
-    router.refresh();
   }
+  async function supprimer(id: string) { if (!confirm("Supprimer ce protocole ?")) return; await fetch(`/api/protocoles/${id}`, { method: "DELETE" }); router.refresh(); }
+  async function dupliquer(p: Protocole) { ouvrirEdition(p); setEditingId(null); setForm((f) => ({ ...f, nom: `${f.nom}_COPIE`, label: `${f.label} — copie` })); }
+  async function basculer(p: Protocole) { await fetch(`/api/protocoles/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actif: !p.actif }) }); router.refresh(); }
 
-  async function toggleActif(p: ProtocoleVaccinConfig) {
-    await fetch(`/api/protocoles/${p.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ actif: !p.actif }),
-    });
-    router.refresh();
-  }
-
-  async function toggleObligatoire(p: ProtocoleVaccinConfig) {
-    await fetch(`/api/protocoles/${p.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ obligatoireVente: !p.obligatoireVente }),
-    });
-    router.refresh();
-  }
-
-  return (
-    <div className="space-y-3">
-      {protocoles.map((p) => (
-        <div
-          key={p.id}
-          className={`bg-white rounded-xl shadow border p-4 ${!p.actif ? "opacity-60" : ""}`}
-        >
-          {editing === p.id ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded font-bold text-gray-600">
-                  {p.nom}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => saveEdit(p.id)}
-                    disabled={saving}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-                  >
-                    <Save size={14} /> Sauver
-                  </button>
-                  <button
-                    onClick={() => setEditing(null)}
-                    className="p-1.5 text-gray-500 hover:text-gray-800 rounded-lg border"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Libellé affiché</label>
-                <input
-                  type="text"
-                  value={editState.label}
-                  onChange={(e) => setEditState((s) => ({ ...s, label: e.target.value }))}
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-
-              {!p.estRappel ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Âge min. (jours)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={editState.ageMinJours}
-                      onChange={(e) => setEditState((s) => ({ ...s, ageMinJours: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Urgence à (jours)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      placeholder="vide = pas d'urgence"
-                      value={editState.urgenceJours}
-                      onChange={(e) => setEditState((s) => ({ ...s, urgenceJours: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Délai rappel (jours)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={editState.delaiRappelJours}
-                      onChange={(e) => setEditState((s) => ({ ...s, delaiRappelJours: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Urgence rappel (jours)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      placeholder="vide = délai+14"
-                      value={editState.urgenceRappelJours}
-                      onChange={(e) => setEditState((s) => ({ ...s, urgenceRappelJours: e.target.value }))}
-                      className="w-full border rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Voie primo-injection</label>
-                  <select
-                    value={editState.voiePrimo}
-                    onChange={(e) => setEditState((s) => ({ ...s, voiePrimo: e.target.value }))}
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  >
-                    {["IM", "SC", "IV", "IN", "PO"].map((v) => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Voie rappel</label>
-                  <select
-                    value={editState.voieRappel}
-                    onChange={(e) => setEditState((s) => ({ ...s, voieRappel: e.target.value }))}
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  >
-                    {["IM", "SC", "IV", "IN", "PO"].map((v) => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={editState.rappelAnnuel}
-                  onChange={(e) => setEditState((s) => ({ ...s, rappelAnnuel: e.target.checked }))}
-                  className="rounded"
-                />
-                <span className="text-gray-700">Rappel annuel</span>
-              </label>
-            </div>
-          ) : (
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded font-bold text-gray-600">
-                    {p.nom}
-                  </span>
-                  {p.estRappel && (
-                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">rappel</span>
-                  )}
-                  {p.obligatoireVente && (
-                    <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">vente</span>
-                  )}
-                </div>
-                <div className="mt-1 text-sm font-semibold text-gray-800">{p.label}</div>
-                <div className="mt-1 text-xs text-gray-500 space-x-3">
-                  {!p.estRappel ? (
-                    <>
-                      <span>Âge min : {p.ageMinJours}j</span>
-                      {p.urgenceJours != null && <span>Urgence : J+{p.urgenceJours}</span>}
-                      {p.voiePrimo && <span>Voie P : {p.voiePrimo}</span>}
-                      {p.voieRappel && <span>Voie R : {p.voieRappel}</span>}
-                      {p.rappelAnnuel && <span>Rappel annuel</span>}
-                    </>
-                  ) : (
-                    <>
-                      {p.primoNom && <span>Après : {p.primoNom}</span>}
-                      {p.delaiRappelJours != null && <span>Délai : {p.delaiRappelJours}j</span>}
-                      {p.urgenceRappelJours != null && <span>Urgence : J+{p.urgenceRappelJours}</span>}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => toggleObligatoire(p)}
-                  title={p.obligatoireVente ? "Retirer obligation vente" : "Marquer obligatoire vente"}
-                  className={`text-xs px-2 py-1 rounded border transition-colors ${
-                    p.obligatoireVente
-                      ? "bg-orange-100 border-orange-300 text-orange-700"
-                      : "bg-white border-gray-200 text-gray-400 hover:border-orange-300"
-                  }`}
-                >
-                  Vente
-                </button>
-                <button
-                  onClick={() => startEdit(p)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg border border-transparent hover:border-gray-200 transition-colors"
-                >
-                  <Pencil size={15} />
-                </button>
-                <button
-                  onClick={() => toggleActif(p)}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${
-                    p.actif ? "bg-green-500" : "bg-gray-300"
-                  }`}
-                  title={p.actif ? "Désactiver" : "Activer"}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                      p.actif ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  return <div className="space-y-3">
+    <button onClick={ouvrirCreation} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-green-700 text-sm font-semibold text-white"><Plus size={17} /> Créer un protocole complet</button>
+    {ouvert && <div className="rounded-xl border bg-white p-3 shadow space-y-3">
+      <div className="flex items-center justify-between"><h3 className="font-bold">{editingId ? "Modifier" : "Nouveau"} protocole</h3><button onClick={() => setOuvert(false)}><X size={20} /></button></div>
+      <details open className="rounded-lg border p-3"><summary className="font-semibold text-sm">Informations générales</summary><div className="mt-2 grid grid-cols-2 gap-2"><input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Nom affiché" className="col-span-2 border rounded-lg px-3 py-2 text-sm" /><input value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value.toUpperCase() })} placeholder="Code unique" className="border rounded-lg px-3 py-2 text-sm" /><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Description" className="border rounded-lg px-3 py-2 text-sm" /></div></details>
+      <details open className="rounded-lg border p-3"><summary className="font-semibold text-sm">Animaux concernés</summary><div className="mt-2 space-y-2"><div className="flex flex-wrap gap-1">{categories.map((c) => <button type="button" key={c} onClick={() => setForm((f) => ({ ...f, categories: f.categories.includes(c) ? f.categories.filter((x) => x !== c) : [...f.categories, c] }))} className={`rounded-full border px-2 py-1 text-xs ${form.categories.includes(c) ? "bg-green-100 border-green-400" : ""}`}>{c}</button>)}</div><div className="grid grid-cols-2 gap-2"><input type="number" value={form.ageMinJours} onChange={(e) => setForm({ ...form, ageMinJours: e.target.value })} placeholder="Âge min. (jours)" className="border rounded-lg px-3 py-2 text-sm" /><input type="number" value={form.ageMaxJours} onChange={(e) => setForm({ ...form, ageMaxJours: e.target.value })} placeholder="Âge max. (jours)" className="border rounded-lg px-3 py-2 text-sm" /><select value={form.sexeCible} onChange={(e) => setForm({ ...form, sexeCible: e.target.value })} className="border rounded-lg px-2 py-2 text-sm"><option value="">Tous sexes</option><option value="F">Femelles</option><option value="M">Mâles</option></select><select value={form.gestante} onChange={(e) => setForm({ ...form, gestante: e.target.value })} className="border rounded-lg px-2 py-2 text-sm"><option value="">Gestation indifférente</option><option value="true">Gestantes</option><option value="false">Non gestantes</option></select><input value={form.stadeReproduction} onChange={(e) => setForm({ ...form, stadeReproduction: e.target.value })} placeholder="Stade reproduction" className="border rounded-lg px-3 py-2 text-sm" /><input value={form.lotCible} onChange={(e) => setForm({ ...form, lotCible: e.target.value })} placeholder="Lot facultatif" className="border rounded-lg px-3 py-2 text-sm" /></div></div></details>
+      <details open className="rounded-lg border p-3"><summary className="font-semibold text-sm">Étapes, fenêtres et médicaments</summary><div className="mt-2 space-y-3">{form.etapes.map((e, i) => <div key={i} className="rounded-lg bg-gray-50 p-2 space-y-2"><div className="flex gap-2"><input value={e.label} onChange={(x) => modifierEtape(i, { label: x.target.value })} className="min-w-0 flex-1 border rounded-lg px-2 py-2 text-sm" /><select value={e.cycle} onChange={(x) => modifierEtape(i, { cycle: x.target.value })} className="border rounded-lg text-xs"><option value="INITIAL">Cycle initial</option><option value="ENTRETIEN">Entretien</option></select>{form.etapes.length > 1 && <button onClick={() => setForm((f) => ({ ...f, etapes: f.etapes.filter((_, n) => n !== i) }))}><Trash2 size={15} /></button>}</div><select value={e.reference} onChange={(x) => modifierEtape(i, { reference: x.target.value })} className="w-full border rounded-lg px-2 py-2 text-sm"><option value="NAISSANCE">Âge / naissance</option><option value="VELAGE">Vêlage prévu</option><option value="ETAPE_PRECEDENTE">Étape précédente</option><option value="DATE_FIXE">Date fixe</option></select><div className="grid grid-cols-2 gap-2">{(["debut", "fin"] as const).map((bord) => <div key={bord} className="grid grid-cols-3 gap-1"><input type="number" value={e[`${bord}Valeur`]} onChange={(x) => modifierEtape(i, { [`${bord}Valeur`]: x.target.value })} className="border rounded px-1 text-sm" /><select value={e[`${bord}Unite`]} onChange={(x) => modifierEtape(i, { [`${bord}Unite`]: x.target.value })} className="border rounded text-xs"><option value="JOUR">jours</option><option value="SEMAINE">sem.</option><option value="MOIS">mois</option></select><select value={e[`${bord}Position`]} onChange={(x) => modifierEtape(i, { [`${bord}Position`]: x.target.value })} className="border rounded text-xs"><option value="AVANT">avant</option><option value="APRES">après</option></select></div>)}</div>{e.cycle === "ENTRETIEN" && <input type="number" value={e.recurrenceMois} onChange={(x) => modifierEtape(i, { recurrenceMois: x.target.value })} placeholder="Répéter tous les X mois" className="w-full border rounded-lg px-2 py-2 text-sm" />}<div className="space-y-1">{e.medicaments.map((m, mi) => <div key={mi} className="grid grid-cols-[1fr_70px_1fr_auto] gap-1"><select value={m.medicamentId} onChange={(x) => { const med = medicaments.find((v) => v.id === x.target.value); modifierEtape(i, { medicaments: e.medicaments.map((v, n) => n === mi ? { ...v, medicamentId: x.target.value, voie: med?.voie ?? "", conditionnements: med?.conditionnements.map((c) => c.doses).join(", ") ?? "" } : v) }); }} className="min-w-0 border rounded text-xs"><option value="">Médicament</option>{medicaments.map((med) => <option key={med.id} value={med.id}>{med.nom}</option>)}</select><select value={m.voie} onChange={(x) => modifierEtape(i, { medicaments: e.medicaments.map((v, n) => n === mi ? { ...v, voie: x.target.value } : v) })} className="border rounded text-xs">{VOIES_ADMINISTRATION.map((v) => <option key={v.code} value={v.code}>{v.code}</option>)}</select><input value={m.conditionnements} onChange={(x) => modifierEtape(i, { medicaments: e.medicaments.map((v, n) => n === mi ? { ...v, conditionnements: x.target.value } : v) })} placeholder="Doses : 1, 5, 10" className="min-w-0 border rounded px-1 text-xs" /><button onClick={() => modifierEtape(i, { medicaments: e.medicaments.filter((_, n) => n !== mi) })}><X size={14} /></button></div>)}<button type="button" onClick={() => modifierEtape(i, { medicaments: [...e.medicaments, { medicamentId: "", voie: "IM", alternative: false, conditionnements: "" }] })} className="text-xs text-blue-700">+ Médicament ou alternative</button></div></div>)}<button type="button" onClick={() => setForm((f) => ({ ...f, etapes: [...f.etapes, { ...etapeVide(), label: `Étape ${f.etapes.length + 1}` }] }))} className="text-sm text-green-700">+ Ajouter une étape</button></div></details>
+      <button disabled={saving || !form.nom || !form.label} onClick={() => void enregistrer()} className="min-h-11 w-full rounded-lg bg-green-700 font-semibold text-white disabled:opacity-40">{saving ? "Enregistrement…" : "Enregistrer le protocole"}</button>
+    </div>}
+    {protocoles.map((p) => <div key={p.id} className={`rounded-xl border bg-white p-3 shadow-sm ${p.actif ? "" : "opacity-50"}`}><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><b className="text-sm">{p.label}</b><p className="text-xs text-gray-500">{p.etapes?.length || 0} étape(s){p.categoriesJson ? ` · ${JSON.parse(p.categoriesJson).join(", ")}` : ""}</p></div><button onClick={() => ouvrirEdition(p)}><Pencil size={15} /></button><button onClick={() => void dupliquer(p)}><Copy size={15} /></button><button onClick={() => void supprimer(p.id)}><Trash2 size={15} /></button><button onClick={() => void basculer(p)} className={`h-6 w-10 rounded-full ${p.actif ? "bg-green-500" : "bg-gray-300"}`} /></div></div>)}
+  </div>;
 }

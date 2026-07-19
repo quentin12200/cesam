@@ -8,7 +8,7 @@ import ProtocoleEditor from "./ProtocoleEditor";
 
 import BackButton from "@/app/components/BackButton";
 async function getProtocoles() {
-  let protocoles = await prisma.protocoleVaccin.findMany({ orderBy: { ordre: "asc" } });
+  let protocoles = await prisma.protocoleVaccin.findMany({ orderBy: { ordre: "asc" }, include: { etapes: { orderBy: { ordre: "asc" }, include: { medicaments: true } } } });
   if (protocoles.length === 0) {
     await prisma.protocoleVaccin.createMany({
       data: DEFAULT_PROTOCOLES.map((p) => ({
@@ -26,13 +26,14 @@ async function getProtocoles() {
         actif: p.actif,
       })),
     });
-    protocoles = await prisma.protocoleVaccin.findMany({ orderBy: { ordre: "asc" } });
+    protocoles = await prisma.protocoleVaccin.findMany({ orderBy: { ordre: "asc" }, include: { etapes: { orderBy: { ordre: "asc" }, include: { medicaments: true } } } });
   }
   return protocoles;
 }
 
 export default async function ProtocolesConfigPage() {
   const protocoles = await getProtocoles();
+  const medicaments = await prisma.medicament.findMany({ where: { actif: true }, select: { id: true, nom: true, voie: true, conditionnements: { where: { actif: true }, select: { doses: true } } }, orderBy: { nom: "asc" } });
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
@@ -52,7 +53,7 @@ export default async function ProtocolesConfigPage() {
         Les modifications s&apos;appliquent immédiatement à tous les calculs.
       </p>
 
-      <ProtocoleEditor protocoles={protocoles} />
+      <ProtocoleEditor protocoles={protocoles} medicaments={medicaments} />
     </div>
   );
 }
