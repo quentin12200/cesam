@@ -16,6 +16,7 @@ import {
 import MedicamentDetailClient from "./MedicamentDetailClient";
 import PreconisationFields from "./PreconisationFields";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
+import ConditionnementsSection from "./ConditionnementsSection";
 
 interface MedicamentData {
   id: string;
@@ -87,6 +88,7 @@ interface Props {
   medicament: MedicamentData;
   preconisations: PreconisationData[];
   termes: TermeData[];
+  conditionnements: Array<{ id: string; doses: number; prixFlaconEur: number | null }>;
   ordonnances: OrdonnanceAssociee[];
   historique: HistoriqueItem[];
 }
@@ -141,7 +143,7 @@ function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicame
   );
 }
 
-export default function MedicamentFicheClient({ medicament, preconisations, termes, ordonnances, historique }: Props) {
+export default function MedicamentFicheClient({ medicament, preconisations, termes, conditionnements, ordonnances, historique }: Props) {
   const router = useRouter();
   const [editMode, setEditMode] = useState(false);
   const [savingFavori, setSavingFavori] = useState(false);
@@ -222,6 +224,8 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
           )}
         </div>
       )}
+
+      <ConditionnementsSection medicamentId={medicament.id} initialConditionnements={conditionnements} />
 
       {/* Préconisations */}
       <section className="space-y-3">

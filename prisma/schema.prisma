@@ -568,6 +568,7 @@ model ConditionnementMedicament {
   medicamentId String
   medicament   Medicament @relation(fields: [medicamentId], references: [id], onDelete: Cascade)
   doses        Int
+  prixFlaconEur Float?
   actif        Boolean  @default(true)
   createdAt    DateTime @default(now())
   @@unique([medicamentId, doses])

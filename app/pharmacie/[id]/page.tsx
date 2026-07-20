@@ -19,6 +19,7 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
       include: {
         preconisations: { orderBy: { createdAt: "asc" } },
         termes: { orderBy: { ordre: "asc" } },
+        conditionnements: { where: { actif: true }, orderBy: { createdAt: "asc" } },
       },
     }),
     prisma.traitement.findMany({
@@ -96,6 +97,11 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
           commentaireVerification: p.commentaireVerification,
         }))}
         termes={medicament.termes.map((t) => ({ id: t.id, terme: t.terme, explication: t.explication }))}
+        conditionnements={medicament.conditionnements.map((conditionnement) => ({
+          id: conditionnement.id,
+          doses: conditionnement.doses,
+          prixFlaconEur: conditionnement.prixFlaconEur,
+        }))}
         ordonnances={Array.from(ordonnancesMap.values())}
         historique={traitements.map((t) => ({
           id: t.id,
