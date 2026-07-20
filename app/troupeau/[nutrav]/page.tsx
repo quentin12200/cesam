@@ -39,6 +39,7 @@ import SevrageButton from "./SevrageButton";
 import QuickActionsBar from "./QuickActionsBar";
 import CategorieButton from "./CategorieButton";
 import EchoButton from "./EchoButton";
+import EchoStatusBadge from "./EchoStatusBadge";
 import GroupeButton from "./GroupeButton";
 import EvenementsSection from "./EvenementsSection";
 import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
@@ -193,7 +194,10 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               </span>
               <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">{formatAge(animal.danais)}</span>
               {animal.aEchographier && (
-                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">À échographier</span>
+                <EchoStatusBadge
+                  nutrav={animal.nutrav}
+                  canCancel={!animal.saillies[0]?.gestation}
+                />
               )}
               {animal.statut !== "ACTIF" && (
                 <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-600">{animal.statut}</span>
