@@ -17,6 +17,14 @@ async function getData() {
         dosagePourKg: true, uniteDosage: true, delaiAttenteViandeJ: true, delaiAttenteLaitJ: true,
         prescriptionRequise: true, actif: true, favori: true, actions: true,
         stockActuel: true, stockUnite: true, stockSeuilAlert: true,
+        conditionnements: {
+          where: { actif: true },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true, quantiteFlacon: true, uniteFlacon: true,
+            doses: true, prixFlaconEur: true,
+          },
+        },
         preconisations: {
           where: { statut: { not: "REJETE" } },
           orderBy: [{ statut: "asc" }, { createdAt: "asc" }],
@@ -51,6 +59,7 @@ async function getData() {
     stockActuel: m.stockActuel,
     stockUnite: m.stockUnite,
     stockSeuilAlert: m.stockSeuilAlert,
+    conditionnements: m.conditionnements,
     preconisations: m.preconisations,
   }));
 

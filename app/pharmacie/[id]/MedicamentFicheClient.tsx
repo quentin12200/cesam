@@ -88,7 +88,13 @@ interface Props {
   medicament: MedicamentData;
   preconisations: PreconisationData[];
   termes: TermeData[];
-  conditionnements: Array<{ id: string; doses: number; prixFlaconEur: number | null }>;
+  conditionnements: Array<{
+    id: string;
+    quantiteFlacon: number | null;
+    uniteFlacon: string | null;
+    doses: number;
+    prixFlaconEur: number | null;
+  }>;
   ordonnances: OrdonnanceAssociee[];
   historique: HistoriqueItem[];
 }

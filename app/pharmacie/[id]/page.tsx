@@ -99,6 +99,8 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
         termes={medicament.termes.map((t) => ({ id: t.id, terme: t.terme, explication: t.explication }))}
         conditionnements={medicament.conditionnements.map((conditionnement) => ({
           id: conditionnement.id,
+          quantiteFlacon: conditionnement.quantiteFlacon,
+          uniteFlacon: conditionnement.uniteFlacon,
           doses: conditionnement.doses,
           prixFlaconEur: conditionnement.prixFlaconEur,
         }))}

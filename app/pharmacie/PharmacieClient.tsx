@@ -7,6 +7,7 @@ import { Star, ChevronDown, Search, Plus, Save, X, Stethoscope } from "lucide-re
 import { normalizeSearch } from "@/lib/fuzzy-search";
 import { CATEGORIES_MEDICAMENT, getCategorieMedicament, formatVoie, formatDoseBase, formatStatutConsultation } from "@/lib/medicament-categories";
 import OrdonnancesClient, { type OrdonnanceItem } from "@/app/ordonnances/OrdonnancesClient";
+import SaisiePrixClient from "./SaisiePrixClient";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,13 @@ export interface MedicamentItem {
   stockActuel: number | null;
   stockUnite: string | null;
   stockSeuilAlert: number | null;
+  conditionnements: Array<{
+    id: string;
+    quantiteFlacon: number | null;
+    uniteFlacon: string | null;
+    doses: number;
+    prixFlaconEur: number | null;
+  }>;
   preconisations: PreconisationSummary[];
 }
 
@@ -271,7 +279,7 @@ function MedicamentRow({ med, expanded, onToggle }: { med: MedicamentItem; expan
 
 type Mode = "alpha" | "favoris" | "categorie";
 
-function Repertoire({ medicaments }: { medicaments: MedicamentItem[] }) {
+function Repertoire({ medicaments, onSaisiePrix }: { medicaments: MedicamentItem[]; onSaisiePrix: () => void }) {
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<Mode>("alpha");
   const [catFilter, setCatFilter] = useState("");
@@ -323,6 +331,10 @@ function Repertoire({ medicaments }: { medicaments: MedicamentItem[] }) {
             className="ml-auto flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">
             <Plus size={13} /> Ajouter un médicament
           </button>
+          <button type="button" onClick={onSaisiePrix}
+            className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
+            Saisie des prix
+          </button>
         </div>
       </div>
 
@@ -368,6 +380,7 @@ function Repertoire({ medicaments }: { medicaments: MedicamentItem[] }) {
 
 export default function PharmacieClient({ medicaments, ordonnances }: Props) {
   const [vue, setVue] = useState<"medicaments" | "ordonnances">("medicaments");
+  const [saisiePrix, setSaisiePrix] = useState(false);
   const ordonnancesActives = ordonnances.filter((o) => o.statut !== "ARCHIVE").length;
 
   return (
@@ -391,7 +404,11 @@ export default function PharmacieClient({ medicaments, ordonnances }: Props) {
         ))}
       </div>
 
-      {vue === "medicaments" ? <Repertoire medicaments={medicaments} /> : <OrdonnancesClient ordonnances={ordonnances} />}
+      {vue === "medicaments"
+        ? saisiePrix
+          ? <SaisiePrixClient medicaments={medicaments} onRetour={() => setSaisiePrix(false)} />
+          : <Repertoire medicaments={medicaments} onSaisiePrix={() => setSaisiePrix(true)} />
+        : <OrdonnancesClient ordonnances={ordonnances} />}
     </div>
   );
 }

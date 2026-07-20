@@ -567,11 +567,13 @@ model ConditionnementMedicament {
   id           String   @id @default(cuid())
   medicamentId String
   medicament   Medicament @relation(fields: [medicamentId], references: [id], onDelete: Cascade)
-  doses        Int
+  quantiteFlacon Float?
+  uniteFlacon    String?
+  doses        Float    @default(0)
   prixFlaconEur Float?
   actif        Boolean  @default(true)
   createdAt    DateTime @default(now())
-  @@unique([medicamentId, doses])
+  @@index([medicamentId])
 }
 
 model MedicamentAliasVocal {
