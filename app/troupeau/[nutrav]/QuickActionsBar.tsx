@@ -10,6 +10,7 @@ interface Props {
   nutrav: string;
   isFemelle: boolean;
   isActif: boolean;
+  className?: string;
 }
 
 type Modal = "chaleur" | null;
@@ -19,7 +20,7 @@ const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 const SaillieIcon = ACTION_VISUALS.saillieIA.icon;
 const EvenementIcon = ACTION_VISUALS.evenementSanitaire.icon;
 
-export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }: Props) {
+export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, className }: Props) {
   const router = useRouter();
   const [modal, setModal] = useState<Modal>(null);
   const [loading, setLoading] = useState(false);
@@ -73,7 +74,7 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif }
     <>
       {/* Accès compact aux actions de l'animal */}
       {isActif && (
-        <div ref={menuRef} className="relative px-3 pt-2 pb-0.5">
+        <div ref={menuRef} className={`relative ${className ?? "px-3 pt-2 pb-0.5"}`}>
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}

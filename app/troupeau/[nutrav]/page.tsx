@@ -178,60 +178,69 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto min-h-screen bg-gray-50">
       {/* Header */}
       <div className="px-3 pt-3">
-        <div className="flex items-start gap-2">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm sm:grid-cols-[auto_minmax(0,1fr)_auto]">
           <BackButton />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="shrink-0 rounded-lg bg-green-700 px-2.5 py-1 font-mono text-xl font-bold text-white">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-baseline gap-2">
+              <span className="shrink-0 rounded-lg bg-green-700 px-2.5 py-1 font-mono text-xl font-bold leading-tight text-white sm:text-2xl">
                 {animal.nutrav}
               </span>
-              <h2 className="truncate text-xl sm:text-2xl font-bold text-gray-900">{animal.nobovi ?? "Sans nom"}</h2>
+              <h2 className="truncate text-lg font-bold text-gray-900 sm:text-2xl">{animal.nobovi ?? "Sans nom"}</h2>
             </div>
-            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getCategorieColor(getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie))}`}>
                 {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
               </span>
-              <span className="text-sm font-semibold text-gray-700">{formatAge(animal.danais)}</span>
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">{formatAge(animal.danais)}</span>
+              {animal.aEchographier && (
+                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">À échographier</span>
+              )}
+              {animal.statut !== "ACTIF" && (
+                <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-600">{animal.statut}</span>
+              )}
             </div>
-            <p className="mt-1 font-mono text-xs text-gray-400 break-all">{animal.numeroNational ?? "Numéro national à compléter"}</p>
+            <p className="mt-1.5 break-all font-mono text-[11px] text-gray-400 sm:text-xs">
+              N° national : {animal.numeroNational ?? "à compléter"}
+            </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <EditAnimalDrawer
+          <div className="col-span-2 flex shrink-0 items-center justify-between gap-2 border-t border-gray-100 pt-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:justify-end sm:border-0 sm:pt-0">
+            <QuickActionsBar
+              animalId={animal.id}
               nutrav={animal.nutrav}
-              nobovi={animal.nobovi}
-              danais={animal.danais.toISOString()}
-              statut={animal.statut}
-              estGenisse={animal.estGenisse}
-              sexbov={animal.sexbov}
-              notes={animal.notes ?? null}
-              boucleFaite={animal.boucleFaite}
-              numeroNational={animal.numeroNational}
+              isFemelle={isFemelle}
+              isActif={animal.statut === "ACTIF"}
+              className="p-0"
             />
-            <Link
-              href={`/troupeau/${animal.nutrav}/arbre`}
-              className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
-              title="Arbre généalogique"
-            >
-              <GitBranch size={18} />
-            </Link>
-            <Link
-              href={`/troupeau/${animal.nutrav}/impression`}
-              className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50"
-              title="Imprimer la fiche"
-            >
-              <Printer size={18} />
-            </Link>
+            <div className="ml-auto inline-flex items-center rounded-xl border border-gray-200 bg-gray-50 p-1 [&>button]:!m-0 [&>button]:!bg-transparent [&>button]:!shadow-none">
+              <EditAnimalDrawer
+                nutrav={animal.nutrav}
+                nobovi={animal.nobovi}
+                danais={animal.danais.toISOString()}
+                statut={animal.statut}
+                estGenisse={animal.estGenisse}
+                sexbov={animal.sexbov}
+                notes={animal.notes ?? null}
+                boucleFaite={animal.boucleFaite}
+                numeroNational={animal.numeroNational}
+              />
+              <Link
+                href={`/troupeau/${animal.nutrav}/arbre`}
+                className="rounded-lg p-2 text-gray-500 hover:bg-white"
+                title="Arbre généalogique"
+              >
+                <GitBranch size={18} />
+              </Link>
+              <Link
+                href={`/troupeau/${animal.nutrav}/impression`}
+                className="rounded-lg p-2 text-gray-500 hover:bg-white"
+                title="Imprimer la fiche"
+              >
+                <Printer size={18} />
+              </Link>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Quick actions */}
-      <QuickActionsBar
-        animalId={animal.id}
-        nutrav={animal.nutrav}
-        isFemelle={isFemelle}
-        isActif={animal.statut === "ACTIF"}
-      />
 
       {/* Onglets */}
       <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 mt-2">
