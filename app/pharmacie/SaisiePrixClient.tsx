@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowLeft, Plus, Save, Search, Trash2, X } from "lucide-react";
-import { normalizeSearch } from "@/lib/fuzzy-search";
+import { searchTypesEvenement } from "@/lib/fuzzy-search";
 
 interface MedicamentPrix {
   id: string;
@@ -40,21 +40,34 @@ const prixFormatter = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 2,
 });
 
-function texteNombre(valeur: number | null) {
-  return valeur == null ? "" : String(valeur);
+function nouvelleCle() {
+  return `nouveau-${Date.now()}-${Math.random()}`;
 }
 
-function lignesInitiales(medicaments: MedicamentPrix[]): Ligne[] {
-  return medicaments.flatMap((medicament) => medicament.conditionnements.map((format) => ({
+function ligneVide(medicamentId: string): Ligne {
+  return {
+    key: nouvelleCle(),
+    medicamentId,
+    quantiteFlacon: "",
+    uniteFlacon: "ml",
+    doses: "",
+    prixFlaconEur: "",
+    modifiee: false,
+  };
+}
+
+function lignesDuMedicament(medicament: MedicamentPrix): Ligne[] {
+  if (medicament.conditionnements.length === 0) return [ligneVide(medicament.id)];
+  return medicament.conditionnements.map((format) => ({
     key: format.id,
     id: format.id,
     medicamentId: medicament.id,
-    quantiteFlacon: texteNombre(format.quantiteFlacon),
+    quantiteFlacon: format.quantiteFlacon == null ? "" : String(format.quantiteFlacon),
     uniteFlacon: format.uniteFlacon ?? "",
     doses: format.doses > 0 ? String(format.doses) : "",
-    prixFlaconEur: texteNombre(format.prixFlaconEur),
+    prixFlaconEur: format.prixFlaconEur == null ? "" : String(format.prixFlaconEur),
     modifiee: false,
-  })));
+  }));
 }
 
 function nombre(valeur: string) {
@@ -73,7 +86,6 @@ function calculs(ligne: Ligne) {
 
 function valider(ligne: Ligne) {
   const erreurs: string[] = [];
-  if (!ligne.medicamentId) erreurs.push("médicament");
   if (!ligne.quantiteFlacon.trim() || !Number.isFinite(nombre(ligne.quantiteFlacon)) || nombre(ligne.quantiteFlacon) <= 0) erreurs.push("quantité");
   if (!UNITES.includes(ligne.uniteFlacon)) erreurs.push("unité");
   if (ligne.doses.trim() && (!Number.isFinite(nombre(ligne.doses)) || nombre(ligne.doses) <= 0)) erreurs.push("nombre de doses");
@@ -82,22 +94,61 @@ function valider(ligne: Ligne) {
 }
 
 export default function SaisiePrixClient({ medicaments, onRetour }: Props) {
-  const [lignes, setLignes] = useState<Ligne[]>(() => lignesInitiales(medicaments));
+  const [lignes, setLignes] = useState<Ligne[]>([]);
   const [suppressions, setSuppressions] = useState<string[]>([]);
   const [recherche, setRecherche] = useState("");
+  const [resultatsOuverts, setResultatsOuverts] = useState(false);
   const [erreurs, setErreurs] = useState<Record<string, string[]>>({});
   const [erreurGlobale, setErreurGlobale] = useState("");
   const [enregistrement, setEnregistrement] = useState(false);
   const [confirmation, setConfirmation] = useState("");
+  const rechercheRef = useRef<HTMLInputElement>(null);
 
-  const noms = useMemo(() => new Map(medicaments.map((medicament) => [medicament.id, medicament.nom])), [medicaments]);
-  const lignesVisibles = useMemo(() => {
-    const requete = normalizeSearch(recherche.trim());
-    if (!requete) return lignes;
-    return lignes.filter((ligne) => normalizeSearch(noms.get(ligne.medicamentId) ?? "").includes(requete));
-  }, [lignes, noms, recherche]);
+  const medicamentsParId = useMemo(() => new Map(medicaments.map((medicament) => [medicament.id, medicament])), [medicaments]);
+  const medicamentsSelectionnes = useMemo(() => {
+    const ids = [...new Set(lignes.map((ligne) => ligne.medicamentId))];
+    return ids.map((id) => medicamentsParId.get(id)).filter((medicament): medicament is MedicamentPrix => Boolean(medicament));
+  }, [lignes, medicamentsParId]);
+  const resultats = useMemo(() => {
+    if (!recherche.trim()) return [];
+    const selectionnes = new Set(medicamentsSelectionnes.map((medicament) => medicament.id));
+    return searchTypesEvenement(recherche, medicaments)
+      .filter(({ item }) => !selectionnes.has(item.id))
+      .slice(0, 6);
+  }, [medicaments, medicamentsSelectionnes, recherche]);
 
-  function modifier(key: string, champ: keyof Pick<Ligne, "medicamentId" | "quantiteFlacon" | "uniteFlacon" | "doses" | "prixFlaconEur">, valeur: string) {
+  function selectionnerMedicament(medicament: MedicamentPrix) {
+    if (!lignes.some((ligne) => ligne.medicamentId === medicament.id)) {
+      setLignes((courantes) => [...courantes, ...lignesDuMedicament(medicament)]);
+    }
+    setRecherche("");
+    setResultatsOuverts(false);
+    setErreurGlobale("");
+    setConfirmation("");
+    rechercheRef.current?.focus();
+  }
+
+  function retirerMedicament(medicament: MedicamentPrix) {
+    const lignesConcernees = lignes.filter((ligne) => ligne.medicamentId === medicament.id);
+    if (lignesConcernees.some((ligne) => ligne.modifiee)
+      && !window.confirm("Retirer ce médicament et abandonner ses modifications non enregistrées ?")) return;
+    const idsConnus = new Set(medicament.conditionnements.map((format) => format.id));
+    setLignes((courantes) => courantes.filter((ligne) => ligne.medicamentId !== medicament.id));
+    setSuppressions((courantes) => courantes.filter((id) => !idsConnus.has(id)));
+    setErreurs((courantes) => {
+      const suivantes = { ...courantes };
+      for (const ligne of lignesConcernees) delete suivantes[ligne.key];
+      return suivantes;
+    });
+    setConfirmation("");
+  }
+
+  function ajouterFormat(medicamentId: string) {
+    setLignes((courantes) => [...courantes, ligneVide(medicamentId)]);
+    setConfirmation("");
+  }
+
+  function modifier(key: string, champ: keyof Pick<Ligne, "quantiteFlacon" | "uniteFlacon" | "doses" | "prixFlaconEur">, valeur: string) {
     setLignes((courantes) => courantes.map((ligne) => ligne.key === key ? { ...ligne, [champ]: valeur, modifiee: true } : ligne));
     setErreurs((courantes) => {
       if (!courantes[key]) return courantes;
@@ -105,21 +156,6 @@ export default function SaisiePrixClient({ medicaments, onRetour }: Props) {
       delete suivantes[key];
       return suivantes;
     });
-    setConfirmation("");
-  }
-
-  function ajouterLigne() {
-    const key = `nouveau-${Date.now()}-${Math.random()}`;
-    setLignes((courantes) => [...courantes, {
-      key,
-      medicamentId: "",
-      quantiteFlacon: "",
-      uniteFlacon: "ml",
-      doses: "",
-      prixFlaconEur: "",
-      modifiee: false,
-    }]);
-    setRecherche("");
     setConfirmation("");
   }
 
@@ -149,6 +185,7 @@ export default function SaisiePrixClient({ medicaments, onRetour }: Props) {
       return;
     }
 
+    const idsSelectionnes = [...new Set(lignes.map((ligne) => ligne.medicamentId))];
     setEnregistrement(true);
     try {
       const response = await fetch("/api/conditionnements/batch", {
@@ -172,12 +209,16 @@ export default function SaisiePrixClient({ medicaments, onRetour }: Props) {
         return;
       }
 
-      const parMedicament = new Map<string, MedicamentPrix>();
-      for (const medicament of medicaments) parMedicament.set(medicament.id, { ...medicament, conditionnements: [] });
+      const formatsParMedicament = new Map<string, MedicamentPrix["conditionnements"]>();
+      for (const id of idsSelectionnes) formatsParMedicament.set(id, []);
       for (const format of resultat.conditionnements) {
-        parMedicament.get(format.medicamentId)?.conditionnements.push(format);
+        formatsParMedicament.get(format.medicamentId)?.push(format);
       }
-      setLignes(lignesInitiales([...parMedicament.values()]));
+      setLignes(idsSelectionnes.flatMap((id) => {
+        const medicament = medicamentsParId.get(id);
+        if (!medicament) return [];
+        return lignesDuMedicament({ ...medicament, conditionnements: formatsParMedicament.get(id) ?? [] });
+      }));
       setSuppressions([]);
       setErreurs({});
       setConfirmation("Toutes les lignes renseignées ont été enregistrées.");
@@ -191,37 +232,22 @@ export default function SaisiePrixClient({ medicaments, onRetour }: Props) {
   function champs(ligne: Ligne, mobile = false) {
     const { prixUnite, prixDose } = calculs(ligne);
     const classeChamp = `w-full rounded-lg border px-2 py-2 text-sm ${erreurs[ligne.key] ? "border-red-400 bg-red-50" : "border-gray-300"}`;
-    const medicament = (
-      <select value={ligne.medicamentId} onChange={(event) => modifier(ligne.key, "medicamentId", event.target.value)} className={classeChamp}>
-        <option value="">Choisir…</option>
-        {medicaments.map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}
-      </select>
-    );
-    const quantite = (
-      <input inputMode="decimal" value={ligne.quantiteFlacon} onChange={(event) => modifier(ligne.key, "quantiteFlacon", event.target.value)}
-        placeholder="200" className={classeChamp} />
-    );
+    const quantite = <input inputMode="decimal" value={ligne.quantiteFlacon} onChange={(event) => modifier(ligne.key, "quantiteFlacon", event.target.value)} placeholder="200" className={classeChamp} />;
     const unite = (
       <select value={ligne.uniteFlacon} onChange={(event) => modifier(ligne.key, "uniteFlacon", event.target.value)} className={classeChamp}>
         <option value="">Choisir…</option>
         {UNITES.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
     );
-    const nombreDoses = (
-      <input inputMode="decimal" value={ligne.doses} onChange={(event) => modifier(ligne.key, "doses", event.target.value)}
-        placeholder="Facultatif" className={classeChamp} />
-    );
-    const prixProduit = (
-      <input inputMode="decimal" value={ligne.prixFlaconEur} onChange={(event) => modifier(ligne.key, "prixFlaconEur", event.target.value)}
-        placeholder="54,00" className={classeChamp} />
-    );
+    const nombreDoses = <input inputMode="decimal" value={ligne.doses} onChange={(event) => modifier(ligne.key, "doses", event.target.value)} placeholder="Facultatif" className={classeChamp} />;
+    const prixProduit = <input inputMode="decimal" value={ligne.prixFlaconEur} onChange={(event) => modifier(ligne.key, "prixFlaconEur", event.target.value)} placeholder="54,00" className={classeChamp} />;
     const prixUnitaireTexte = prixUnite == null ? "—" : `${prixFormatter.format(prixUnite)} /${ligne.uniteFlacon || "unité"}`;
     const prixDoseTexte = prixDose == null ? "—" : `${prixFormatter.format(prixDose)} /dose`;
 
     if (!mobile) {
       return (
         <>
-          <td className="p-2">{medicament}</td>
+          <td className="p-2 font-medium text-gray-800">{medicamentsParId.get(ligne.medicamentId)?.nom}</td>
           <td className="p-2">{quantite}</td>
           <td className="p-2">{unite}</td>
           <td className="p-2">{nombreDoses}</td>
@@ -231,10 +257,8 @@ export default function SaisiePrixClient({ medicaments, onRetour }: Props) {
         </>
       );
     }
-
     return (
       <>
-        <label className="col-span-2 text-xs text-gray-500">Médicament{medicament}</label>
         <label className="text-xs text-gray-500">Quantité{quantite}</label>
         <label className="text-xs text-gray-500">Unité{unite}</label>
         <label className="text-xs text-gray-500">Nombre de doses{nombreDoses}</label>
@@ -247,30 +271,48 @@ export default function SaisiePrixClient({ medicaments, onRetour }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2">
         <button type="button" onClick={onRetour} className="flex min-h-10 items-center gap-1 rounded-lg border bg-white px-3 text-sm text-gray-600">
           <ArrowLeft size={15} /> Retour
         </button>
         <div>
           <h3 className="font-semibold text-gray-900">Saisie groupée des formats et prix</h3>
-          <p className="text-xs text-gray-500">Seules les lignes renseignées ou modifiées seront enregistrées.</p>
+          <p className="text-xs text-gray-500">Recherchez puis sélectionnez plusieurs médicaments.</p>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-xl bg-white p-3 shadow">
-        <div className="flex min-w-56 flex-1 items-center rounded-lg border px-3 py-2">
-          <Search size={15} className="mr-2 shrink-0 text-gray-400" />
-          <input value={recherche} onChange={(event) => setRecherche(event.target.value)} placeholder="Rechercher un médicament…"
-            className="w-full text-sm outline-none" />
-          {recherche && <button type="button" onClick={() => setRecherche("")} aria-label="Effacer la recherche"><X size={14} /></button>}
+      <div className="rounded-xl bg-white p-3 shadow">
+        <div className="relative">
+          <div className="flex items-center rounded-lg border border-gray-300 px-3 py-2 focus-within:ring-2 focus-within:ring-blue-400">
+            <Search size={15} className="mr-2 shrink-0 text-gray-400" />
+            <input ref={rechercheRef} value={recherche}
+              onChange={(event) => { setRecherche(event.target.value); setResultatsOuverts(true); }}
+              onFocus={() => recherche.trim() && setResultatsOuverts(true)}
+              onBlur={() => setTimeout(() => setResultatsOuverts(false), 150)}
+              placeholder="Rechercher des médicaments…" className="w-full text-sm outline-none" />
+            {recherche && <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setRecherche("")} aria-label="Effacer la recherche"><X size={14} /></button>}
+          </div>
+          {resultatsOuverts && recherche.trim() && (
+            <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-lg border bg-white shadow-lg">
+              {resultats.length > 0 ? resultats.map(({ item }) => (
+                <button key={item.id} type="button" onMouseDown={() => selectionnerMedicament(item)}
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50">{item.nom}</button>
+              )) : <p className="px-3 py-2 text-sm text-gray-400">Aucun médicament correspondant</p>}
+            </div>
+          )}
         </div>
-        <button type="button" onClick={ajouterLigne} className="flex min-h-10 items-center gap-1 rounded-lg border px-3 text-sm text-blue-600">
-          <Plus size={15} /> Ajouter une ligne
-        </button>
-        <button type="button" onClick={() => void enregistrerTout()} disabled={enregistrement}
-          className="flex min-h-10 items-center gap-1 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white disabled:opacity-50">
-          <Save size={15} /> Enregistrer toutes les lignes
-        </button>
+
+        {medicamentsSelectionnes.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {medicamentsSelectionnes.map((medicament) => (
+              <span key={medicament.id} className="flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 py-1 pl-2.5 pr-1 text-xs text-blue-700">
+                {medicament.nom}
+                <button type="button" onClick={() => retirerMedicament(medicament)} aria-label={`Retirer ${medicament.nom}`}
+                  className="rounded-full p-0.5 hover:bg-blue-100"><X size={11} /></button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {erreurGlobale && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{erreurGlobale}</div>}
@@ -287,16 +329,20 @@ export default function SaisiePrixClient({ medicaments, onRetour }: Props) {
               <th className="p-2 font-medium">Prix HT du produit</th>
               <th className="p-2 font-medium">Prix HT par unité</th>
               <th className="p-2 font-medium">Prix HT par dose</th>
-              <th className="w-12 p-2 font-medium">Actions</th>
+              <th className="w-36 p-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            {lignesVisibles.map((ligne) => (
+            {lignes.map((ligne) => (
               <tr key={ligne.key} className={erreurs[ligne.key] ? "bg-red-50/60" : ""}>
                 {champs(ligne)}
                 <td className="p-2">
-                  <button type="button" onClick={() => supprimerLigne(ligne)} aria-label="Supprimer la ligne"
-                    className="rounded p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>
+                  <div className="flex items-center gap-1">
+                    <button type="button" onClick={() => ajouterFormat(ligne.medicamentId)}
+                      className="whitespace-nowrap rounded px-1.5 py-1 text-xs text-blue-600 hover:bg-blue-50">+ Ajouter un format</button>
+                    <button type="button" onClick={() => supprimerLigne(ligne)} aria-label="Supprimer la ligne"
+                      className="rounded p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>
+                  </div>
                   {erreurs[ligne.key] && <span className="block text-[10px] text-red-600">{erreurs[ligne.key].join(", ")}</span>}
                 </td>
               </tr>
@@ -305,25 +351,38 @@ export default function SaisiePrixClient({ medicaments, onRetour }: Props) {
         </table>
       </div>
 
-      <div className="space-y-2 md:hidden">
-        {lignesVisibles.map((ligne) => (
-          <div key={ligne.key} className={`rounded-xl border bg-white p-3 shadow-sm ${erreurs[ligne.key] ? "border-red-300" : "border-gray-100"}`}>
-            <div className="grid grid-cols-2 gap-2">
-              {champs(ligne, true)}
+      <div className="space-y-3 md:hidden">
+        {medicamentsSelectionnes.map((medicament) => (
+          <section key={medicament.id} className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <h4 className="text-sm font-semibold text-gray-800">{medicament.nom}</h4>
+              <button type="button" onClick={() => ajouterFormat(medicament.id)} className="text-xs text-blue-600">+ Ajouter un format</button>
             </div>
-            <div className="mt-2 flex items-center justify-between border-t pt-2">
-              {erreurs[ligne.key]
-                ? <span className="text-xs text-red-600">À corriger : {erreurs[ligne.key].join(", ")}</span>
-                : <span />}
-              <button type="button" onClick={() => supprimerLigne(ligne)} className="flex items-center gap-1 text-xs text-red-600">
-                <Trash2 size={14} /> Supprimer
-              </button>
-            </div>
-          </div>
+            {lignes.filter((ligne) => ligne.medicamentId === medicament.id).map((ligne) => (
+              <div key={ligne.key} className={`rounded-xl border bg-white p-3 shadow-sm ${erreurs[ligne.key] ? "border-red-300" : "border-gray-100"}`}>
+                <div className="grid grid-cols-2 gap-2">{champs(ligne, true)}</div>
+                <div className="mt-2 flex items-center justify-between border-t pt-2">
+                  {erreurs[ligne.key] ? <span className="text-xs text-red-600">À corriger : {erreurs[ligne.key].join(", ")}</span> : <span />}
+                  <button type="button" onClick={() => supprimerLigne(ligne)} className="flex items-center gap-1 text-xs text-red-600">
+                    <Trash2 size={14} /> Supprimer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </section>
         ))}
       </div>
 
-      {lignesVisibles.length === 0 && <p className="py-8 text-center text-sm text-gray-400">Aucune ligne pour cette recherche.</p>}
+      {medicamentsSelectionnes.length === 0 && (
+        <p className="rounded-xl bg-white py-10 text-center text-sm text-gray-400 shadow">Recherchez un médicament pour commencer.</p>
+      )}
+
+      <div className="sticky bottom-16 z-10 flex justify-end rounded-xl border bg-white/95 p-3 shadow-lg backdrop-blur">
+        <button type="button" onClick={() => void enregistrerTout()} disabled={enregistrement || medicamentsSelectionnes.length === 0}
+          className="flex min-h-11 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+          <Save size={15} /> Enregistrer
+        </button>
+      </div>
     </div>
   );
 }
