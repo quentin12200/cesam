@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
+import { VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 
 interface SearchResult {
   nutrav: string;
@@ -17,7 +18,7 @@ interface SearchResult {
 
 const ETAT_COLORS: Record<string, string> = {
   VERT: "bg-green-500",
-  ROSE: "bg-pink-400",
+  ROSE: VELAGE_IMMINENT_COLORS.fill,
   JAUNE: "bg-yellow-400",
   ROUGE: "bg-red-500",
   GRIS: "bg-gray-400",

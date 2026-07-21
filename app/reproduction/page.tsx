@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { differenceInDays, addDays } from "date-fns";
-import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate } from "@/lib/utils";
+import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate, VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 import Link from "next/link";
 import {
   RefreshCw, CheckCircle,
@@ -62,7 +62,7 @@ const reproductionCardStates: Record<EtatGestation, { label: string; border: str
   ROUGE: { label: "Vide", border: "border-red-400", text: "text-red-700" },
   JAUNE: { label: "À écho", border: "border-amber-400", text: "text-amber-700" },
   REPOS: { label: "Repos post-vêlage", border: "border-sky-400", text: "text-sky-700" },
-  ROSE: { label: "Imminent", border: "border-pink-400", text: "text-pink-700" },
+  ROSE: { label: "Imminent", border: VELAGE_IMMINENT_COLORS.border, text: VELAGE_IMMINENT_COLORS.text },
   GRIS: { label: "Saillie récente", border: "border-slate-300", text: "text-slate-600" },
 };
 
@@ -793,7 +793,7 @@ function ReproductionContent() {
             : etat === "ROUGE" ? (isActive ? "bg-red-500 text-white" : "bg-red-100 text-red-600")
             : etat === "JAUNE" ? (isActive ? "bg-yellow-400 text-black" : "bg-yellow-50 text-yellow-700")
             : etat === "VERT" ? (isActive ? "bg-green-500 text-white" : "bg-green-100 text-green-700")
-            : etat === "ROSE" ? (isActive ? "bg-pink-400 text-white" : "bg-pink-100 text-pink-600")
+            : etat === "ROSE" ? (isActive ? VELAGE_IMMINENT_COLORS.badge : `${VELAGE_IMMINENT_COLORS.surface} ${VELAGE_IMMINENT_COLORS.text}`)
             : etat === "REPOS" ? (isActive ? "bg-sky-500 text-white" : "bg-sky-100 text-sky-700")
             : (isActive ? "bg-gray-400 text-white" : "bg-gray-100 text-gray-600");
           return (
@@ -1404,7 +1404,7 @@ function ReproductionContent() {
                         <span className="font-bold text-green-700">{echoDateVelagePrevue.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</span>
                       </div>
                       {joursAvantVelage !== null && (
-                        <div className={`text-center text-xs font-semibold py-1 px-2 rounded-lg ${joursAvantVelage <= 30 ? "bg-pink-100 text-pink-700" : joursAvantVelage <= 60 ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>
+                        <div className={`text-center text-xs font-semibold py-1 px-2 rounded-lg ${joursAvantVelage <= 30 ? `${VELAGE_IMMINENT_COLORS.surface} ${VELAGE_IMMINENT_COLORS.text}` : joursAvantVelage <= 60 ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>
                           dans {joursAvantVelage} jours
                         </div>
                       )}

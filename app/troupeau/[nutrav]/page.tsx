@@ -12,6 +12,7 @@ import {
   getCategorieColor,
   getCategorie,
   DEFAULT_PROTOCOLES,
+  VELAGE_IMMINENT_COLORS,
   type ProtocoleVaccinConfig,
 } from "@/lib/utils";
 import Link from "next/link";
@@ -40,7 +41,7 @@ import QuickActionsBar from "./QuickActionsBar";
 import CategorieButton from "./CategorieButton";
 import EchoButton from "./EchoButton";
 import EchoStatusBadge from "./EchoStatusBadge";
-import GestationProgress from "./GestationProgress";
+import ReproductiveCycleTimeline from "./ReproductiveCycleTimeline";
 import GroupeButton from "./GroupeButton";
 import EvenementsSection from "./EvenementsSection";
 import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
@@ -207,10 +208,13 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             <p className="mt-1.5 break-all font-mono text-[11px] text-gray-400 sm:text-xs">
               N° national : {animal.numeroNational ?? "à compléter"}
             </p>
-            {animal.sexbov === "F" && (etat === "VERT" || etat === "ROSE") && (
-              <GestationProgress
-                startDate={animal.saillies[0]?.date ?? null}
+            {animal.sexbov === "F" && (
+              <ReproductiveCycleTimeline
+                status={etat}
+                breedingDate={animal.saillies[0]?.date ?? null}
+                breedingType={animal.saillies[0]?.type ?? null}
                 dueDate={animal.saillies[0]?.gestation?.dateVelagePrevue ?? null}
+                lastCalvingDate={animal.velagesVache[0]?.date ?? null}
               />
             )}
           </div>
@@ -713,7 +717,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   etat === "VERT"
                     ? "bg-green-50 border border-green-200"
                     : etat === "ROSE"
-                    ? "bg-pink-50 border border-pink-200"
+                    ? `${VELAGE_IMMINENT_COLORS.surface} border ${VELAGE_IMMINENT_COLORS.border}`
                     : etat === "JAUNE"
                     ? "bg-yellow-50 border border-yellow-200"
                     : etat === "ROUGE"

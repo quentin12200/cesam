@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { differenceInDays } from "date-fns";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
 import { GestationCalendarTable } from "@/app/components/GestationCalendarTable";
+import { VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 
 export default async function CalendrierGestationPage() {
   const now = new Date();
@@ -53,8 +54,8 @@ export default async function CalendrierGestationPage() {
               <div className="text-2xl font-bold text-green-700">{gestationsList.length}</div>
               <div className="text-xs text-gray-500">Vaches pleines</div>
             </div>
-            <div className="bg-pink-50 rounded-xl shadow px-4 py-3 flex-1 text-center">
-              <div className="text-2xl font-bold text-pink-600">{imminentes.length}</div>
+            <div className={`${VELAGE_IMMINENT_COLORS.surface} rounded-xl shadow px-4 py-3 flex-1 text-center`}>
+              <div className={`text-2xl font-bold ${VELAGE_IMMINENT_COLORS.text}`}>{imminentes.length}</div>
               <div className="text-xs text-gray-500">Vêlages ≤ 30 jours</div>
             </div>
           </div>

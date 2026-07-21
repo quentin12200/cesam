@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { differenceInDays } from "date-fns";
 import type { GestationCalendarRow } from "@/lib/gestation-calendar";
+import { VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 
 const DUREE_GESTATION = 285;
 
@@ -123,7 +124,7 @@ export function GestationCalendarTable({ rows, now, noPrintProgress = false }: {
           <tbody className="divide-y divide-gray-100">
             {rows.map((g) => {
               const daysLeft = differenceInDays(g.dateVelagePrevue, now);
-              const rowBg = daysLeft < 0 ? "bg-red-50" : daysLeft <= 14 ? "bg-pink-50" : daysLeft <= 30 ? "bg-yellow-50" : "";
+              const rowBg = daysLeft < 0 ? "bg-red-50" : daysLeft <= 30 ? VELAGE_IMMINENT_COLORS.surface : "";
               return (
                 <tr key={g.id} className={rowBg}>
                   <td className="px-3 py-2.5">

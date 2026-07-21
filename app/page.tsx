@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, addDays } from "date-fns";
-import { getEtatGestation, getVaccinsManquants, formatAge } from "@/lib/utils";
+import { getEtatGestation, getVaccinsManquants, formatAge, VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 import Link from "next/link";
 import CowIcon from "@/components/CowIcon";
 import Collapsible from "@/app/components/Collapsible";
@@ -410,13 +410,13 @@ export default async function Dashboard({ searchParams }: PageProps) {
         {data.velagesSemaine > 0 && (
           <Link
             href="/velage"
-            className="flex items-center justify-between p-3 bg-pink-50 rounded-lg border border-pink-200"
+            className={`flex items-center justify-between p-3 rounded-lg border ${VELAGE_IMMINENT_COLORS.surface} ${VELAGE_IMMINENT_COLORS.border}`}
           >
             <div className="flex items-center gap-2">
-              <Baby size={16} className="text-pink-600" />
-              <span className="text-sm font-medium text-pink-800">Vélages prévus cette semaine</span>
+              <Baby size={16} className={VELAGE_IMMINENT_COLORS.text} />
+              <span className={`text-sm font-medium ${VELAGE_IMMINENT_COLORS.text}`}>Vélages prévus cette semaine</span>
             </div>
-            <span className="bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+            <span className={`${VELAGE_IMMINENT_COLORS.badge} text-xs font-bold px-2 py-1 rounded-full`}>
               {data.velagesSemaine}
             </span>
           </Link>
@@ -591,8 +591,8 @@ export default async function Dashboard({ searchParams }: PageProps) {
             {data.vachesPleine} / {data.vachesActives}
           </div>
         </div>
-        <div className="text-center p-3 bg-pink-50 rounded-lg">
-          <div className="text-2xl font-bold text-pink-600">{data.velagesPrevus}</div>
+        <div className={`text-center p-3 rounded-lg ${VELAGE_IMMINENT_COLORS.surface}`}>
+          <div className={`text-2xl font-bold ${VELAGE_IMMINENT_COLORS.text}`}>{data.velagesPrevus}</div>
           <div className="text-xs text-gray-600 mt-1">Vélages prévus</div>
           <div className="text-xs text-gray-400">30 prochains jours</div>
         </div>
@@ -889,8 +889,8 @@ export default async function Dashboard({ searchParams }: PageProps) {
               <div className="text-xl font-bold text-emerald-700">{data.pctPleine}%</div>
               <div className="text-xs text-gray-600">Vaches pleines</div>
             </Link>
-            <Link href="/velage" className="rounded-xl bg-pink-50 p-3 text-center">
-              <div className="text-xl font-bold text-pink-700">{data.velagesPrevus}</div>
+            <Link href="/velage" className={`rounded-xl p-3 text-center ${VELAGE_IMMINENT_COLORS.surface}`}>
+              <div className={`text-xl font-bold ${VELAGE_IMMINENT_COLORS.text}`}>{data.velagesPrevus}</div>
               <div className="text-xs text-gray-600">Vêlages sous 30 j</div>
             </Link>
             <Link href="/sanitaire" className="rounded-xl bg-blue-50 p-3 text-center">

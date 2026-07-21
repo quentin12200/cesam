@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { addDays, differenceInDays, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { X, ScanLine } from "lucide-react";
+import { VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 
 const DUREE_GESTATION = 285;
 const today = new Date().toISOString().slice(0, 10);
@@ -151,7 +152,7 @@ export default function EchoModal({ nutrav, saillieId, saillieDate, onClose, onD
               {dateVelagePrevue && (
                 <div className={`mt-2 px-3 py-2.5 rounded-xl text-sm ${
                   joursRestants !== null && joursRestants <= 21
-                    ? "bg-pink-50 border border-pink-200"
+                    ? `${VELAGE_IMMINENT_COLORS.surface} border ${VELAGE_IMMINENT_COLORS.border}`
                     : "bg-green-50 border border-green-100"
                 }`}>
                   <div className="flex items-center justify-between">
@@ -161,7 +162,7 @@ export default function EchoModal({ nutrav, saillieId, saillieDate, onClose, onD
                     </span>
                   </div>
                   {joursRestants !== null && (
-                    <p className={`text-xs mt-0.5 ${joursRestants <= 21 ? "text-pink-600 font-semibold" : "text-gray-400"}`}>
+                    <p className={`text-xs mt-0.5 ${joursRestants <= 21 ? `${VELAGE_IMMINENT_COLORS.text} font-semibold` : "text-gray-400"}`}>
                       {joursRestants > 0 ? `Dans ${joursRestants} jours` : "Terme dépassé"}
                       {joursRestants <= 21 && joursRestants > 0 && " — Imminent ⚠"}
                     </p>

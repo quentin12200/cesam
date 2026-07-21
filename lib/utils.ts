@@ -140,6 +140,18 @@ export function formatDateShort(date: Date | null | undefined): string {
 
 export type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
+export const ECHOGRAPHY_WAIT_DAYS = 35;
+export const POST_CALVING_REST_DAYS = 60;
+
+export const VELAGE_IMMINENT_COLORS = {
+  badge: "bg-orange-500 text-white",
+  surface: "bg-orange-50",
+  border: "border-orange-300",
+  text: "text-orange-700",
+  fill: "bg-orange-500",
+  hex: "#f97316",
+} as const;
+
 export function getEtatGestation(
   derniereSaillie: Date | null,
   gestationEtat: string | null,
@@ -155,7 +167,7 @@ export function getEtatGestation(
   // ou imminente après son terme.
   if (derniereSaillie && dernierVelage && dernierVelage > derniereSaillie) {
     const joursDepuisVelage = differenceInDays(now, dernierVelage);
-    return joursDepuisVelage <= 60 ? "REPOS" : "ROUGE";
+    return joursDepuisVelage <= POST_CALVING_REST_DAYS ? "REPOS" : "ROUGE";
   }
 
   // Échographie de recontrôle demandée manuellement (ex: doute sur une
@@ -181,7 +193,7 @@ export function getEtatGestation(
   if (!derniereSaillie) {
     if (dernierVelage) {
       const joursDepuisVelage = differenceInDays(now, dernierVelage);
-      if (joursDepuisVelage <= 60) return "REPOS"; // < 2 mois post-vêlage
+      if (joursDepuisVelage <= POST_CALVING_REST_DAYS) return "REPOS"; // < 2 mois post-vêlage
       return "ROUGE";
     }
     return "ROUGE";
@@ -189,7 +201,7 @@ export function getEtatGestation(
 
   // Saillie enregistrée — calcul par délai
   const joursDepuisSaillie = differenceInDays(now, derniereSaillie);
-  if (joursDepuisSaillie < 35) return "GRIS";
+  if (joursDepuisSaillie < ECHOGRAPHY_WAIT_DAYS) return "GRIS";
   return "JAUNE";
 }
 
@@ -198,7 +210,7 @@ export function getBadgeClass(etat: EtatGestation): string {
     case "VERT": return "bg-green-500 text-white";
     case "JAUNE": return "bg-yellow-400 text-black";
     case "ROUGE": return "bg-red-500 text-white";
-    case "ROSE": return "bg-pink-400 text-white";
+    case "ROSE": return VELAGE_IMMINENT_COLORS.badge;
     case "GRIS": return "bg-gray-400 text-white";
     case "REPOS": return "bg-sky-400 text-white";
     default: return "bg-gray-400 text-white";

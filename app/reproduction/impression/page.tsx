@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import PrintButton from "./PrintButton";
+import { VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 
 interface PageProps {
   searchParams: Promise<{ mois?: string; quantite?: string }>;
@@ -161,7 +162,7 @@ export default async function ImpressionVelagesPage({ searchParams }: PageProps)
                 velage
                   ? "bg-white"
                   : daysLeft !== null && daysLeft <= 14
-                  ? "bg-pink-50"
+                  ? VELAGE_IMMINENT_COLORS.surface
                   : daysLeft !== null && daysLeft <= 30
                   ? "bg-yellow-50"
                   : i % 2 === 0
@@ -217,7 +218,7 @@ export default async function ImpressionVelagesPage({ searchParams }: PageProps)
           table { width: 100%; font-size: 11px; }
           th, td { padding: 4px 6px !important; }
           @page { size: A4 landscape; margin: 1.5cm; }
-          .bg-pink-50 { background-color: #fdf2f8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .bg-orange-50 { background-color: #fff7ed !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .bg-yellow-50 { background-color: #fefce8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>

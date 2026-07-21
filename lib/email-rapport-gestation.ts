@@ -1,6 +1,7 @@
 import { differenceInDays, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import nodemailer from "nodemailer";
+import { VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -26,7 +27,7 @@ export async function sendRapportGestation(vaches: VacheGestante[], to: string[]
 
   function etatBadge(etat: string) {
     if (etat === "VERT") return `<span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">Confirmée</span>`;
-    if (etat === "ROSE") return `<span style="background:#db2777;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">Probable</span>`;
+    if (etat === "ROSE") return `<span style="background:${VELAGE_IMMINENT_COLORS.hex};color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">Imminente</span>`;
     return `<span style="background:#9ca3af;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">Non confirmée</span>`;
   }
 
