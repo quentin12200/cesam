@@ -317,15 +317,32 @@ export default function ReproductiveCycleTimeline({
     };
   }, [status, breedingDate, breedingType, dueDate, echoDate, echoResult, lastCalvingDate, statusModifiedAt]);
 
-  let offset = 0;
-  const ringSegments = model.segments.map((segment) => {
-    const length = (segment.days / model.scaleDays) * RING_CIRCUMFERENCE;
-    const gap = Math.min(3, length * 0.18);
-    const item = { ...segment, length: Math.max(0, length - gap), offset };
-    offset += length;
+  const activeStage =
+    status === "GRIS" ? "waiting"
+      : status === "JAUNE" ? "scan"
+      : status === "VERT" ? "pregnant"
+      : status === "ROSE" && model.gestation?.remainingDays && model.gestation.remainingDays < 0 ? "delay"
+      : status === "ROSE" ? "imminent"
+      : status === "REPOS" ? "rest"
+      : "delay";
+
+  const canonicalStages = [
+    { id: "waiting", label: "Après saillie / IA", duration: `${ECHOGRAPHY_WAIT_DAYS} j`, color: STAGE_COLORS.waiting, share: 0.22 },
+    { id: "scan", label: "À échographier", duration: "7 j", color: STAGE_COLORS.scan, share: 0.06 },
+    { id: "pregnant", label: "Gestante", duration: "~200 j", color: STAGE_COLORS.pregnant, share: 0.36 },
+    { id: "imminent", label: "Vêlage imminent", duration: `${VELAGE_IMMINENT_DAYS} j`, color: STAGE_COLORS.imminent, share: 0.09 },
+    { id: "rest", label: "Repos", duration: `${POST_CALVING_REST_DAYS} j`, color: STAGE_COLORS.rest, share: 0.18 },
+    { id: "delay", label: "Retard", duration: "Variable", color: STAGE_COLORS.delay, share: 0.09 },
+  ];
+
+  let canonicalOffset = 0;
+  const canonicalRing = canonicalStages.map((stage) => {
+    const slot = stage.share * RING_CIRCUMFERENCE;
+    const gap = 7;
+    const item = { ...stage, length: Math.max(1, slot - gap), offset: canonicalOffset };
+    canonicalOffset += slot;
     return item;
   });
-  const futureLength = (model.futureDays / model.scaleDays) * RING_CIRCUMFERENCE;
 
   const nav = [
     { id: "cycle" as const, label: "Cycle", icon: RefreshCw },
@@ -350,75 +367,99 @@ export default function ReproductiveCycleTimeline({
 
       <div className="px-3 py-4 sm:px-5">
         {view === "cycle" && (
-          <div className="mx-auto grid max-w-xl items-center gap-4 sm:grid-cols-[minmax(260px,320px)_1fr]">
-            <div className="relative mx-auto aspect-square w-full max-w-[280px] sm:max-w-[320px]">
-              <svg viewBox="0 0 200 200" className="-rotate-90 h-full w-full" role="img" aria-label={`${model.title} : ${model.main}`}>
-                <circle cx="100" cy="100" r={RING_RADIUS} fill="none" stroke={STAGE_COLORS.future} strokeWidth="18" />
-                {futureLength > 0 && (
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r={RING_RADIUS}
-                    fill="none"
-                    stroke={STAGE_COLORS.future}
-                    strokeWidth="18"
-                    strokeDasharray={`${futureLength} ${RING_CIRCUMFERENCE - futureLength}`}
-                    strokeDashoffset={-offset}
-                  />
-                )}
-                {ringSegments.map((segment) => (
-                  <circle
-                    key={segment.id}
-                    cx="100"
-                    cy="100"
-                    r={RING_RADIUS}
-                    fill="none"
-                    stroke={segment.color}
-                    strokeOpacity={segment.current ? 1 : 0.38}
-                    strokeWidth={segment.current ? 24 : 18}
-                    strokeLinecap="round"
-                    strokeDasharray={`${segment.length} ${RING_CIRCUMFERENCE - segment.length}`}
-                    strokeDashoffset={-segment.offset}
-                    className="transition-all duration-300"
-                  >
-                    <title>{segment.label} · {pluralDays(segment.days)}</title>
-                  </circle>
-                ))}
+          <div className="mx-auto max-w-[660px]">
+            <div className="relative mx-auto aspect-square w-full max-w-[330px] sm:max-w-[430px]">
+              <svg
+                viewBox="0 0 240 240"
+                className="-rotate-90 h-full w-full overflow-visible"
+                role="img"
+                aria-label={`${model.title} : ${model.main}`}
+              >
+                <circle
+                  cx="120"
+                  cy="120"
+                  r="102"
+                  fill="none"
+                  stroke="#e2e8f0"
+                  strokeDasharray="2 5"
+                  strokeWidth="1.5"
+                />
+                <g transform="translate(20 20)">
+                  {canonicalRing.map((stage) => {
+                    const selected = stage.id === activeStage;
+                    return (
+                      <circle
+                        key={stage.id}
+                        cx="100"
+                        cy="100"
+                        r={RING_RADIUS}
+                        fill="none"
+                        stroke={stage.color}
+                        strokeOpacity={selected ? 1 : 0.72}
+                        strokeWidth={selected ? 15 : 11}
+                        strokeLinecap="round"
+                        strokeDasharray={`${stage.length} ${RING_CIRCUMFERENCE - stage.length}`}
+                        strokeDashoffset={-stage.offset}
+                        className="transition-all duration-300"
+                      >
+                        <title>{stage.label} · {stage.duration}</title>
+                      </circle>
+                    );
+                  })}
+                </g>
               </svg>
-              <div className="absolute inset-[23%] flex flex-col items-center justify-center rounded-full bg-white px-2 text-center shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
-                <span className={`text-[10px] font-extrabold uppercase tracking-[0.12em] sm:text-xs ${model.tone}`}>
+
+              <div className="absolute left-1/2 top-[2%] w-32 -translate-x-1/2 text-center">
+                <span className="text-[10px] font-bold leading-tight text-amber-500 sm:text-xs">À échographier</span>
+                <span className="block text-[10px] text-slate-500 sm:text-xs">7 j</span>
+              </div>
+              <div className="absolute left-[-2%] top-[25%] w-28 text-center sm:left-[-11%] sm:w-36">
+                <span className="text-[10px] font-semibold leading-tight text-slate-500 sm:text-xs">Après saillie / IA</span>
+                <span className="block text-[10px] text-slate-500 sm:text-xs">{ECHOGRAPHY_WAIT_DAYS} j</span>
+              </div>
+              <div className="absolute right-[-2%] top-[31%] w-24 text-center sm:right-[-12%] sm:w-32">
+                <span className="text-[10px] font-bold text-green-600 sm:text-xs">Gestante</span>
+                <span className="block text-[10px] text-slate-500 sm:text-xs">~200 j</span>
+              </div>
+              <div className="absolute bottom-[19%] right-[-3%] w-28 text-center sm:right-[-14%] sm:w-36">
+                <span className="text-[10px] font-bold leading-tight text-orange-500 sm:text-xs">Vêlage imminent</span>
+                <span className="block text-[10px] text-slate-500 sm:text-xs">{VELAGE_IMMINENT_DAYS} j</span>
+              </div>
+              <div className="absolute bottom-[1%] left-1/2 w-24 -translate-x-1/2 text-center">
+                <span className="text-[10px] font-bold text-sky-600 sm:text-xs">Repos</span>
+                <span className="block text-[10px] text-slate-500 sm:text-xs">{POST_CALVING_REST_DAYS} j</span>
+              </div>
+              <div className="absolute bottom-[20%] left-[-2%] w-24 text-center sm:left-[-11%] sm:w-32">
+                <span className="text-[10px] font-bold text-red-500 sm:text-xs">Retard</span>
+                <span className="block text-[10px] text-slate-500 sm:text-xs">Variable</span>
+              </div>
+
+              <div className="absolute inset-[24%] flex flex-col items-center justify-center rounded-full bg-white px-3 text-center">
+                <span
+                  className="mb-1 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-2xl font-black text-emerald-600 sm:h-14 sm:w-14 sm:text-3xl"
+                  aria-hidden="true"
+                >
+                  ✓
+                </span>
+                <span className={`text-[10px] font-extrabold uppercase tracking-[0.1em] sm:text-xs ${model.tone}`}>
                   {model.title}
                 </span>
-                <strong className="mt-1 text-xl leading-tight text-slate-950 sm:text-2xl">{model.main}</strong>
-                <span className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-500 sm:text-xs">
+                <strong className="mt-0.5 text-xl leading-tight text-emerald-900 sm:text-3xl">{model.main}</strong>
+                {model.gestation && (
+                  <>
+                    <span className="my-2 h-px w-4/5 bg-slate-200" />
+                    <span className="text-[10px] text-slate-500 sm:text-xs">Vêlage prévu dans</span>
+                    <strong className="mt-0.5 text-base text-emerald-900 sm:text-xl">
+                      {model.gestation.remainingDays < 0
+                        ? `Terme dépassé de ${pluralDays(Math.abs(model.gestation.remainingDays))}`
+                        : formatGestationElapsed(model.gestation.remainingDays)}
+                    </strong>
+                  </>
+                )}
+                <span className="mt-1 line-clamp-2 text-[9px] leading-snug text-slate-500 sm:text-[11px]">
                   {model.secondary}
                 </span>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-1">
-              {model.segments.map((segment) => (
-                <div
-                  key={segment.id}
-                  className={`rounded-xl border px-3 py-2 ${segment.current ? "border-slate-300 bg-slate-50 shadow-sm" : "border-slate-100 bg-white"}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`h-2.5 w-2.5 rounded-full ${segment.current ? "ring-4 ring-slate-100" : "opacity-50"}`}
-                      style={{ backgroundColor: segment.color }}
-                    />
-                    <p className="text-xs font-bold text-slate-800">{segment.label}</p>
-                  </div>
-                  <p className="mt-1 pl-[18px] text-[11px] text-slate-500">
-                    {segment.current ? segment.detail ?? pluralDays(segment.days) : "Étape passée"}
-                  </p>
-                </div>
-              ))}
-              {model.segments.length === 0 && (
-                <div className="col-span-2 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-500 sm:col-span-1">
-                  Le cycle apparaîtra dès qu’une donnée de reproduction sera disponible.
-                </div>
-              )}
             </div>
           </div>
         )}
