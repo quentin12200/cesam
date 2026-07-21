@@ -460,13 +460,13 @@ export default function ReproductiveCycleTimeline({
                     <p className="mt-1 text-lg font-extrabold text-slate-900">{formatGestationElapsed(model.gestation.elapsedDays)}</p>
                   </div>
                   <p className="text-sm font-bold text-green-700">
-                    {Math.round(model.gestation.progress * 100)} %
+                    {Math.round(model.gestation.percentage / 100 * 100)} %
                   </p>
                 </div>
                 <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
                   <div
                     className="h-full rounded-full bg-green-500"
-                    style={{ width: `${Math.min(100, Math.max(0, model.gestation.progress * 100))}%` }}
+                    style={{ width: `${Math.min(100, Math.max(0, model.gestation.percentage / 100 * 100))}%` }}
                   />
                 </div>
               </div>
