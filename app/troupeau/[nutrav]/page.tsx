@@ -40,6 +40,7 @@ import QuickActionsBar from "./QuickActionsBar";
 import CategorieButton from "./CategorieButton";
 import EchoButton from "./EchoButton";
 import EchoStatusBadge from "./EchoStatusBadge";
+import GestationProgress from "./GestationProgress";
 import GroupeButton from "./GroupeButton";
 import EvenementsSection from "./EvenementsSection";
 import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
@@ -206,6 +207,12 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             <p className="mt-1.5 break-all font-mono text-[11px] text-gray-400 sm:text-xs">
               N° national : {animal.numeroNational ?? "à compléter"}
             </p>
+            {animal.sexbov === "F" && (etat === "VERT" || etat === "ROSE") && (
+              <GestationProgress
+                startDate={animal.saillies[0]?.date ?? null}
+                dueDate={animal.saillies[0]?.gestation?.dateVelagePrevue ?? null}
+              />
+            )}
           </div>
           <div className="col-span-2 flex shrink-0 items-center justify-between gap-2 border-t border-gray-100 pt-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:justify-end sm:border-0 sm:pt-0">
             <QuickActionsBar
