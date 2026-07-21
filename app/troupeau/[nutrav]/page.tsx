@@ -208,18 +208,6 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             <p className="mt-1.5 break-all font-mono text-[11px] text-gray-400 sm:text-xs">
               N° national : {animal.numeroNational ?? "à compléter"}
             </p>
-            {animal.sexbov === "F" && (
-              <ReproductiveCycleTimeline
-                status={etat}
-                breedingDate={animal.saillies[0]?.date ?? null}
-                breedingType={animal.saillies[0]?.type ?? null}
-                dueDate={animal.saillies[0]?.gestation?.dateVelagePrevue ?? null}
-                echoDate={animal.saillies[0]?.gestation?.dateEcho ?? null}
-                echoResult={animal.saillies[0]?.gestation?.resultatEcho ?? null}
-                lastCalvingDate={animal.velagesVache[0]?.date ?? null}
-                statusModifiedAt={animal.reproductionEtatModifieAt ?? null}
-              />
-            )}
           </div>
           <div className="col-span-2 flex shrink-0 items-center justify-between gap-2 border-t border-gray-100 pt-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:justify-end sm:border-0 sm:pt-0">
             <QuickActionsBar
@@ -259,6 +247,21 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
           </div>
         </div>
       </div>
+
+      {animal.sexbov === "F" && (
+        <div className="px-3">
+          <ReproductiveCycleTimeline
+            status={etat}
+            breedingDate={animal.saillies[0]?.date ?? null}
+            breedingType={animal.saillies[0]?.type ?? null}
+            dueDate={animal.saillies[0]?.gestation?.dateVelagePrevue ?? null}
+            echoDate={animal.saillies[0]?.gestation?.dateEcho ?? null}
+            echoResult={animal.saillies[0]?.gestation?.resultatEcho ?? null}
+            lastCalvingDate={animal.velagesVache[0]?.date ?? null}
+            statusModifiedAt={animal.reproductionEtatModifieAt ?? null}
+          />
+        </div>
+      )}
 
       {/* Onglets */}
       <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 mt-2">
