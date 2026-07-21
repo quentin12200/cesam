@@ -214,7 +214,10 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 breedingDate={animal.saillies[0]?.date ?? null}
                 breedingType={animal.saillies[0]?.type ?? null}
                 dueDate={animal.saillies[0]?.gestation?.dateVelagePrevue ?? null}
+                echoDate={animal.saillies[0]?.gestation?.dateEcho ?? null}
+                echoResult={animal.saillies[0]?.gestation?.resultatEcho ?? null}
                 lastCalvingDate={animal.velagesVache[0]?.date ?? null}
+                statusModifiedAt={animal.reproductionEtatModifieAt ?? null}
               />
             )}
           </div>

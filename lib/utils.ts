@@ -142,6 +142,7 @@ export type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPO
 
 export const ECHOGRAPHY_WAIT_DAYS = 35;
 export const POST_CALVING_REST_DAYS = 60;
+export const VELAGE_IMMINENT_DAYS = 30;
 
 export const VELAGE_IMMINENT_COLORS = {
   badge: "bg-orange-500 text-white",
@@ -184,7 +185,7 @@ export function getEtatGestation(
   if (gestationEtat === "VERT") {
     if (dateVelagePrevue) {
       const diffJours = differenceInDays(dateVelagePrevue, now);
-      if (diffJours <= 30) return "ROSE"; // imminente OU terme dépassé → ROSE dans les deux cas
+      if (diffJours <= VELAGE_IMMINENT_DAYS) return "ROSE"; // imminente OU terme dépassé → ROSE dans les deux cas
     }
     return "VERT";
   }

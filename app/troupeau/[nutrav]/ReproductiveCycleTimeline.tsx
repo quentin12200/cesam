@@ -1,39 +1,41 @@
-import { differenceInCalendarDays } from "date-fns";
+import { addDays, differenceInCalendarDays, subDays } from "date-fns";
 import {
   ECHOGRAPHY_WAIT_DAYS,
   POST_CALVING_REST_DAYS,
-  VELAGE_IMMINENT_COLORS,
+  VELAGE_IMMINENT_DAYS,
   type EtatGestation,
 } from "@/lib/utils";
-import { formatGestationElapsed, getGestationProgress } from "@/lib/gestation-progress";
+import { GESTATION_REFERENCE_DAYS, formatGestationElapsed, getGestationProgress } from "@/lib/gestation-progress";
 
 interface Props {
   status: EtatGestation | null;
   breedingDate: Date | null;
   breedingType: string | null;
   dueDate: Date | null;
+  echoDate: Date | null;
+  echoResult: string | null;
   lastCalvingDate: Date | null;
+  statusModifiedAt: Date | null;
 }
 
-const STAGES = [
-  { short: "Saillie", full: "Saillie / IA", active: "bg-fuchsia-600 text-white", past: "bg-fuchsia-100 text-fuchsia-700" },
-  { short: "Attente", full: "Attente avant échographie", active: "bg-slate-500 text-white", past: "bg-slate-200 text-slate-700" },
-  { short: "Écho", full: "À échographier", active: "bg-yellow-400 text-black", past: "bg-yellow-100 text-yellow-800" },
-  { short: "Gestante", full: "Gestante", active: "bg-green-500 text-white", past: "bg-green-100 text-green-700" },
-  { short: "Imminent", full: "Vêlage imminent", active: VELAGE_IMMINENT_COLORS.badge, past: `${VELAGE_IMMINENT_COLORS.surface} ${VELAGE_IMMINENT_COLORS.text}` },
-  { short: "Repos", full: "Repos post-vêlage", active: "bg-sky-500 text-white", past: "bg-sky-100 text-sky-700" },
-  { short: "Retard ↻", full: "Retard ↻", active: "bg-red-500 text-white", past: "bg-red-100 text-red-700" },
-] as const;
+interface Segment {
+  id: string;
+  days: number;
+  active: string;
+  past: string;
+  current?: boolean;
+  marker?: "Vêlage" | "Saillie / IA" | "Échographie";
+  striped?: boolean;
+}
 
-function cyclePosition(status: EtatGestation | null, daysSinceBreeding: number | null, isPostCalvingDelay: boolean) {
-  if (isPostCalvingDelay) return 6;
-  if (status === "REPOS") return 5;
-  if (status === "ROSE") return 4;
-  if (status === "VERT") return 3;
-  if (status === "JAUNE") return 2;
-  if (status === "GRIS") return daysSinceBreeding !== null && daysSinceBreeding <= 0 ? 0 : 1;
-  if (status === "ROUGE") return 0;
-  return -1;
+const OPEN_CYCLE_SCALE_DAYS = 365;
+
+function elapsedDays(from: Date, to: Date) {
+  return Math.max(0, differenceInCalendarDays(to, from));
+}
+
+function addSegment(segments: Segment[], segment: Segment) {
+  if (segment.days > 0) segments.push(segment);
 }
 
 export default function ReproductiveCycleTimeline({
@@ -41,69 +43,182 @@ export default function ReproductiveCycleTimeline({
   breedingDate,
   breedingType,
   dueDate,
+  echoDate,
+  echoResult,
   lastCalvingDate,
+  statusModifiedAt,
 }: Props) {
   const today = new Date();
-  const daysSinceBreeding = breedingDate ? Math.max(0, differenceInCalendarDays(today, breedingDate)) : null;
-  const daysSinceCalving = lastCalvingDate ? Math.max(0, differenceInCalendarDays(today, lastCalvingDate)) : null;
+  const segments: Segment[] = [];
+  const daysSinceBreeding = breedingDate ? elapsedDays(breedingDate, today) : null;
+  const daysSinceCalving = lastCalvingDate ? elapsedDays(lastCalvingDate, today) : null;
   const calvingIsLatest = Boolean(lastCalvingDate && (!breedingDate || lastCalvingDate > breedingDate));
   const isPostCalvingDelay = status === "ROUGE" && calvingIsLatest && daysSinceCalving !== null && daysSinceCalving > POST_CALVING_REST_DAYS;
-  const activeStage = cyclePosition(status, daysSinceBreeding, isPostCalvingDelay);
+  const isEmptyAfterEcho = status === "ROUGE" && !calvingIsLatest && (echoResult === "VIDE" || Boolean(echoDate));
   const gestation = status === "VERT" || status === "ROSE" ? getGestationProgress(breedingDate, dueDate, today) : null;
-
   let summary = "Cycle reproductif à renseigner";
-  if (isPostCalvingDelay && daysSinceCalving !== null) {
-    summary = `Retard de remise à la reproduction · ${daysSinceCalving - POST_CALVING_REST_DAYS} jours`;
-  } else if (status === "REPOS" && daysSinceCalving !== null) {
-    summary = `Repos post-vêlage · ${daysSinceCalving} ${daysSinceCalving === 1 ? "jour" : "jours"}`;
-  } else if (status === "ROSE" && gestation) {
-    summary = gestation.remainingDays < 0
-      ? `Terme dépassé de ${Math.abs(gestation.remainingDays)} ${Math.abs(gestation.remainingDays) === 1 ? "jour" : "jours"}`
-      : `Vêlage imminent · J-${gestation.remainingDays}`;
-  } else if (status === "VERT" && gestation) {
-    const elapsed = formatGestationElapsed(gestation.elapsedDays);
-    summary = `Gestante · ${elapsed}${gestation.remainingDays >= 0 && gestation.remainingDays <= 60 ? ` · J-${gestation.remainingDays}` : ""}`;
-  } else if (status === "JAUNE" && daysSinceBreeding !== null) {
-    const waitingDays = Math.max(0, daysSinceBreeding - ECHOGRAPHY_WAIT_DAYS);
-    summary = `À échographier depuis ${waitingDays} ${waitingDays === 1 ? "jour" : "jours"}`;
-  } else if (status === "GRIS" && daysSinceBreeding !== null) {
-    const typeLabel = breedingType === "IA" ? "IA" : "Saillie naturelle";
-    summary = `${typeLabel} il y a ${daysSinceBreeding} ${daysSinceBreeding === 1 ? "jour" : "jours"}`;
+  let horizonDays = OPEN_CYCLE_SCALE_DAYS;
+
+  if ((status === "REPOS" || isPostCalvingDelay) && lastCalvingDate && daysSinceCalving !== null) {
+    const restDays = Math.min(daysSinceCalving, POST_CALVING_REST_DAYS);
+    addSegment(segments, {
+      id: "repos",
+      days: restDays || 1,
+      active: "bg-sky-500",
+      past: "bg-sky-200",
+      current: status === "REPOS",
+      marker: "Vêlage",
+    });
+
+    if (isPostCalvingDelay) {
+      const delayDays = daysSinceCalving - POST_CALVING_REST_DAYS;
+      addSegment(segments, {
+        id: "retard",
+        days: delayDays,
+        active: "bg-red-500",
+        past: "bg-red-200",
+        current: true,
+        striped: true,
+      });
+      summary = `En retard depuis ${delayDays} ${delayDays === 1 ? "jour" : "jours"}`;
+    } else {
+      summary = `Repos post-vêlage · ${daysSinceCalving} ${daysSinceCalving === 1 ? "jour" : "jours"}`;
+    }
+  } else if (breedingDate && daysSinceBreeding !== null) {
+    const expectedEchoDate = addDays(breedingDate, ECHOGRAPHY_WAIT_DAYS);
+    const effectiveEchoDate = echoDate && echoDate >= breedingDate ? echoDate : null;
+    const waitingEnd = effectiveEchoDate && effectiveEchoDate < expectedEchoDate ? effectiveEchoDate : expectedEchoDate;
+    const waitingDays = elapsedDays(breedingDate, waitingEnd > today ? today : waitingEnd);
+    addSegment(segments, {
+      id: "attente",
+      days: waitingDays || (daysSinceBreeding === 0 ? 1 : 0),
+      active: "bg-slate-500",
+      past: "bg-slate-200",
+      current: status === "GRIS",
+      marker: "Saillie / IA",
+    });
+
+    const echoWaitingEnd = effectiveEchoDate ?? today;
+    const echoWaitingDays = echoWaitingEnd > expectedEchoDate ? elapsedDays(expectedEchoDate, echoWaitingEnd) : 0;
+    addSegment(segments, {
+      id: "echo-wait",
+      days: echoWaitingDays || (status === "JAUNE" ? 1 : 0),
+      active: "bg-yellow-400",
+      past: "bg-yellow-100",
+      current: status === "JAUNE",
+    });
+
+    if (isEmptyAfterEcho) {
+      const emptySince = effectiveEchoDate ?? statusModifiedAt ?? breedingDate;
+      const availableDays = elapsedDays(emptySince, today);
+      addSegment(segments, {
+        id: "a-remettre",
+        days: availableDays || 1,
+        active: "bg-fuchsia-500",
+        past: "bg-fuchsia-100",
+        current: true,
+        marker: effectiveEchoDate ? "Échographie" : undefined,
+      });
+      summary = `À remettre à la reproduction depuis ${availableDays} ${availableDays === 1 ? "jour" : "jours"}`;
+    } else if ((status === "VERT" || status === "ROSE") && gestation) {
+      const confirmedAt = effectiveEchoDate ?? expectedEchoDate;
+      const calculatedDueDate = dueDate ?? addDays(breedingDate, GESTATION_REFERENCE_DAYS);
+      const imminentAt = subDays(calculatedDueDate, VELAGE_IMMINENT_DAYS);
+      const gestationEnd = today < imminentAt ? today : imminentAt;
+      addSegment(segments, {
+        id: "gestante",
+        days: Math.max(status === "VERT" ? 1 : 0, elapsedDays(confirmedAt, gestationEnd)),
+        active: "bg-green-500",
+        past: "bg-green-200",
+        current: status === "VERT",
+        marker: "Échographie",
+      });
+
+      if (status === "ROSE") {
+        const imminentEnd = today < calculatedDueDate ? today : calculatedDueDate;
+        addSegment(segments, {
+          id: "imminent",
+          days: Math.max(1, elapsedDays(imminentAt, imminentEnd)),
+          active: "bg-orange-500",
+          past: "bg-orange-200",
+          current: gestation.remainingDays >= 0,
+        });
+        if (gestation.remainingDays < 0) {
+          addSegment(segments, {
+            id: "terme-depasse",
+            days: Math.abs(gestation.remainingDays),
+            active: "bg-red-500",
+            past: "bg-red-200",
+            current: true,
+            striped: true,
+          });
+        }
+      }
+
+      horizonDays = Math.max(1, elapsedDays(breedingDate, calculatedDueDate));
+      if (status === "ROSE") {
+        summary = gestation.remainingDays < 0
+          ? `Terme dépassé de ${Math.abs(gestation.remainingDays)} ${Math.abs(gestation.remainingDays) === 1 ? "jour" : "jours"}`
+          : `Vêlage imminent · J-${gestation.remainingDays}`;
+      } else {
+        const elapsed = formatGestationElapsed(gestation.elapsedDays);
+        summary = `Gestante · ${elapsed}${gestation.remainingDays >= 0 && gestation.remainingDays <= 60 ? ` · J-${gestation.remainingDays}` : ""}`;
+      }
+    } else if (status === "JAUNE") {
+      const waitingForEchoDays = Math.max(0, daysSinceBreeding - ECHOGRAPHY_WAIT_DAYS);
+      summary = `À échographier depuis ${waitingForEchoDays} ${waitingForEchoDays === 1 ? "jour" : "jours"}`;
+    } else if (status === "GRIS") {
+      const typeLabel = breedingType === "IA" ? "IA" : "Saillie naturelle";
+      summary = daysSinceBreeding === 0
+        ? `${typeLabel} aujourd’hui`
+        : `${typeLabel} il y a ${daysSinceBreeding} ${daysSinceBreeding === 1 ? "jour" : "jours"}`;
+    } else if (status === "ROUGE") {
+      const availableSince = statusModifiedAt ?? breedingDate;
+      const availableDays = elapsedDays(availableSince, today);
+      addSegment(segments, {
+        id: "a-remettre",
+        days: availableDays || 1,
+        active: "bg-fuchsia-500",
+        past: "bg-fuchsia-100",
+        current: true,
+      });
+      summary = `À remettre à la reproduction depuis ${availableDays} ${availableDays === 1 ? "jour" : "jours"}`;
+    }
   } else if (status === "ROUGE") {
-    summary = "En attente d’une nouvelle saillie / IA";
+    summary = "À remettre à la reproduction";
   }
+
+  const trackedDays = segments.reduce((total, segment) => total + segment.days, 0);
+  const scaleDays = Math.max(horizonDays, trackedDays);
+  const futureDays = Math.max(0, scaleDays - trackedDays);
 
   return (
     <div className="mt-2 w-full" aria-label={`Cycle reproductif : ${summary}`}>
-      <div className="grid grid-cols-7 gap-0.5" role="list" aria-label="Étapes du cycle reproductif">
-        {STAGES.map((stage, index) => {
-          const isActive = index === activeStage;
-          const isPast = activeStage > 0 && index < activeStage;
-          const classes = isActive ? stage.active : isPast ? stage.past : "bg-gray-100 text-gray-400";
-          const showGestationFill = index === 3 && isActive && gestation;
-
-          return (
-            <div
-              key={stage.full}
-              role="listitem"
-              aria-current={isActive ? "step" : undefined}
-              title={stage.full}
-              className={`relative flex min-h-8 min-w-0 items-center justify-center overflow-hidden rounded-md px-0.5 text-center text-[9px] font-semibold leading-tight sm:min-h-9 sm:px-1 sm:text-[10px] ${classes}`}
-            >
-              {showGestationFill && (
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-y-0 left-0 bg-green-700/35"
-                  style={{ width: `${gestation.percentage}%` }}
-                />
-              )}
-              <span className="relative z-[1] sm:hidden">{stage.short}</span>
-              <span className="relative z-[1] hidden sm:inline">{stage.full}</span>
-            </div>
-          );
-        })}
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-gray-100" role="img" aria-label={summary}>
+        {segments.map((segment) => (
+          <span
+            key={segment.id}
+            title={segment.marker ? `${segment.marker} · ${segment.days} jours` : `${segment.days} jours`}
+            className={`relative min-w-0 ${segment.current ? segment.active : segment.past}`}
+            style={{
+              flexGrow: segment.days,
+              flexBasis: 0,
+              backgroundImage: segment.striped
+                ? "repeating-linear-gradient(135deg, transparent 0, transparent 4px, rgba(255,255,255,.35) 4px, rgba(255,255,255,.35) 7px)"
+                : undefined,
+            }}
+          >
+            {segment.marker && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-0 left-0 w-0.5 bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.12)]"
+              />
+            )}
+          </span>
+        ))}
+        {futureDays > 0 && <span className="bg-gray-100" style={{ flexGrow: futureDays, flexBasis: 0 }} />}
       </div>
-      <p className={`mt-1.5 text-xs font-semibold ${activeStage === 6 || (status === "ROSE" && gestation && gestation.remainingDays < 0) ? "text-red-700" : activeStage === 4 ? VELAGE_IMMINENT_COLORS.text : "text-gray-700"}`}>
+      <p className={`mt-1.5 text-xs font-semibold ${summary.startsWith("En retard") || summary.startsWith("Terme dépassé") ? "text-red-700" : "text-gray-700"}`}>
         {summary}
       </p>
     </div>
