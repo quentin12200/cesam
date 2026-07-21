@@ -46,7 +46,7 @@ interface EventItem {
 }
 
 const OPEN_CYCLE_SCALE_DAYS = 365;
-const RING_RADIUS = 82;
+const RING_RADIUS = 92;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const STAGE_COLORS = {
   service: "#d946ef",
@@ -326,13 +326,15 @@ export default function ReproductiveCycleTimeline({
       : status === "REPOS" ? "rest"
       : "delay";
 
+  // Ordre horaire identique à la maquette : jaune en haut, puis vert,
+  // orange, bleu, rouge et enfin gris sur la partie supérieure gauche.
   const canonicalStages = [
-    { id: "waiting", label: "Après saillie / IA", duration: `${ECHOGRAPHY_WAIT_DAYS} j`, color: STAGE_COLORS.waiting, share: 0.22 },
-    { id: "scan", label: "À échographier", duration: "7 j", color: STAGE_COLORS.scan, share: 0.06 },
-    { id: "pregnant", label: "Gestante", duration: "~200 j", color: STAGE_COLORS.pregnant, share: 0.36 },
-    { id: "imminent", label: "Vêlage imminent", duration: `${VELAGE_IMMINENT_DAYS} j`, color: STAGE_COLORS.imminent, share: 0.09 },
-    { id: "rest", label: "Repos", duration: `${POST_CALVING_REST_DAYS} j`, color: STAGE_COLORS.rest, share: 0.18 },
-    { id: "delay", label: "Retard", duration: "Variable", color: STAGE_COLORS.delay, share: 0.09 },
+    { id: "scan", label: "À échographier", duration: "7 j", color: STAGE_COLORS.scan, share: 0.05 },
+    { id: "pregnant", label: "Gestante", duration: "~200 j", color: STAGE_COLORS.pregnant, share: 0.31 },
+    { id: "imminent", label: "Vêlage imminent", duration: `${VELAGE_IMMINENT_DAYS} j`, color: STAGE_COLORS.imminent, share: 0.10 },
+    { id: "rest", label: "Repos", duration: `${POST_CALVING_REST_DAYS} j`, color: STAGE_COLORS.rest, share: 0.19 },
+    { id: "delay", label: "Retard", duration: "Variable", color: STAGE_COLORS.delay, share: 0.10 },
+    { id: "waiting", label: "Après saillie / IA", duration: `${ECHOGRAPHY_WAIT_DAYS} j`, color: STAGE_COLORS.waiting, share: 0.25 },
   ];
 
   let canonicalOffset = 0;
@@ -368,7 +370,7 @@ export default function ReproductiveCycleTimeline({
       <div className="px-3 py-4 sm:px-5">
         {view === "cycle" && (
           <div className="mx-auto max-w-[660px]">
-            <div className="relative mx-auto aspect-square w-full max-w-[330px] sm:max-w-[430px]">
+            <div className="relative mx-auto aspect-square w-full max-w-[390px] sm:max-w-[500px]">
               <svg
                 viewBox="0 0 240 240"
                 className="-rotate-90 h-full w-full overflow-visible"
@@ -378,7 +380,7 @@ export default function ReproductiveCycleTimeline({
                 <circle
                   cx="120"
                   cy="120"
-                  r="102"
+                  r="108"
                   fill="none"
                   stroke="#e2e8f0"
                   strokeDasharray="2 5"
@@ -396,7 +398,7 @@ export default function ReproductiveCycleTimeline({
                         fill="none"
                         stroke={stage.color}
                         strokeOpacity={selected ? 1 : 0.72}
-                        strokeWidth={selected ? 15 : 11}
+                        strokeWidth={selected ? 17 : 13}
                         strokeLinecap="round"
                         strokeDasharray={`${stage.length} ${RING_CIRCUMFERENCE - stage.length}`}
                         strokeDashoffset={-stage.offset}
@@ -409,27 +411,27 @@ export default function ReproductiveCycleTimeline({
                 </g>
               </svg>
 
-              <div className="absolute left-1/2 top-[2%] w-32 -translate-x-1/2 text-center">
+              <div className="absolute left-1/2 top-[-1%] w-32 -translate-x-1/2 text-center">
                 <span className="text-[10px] font-bold leading-tight text-amber-500 sm:text-xs">À échographier</span>
                 <span className="block text-[10px] text-slate-500 sm:text-xs">7 j</span>
               </div>
-              <div className="absolute left-[-2%] top-[25%] w-28 text-center sm:left-[-11%] sm:w-36">
+              <div className="absolute left-[-1%] top-[23%] w-28 text-center sm:left-[-8%] sm:w-36">
                 <span className="text-[10px] font-semibold leading-tight text-slate-500 sm:text-xs">Après saillie / IA</span>
                 <span className="block text-[10px] text-slate-500 sm:text-xs">{ECHOGRAPHY_WAIT_DAYS} j</span>
               </div>
-              <div className="absolute right-[-2%] top-[31%] w-24 text-center sm:right-[-12%] sm:w-32">
+              <div className="absolute right-[-1%] top-[30%] w-24 text-center sm:right-[-8%] sm:w-32">
                 <span className="text-[10px] font-bold text-green-600 sm:text-xs">Gestante</span>
                 <span className="block text-[10px] text-slate-500 sm:text-xs">~200 j</span>
               </div>
-              <div className="absolute bottom-[19%] right-[-3%] w-28 text-center sm:right-[-14%] sm:w-36">
+              <div className="absolute bottom-[18%] right-[-1%] w-28 text-center sm:right-[-9%] sm:w-36">
                 <span className="text-[10px] font-bold leading-tight text-orange-500 sm:text-xs">Vêlage imminent</span>
                 <span className="block text-[10px] text-slate-500 sm:text-xs">{VELAGE_IMMINENT_DAYS} j</span>
               </div>
-              <div className="absolute bottom-[1%] left-1/2 w-24 -translate-x-1/2 text-center">
+              <div className="absolute bottom-[-1%] left-1/2 w-24 -translate-x-1/2 text-center">
                 <span className="text-[10px] font-bold text-sky-600 sm:text-xs">Repos</span>
                 <span className="block text-[10px] text-slate-500 sm:text-xs">{POST_CALVING_REST_DAYS} j</span>
               </div>
-              <div className="absolute bottom-[20%] left-[-2%] w-24 text-center sm:left-[-11%] sm:w-32">
+              <div className="absolute bottom-[18%] left-[-1%] w-24 text-center sm:left-[-8%] sm:w-32">
                 <span className="text-[10px] font-bold text-red-500 sm:text-xs">Retard</span>
                 <span className="block text-[10px] text-slate-500 sm:text-xs">Variable</span>
               </div>
