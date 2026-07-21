@@ -326,6 +326,27 @@ export default function ReproductiveCycleTimeline({
       : status === "REPOS" ? "rest"
       : "delay";
 
+  const today = new Date();
+  const projectedCalvingDate =
+    dueDate ?? (breedingDate ? addDays(breedingDate, GESTATION_REFERENCE_DAYS) : null);
+  const knownCycleEnd =
+    projectedCalvingDate && projectedCalvingDate > today ? projectedCalvingDate : today;
+  const measuredCycleDays =
+    lastCalvingDate && knownCycleEnd > lastCalvingDate
+      ? elapsedDays(lastCalvingDate, knownCycleEnd)
+      : 365;
+  const cycleDays = Math.max(365, measuredCycleDays);
+  const lapCount = Math.max(1, Math.ceil(cycleDays / 365));
+  const extraLaps = Array.from({ length: Math.min(3, lapCount - 1) }, (_, index) => {
+    const days = Math.min(365, Math.max(0, cycleDays - 365 * (index + 1)));
+    return {
+      index,
+      days,
+      radius: 101 + index * 7,
+      circumference: 2 * Math.PI * (101 + index * 7),
+    };
+  });
+
   // Ordre horaire identique à la maquette : jaune en haut, puis vert,
   // orange, bleu, rouge et enfin gris sur la partie supérieure gauche.
   const canonicalStages = [
@@ -340,7 +361,8 @@ export default function ReproductiveCycleTimeline({
   let canonicalOffset = 0;
   const canonicalRing = canonicalStages.map((stage) => {
     const slot = stage.share * RING_CIRCUMFERENCE;
-    const gap = 7;
+    // Le vide compense les extrémités arrondies : les segments restent proches sans se chevaucher.
+    const gap = 19;
     const item = { ...stage, length: Math.max(1, slot - gap), offset: canonicalOffset };
     canonicalOffset += slot;
     return item;
@@ -387,6 +409,35 @@ export default function ReproductiveCycleTimeline({
                   strokeWidth="1.5"
                 />
                 <g transform="translate(20 20)">
+                  {extraLaps.map((lap) => {
+                    const visibleLength = (lap.days / 365) * lap.circumference;
+                    return (
+                      <g key={lap.index}>
+                        <circle
+                          cx="100"
+                          cy="100"
+                          r={lap.radius}
+                          fill="none"
+                          stroke="#e2e8f0"
+                          strokeWidth="3"
+                          strokeDasharray="2 5"
+                        />
+                        <circle
+                          cx="100"
+                          cy="100"
+                          r={lap.radius}
+                          fill="none"
+                          stroke={activeStage === "delay" ? STAGE_COLORS.delay : "#047857"}
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          strokeDasharray={`${visibleLength} ${lap.circumference - visibleLength}`}
+                          opacity="0.8"
+                        >
+                          <title>Tour {lap.index + 2} · {lap.days} jours supplémentaires</title>
+                        </circle>
+                      </g>
+                    );
+                  })}
                   {canonicalRing.map((stage) => {
                     const selected = stage.id === activeStage;
                     return (
@@ -462,6 +513,17 @@ export default function ReproductiveCycleTimeline({
                   {model.secondary}
                 </span>
               </div>
+            </div>
+            <div className="mx-auto mt-1 flex w-fit flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-semibold text-slate-600 sm:text-xs">
+              <span>1 tour = 365 jours</span>
+              <span aria-hidden="true" className="text-slate-300">•</span>
+              <span>Cycle estimé : {cycleDays} jours</span>
+              {lapCount > 1 && (
+                <>
+                  <span aria-hidden="true" className="text-slate-300">•</span>
+                  <span className="text-emerald-700">{lapCount} tours</span>
+                </>
+              )}
             </div>
           </div>
         )}
