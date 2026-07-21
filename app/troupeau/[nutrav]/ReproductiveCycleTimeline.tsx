@@ -1,11 +1,20 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import { addDays, differenceInCalendarDays, subDays } from "date-fns";
+import { BarChart3, CalendarDays, List, RefreshCw } from "lucide-react";
 import {
   ECHOGRAPHY_WAIT_DAYS,
   POST_CALVING_REST_DAYS,
   VELAGE_IMMINENT_DAYS,
+  VELAGE_IMMINENT_COLORS,
   type EtatGestation,
 } from "@/lib/utils";
-import { GESTATION_REFERENCE_DAYS, formatGestationElapsed, getGestationProgress } from "@/lib/gestation-progress";
+import {
+  GESTATION_REFERENCE_DAYS,
+  formatGestationElapsed,
+  getGestationProgress,
+} from "@/lib/gestation-progress";
 
 interface Props {
   status: EtatGestation | null;
@@ -18,17 +27,37 @@ interface Props {
   statusModifiedAt: Date | null;
 }
 
+type View = "cycle" | "suivi" | "analyse";
+
 interface Segment {
   id: string;
+  label: string;
   days: number;
-  active: string;
-  past: string;
+  color: string;
   current?: boolean;
-  marker?: "Vêlage" | "Saillie / IA" | "Échographie";
   striped?: boolean;
+  detail?: string;
+}
+
+interface EventItem {
+  label: string;
+  date: Date;
+  color: string;
 }
 
 const OPEN_CYCLE_SCALE_DAYS = 365;
+const RING_RADIUS = 82;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const STAGE_COLORS = {
+  service: "#d946ef",
+  waiting: "#94a3b8",
+  scan: "#facc15",
+  pregnant: "#22c55e",
+  imminent: VELAGE_IMMINENT_COLORS.hex,
+  rest: "#38bdf8",
+  delay: "#ef4444",
+  future: "#f1f5f9",
+} as const;
 
 function elapsedDays(from: Date, to: Date) {
   return Math.max(0, differenceInCalendarDays(to, from));
@@ -36,6 +65,18 @@ function elapsedDays(from: Date, to: Date) {
 
 function addSegment(segments: Segment[], segment: Segment) {
   if (segment.days > 0) segments.push(segment);
+}
+
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function pluralDays(days: number) {
+  return `${days} ${days === 1 ? "jour" : "jours"}`;
 }
 
 export default function ReproductiveCycleTimeline({
@@ -48,179 +89,414 @@ export default function ReproductiveCycleTimeline({
   lastCalvingDate,
   statusModifiedAt,
 }: Props) {
-  const today = new Date();
-  const segments: Segment[] = [];
-  const daysSinceBreeding = breedingDate ? elapsedDays(breedingDate, today) : null;
-  const daysSinceCalving = lastCalvingDate ? elapsedDays(lastCalvingDate, today) : null;
-  const calvingIsLatest = Boolean(lastCalvingDate && (!breedingDate || lastCalvingDate > breedingDate));
-  const isPostCalvingDelay = status === "ROUGE" && calvingIsLatest && daysSinceCalving !== null && daysSinceCalving > POST_CALVING_REST_DAYS;
-  const isEmptyAfterEcho = status === "ROUGE" && !calvingIsLatest && (echoResult === "VIDE" || Boolean(echoDate));
-  const gestation = status === "VERT" || status === "ROSE" ? getGestationProgress(breedingDate, dueDate, today) : null;
-  let summary = "Cycle reproductif à renseigner";
-  let horizonDays = OPEN_CYCLE_SCALE_DAYS;
+  const [view, setView] = useState<View>("cycle");
 
-  if ((status === "REPOS" || isPostCalvingDelay) && lastCalvingDate && daysSinceCalving !== null) {
-    const restDays = Math.min(daysSinceCalving, POST_CALVING_REST_DAYS);
-    addSegment(segments, {
-      id: "repos",
-      days: restDays || 1,
-      active: "bg-sky-500",
-      past: "bg-sky-200",
-      current: status === "REPOS",
-      marker: "Vêlage",
-    });
+  const model = useMemo(() => {
+    const today = new Date();
+    const segments: Segment[] = [];
+    const events: EventItem[] = [];
+    const daysSinceBreeding = breedingDate ? elapsedDays(breedingDate, today) : null;
+    const daysSinceCalving = lastCalvingDate ? elapsedDays(lastCalvingDate, today) : null;
+    const calvingIsLatest = Boolean(lastCalvingDate && (!breedingDate || lastCalvingDate > breedingDate));
+    const isPostCalvingDelay =
+      status === "ROUGE" &&
+      calvingIsLatest &&
+      daysSinceCalving !== null &&
+      daysSinceCalving > POST_CALVING_REST_DAYS;
+    const isEmptyAfterEcho =
+      status === "ROUGE" &&
+      !calvingIsLatest &&
+      (echoResult === "VIDE" || Boolean(echoDate));
+    const gestation =
+      status === "VERT" || status === "ROSE"
+        ? getGestationProgress(breedingDate, dueDate, today)
+        : null;
 
-    if (isPostCalvingDelay) {
-      const delayDays = daysSinceCalving - POST_CALVING_REST_DAYS;
-      addSegment(segments, {
-        id: "retard",
-        days: delayDays,
-        active: "bg-red-500",
-        past: "bg-red-200",
-        current: true,
-        striped: true,
-      });
-      summary = `En retard depuis ${delayDays} ${delayDays === 1 ? "jour" : "jours"}`;
-    } else {
-      summary = `Repos post-vêlage · ${daysSinceCalving} ${daysSinceCalving === 1 ? "jour" : "jours"}`;
+    let title = "Cycle à renseigner";
+    let main = "Aucune étape connue";
+    let secondary = "Ajoutez un événement de reproduction pour démarrer le suivi.";
+    let tone = "text-slate-700";
+    let horizonDays = OPEN_CYCLE_SCALE_DAYS;
+
+    if (lastCalvingDate) {
+      events.push({ label: "Dernier vêlage", date: lastCalvingDate, color: STAGE_COLORS.rest });
     }
-  } else if (breedingDate && daysSinceBreeding !== null) {
-    const expectedEchoDate = addDays(breedingDate, ECHOGRAPHY_WAIT_DAYS);
-    const effectiveEchoDate = echoDate && echoDate >= breedingDate ? echoDate : null;
-    const waitingEnd = effectiveEchoDate && effectiveEchoDate < expectedEchoDate ? effectiveEchoDate : expectedEchoDate;
-    const waitingDays = elapsedDays(breedingDate, waitingEnd > today ? today : waitingEnd);
-    addSegment(segments, {
-      id: "attente",
-      days: waitingDays || (daysSinceBreeding === 0 ? 1 : 0),
-      active: "bg-slate-500",
-      past: "bg-slate-200",
-      current: status === "GRIS",
-      marker: "Saillie / IA",
-    });
-
-    const echoWaitingEnd = effectiveEchoDate ?? today;
-    const echoWaitingDays = echoWaitingEnd > expectedEchoDate ? elapsedDays(expectedEchoDate, echoWaitingEnd) : 0;
-    addSegment(segments, {
-      id: "echo-wait",
-      days: echoWaitingDays || (status === "JAUNE" ? 1 : 0),
-      active: "bg-yellow-400",
-      past: "bg-yellow-100",
-      current: status === "JAUNE",
-    });
-
-    if (isEmptyAfterEcho) {
-      const emptySince = effectiveEchoDate ?? statusModifiedAt ?? breedingDate;
-      const availableDays = elapsedDays(emptySince, today);
-      addSegment(segments, {
-        id: "a-remettre",
-        days: availableDays || 1,
-        active: "bg-fuchsia-500",
-        past: "bg-fuchsia-100",
-        current: true,
-        marker: effectiveEchoDate ? "Échographie" : undefined,
+    if (breedingDate) {
+      events.push({
+        label: breedingType === "IA" ? "Insémination artificielle" : "Saillie",
+        date: breedingDate,
+        color: STAGE_COLORS.service,
       });
-      summary = `À remettre à la reproduction depuis ${availableDays} ${availableDays === 1 ? "jour" : "jours"}`;
-    } else if ((status === "VERT" || status === "ROSE") && gestation) {
-      const confirmedAt = effectiveEchoDate ?? expectedEchoDate;
-      const calculatedDueDate = dueDate ?? addDays(breedingDate, GESTATION_REFERENCE_DAYS);
-      const imminentAt = subDays(calculatedDueDate, VELAGE_IMMINENT_DAYS);
-      const gestationEnd = today < imminentAt ? today : imminentAt;
+    }
+    if (echoDate) {
+      events.push({ label: "Échographie", date: echoDate, color: STAGE_COLORS.scan });
+    }
+    if (dueDate) {
+      events.push({ label: "Vêlage prévu", date: dueDate, color: STAGE_COLORS.imminent });
+    }
+
+    if ((status === "REPOS" || isPostCalvingDelay) && lastCalvingDate && daysSinceCalving !== null) {
+      const restDays = Math.min(daysSinceCalving, POST_CALVING_REST_DAYS);
       addSegment(segments, {
-        id: "gestante",
-        days: Math.max(status === "VERT" ? 1 : 0, elapsedDays(confirmedAt, gestationEnd)),
-        active: "bg-green-500",
-        past: "bg-green-200",
-        current: status === "VERT",
-        marker: "Échographie",
+        id: "repos",
+        label: "Repos post-vêlage",
+        days: restDays || 1,
+        color: STAGE_COLORS.rest,
+        current: status === "REPOS",
+        detail: `Depuis le ${formatDate(lastCalvingDate)}`,
       });
 
-      if (status === "ROSE") {
-        const imminentEnd = today < calculatedDueDate ? today : calculatedDueDate;
+      if (isPostCalvingDelay) {
+        const delayDays = daysSinceCalving - POST_CALVING_REST_DAYS;
         addSegment(segments, {
-          id: "imminent",
-          days: Math.max(1, elapsedDays(imminentAt, imminentEnd)),
-          active: "bg-orange-500",
-          past: "bg-orange-200",
-          current: gestation.remainingDays >= 0,
+          id: "retard",
+          label: "Retard",
+          days: delayDays,
+          color: STAGE_COLORS.delay,
+          current: true,
+          striped: true,
+          detail: `Remise à la reproduction attendue depuis ${pluralDays(delayDays)}`,
         });
-        if (gestation.remainingDays < 0) {
-          addSegment(segments, {
-            id: "terme-depasse",
-            days: Math.abs(gestation.remainingDays),
-            active: "bg-red-500",
-            past: "bg-red-200",
-            current: true,
-            striped: true,
-          });
-        }
-      }
-
-      horizonDays = Math.max(1, elapsedDays(breedingDate, calculatedDueDate));
-      if (status === "ROSE") {
-        summary = gestation.remainingDays < 0
-          ? `Terme dépassé de ${Math.abs(gestation.remainingDays)} ${Math.abs(gestation.remainingDays) === 1 ? "jour" : "jours"}`
-          : `Vêlage imminent · J-${gestation.remainingDays}`;
+        title = "Retard";
+        main = pluralDays(delayDays);
+        secondary = "Retard de remise à la reproduction";
+        tone = "text-red-700";
       } else {
-        const elapsed = formatGestationElapsed(gestation.elapsedDays);
-        summary = `Gestante · ${elapsed}${gestation.remainingDays >= 0 && gestation.remainingDays <= 60 ? ` · J-${gestation.remainingDays}` : ""}`;
+        title = "Repos post-vêlage";
+        main = pluralDays(daysSinceCalving);
+        secondary = `Vêlage le ${formatDate(lastCalvingDate)}`;
+        tone = "text-sky-700";
       }
-    } else if (status === "JAUNE") {
-      const waitingForEchoDays = Math.max(0, daysSinceBreeding - ECHOGRAPHY_WAIT_DAYS);
-      summary = `À échographier depuis ${waitingForEchoDays} ${waitingForEchoDays === 1 ? "jour" : "jours"}`;
-    } else if (status === "GRIS") {
-      const typeLabel = breedingType === "IA" ? "IA" : "Saillie naturelle";
-      summary = daysSinceBreeding === 0
-        ? `${typeLabel} aujourd’hui`
-        : `${typeLabel} il y a ${daysSinceBreeding} ${daysSinceBreeding === 1 ? "jour" : "jours"}`;
-    } else if (status === "ROUGE") {
-      const availableSince = statusModifiedAt ?? breedingDate;
-      const availableDays = elapsedDays(availableSince, today);
-      addSegment(segments, {
-        id: "a-remettre",
-        days: availableDays || 1,
-        active: "bg-fuchsia-500",
-        past: "bg-fuchsia-100",
-        current: true,
-      });
-      summary = `À remettre à la reproduction depuis ${availableDays} ${availableDays === 1 ? "jour" : "jours"}`;
-    }
-  } else if (status === "ROUGE") {
-    summary = "À remettre à la reproduction";
-  }
+    } else if (breedingDate && daysSinceBreeding !== null) {
+      const expectedEchoDate = addDays(breedingDate, ECHOGRAPHY_WAIT_DAYS);
+      const effectiveEchoDate = echoDate && echoDate >= breedingDate ? echoDate : null;
+      const waitingEnd =
+        effectiveEchoDate && effectiveEchoDate < expectedEchoDate ? effectiveEchoDate : expectedEchoDate;
+      const waitingDays = elapsedDays(breedingDate, waitingEnd > today ? today : waitingEnd);
 
-  const trackedDays = segments.reduce((total, segment) => total + segment.days, 0);
-  const scaleDays = Math.max(horizonDays, trackedDays);
-  const futureDays = Math.max(0, scaleDays - trackedDays);
+      addSegment(segments, {
+        id: "attente",
+        label: "Attente avant écho",
+        days: waitingDays || (daysSinceBreeding === 0 ? 1 : 0),
+        color: STAGE_COLORS.waiting,
+        current: status === "GRIS",
+        detail: `Échographie possible à partir du ${formatDate(expectedEchoDate)}`,
+      });
+
+      const echoWaitingEnd = effectiveEchoDate ?? today;
+      const echoWaitingDays =
+        echoWaitingEnd > expectedEchoDate ? elapsedDays(expectedEchoDate, echoWaitingEnd) : 0;
+      addSegment(segments, {
+        id: "echo-wait",
+        label: "À échographier",
+        days: echoWaitingDays || (status === "JAUNE" ? 1 : 0),
+        color: STAGE_COLORS.scan,
+        current: status === "JAUNE",
+        detail: `Échographie possible depuis le ${formatDate(expectedEchoDate)}`,
+      });
+
+      if (isEmptyAfterEcho) {
+        const emptySince = effectiveEchoDate ?? statusModifiedAt ?? breedingDate;
+        const availableDays = elapsedDays(emptySince, today);
+        addSegment(segments, {
+          id: "a-remettre",
+          label: "À remettre à la reproduction",
+          days: availableDays || 1,
+          color: STAGE_COLORS.service,
+          current: true,
+          detail: `Disponible depuis le ${formatDate(emptySince)}`,
+        });
+        title = "À remettre à la reproduction";
+        main = `Depuis ${pluralDays(availableDays)}`;
+        secondary = effectiveEchoDate ? `Échographie le ${formatDate(effectiveEchoDate)}` : "Cycle ouvert";
+        tone = "text-fuchsia-700";
+      } else if ((status === "VERT" || status === "ROSE") && gestation) {
+        const confirmedAt = effectiveEchoDate ?? expectedEchoDate;
+        const calculatedDueDate = dueDate ?? addDays(breedingDate, GESTATION_REFERENCE_DAYS);
+        const imminentAt = subDays(calculatedDueDate, VELAGE_IMMINENT_DAYS);
+        const gestationEnd = today < imminentAt ? today : imminentAt;
+
+        addSegment(segments, {
+          id: "gestante",
+          label: "Gestante",
+          days: Math.max(status === "VERT" ? 1 : 0, elapsedDays(confirmedAt, gestationEnd)),
+          color: STAGE_COLORS.pregnant,
+          current: status === "VERT",
+          detail: `Vêlage prévu le ${formatDate(calculatedDueDate)}`,
+        });
+
+        if (status === "ROSE") {
+          const imminentEnd = today < calculatedDueDate ? today : calculatedDueDate;
+          addSegment(segments, {
+            id: "imminent",
+            label: "Vêlage imminent",
+            days: Math.max(1, elapsedDays(imminentAt, imminentEnd)),
+            color: STAGE_COLORS.imminent,
+            current: gestation.remainingDays >= 0,
+            detail: `Vêlage prévu le ${formatDate(calculatedDueDate)}`,
+          });
+          if (gestation.remainingDays < 0) {
+            addSegment(segments, {
+              id: "terme-depasse",
+              label: "Terme dépassé",
+              days: Math.abs(gestation.remainingDays),
+              color: STAGE_COLORS.delay,
+              current: true,
+              striped: true,
+            });
+          }
+        }
+
+        horizonDays = Math.max(1, elapsedDays(breedingDate, calculatedDueDate));
+        if (status === "ROSE") {
+          title = gestation.remainingDays < 0 ? "Terme dépassé" : "Vêlage imminent";
+          main =
+            gestation.remainingDays < 0
+              ? `De ${pluralDays(Math.abs(gestation.remainingDays))}`
+              : `J-${gestation.remainingDays}`;
+          secondary = `Vêlage prévu le ${formatDate(calculatedDueDate)}`;
+          tone = gestation.remainingDays < 0 ? "text-red-700" : "text-orange-700";
+        } else {
+          title = "Gestante";
+          main = formatGestationElapsed(gestation.elapsedDays);
+          secondary =
+            gestation.remainingDays >= 0 && gestation.remainingDays <= 60
+              ? `J-${gestation.remainingDays} · Vêlage le ${formatDate(calculatedDueDate)}`
+              : `Vêlage prévu le ${formatDate(calculatedDueDate)}`;
+          tone = "text-green-700";
+        }
+      } else if (status === "JAUNE") {
+        const waitingForEchoDays = Math.max(0, daysSinceBreeding - ECHOGRAPHY_WAIT_DAYS);
+        title = "À échographier";
+        main = waitingForEchoDays === 0 ? "Dès aujourd’hui" : `Depuis ${pluralDays(waitingForEchoDays)}`;
+        secondary = `Saillie / IA le ${formatDate(breedingDate)}`;
+        tone = "text-amber-700";
+      } else if (status === "GRIS") {
+        const remaining = Math.max(0, ECHOGRAPHY_WAIT_DAYS - daysSinceBreeding);
+        title = "Attente avant écho";
+        main = remaining === 0 ? "Échographie possible" : `Encore ${pluralDays(remaining)}`;
+        secondary = `${breedingType === "IA" ? "IA" : "Saillie"} le ${formatDate(breedingDate)}`;
+        tone = "text-slate-700";
+      } else if (status === "ROUGE") {
+        const availableSince = statusModifiedAt ?? breedingDate;
+        const availableDays = elapsedDays(availableSince, today);
+        addSegment(segments, {
+          id: "a-remettre",
+          label: "À remettre à la reproduction",
+          days: availableDays || 1,
+          color: STAGE_COLORS.service,
+          current: true,
+        });
+        title = "À remettre à la reproduction";
+        main = `Depuis ${pluralDays(availableDays)}`;
+        secondary = "Animal disponible";
+        tone = "text-fuchsia-700";
+      }
+    } else if (status === "ROUGE") {
+      title = "À remettre à la reproduction";
+      main = "Disponible";
+      secondary = "Aucune date de saillie enregistrée";
+      tone = "text-fuchsia-700";
+    }
+
+    const trackedDays = segments.reduce((total, segment) => total + segment.days, 0);
+    const scaleDays = Math.max(horizonDays, trackedDays, 1);
+    const futureDays = Math.max(0, scaleDays - trackedDays);
+
+    return {
+      segments,
+      events: events.sort((a, b) => b.date.getTime() - a.date.getTime()),
+      title,
+      main,
+      secondary,
+      tone,
+      scaleDays,
+      futureDays,
+      trackedDays,
+      gestation,
+    };
+  }, [status, breedingDate, breedingType, dueDate, echoDate, echoResult, lastCalvingDate, statusModifiedAt]);
+
+  let offset = 0;
+  const ringSegments = model.segments.map((segment) => {
+    const length = (segment.days / model.scaleDays) * RING_CIRCUMFERENCE;
+    const gap = Math.min(3, length * 0.18);
+    const item = { ...segment, length: Math.max(0, length - gap), offset };
+    offset += length;
+    return item;
+  });
+  const futureLength = (model.futureDays / model.scaleDays) * RING_CIRCUMFERENCE;
+
+  const nav = [
+    { id: "cycle" as const, label: "Cycle", icon: RefreshCw },
+    { id: "suivi" as const, label: "Suivi", icon: List },
+    { id: "analyse" as const, label: "Analyse", icon: BarChart3 },
+  ];
 
   return (
-    <div className="mt-2 w-full" aria-label={`Cycle reproductif : ${summary}`}>
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-gray-100" role="img" aria-label={summary}>
-        {segments.map((segment) => (
-          <span
-            key={segment.id}
-            title={segment.marker ? `${segment.marker} · ${segment.days} jours` : `${segment.days} jours`}
-            className={`relative min-w-0 ${segment.current ? segment.active : segment.past}`}
-            style={{
-              flexGrow: segment.days,
-              flexBasis: 0,
-              backgroundImage: segment.striped
-                ? "repeating-linear-gradient(135deg, transparent 0, transparent 4px, rgba(255,255,255,.35) 4px, rgba(255,255,255,.35) 7px)"
-                : undefined,
-            }}
-          >
-            {segment.marker && (
-              <span
-                aria-hidden="true"
-                className="absolute inset-y-0 left-0 w-0.5 bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.12)]"
-              />
-            )}
-          </span>
-        ))}
-        {futureDays > 0 && <span className="bg-gray-100" style={{ flexGrow: futureDays, flexBasis: 0 }} />}
+    <section
+      className="mt-3 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      aria-label={`Cycle reproductif : ${model.title}, ${model.main}`}
+    >
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Reproduction</p>
+          <h3 className="text-base font-bold text-slate-900">Cycle reproductif</h3>
+        </div>
+        <span className={`rounded-full bg-slate-50 px-2.5 py-1 text-xs font-bold ${model.tone}`}>
+          {model.title}
+        </span>
       </div>
-      <p className={`mt-1.5 text-xs font-semibold ${summary.startsWith("En retard") || summary.startsWith("Terme dépassé") ? "text-red-700" : "text-gray-700"}`}>
-        {summary}
-      </p>
-    </div>
+
+      <div className="px-3 py-4 sm:px-5">
+        {view === "cycle" && (
+          <div className="mx-auto grid max-w-xl items-center gap-4 sm:grid-cols-[minmax(260px,320px)_1fr]">
+            <div className="relative mx-auto aspect-square w-full max-w-[280px] sm:max-w-[320px]">
+              <svg viewBox="0 0 200 200" className="-rotate-90 h-full w-full" role="img" aria-label={`${model.title} : ${model.main}`}>
+                <circle cx="100" cy="100" r={RING_RADIUS} fill="none" stroke={STAGE_COLORS.future} strokeWidth="18" />
+                {futureLength > 0 && (
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r={RING_RADIUS}
+                    fill="none"
+                    stroke={STAGE_COLORS.future}
+                    strokeWidth="18"
+                    strokeDasharray={`${futureLength} ${RING_CIRCUMFERENCE - futureLength}`}
+                    strokeDashoffset={-offset}
+                  />
+                )}
+                {ringSegments.map((segment) => (
+                  <circle
+                    key={segment.id}
+                    cx="100"
+                    cy="100"
+                    r={RING_RADIUS}
+                    fill="none"
+                    stroke={segment.color}
+                    strokeOpacity={segment.current ? 1 : 0.38}
+                    strokeWidth={segment.current ? 24 : 18}
+                    strokeLinecap="round"
+                    strokeDasharray={`${segment.length} ${RING_CIRCUMFERENCE - segment.length}`}
+                    strokeDashoffset={-segment.offset}
+                    className="transition-all duration-300"
+                  >
+                    <title>{segment.label} · {pluralDays(segment.days)}</title>
+                  </circle>
+                ))}
+              </svg>
+              <div className="absolute inset-[23%] flex flex-col items-center justify-center rounded-full bg-white px-2 text-center shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
+                <span className={`text-[10px] font-extrabold uppercase tracking-[0.12em] sm:text-xs ${model.tone}`}>
+                  {model.title}
+                </span>
+                <strong className="mt-1 text-xl leading-tight text-slate-950 sm:text-2xl">{model.main}</strong>
+                <span className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-500 sm:text-xs">
+                  {model.secondary}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-1">
+              {model.segments.map((segment) => (
+                <div
+                  key={segment.id}
+                  className={`rounded-xl border px-3 py-2 ${segment.current ? "border-slate-300 bg-slate-50 shadow-sm" : "border-slate-100 bg-white"}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${segment.current ? "ring-4 ring-slate-100" : "opacity-50"}`}
+                      style={{ backgroundColor: segment.color }}
+                    />
+                    <p className="text-xs font-bold text-slate-800">{segment.label}</p>
+                  </div>
+                  <p className="mt-1 pl-[18px] text-[11px] text-slate-500">
+                    {segment.current ? segment.detail ?? pluralDays(segment.days) : "Étape passée"}
+                  </p>
+                </div>
+              ))}
+              {model.segments.length === 0 && (
+                <div className="col-span-2 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-500 sm:col-span-1">
+                  Le cycle apparaîtra dès qu’une donnée de reproduction sera disponible.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {view === "suivi" && (
+          <div className="mx-auto max-w-lg">
+            {model.events.length > 0 ? (
+              <ol className="space-y-1">
+                {model.events.map((event, index) => (
+                  <li key={`${event.label}-${event.date.toISOString()}`} className="grid grid-cols-[28px_1fr] gap-2">
+                    <div className="flex flex-col items-center">
+                      <span className="mt-3 h-3 w-3 rounded-full ring-4 ring-white" style={{ backgroundColor: event.color }} />
+                      {index < model.events.length - 1 && <span className="h-full w-px bg-slate-200" />}
+                    </div>
+                    <div className="mb-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
+                      <p className="text-sm font-bold text-slate-800">{event.label}</p>
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                        <CalendarDays size={13} /> {formatDate(event.date)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                Aucun événement de reproduction enregistré.
+              </p>
+            )}
+          </div>
+        )}
+
+        {view === "analyse" && (
+          <div className="mx-auto max-w-lg">
+            {model.gestation ? (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Avancement estimé</p>
+                    <p className="mt-1 text-lg font-extrabold text-slate-900">{formatGestationElapsed(model.gestation.elapsedDays)}</p>
+                  </div>
+                  <p className="text-sm font-bold text-green-700">
+                    {Math.round(model.gestation.progress * 100)} %
+                  </p>
+                </div>
+                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
+                  <div
+                    className="h-full rounded-full bg-green-500"
+                    style={{ width: `${Math.min(100, Math.max(0, model.gestation.progress * 100))}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                Aucun indicateur existant n’est disponible pour ce cycle.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <nav className="grid grid-cols-3 border-t border-slate-100 bg-slate-50/80 p-1.5" aria-label="Vues du cycle reproductif">
+        {nav.map((item) => {
+          const Icon = item.icon;
+          const selected = view === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setView(item.id)}
+              aria-pressed={selected}
+              className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-bold transition ${selected ? "bg-white text-green-700 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-800"}`}
+            >
+              <Icon size={16} />
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+    </section>
   );
 }
