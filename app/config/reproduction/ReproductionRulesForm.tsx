@@ -4,12 +4,20 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, Plus, RotateCcw, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import {
   CESAM_REPRODUCTION_RULES,
+  EVENT_FIELD_CATALOG,
   REPRODUCTION_COLOR_PALETTE,
+  describeActionWindow,
+  describePhaseRule,
   validateReproductionRules,
   type AnimalCategory,
   type ExistingReproductionAction,
   type ReproductionActionWindow,
   type ReproductionEventRule,
+  type ReproductionEventField,
+  type EventFieldKey,
+  type PhaseEndType,
+  type PhaseStartCondition,
+  type ReproductionPosition,
   type ReproductionPhaseRule,
   type ReproductionPriority,
   type ReproductionReference,
@@ -21,10 +29,11 @@ const PRIORITIES: Array<[ReproductionPriority, string]> = [["LOW", "Faible"], ["
 const ACTIONS: Array<[ExistingReproductionAction, string]> = [
   ["NONE", "Aucune"], ["RECORD_BREEDING", "Enregistrer saillie / IA"], ["RECORD_ECHO", "Saisir l’écho"],
   ["VIEW_FOLLOW_UP", "Voir le suivi"], ["PREPARE_CALVING", "Préparer le vêlage"], ["RECORD_CALVING", "Enregistrer le vêlage"], ["RECORD_HEALTH_EVENT", "Événement sanitaire"],
+  ["RECORD_MEDICATION", "Médicament"], ["RECORD_VACCINE", "Vaccin"], ["RECORD_TREATMENT", "Traitement"],
 ];
 const REFERENCES: Array<[ReproductionReference, string]> = [
   ["CALVING", "Vêlage"], ["BREEDING", "Saillie / IA"], ["POSITIVE_ECHO", "Échographie positive"],
-  ["EXPECTED_CALVING", "Vêlage prévu"], ["BIRTH", "Naissance"], ["CUSTOM_DATE", "Date personnalisée"],
+  ["NEGATIVE_ECHO", "Échographie négative"], ["ANY_ECHO", "Échographie positive ou négative"], ["EXPECTED_CALVING", "Vêlage prévu"], ["BIRTH", "Naissance"], ["CUSTOM_DATE", "Date personnalisée"],
 ];
 const UNITS: Array<[ReproductionUnit, string]> = [["DAYS", "jours"], ["WEEKS", "semaines"], ["MONTHS", "mois"]];
 const CATEGORIES: Array<[AnimalCategory, string]> = [["ALL", "Toutes"], ["COW", "Vaches"], ["HEIFER", "Génisses"]];
@@ -64,6 +73,15 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
     setConfig((current) => ({ ...current, phases: current.phases.map((phase) => phase.id === id ? { ...phase, ...patch } : phase) }));
   }
 
+  function primaryValue(phase: ReproductionPhaseRule) {
+    return phase.endRule.type === "AFTER_DURATION" ? phase.endRule.duration ?? 0 : phase.startRule.offset;
+  }
+
+  function updatePrimaryValue(phase: ReproductionPhaseRule, value: number) {
+    if (phase.endRule.type === "AFTER_DURATION") updatePhase(phase.id, { endRule: { ...phase.endRule, duration: value } });
+    else updatePhase(phase.id, { startRule: { ...phase.startRule, offset: value } });
+  }
+
   async function save() {
     if (validation.errors.length > 0) { setMessage(validation.errors[0]); return; }
     setSaving(true); setMessage("");
@@ -87,12 +105,34 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
   }
 
   function addEvent() {
-    const event: ReproductionEventRule = { id: crypto.randomUUID(), fundamental: false, name: "Nouvel événement", icon: "calendar", color: "gray", fields: ["date", "observation"], showOnCycle: false, createsReminder: false };
+    const event: ReproductionEventRule = { id: crypto.randomUUID(), fundamental: false, name: "Nouvel événement", icon: "calendar", color: "gray", fields: [], showOnCycle: false, createsReminder: false, action: "NONE" };
     setConfig((current) => ({ ...current, events: [...current.events, event] }));
   }
 
   function updateEvent(id: string, patch: Partial<ReproductionEventRule>) {
     setConfig((current) => ({ ...current, events: current.events.map((item) => item.id === id ? { ...item, ...patch } : item) }));
+  }
+
+  function addEventField(eventId: string, key: EventFieldKey) {
+    const definition = EVENT_FIELD_CATALOG.find((item) => item.key === key);
+    if (!definition) return;
+    const newField: ReproductionEventField = { id: crypto.randomUUID(), key, label: definition.label, dataType: definition.dataType, required: false, locked: false, order: 999 };
+    setConfig((current) => ({ ...current, events: current.events.map((event) => event.id === eventId ? (key !== "CUSTOM" && event.fields.some((field) => field.key === key) ? event : { ...event, fields: [...event.fields, newField].map((field, order) => ({ ...field, order })) }) : event) }));
+  }
+
+  function updateEventField(eventId: string, fieldId: string, patch: Partial<ReproductionEventField>) {
+    setConfig((current) => ({ ...current, events: current.events.map((event) => event.id === eventId ? { ...event, fields: event.fields.map((field) => field.id === fieldId ? { ...field, ...patch } : field) } : event) }));
+  }
+
+  function moveEventField(eventId: string, fieldId: string, direction: -1 | 1) {
+    setConfig((current) => ({ ...current, events: current.events.map((event) => {
+      if (event.id !== eventId) return event;
+      const fields = [...event.fields].sort((left, right) => left.order - right.order);
+      const index = fields.findIndex((field) => field.id === fieldId); const target = index + direction;
+      if (index < 0 || target < 0 || target >= fields.length) return event;
+      [fields[index], fields[target]] = [fields[target], fields[index]];
+      return { ...event, fields: fields.map((field, order) => ({ ...field, order })) };
+    }) }));
   }
 
   return (
@@ -104,17 +144,24 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
         <div className="mt-3 space-y-2">
           {config.phases.map((phase) => (
             <details key={phase.id} className="group rounded-xl border border-slate-200 bg-white open:bg-slate-50">
-              <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-3">
-                <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: REPRODUCTION_COLOR_PALETTE[phase.color].value }} />
-                <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-800">{phase.displayedName}</span>
-                <span className="text-xs font-semibold text-slate-400">{phase.start}{phase.end === null ? "+" : `–${phase.end}`} j</span><ChevronDown size={16} className="text-slate-400 group-open:rotate-180" />
+              <summary className="min-h-12 cursor-pointer list-none px-3 py-2.5">
+                <span className="flex items-center gap-3"><span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: REPRODUCTION_COLOR_PALETTE[phase.color].value }} /><span className="min-w-0 flex-1 text-sm font-bold text-slate-800">{phase.displayedName}</span><ChevronDown size={16} className="shrink-0 text-slate-400 group-open:rotate-180" /></span>
+                <span className="mt-1 block pl-7 text-xs leading-relaxed text-slate-500">{describePhaseRule(phase, config.phases)}</span>
               </summary>
               <div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2">
-                {advanced && <label className="text-xs font-semibold text-slate-500">Nom affiché<input value={phase.displayedName} onChange={(event) => updatePhase(phase.id, { displayedName: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-900" /></label>}
+                <label className="text-xs font-semibold text-slate-500">Nom affiché<input value={phase.displayedName} onChange={(event) => updatePhase(phase.id, { displayedName: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-900" /></label>
                 <label className="text-xs font-semibold text-slate-500">Couleur<select value={phase.color} onChange={(event) => updatePhase(phase.id, { color: event.target.value as ReproductionPhaseRule["color"] })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-900">{Object.entries(REPRODUCTION_COLOR_PALETTE).map(([key, color]) => <option key={key} value={key}>{color.label}</option>)}</select></label>
-                <label className="text-xs font-semibold text-slate-500">Début<input type="number" min={0} value={phase.start} onChange={(event) => updatePhase(phase.id, { start: Number(event.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
-                <label className="text-xs font-semibold text-slate-500">Fin éventuelle<input type="number" min={0} value={phase.end ?? ""} onChange={(event) => updatePhase(phase.id, { end: event.target.value === "" ? null : Number(event.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" placeholder="Sans fin" /></label>
+                <label className="text-xs font-semibold text-slate-500">Durée ou seuil principal<input type="number" min={0} value={primaryValue(phase)} onChange={(event) => updatePrimaryValue(phase, Number(event.target.value))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
+                <label className="text-xs font-semibold text-slate-500">Unité<select value={phase.endRule.type === "AFTER_DURATION" ? phase.endRule.unit ?? "DAYS" : phase.startRule.unit} onChange={(event) => phase.endRule.type === "AFTER_DURATION" ? updatePhase(phase.id, { endRule: { ...phase.endRule, unit: event.target.value as ReproductionUnit } }) : updatePhase(phase.id, { startRule: { ...phase.startRule, unit: event.target.value as ReproductionUnit } })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm">{UNITS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                 {advanced && <>
+                  <label className="text-xs font-semibold text-slate-500">Référence de départ<select value={phase.startRule.reference} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, reference: event.target.value as ReproductionReference } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm">{REFERENCES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                  <label className="text-xs font-semibold text-slate-500">Position<select value={phase.startRule.position} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, position: event.target.value as ReproductionPosition } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"><option value="AT">Au moment de</option><option value="AFTER">Après</option><option value="BEFORE">Avant</option></select></label>
+                  <label className="text-xs font-semibold text-slate-500">Décalage<input type="number" min={0} value={phase.startRule.offset} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, offset: Number(event.target.value) } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm" /></label>
+                  <label className="text-xs font-semibold text-slate-500">Condition de départ<select value={phase.startRule.condition} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, condition: event.target.value as PhaseStartCondition } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"><option value="ALWAYS">Toujours</option><option value="IF_NO_BREEDING">Si aucune saillie / IA</option><option value="FERTILIZING_ATTEMPT">Tentative retenue comme fécondante</option></select></label>
+                  <label className="text-xs font-semibold text-slate-500">Condition de fin<select value={phase.endRule.type} onChange={(event) => updatePhase(phase.id, { endRule: { type: event.target.value as PhaseEndType, unit: "DAYS", duration: 0 } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"><option value="AFTER_DURATION">Après une durée</option><option value="AT_EVENT">À un événement</option><option value="AT_PHASE_START">Au début d’une autre phase</option><option value="UNTIL_EVENT">Jusqu’à un événement</option><option value="OPEN">Sans fin définie</option></select></label>
+                  {phase.endRule.type === "AFTER_DURATION" && <label className="text-xs font-semibold text-slate-500">Durée avant la fin<input type="number" min={0} value={phase.endRule.duration ?? 0} onChange={(event) => updatePhase(phase.id, { endRule: { ...phase.endRule, duration: Number(event.target.value) } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm" /></label>}
+                  {(phase.endRule.type === "AT_EVENT" || phase.endRule.type === "UNTIL_EVENT") && <label className="text-xs font-semibold text-slate-500">Événement de fin<select value={phase.endRule.event ?? "CALVING"} onChange={(event) => updatePhase(phase.id, { endRule: { ...phase.endRule, event: event.target.value as ReproductionReference } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm">{REFERENCES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
+                  {phase.endRule.type === "AT_PHASE_START" && <label className="text-xs font-semibold text-slate-500">Phase suivante<select value={phase.endRule.phaseId ?? ""} onChange={(event) => updatePhase(phase.id, { endRule: { ...phase.endRule, phaseId: event.target.value } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm">{config.phases.filter((item) => item.id !== phase.id).map((item) => <option key={item.id} value={item.id}>{item.displayedName}</option>)}</select></label>}
                   <label className="text-xs font-semibold text-slate-500 sm:col-span-2">Message principal<input value={phase.mainMessage} onChange={(event) => updatePhase(phase.id, { mainMessage: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
                   <label className="text-xs font-semibold text-slate-500">Priorité<select value={phase.priority} onChange={(event) => updatePhase(phase.id, { priority: event.target.value as ReproductionPriority })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm">{PRIORITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                   <label className="text-xs font-semibold text-slate-500">Action existante<select value={phase.action} onChange={(event) => updatePhase(phase.id, { action: event.target.value as ExistingReproductionAction })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm">{ACTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -142,7 +189,7 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
       {advanced && <>
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <SectionHeader title="Fenêtres d’action" summary={`${config.actionWindows.length} fenêtre${config.actionWindows.length > 1 ? "s" : ""}`} onRestore={() => restoreSection("actionWindows")} />
-          <div className="mt-3 space-y-3">{config.actionWindows.map((item) => <details key={item.id} className="rounded-xl border border-slate-200" open={!item.fundamental}><summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-3 text-sm font-bold text-slate-800"><span className="flex-1">{item.name}</span>{item.fundamental && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">Fondamentale</span>}<ChevronDown size={16} /></summary><div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2">
+          <div className="mt-3 space-y-3">{config.actionWindows.map((item) => <details key={item.id} className="rounded-xl border border-slate-200" open={!item.fundamental}><summary className="min-h-12 cursor-pointer list-none px-3 py-2.5"><span className="flex items-center gap-2 text-sm font-bold text-slate-800"><span className="flex-1">{item.name}</span>{item.fundamental && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">Fondamentale</span>}<ChevronDown size={16} /></span><span className="mt-1 block text-xs font-normal leading-relaxed text-slate-500">{describeActionWindow(item)}</span></summary><div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2">
             <label className="text-xs font-semibold text-slate-500">Nom<input value={item.name} onChange={(event) => updateWindow(item.id, { name: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm" /></label>
             <label className="text-xs font-semibold text-slate-500">Référence<select value={item.reference} onChange={(event) => updateWindow(item.id, { reference: event.target.value as ReproductionReference })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm">{REFERENCES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <label className="text-xs font-semibold text-slate-500">Position<select value={item.direction} onChange={(event) => updateWindow(item.id, { direction: event.target.value as "BEFORE" | "AFTER" })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"><option value="AFTER">Après</option><option value="BEFORE">Avant</option></select></label>
@@ -163,7 +210,8 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
             <label className="text-xs font-semibold text-slate-500">Nom<input value={item.name} onChange={(event) => updateEvent(item.id, { name: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm" /></label>
             <label className="text-xs font-semibold text-slate-500">Icône<select value={item.icon} onChange={(event) => updateEvent(item.id, { icon: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"><option value="calendar">Calendrier</option><option value="syringe">Seringue</option><option value="pill">Médicament</option><option value="scan">Échographie</option><option value="eye">Surveillance</option><option value="heart">Cœur</option></select></label>
             <label className="text-xs font-semibold text-slate-500">Couleur<select value={item.color} onChange={(event) => updateEvent(item.id, { color: event.target.value as ReproductionEventRule["color"] })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm">{Object.entries(REPRODUCTION_COLOR_PALETTE).map(([key, color]) => <option key={key} value={key}>{color.label}</option>)}</select></label>
-            <label className="text-xs font-semibold text-slate-500">Champs demandés<input value={item.fields.join(", ")} onChange={(event) => updateEvent(item.id, { fields: event.target.value.split(",").map((field) => field.trim()).filter(Boolean) })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm" /></label>
+            <label className="text-xs font-semibold text-slate-500">Formulaire existant<select value={item.action} onChange={(event) => updateEvent(item.id, { action: event.target.value as ExistingReproductionAction })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm">{ACTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <div className="sm:col-span-2"><p className="text-xs font-semibold text-slate-500">Champs demandés</p><div className="mt-2 space-y-2">{[...item.fields].sort((left, right) => left.order - right.order).map((eventField, index) => <div key={eventField.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5"><div className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-800">{eventField.label}</span><span className="rounded bg-white px-1.5 py-0.5 text-[10px] text-slate-400">{eventField.dataType}</span><button type="button" onClick={() => moveEventField(item.id, eventField.id, -1)} disabled={index === 0} className="min-h-9 px-2 text-slate-500 disabled:opacity-20" aria-label="Monter le champ">↑</button><button type="button" onClick={() => moveEventField(item.id, eventField.id, 1)} disabled={index === item.fields.length - 1} className="min-h-9 px-2 text-slate-500 disabled:opacity-20" aria-label="Descendre le champ">↓</button>{!eventField.locked && <button type="button" onClick={() => updateEvent(item.id, { fields: item.fields.filter((field) => field.id !== eventField.id).map((field, order) => ({ ...field, order })) })} className="min-h-9 px-2 text-red-600" aria-label="Supprimer le champ"><Trash2 size={15} /></button>}</div><div className="mt-2 grid gap-2 sm:grid-cols-3"><label className="text-[10px] font-semibold text-slate-500">Libellé<input value={eventField.label} onChange={(event) => updateEventField(item.id, eventField.id, { label: event.target.value })} className="mt-1 min-h-10 w-full rounded border bg-white px-2 text-xs" /></label><label className="text-[10px] font-semibold text-slate-500">Type<select value={eventField.dataType} onChange={(event) => updateEventField(item.id, eventField.id, { dataType: event.target.value as ReproductionEventField["dataType"] })} className="mt-1 min-h-10 w-full rounded border bg-white px-2 text-xs"><option value="DATE">Date</option><option value="TIME">Heure</option><option value="TEXT">Texte</option><option value="NUMBER">Nombre</option><option value="SELECT">Choix</option><option value="FILE">Fichier</option><option value="REFERENCE">Référence</option></select></label><label className="text-[10px] font-semibold text-slate-500">Valeur par défaut<input value={eventField.defaultValue ?? ""} onChange={(event) => updateEventField(item.id, eventField.id, { defaultValue: event.target.value || undefined })} disabled={eventField.locked && Boolean(eventField.defaultValue)} className="mt-1 min-h-10 w-full rounded border bg-white px-2 text-xs disabled:bg-slate-100" /></label></div><label className="mt-2 flex min-h-9 items-center gap-2 text-xs font-semibold text-slate-600"><input type="checkbox" checked={eventField.required} disabled={eventField.locked && eventField.required} onChange={(event) => updateEventField(item.id, eventField.id, { required: event.target.checked })} className="h-4 w-4 accent-green-700" /> Obligatoire{eventField.locked && <span className="text-[10px] text-slate-400">Champ métier protégé</span>}</label></div>)}</div><div className="mt-2 flex gap-2"><select id={`field-${item.id}`} defaultValue="OBSERVATION" className="min-h-11 min-w-0 flex-1 rounded-lg border px-2 text-xs">{EVENT_FIELD_CATALOG.map((definition) => <option key={definition.key} value={definition.key}>{definition.label}</option>)}</select><button type="button" onClick={() => { const select = document.getElementById(`field-${item.id}`) as HTMLSelectElement | null; if (select) addEventField(item.id, select.value as EventFieldKey); }} className="min-h-11 rounded-lg border border-green-300 px-3 text-xs font-bold text-green-700"><Plus size={15} className="inline" /> Ajouter</button></div></div>
             <Toggle label="Afficher sur le cercle" checked={item.showOnCycle} onChange={(showOnCycle) => updateEvent(item.id, { showOnCycle })} /><Toggle label="Créer un rappel" checked={item.createsReminder} onChange={(createsReminder) => updateEvent(item.id, { createsReminder })} />
             {!item.fundamental && <button type="button" onClick={() => setConfig((current) => ({ ...current, events: current.events.filter((event) => event.id !== item.id) }))} className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-200 text-sm font-bold text-red-700 sm:col-span-2"><Trash2 size={16} /> Supprimer cet événement</button>}
           </div></details>)}</div>
