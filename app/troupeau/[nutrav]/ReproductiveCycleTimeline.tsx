@@ -44,6 +44,10 @@ interface Segment {
   detail?: string;
 }
 
+interface OverlaySegment extends Segment {
+  startDays: number;
+}
+
 interface EventItem {
   id: string;
   kind: "calving" | "natural" | "ia" | "echo-positive" | "echo-negative";
@@ -57,6 +61,11 @@ interface EventItem {
 const OPEN_CYCLE_SCALE_DAYS = 365;
 const RING_RADIUS = 92;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const MAIN_RING_WIDTH = 21;
+const ACTIVE_RING_WIDTH = 24;
+const PAST_RING_WIDTH = 19;
+const ECHO_OVERLAY_RADIUS = 103;
+const ECHO_OVERLAY_CIRCUMFERENCE = 2 * Math.PI * ECHO_OVERLAY_RADIUS;
 const STAGE_COLORS = REPRODUCTIVE_CYCLE_COLORS;
 
 function CalvingEventIcon({ size = 24 }: { size?: number }) {
@@ -152,6 +161,7 @@ export default function ReproductiveCycleTimeline({
   const model = useMemo(() => {
     const today = new Date();
     const segments: Segment[] = [];
+    const overlaySegments: OverlaySegment[] = [];
     const events: EventItem[] = [];
     const daysSinceBreeding = breedingDate ? elapsedDays(breedingDate, today) : null;
     const daysSinceCalving = lastCalvingDate ? elapsedDays(lastCalvingDate, today) : null;
@@ -268,6 +278,7 @@ export default function ReproductiveCycleTimeline({
           ? effectiveEchoDate ?? (statusModifiedAt && statusModifiedAt >= breedingDate ? statusModifiedAt : null) ?? expectedEchoDate
           : null;
       const conclusionDate = gestationConfirmedAt ?? negativeSince;
+      const cycleStartDate = lastCalvingDate && lastCalvingDate < breedingDate ? lastCalvingDate : breedingDate;
 
       if (lastCalvingDate && lastCalvingDate < breedingDate) {
         addSegment(segments, {
@@ -279,12 +290,7 @@ export default function ReproductiveCycleTimeline({
         });
       }
 
-      const waitingEnd =
-        conclusionDate && conclusionDate < expectedEchoDate
-          ? conclusionDate
-          : today < expectedEchoDate && !conclusionDate
-            ? today
-            : expectedEchoDate;
+      const waitingEnd = conclusionDate ?? today;
       const waitingDays = elapsedDays(breedingDate, waitingEnd);
 
       addSegment(segments, {
@@ -292,7 +298,7 @@ export default function ReproductiveCycleTimeline({
         label: "Attente",
         days: waitingDays || (daysSinceBreeding === 0 ? 1 : 0),
         color: STAGE_COLORS.waiting,
-        current: status === "GRIS",
+        current: status === "GRIS" || status === "JAUNE",
         detail: `Attente post-${breedingType === "IA" ? "IA" : "saillie"} jusqu’au ${formatDate(expectedEchoDate)}`,
       });
 
@@ -301,15 +307,18 @@ export default function ReproductiveCycleTimeline({
         : today;
       const echoWaitingDays =
         echoWaitingEnd > expectedEchoDate ? elapsedDays(expectedEchoDate, echoWaitingEnd) : 0;
-      addSegment(segments, {
-        id: "echo-wait",
-        label: "À échographier",
-        shortLabel: "Écho",
-        days: echoWaitingDays || (status === "JAUNE" ? 1 : 0),
-        color: STAGE_COLORS.scan,
-        current: status === "JAUNE",
-        detail: `Échographie possible depuis le ${formatDate(expectedEchoDate)}`,
-      });
+      if (echoWaitingDays > 0 || status === "JAUNE") {
+        overlaySegments.push({
+          id: "echo-wait",
+          label: "À échographier",
+          shortLabel: "Écho",
+          startDays: elapsedDays(cycleStartDate, expectedEchoDate),
+          days: echoWaitingDays || 1,
+          color: STAGE_COLORS.scan,
+          current: status === "JAUNE",
+          detail: `Échographie possible depuis le ${formatDate(expectedEchoDate)}`,
+        });
+      }
 
       if (isEmptyAfterEcho) {
         const emptySince = negativeSince ?? breedingDate;
@@ -438,6 +447,7 @@ export default function ReproductiveCycleTimeline({
 
     return {
       segments,
+      overlaySegments,
       events: events.sort((a, b) => b.date.getTime() - a.date.getTime()),
       title,
       main,
@@ -461,7 +471,10 @@ export default function ReproductiveCycleTimeline({
       : "delay";
 
   const activeSegment = model.segments.find((segment) => segment.current);
-  const activeColor = activeSegment?.color ?? (status === "ROUGE" ? STAGE_COLORS.service : STAGE_COLORS[activeStage]);
+  const activeColor =
+    status === "JAUNE"
+      ? STAGE_COLORS.scan
+      : activeSegment?.color ?? (status === "ROUGE" ? STAGE_COLORS.service : STAGE_COLORS[activeStage]);
   const progressRatio = Math.min(1, Math.max(0, model.trackedDays / model.scaleDays));
   const markerAngle = progressRatio * 360 - 90;
   const markerPosition = {
@@ -492,6 +505,17 @@ export default function ReproductiveCycleTimeline({
     };
     ringOffset += slot;
     return item;
+  });
+  const overlayRing = model.overlaySegments.map((segment) => {
+    const slot = (segment.days / model.scaleDays) * ECHO_OVERLAY_CIRCUMFERENCE;
+    const offset = (segment.startDays / model.scaleDays) * ECHO_OVERLAY_CIRCUMFERENCE;
+    return {
+      ...segment,
+      length: Math.max(2, slot - 2),
+      offset,
+      midAngle: ((segment.startDays + segment.days / 2) / model.scaleDays) * 360 - 90,
+      displayColor: segment.current ? segment.color : softenColor(segment.color, 0.38),
+    };
   });
 
   const eventStart = lastCalvingDate ?? breedingDate ?? today;
@@ -551,7 +575,7 @@ export default function ReproductiveCycleTimeline({
                 role="img"
                 aria-label={`${model.title} : ${model.main}`}
               >
-                <circle cx="100" cy="100" r={RING_RADIUS} fill="none" stroke={STAGE_COLORS.future} strokeWidth="15" />
+                <circle cx="100" cy="100" r={RING_RADIUS} fill="none" stroke={STAGE_COLORS.future} strokeWidth={MAIN_RING_WIDTH} />
                 <circle cx="100" cy="100" r="79" fill="none" stroke="#e2e8f0" strokeWidth="1" />
                 <g>
                   {elapsedRing.map((stage) => {
@@ -563,9 +587,31 @@ export default function ReproductiveCycleTimeline({
                         r={RING_RADIUS}
                         fill="none"
                         stroke={stage.displayColor}
-                        strokeWidth={stage.current ? 17 : 13}
+                        strokeWidth={stage.current ? ACTIVE_RING_WIDTH : PAST_RING_WIDTH}
                         strokeLinecap="round"
                         strokeDasharray={`${stage.length} ${RING_CIRCUMFERENCE - stage.length}`}
+                        strokeDashoffset={-stage.offset}
+                        transform="rotate(-90 100 100)"
+                        className="transition-all duration-500"
+                      >
+                        <title>{stage.label} · {pluralDays(stage.days)}</title>
+                      </circle>
+                    );
+                  })}
+                </g>
+                <g aria-label="Surcouche des échographies">
+                  {overlayRing.map((stage) => {
+                    return (
+                      <circle
+                        key={`${stage.id}-overlay`}
+                        cx="100"
+                        cy="100"
+                        r={ECHO_OVERLAY_RADIUS}
+                        fill="none"
+                        stroke={stage.displayColor}
+                        strokeWidth={stage.current ? 7 : 6}
+                        strokeLinecap="round"
+                        strokeDasharray={`${stage.length} ${ECHO_OVERLAY_CIRCUMFERENCE - stage.length}`}
                         strokeDashoffset={-stage.offset}
                         transform="rotate(-90 100 100)"
                         className="transition-all duration-500"
@@ -601,6 +647,28 @@ export default function ReproductiveCycleTimeline({
                         }}
                       >
                         {isShort ? stage.shortLabel ?? stage.label : stage.shortLabel ?? stage.label}
+                      </text>
+                    );
+                  })}
+                  {overlayRing.map((stage) => {
+                    const radians = stage.midAngle * Math.PI / 180;
+                    const x = 100 + 112 * Math.cos(radians);
+                    const y = 100 + 112 * Math.sin(radians);
+                    return (
+                      <text
+                        key={`${stage.id}-overlay-label`}
+                        x={x}
+                        y={y}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        className="font-extrabold tracking-wide [paint-order:stroke] [stroke-width:2.2px]"
+                        style={{
+                          fill: "#92400e",
+                          stroke: "#ffffff",
+                          fontSize: "4.8px",
+                        }}
+                      >
+                        {stage.shortLabel ?? stage.label}
                       </text>
                     );
                   })}
