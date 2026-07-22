@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { addDays, differenceInCalendarDays, subDays } from "date-fns";
-import { BarChart3, CalendarDays, List, RefreshCw, Syringe } from "lucide-react";
+import { BarChart3, CalendarDays, CheckCircle2, List, RefreshCw, Syringe } from "lucide-react";
 import {
   ECHOGRAPHY_WAIT_DAYS,
   POST_CALVING_REST_DAYS,
@@ -59,12 +59,12 @@ interface EventItem {
 }
 
 const OPEN_CYCLE_SCALE_DAYS = 365;
-const RING_RADIUS = 92;
+const RING_RADIUS = 82;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-const MAIN_RING_WIDTH = 21;
-const ACTIVE_RING_WIDTH = 24;
-const PAST_RING_WIDTH = 19;
-const ECHO_OVERLAY_RADIUS = 103;
+const MAIN_RING_WIDTH = 10;
+const ACTIVE_RING_WIDTH = 11;
+const PAST_RING_WIDTH = 10;
+const ECHO_OVERLAY_RADIUS = 94;
 const ECHO_OVERLAY_CIRCUMFERENCE = 2 * Math.PI * ECHO_OVERLAY_RADIUS;
 const STAGE_COLORS = REPRODUCTIVE_CYCLE_COLORS;
 
@@ -100,10 +100,10 @@ function UltrasoundEventIcon({ positive, size = 26 }: { positive: boolean; size?
 }
 
 function EventIcon({ kind }: { kind: EventItem["kind"] }) {
-  if (kind === "calving") return <CalvingEventIcon size={25} />;
-  if (kind === "natural") return <NaturalServiceIcon size={24} />;
-  if (kind === "ia") return <Syringe size={23} strokeWidth={2.3} />;
-  return <UltrasoundEventIcon positive={kind === "echo-positive"} />;
+  if (kind === "calving") return <CalvingEventIcon size={21} />;
+  if (kind === "natural") return <NaturalServiceIcon size={20} />;
+  if (kind === "ia") return <Syringe size={20} strokeWidth={2.2} />;
+  return <UltrasoundEventIcon positive={kind === "echo-positive"} size={22} />;
 }
 
 function elapsedDays(from: Date, to: Date) {
@@ -498,10 +498,10 @@ export default function ReproductiveCycleTimeline({
     const startRatio = ringOffset / RING_CIRCUMFERENCE;
     const item = {
       ...segment,
-      length: Math.max(2, slot - 3),
+      length: Math.max(2, slot - 7),
       offset: ringOffset,
       midAngle: (startRatio + segment.days / model.scaleDays / 2) * 360 - 90,
-      displayColor: segment.current ? segment.color : softenColor(segment.color),
+      displayColor: segment.current ? softenColor(segment.color, 0.12) : softenColor(segment.color, 0.58),
     };
     ringOffset += slot;
     return item;
@@ -511,10 +511,10 @@ export default function ReproductiveCycleTimeline({
     const offset = (segment.startDays / model.scaleDays) * ECHO_OVERLAY_CIRCUMFERENCE;
     return {
       ...segment,
-      length: Math.max(2, slot - 2),
+      length: Math.max(2, slot - 5),
       offset,
       midAngle: ((segment.startDays + segment.days / 2) / model.scaleDays) * 360 - 90,
-      displayColor: segment.current ? segment.color : softenColor(segment.color, 0.38),
+      displayColor: segment.current ? softenColor(segment.color, 0.1) : softenColor(segment.color, 0.44),
     };
   });
 
@@ -531,8 +531,8 @@ export default function ReproductiveCycleTimeline({
       return {
         ...event,
         position: {
-          left: `${50 + 48 * Math.cos(angle * Math.PI / 180)}%`,
-          top: `${50 + 48 * Math.sin(angle * Math.PI / 180)}%`,
+          left: `${50 + 45.5 * Math.cos(angle * Math.PI / 180)}%`,
+          top: `${50 + 45.5 * Math.sin(angle * Math.PI / 180)}%`,
         },
       };
     });
@@ -576,7 +576,8 @@ export default function ReproductiveCycleTimeline({
                 aria-label={`${model.title} : ${model.main}`}
               >
                 <circle cx="100" cy="100" r={RING_RADIUS} fill="none" stroke={STAGE_COLORS.future} strokeWidth={MAIN_RING_WIDTH} />
-                <circle cx="100" cy="100" r="79" fill="none" stroke="#e2e8f0" strokeWidth="1" />
+                <circle cx="100" cy="100" r={ECHO_OVERLAY_RADIUS} fill="none" stroke="#e2e8f0" strokeWidth="0.8" strokeDasharray="2.4 3.2" />
+                <circle cx="100" cy="100" r="67" fill="none" stroke="#eef2f7" strokeWidth="0.8" />
                 <g>
                   {elapsedRing.map((stage) => {
                     return (
@@ -609,7 +610,7 @@ export default function ReproductiveCycleTimeline({
                         r={ECHO_OVERLAY_RADIUS}
                         fill="none"
                         stroke={stage.displayColor}
-                        strokeWidth={stage.current ? 7 : 6}
+                        strokeWidth={stage.current ? 5 : 4}
                         strokeLinecap="round"
                         strokeDasharray={`${stage.length} ${ECHO_OVERLAY_CIRCUMFERENCE - stage.length}`}
                         strokeDashoffset={-stage.offset}
@@ -626,50 +627,54 @@ export default function ReproductiveCycleTimeline({
                     const segmentRatio = stage.days / model.scaleDays;
                     const isShort = segmentRatio < 0.075;
                     const radians = stage.midAngle * Math.PI / 180;
-                    const labelRadius = isShort ? 111 : RING_RADIUS;
-                    const x = 100 + labelRadius * Math.cos(radians);
-                    const y = 100 + labelRadius * Math.sin(radians);
-                    let rotation = stage.midAngle + 90;
-                    if (rotation > 90 && rotation < 270) rotation += 180;
+                    const dotX = 100 + 96 * Math.cos(radians);
+                    const dotY = 100 + 96 * Math.sin(radians);
+                    const x = 100 + 110 * Math.cos(radians);
+                    const y = 100 + 110 * Math.sin(radians);
                     return (
-                      <text
-                        key={`${stage.id}-label`}
-                        x={x}
-                        y={y}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        transform={isShort ? undefined : `rotate(${rotation} ${x} ${y})`}
-                        className="font-extrabold tracking-wide [paint-order:stroke] [stroke-width:2px]"
-                        style={{
-                          fill: stage.current ? "#ffffff" : "#475569",
-                          stroke: stage.current ? stage.color : "#ffffff",
-                          fontSize: isShort ? "4.8px" : "5.6px",
-                        }}
-                      >
-                        {isShort ? stage.shortLabel ?? stage.label : stage.shortLabel ?? stage.label}
-                      </text>
+                      <g key={`${stage.id}-label`}>
+                        <circle cx={dotX} cy={dotY} r={stage.current ? 2 : 1.6} fill={stage.displayColor} />
+                        <text
+                          x={x}
+                          y={y}
+                          textAnchor={x < 92 ? "end" : x > 108 ? "start" : "middle"}
+                          dominantBaseline="central"
+                          className="font-bold [paint-order:stroke] [stroke-width:2.8px]"
+                          style={{
+                            fill: stage.current ? stage.color : "#64748b",
+                            stroke: "#ffffff",
+                            fontSize: isShort ? "4.3px" : "4.8px",
+                          }}
+                        >
+                          {stage.shortLabel ?? stage.label}
+                        </text>
+                      </g>
                     );
                   })}
                   {overlayRing.map((stage) => {
                     const radians = stage.midAngle * Math.PI / 180;
-                    const x = 100 + 112 * Math.cos(radians);
-                    const y = 100 + 112 * Math.sin(radians);
+                    const dotX = 100 + 101 * Math.cos(radians);
+                    const dotY = 100 + 101 * Math.sin(radians);
+                    const x = 100 + 116 * Math.cos(radians);
+                    const y = 100 + 116 * Math.sin(radians);
                     return (
-                      <text
-                        key={`${stage.id}-overlay-label`}
-                        x={x}
-                        y={y}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        className="font-extrabold tracking-wide [paint-order:stroke] [stroke-width:2.2px]"
-                        style={{
-                          fill: "#92400e",
-                          stroke: "#ffffff",
-                          fontSize: "4.8px",
-                        }}
-                      >
-                        {stage.shortLabel ?? stage.label}
-                      </text>
+                      <g key={`${stage.id}-overlay-label`}>
+                        <circle cx={dotX} cy={dotY} r={1.7} fill={stage.displayColor} />
+                        <text
+                          x={x}
+                          y={y}
+                          textAnchor={x < 92 ? "end" : x > 108 ? "start" : "middle"}
+                          dominantBaseline="central"
+                          className="font-bold [paint-order:stroke] [stroke-width:2.8px]"
+                          style={{
+                            fill: "#b45309",
+                            stroke: "#ffffff",
+                            fontSize: "4.6px",
+                          }}
+                        >
+                          {stage.shortLabel ?? stage.label}
+                        </text>
+                      </g>
                     );
                   })}
                 </g>
@@ -684,7 +689,7 @@ export default function ReproductiveCycleTimeline({
                       onClick={() => setSelectedEventId(selectedEventId === event.id ? null : event.id)}
                       aria-expanded={selected}
                       aria-label={`${event.label}, ${formatDate(event.date)}. Afficher les détails`}
-                      className={`flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 ${selected ? "scale-110 border-[4px] shadow-lg ring-4 ring-white" : "border-[3px]"}`}
+                      className={`flex h-9 w-9 touch-manipulation items-center justify-center rounded-full bg-white shadow-sm transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 ${selected ? "scale-110 border-[3px] shadow-md ring-4 ring-white" : "border-2"}`}
                       style={{ borderColor: event.color, color: event.color }}
                       title={`${event.label} · ${formatDate(event.date)}`}
                     >
@@ -695,7 +700,7 @@ export default function ReproductiveCycleTimeline({
                         Début du cycle
                       </span>
                     )}
-                    <span className="pointer-events-none absolute left-1/2 top-12 hidden w-max max-w-40 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-center text-[10px] font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
+                    <span className="pointer-events-none absolute left-1/2 top-10 hidden w-max max-w-40 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-center text-[10px] font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
                       {event.label} · {formatDate(event.date)}
                     </span>
                   </div>
@@ -703,12 +708,12 @@ export default function ReproductiveCycleTimeline({
               })}
 
               <div className="absolute z-30 -translate-x-1/2 -translate-y-1/2" style={markerPosition}>
-                <span className="flex min-h-10 min-w-10 items-center justify-center rounded-full border-[3px] bg-white px-2 text-[11px] font-extrabold shadow-md" style={{ borderColor: activeColor, color: activeColor }}>
+                <span className="flex min-h-8 min-w-8 items-center justify-center rounded-full border-2 bg-white px-1.5 text-[10px] font-extrabold shadow-sm ring-4 ring-white/90" style={{ borderColor: activeColor, color: activeColor }}>
                   {markerText}
                 </span>
               </div>
 
-              <div className="absolute inset-[20%] flex flex-col items-center justify-center rounded-full bg-white px-4 text-center shadow-[inset_0_0_0_1px_#f1f5f9]">
+              <div className="absolute inset-[23%] flex flex-col items-center justify-center rounded-full bg-white px-5 text-center shadow-[inset_0_0_0_1px_#eef2f7]">
                 {selectedEvent ? (
                   <>
                     <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400 sm:text-[10px]">Événement</span>
@@ -726,16 +731,21 @@ export default function ReproductiveCycleTimeline({
                   </>
                 ) : (
                   <>
-                    <span className="text-[10px] font-medium text-slate-400 sm:text-xs">Aujourd’hui</span>
-                    <span className={`mt-1 text-[11px] font-extrabold uppercase tracking-[0.08em] sm:text-sm ${model.tone}`}>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 ring-1 ring-slate-100" style={{ color: activeColor }}>
+                      <CheckCircle2 size={23} strokeWidth={2.6} />
+                    </span>
+                    <span className={`mt-2 text-lg font-extrabold leading-none sm:text-2xl ${model.tone}`}>
                       {model.title}
                     </span>
-                    <strong className="mt-1 text-lg leading-tight text-slate-900 sm:text-2xl">{model.main}</strong>
-                    <span className="mt-2 line-clamp-2 max-w-[90%] text-[9px] leading-snug text-slate-500 sm:text-[11px]">
+                    <strong className="mt-2 rounded-full px-3 py-1 text-sm leading-tight sm:text-base" style={{ backgroundColor: softenColor(activeColor, 0.82), color: activeColor }}>
+                      {model.main}
+                    </strong>
+                    <span className="mt-3 h-px w-1/2 bg-slate-200" />
+                    <span className="mt-2 line-clamp-2 max-w-[92%] text-[10px] leading-snug text-slate-600 sm:text-xs">
                       {model.secondary}
                     </span>
                     {model.usefulDate && (
-                      <span className="mt-1 text-[9px] font-semibold text-slate-400 sm:text-[10px]">
+                      <span className="mt-1 text-[9px] font-semibold text-slate-400 sm:text-[11px]">
                         {model.usefulDate}
                       </span>
                     )}
