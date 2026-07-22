@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Settings, X, UserRound, Mic, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useUserPreferences, type CesamProfile } from "@/components/UserPreferencesProvider";
 import NotificationBell from "@/app/components/NotificationBell";
 import IdentificationSettings from "@/components/IdentificationSettings";
@@ -112,6 +113,12 @@ export default function GlobalSettingsButton() {
             </div>
 
             <IdentificationSettings />
+            <div className="mt-5 border-t border-gray-100 pt-4">
+              <h3 className="text-sm font-bold text-gray-800">Reproduction</h3>
+              <Link href="/config/reproduction" onClick={() => setOpen(false)} className="mt-2 flex min-h-12 items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-700 hover:border-green-300 hover:bg-green-50">
+                <span><span className="block font-bold">Règles du cycle</span><span className="block text-xs font-normal text-gray-500">Durées, alertes, fenêtres et événements</span></span><span aria-hidden="true">›</span>
+              </Link>
+            </div>
             <PreconisationReferentielsSettings />
 
             <div className="mt-5">

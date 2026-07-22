@@ -698,6 +698,7 @@ model ExploitationConfig {
   affichageDelaiAttente  String   @default("LES_DEUX")
   reproReposObjectifJours Int      @default(60)
   tarissementVeauAgeMois  Int      @default(6)
+  reproductionRulesJson   String   @default("{}")
   identificationMode     String   @default("TRAVAIL_ET_NATIONAL")
   nutravNbChiffres       Int      @default(4)
   nutravZerosGauche      Boolean  @default(true)
