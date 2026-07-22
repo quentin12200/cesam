@@ -257,7 +257,11 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             dueDate={animal.saillies[0]?.gestation?.dateVelagePrevue ?? null}
             echoDate={animal.saillies[0]?.gestation?.dateEcho ?? null}
             echoResult={animal.saillies[0]?.gestation?.resultatEcho ?? null}
+            echoObservation={animal.saillies[0]?.gestation?.sousResultat ?? null}
             lastCalvingDate={animal.velagesVache[0]?.date ?? null}
+            calfNumber={animal.velagesVache[0]?.veau?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.nutrav ?? null}
+            calfSex={animal.velagesVache[0]?.veau?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.sexe ?? null}
+            breedingReference={animal.saillies[0]?.taureau?.nopere ?? animal.saillies[0]?.taureau?.nupere ?? null}
             statusModifiedAt={animal.reproductionEtatModifieAt ?? null}
           />
         </div>

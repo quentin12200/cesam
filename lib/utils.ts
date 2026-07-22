@@ -153,6 +153,21 @@ export const VELAGE_IMMINENT_COLORS = {
   hex: "#f97316",
 } as const;
 
+/** Palette partagée du cycle reproductif. */
+export const REPRODUCTIVE_CYCLE_COLORS = {
+  service: "#d946ef",
+  waiting: "#94a3b8",
+  scan: "#facc15",
+  pregnant: "#22c55e",
+  imminent: VELAGE_IMMINENT_COLORS.hex,
+  rest: "#38bdf8",
+  delay: "#ef4444",
+  future: "#f1f5f9",
+  femaleCalf: "#ec4899",
+  maleCalf: "#3b82f6",
+  unknownCalf: "#64748b",
+} as const;
+
 export function getEtatGestation(
   derniereSaillie: Date | null,
   gestationEtat: string | null,

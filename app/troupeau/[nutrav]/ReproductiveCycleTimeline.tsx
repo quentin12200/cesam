@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { addDays, differenceInCalendarDays, subDays } from "date-fns";
-import { BarChart3, CalendarDays, Check, HeartPulse, List, RefreshCw, Syringe } from "lucide-react";
+import { BarChart3, CalendarDays, List, RefreshCw, Syringe } from "lucide-react";
 import {
   ECHOGRAPHY_WAIT_DAYS,
   POST_CALVING_REST_DAYS,
+  REPRODUCTIVE_CYCLE_COLORS,
   VELAGE_IMMINENT_DAYS,
-  VELAGE_IMMINENT_COLORS,
   type EtatGestation,
 } from "@/lib/utils";
 import {
@@ -23,7 +23,11 @@ interface Props {
   dueDate: Date | null;
   echoDate: Date | null;
   echoResult: string | null;
+  echoObservation: string | null;
   lastCalvingDate: Date | null;
+  calfNumber: string | null;
+  calfSex: string | null;
+  breedingReference: string | null;
   statusModifiedAt: Date | null;
 }
 
@@ -40,24 +44,57 @@ interface Segment {
 }
 
 interface EventItem {
+  id: string;
+  kind: "calving" | "natural" | "ia" | "echo-positive" | "echo-negative";
   label: string;
   date: Date;
   color: string;
+  details: string[];
+  transition: string;
 }
 
 const OPEN_CYCLE_SCALE_DAYS = 365;
 const RING_RADIUS = 92;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-const STAGE_COLORS = {
-  service: "#d946ef",
-  waiting: "#94a3b8",
-  scan: "#facc15",
-  pregnant: "#22c55e",
-  imminent: VELAGE_IMMINENT_COLORS.hex,
-  rest: "#38bdf8",
-  delay: "#ef4444",
-  future: "#f1f5f9",
-} as const;
+const STAGE_COLORS = REPRODUCTIVE_CYCLE_COLORS;
+
+function CalvingEventIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 20.2 4.3 13A5.1 5.1 0 0 1 11.9 6.2 5.1 5.1 0 0 1 19.7 13Z" fill="currentColor" opacity=".2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M8.2 10.2 6.5 8.7M15.8 10.2l1.7-1.5M8.2 10.4c0-2.1 1.7-3.6 3.8-3.6s3.8 1.5 3.8 3.6v2.2c0 2-1.7 3.6-3.8 3.6s-3.8-1.6-3.8-3.6Z" fill="white" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+      <circle cx="10.5" cy="11.5" r=".65" fill="currentColor" /><circle cx="13.5" cy="11.5" r=".65" fill="currentColor" />
+      <path d="M10.5 14h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function NaturalServiceIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="9" cy="9" r="4" /><path d="M6.2 11.8 3 15m0-3v3h3" />
+      <circle cx="15" cy="15" r="4" /><path d="m17.8 12.2 3.2-3.2m-3 0h3v3" />
+    </svg>
+  );
+}
+
+function UltrasoundEventIcon({ positive, size = 26 }: { positive: boolean; size?: number }) {
+  const accent = positive ? "#16a34a" : "#dc2626";
+  return (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <rect x="2.5" y="4" width="23" height="17" rx="3" fill="#f8fafc" stroke="currentColor" strokeWidth="2" />
+      <path d="M10 24h8M14 21v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      {positive ? <path d="m7.5 12.5 4 4 9-9" stroke={accent} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /> : <path d="m8.5 8.5 11 9m0-9-11 9" stroke={accent} strokeWidth="4" strokeLinecap="round" />}
+    </svg>
+  );
+}
+
+function EventIcon({ kind }: { kind: EventItem["kind"] }) {
+  if (kind === "calving") return <CalvingEventIcon size={25} />;
+  if (kind === "natural") return <NaturalServiceIcon size={24} />;
+  if (kind === "ia") return <Syringe size={23} strokeWidth={2.3} />;
+  return <UltrasoundEventIcon positive={kind === "echo-positive"} />;
+}
 
 function elapsedDays(from: Date, to: Date) {
   return Math.max(0, differenceInCalendarDays(to, from));
@@ -86,10 +123,15 @@ export default function ReproductiveCycleTimeline({
   dueDate,
   echoDate,
   echoResult,
+  echoObservation,
   lastCalvingDate,
+  calfNumber,
+  calfSex,
+  breedingReference,
   statusModifiedAt,
 }: Props) {
   const [view, setView] = useState<View>("cycle");
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   const model = useMemo(() => {
     const today = new Date();
@@ -119,27 +161,55 @@ export default function ReproductiveCycleTimeline({
     let horizonDays = OPEN_CYCLE_SCALE_DAYS;
 
     if (lastCalvingDate) {
-      events.push({ label: "Dernier vêlage", date: lastCalvingDate, color: STAGE_COLORS.rest });
+      events.push({
+        id: "calving",
+        kind: "calving",
+        label: "Vêlage",
+        date: lastCalvingDate,
+        color: calfSex === "M"
+          ? STAGE_COLORS.maleCalf
+          : calfSex === "F"
+            ? STAGE_COLORS.femaleCalf
+            : STAGE_COLORS.unknownCalf,
+        details: calfNumber ? [`Veau n° ${calfNumber}`] : [],
+        transition: "Début du repos",
+      });
     }
     if (breedingDate) {
+      const isIa = breedingType === "IA";
       events.push({
-        label: breedingType === "IA" ? "Insémination artificielle" : "Saillie",
+        id: "breeding",
+        kind: isIa ? "ia" : "natural",
+        label: isIa ? "Insémination artificielle" : "Saillie naturelle",
         date: breedingDate,
         color: STAGE_COLORS.service,
+        details: breedingReference
+          ? [`${isIa ? "Référence IA" : "Taureau"} : ${breedingReference}`]
+          : [],
+        transition: "Début de l’attente",
       });
     }
     if (echoDate) {
-      events.push({ label: "Échographie", date: echoDate, color: STAGE_COLORS.scan });
-    }
-    if (dueDate) {
-      events.push({ label: "Vêlage prévu", date: dueDate, color: STAGE_COLORS.imminent });
+      const positive = echoResult === "PLEINE";
+      events.push({
+        id: "echo",
+        kind: positive ? "echo-positive" : "echo-negative",
+        label: "Échographie",
+        date: echoDate,
+        color: positive ? STAGE_COLORS.pregnant : STAGE_COLORS.delay,
+        details: [
+          `Résultat : ${positive ? "positive" : echoResult === "VIDE" ? "négative" : echoResult ?? "non renseigné"}`,
+          ...(echoObservation ? [echoObservation] : []),
+        ],
+        transition: positive ? "Début de la gestation" : "Retour en retard",
+      });
     }
 
     if ((status === "REPOS" || isPostCalvingDelay) && lastCalvingDate && daysSinceCalving !== null) {
       const restDays = Math.min(daysSinceCalving, POST_CALVING_REST_DAYS);
       addSegment(segments, {
         id: "repos",
-        label: "Repos post-vêlage",
+        label: "Repos",
         days: restDays || 1,
         color: STAGE_COLORS.rest,
         current: status === "REPOS",
@@ -176,7 +246,7 @@ export default function ReproductiveCycleTimeline({
 
       addSegment(segments, {
         id: "attente",
-        label: "Attente avant écho",
+        label: "Attente",
         days: waitingDays || (daysSinceBreeding === 0 ? 1 : 0),
         color: STAGE_COLORS.waiting,
         current: status === "GRIS",
@@ -188,7 +258,7 @@ export default function ReproductiveCycleTimeline({
         echoWaitingEnd > expectedEchoDate ? elapsedDays(expectedEchoDate, echoWaitingEnd) : 0;
       addSegment(segments, {
         id: "echo-wait",
-        label: "À échographier",
+        label: "Phase d’écho",
         days: echoWaitingDays || (status === "JAUNE" ? 1 : 0),
         color: STAGE_COLORS.scan,
         current: status === "JAUNE",
@@ -200,9 +270,9 @@ export default function ReproductiveCycleTimeline({
         const availableDays = elapsedDays(emptySince, today);
         addSegment(segments, {
           id: "a-remettre",
-          label: "À remettre à la reproduction",
+          label: "Retard",
           days: availableDays || 1,
-          color: STAGE_COLORS.service,
+          color: STAGE_COLORS.delay,
           current: true,
           detail: `Disponible depuis le ${formatDate(emptySince)}`,
         });
@@ -218,7 +288,7 @@ export default function ReproductiveCycleTimeline({
 
         addSegment(segments, {
           id: "gestante",
-          label: "Gestante",
+          label: "Gestation",
           days: Math.max(status === "VERT" ? 1 : 0, elapsedDays(confirmedAt, gestationEnd)),
           color: STAGE_COLORS.pregnant,
           current: status === "VERT",
@@ -282,9 +352,9 @@ export default function ReproductiveCycleTimeline({
         const availableDays = elapsedDays(availableSince, today);
         addSegment(segments, {
           id: "a-remettre",
-          label: "À remettre à la reproduction",
+          label: "Retard",
           days: availableDays || 1,
-          color: STAGE_COLORS.service,
+          color: STAGE_COLORS.delay,
           current: true,
         });
         title = "À remettre à la reproduction";
@@ -315,7 +385,7 @@ export default function ReproductiveCycleTimeline({
       trackedDays,
       gestation,
     };
-  }, [status, breedingDate, breedingType, dueDate, echoDate, echoResult, lastCalvingDate, statusModifiedAt]);
+  }, [status, breedingDate, breedingType, breedingReference, calfNumber, calfSex, dueDate, echoDate, echoObservation, echoResult, lastCalvingDate, statusModifiedAt]);
 
   const activeStage =
     status === "GRIS" ? "waiting"
@@ -347,7 +417,13 @@ export default function ReproductiveCycleTimeline({
   let ringOffset = 0;
   const elapsedRing = model.segments.map((segment) => {
     const slot = (segment.days / model.scaleDays) * RING_CIRCUMFERENCE;
-    const item = { ...segment, length: Math.max(2, slot - 3), offset: ringOffset };
+    const startRatio = ringOffset / RING_CIRCUMFERENCE;
+    const item = {
+      ...segment,
+      length: Math.max(2, slot - 3),
+      offset: ringOffset,
+      midAngle: (startRatio + segment.days / model.scaleDays / 2) * 360 - 90,
+    };
     ringOffset += slot;
     return item;
   });
@@ -362,17 +438,21 @@ export default function ReproductiveCycleTimeline({
     .map((event) => {
       const ratio = Math.min(1, Math.max(0, elapsedDays(eventStart, event.date) / eventSpan));
       const angle = ratio * 360 - 90;
-      const isEcho = event.label.includes("chographie");
-      const isService = event.label.includes("Saillie") || event.label.includes("Insémination");
       return {
         ...event,
-        Icon: isEcho ? Check : isService ? Syringe : HeartPulse,
         position: {
-          left: `${50 + 47 * Math.cos(angle * Math.PI / 180)}%`,
-          top: `${50 + 47 * Math.sin(angle * Math.PI / 180)}%`,
+          left: `${50 + 46 * Math.cos(angle * Math.PI / 180)}%`,
+          top: `${50 + 46 * Math.sin(angle * Math.PI / 180)}%`,
         },
       };
     });
+  const selectedEvent = ringEvents.find((event) => event.id === selectedEventId) ?? null;
+  const markerText =
+    model.gestation && (status === "VERT" || status === "ROSE")
+      ? model.gestation.remainingDays >= 0
+        ? `J-${model.gestation.remainingDays}`
+        : `J+${Math.abs(model.gestation.remainingDays)}`
+      : `J+${model.trackedDays}`;
 
   const nav = [
     { id: "cycle" as const, label: "Cycle", icon: RefreshCw },
@@ -401,7 +481,7 @@ export default function ReproductiveCycleTimeline({
             <div className="relative mx-auto my-3 aspect-square w-[min(88vw,390px)] sm:w-[430px]">
               <svg
                 viewBox="0 0 200 200"
-                className="-rotate-90 h-full w-full overflow-visible"
+                className="h-full w-full overflow-visible"
                 role="img"
                 aria-label={`${model.title} : ${model.main}`}
               >
@@ -421,6 +501,7 @@ export default function ReproductiveCycleTimeline({
                         strokeLinecap="round"
                         strokeDasharray={`${stage.length} ${RING_CIRCUMFERENCE - stage.length}`}
                         strokeDashoffset={-stage.offset}
+                        transform="rotate(-90 100 100)"
                         className="transition-all duration-500"
                       >
                         <title>{stage.label} · {pluralDays(stage.days)}</title>
@@ -428,16 +509,47 @@ export default function ReproductiveCycleTimeline({
                     );
                   })}
                 </g>
+                <g aria-hidden="true">
+                  {elapsedRing.map((stage) => {
+                    const segmentRatio = stage.days / model.scaleDays;
+                    const radians = stage.midAngle * Math.PI / 180;
+                    const x = 100 + RING_RADIUS * Math.cos(radians);
+                    const y = 100 + RING_RADIUS * Math.sin(radians);
+                    let rotation = stage.midAngle + 90;
+                    if (rotation > 90 && rotation < 270) rotation += 180;
+                    return (
+                      <text
+                        key={`${stage.id}-label`}
+                        x={x}
+                        y={y}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        transform={`rotate(${rotation} ${x} ${y})`}
+                        className="fill-white font-extrabold tracking-wide [paint-order:stroke] [stroke-width:1.2px]"
+                        style={{ stroke: stage.color, fontSize: segmentRatio < 0.055 ? "4px" : "5.6px" }}
+                      >
+                        {stage.label}
+                      </text>
+                    );
+                  })}
+                </g>
               </svg>
 
               {ringEvents.map((event) => {
-                const Icon = event.Icon;
                 return (
                   <div key={`${event.label}-${event.date.toISOString()}`} className="group absolute z-20 -translate-x-1/2 -translate-y-1/2" style={event.position}>
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 bg-white shadow-sm" style={{ borderColor: event.color, color: event.color }} title={`${event.label} · ${formatDate(event.date)}`}>
-                      <Icon size={15} strokeWidth={2.5} />
-                    </span>
-                    <span className="pointer-events-none absolute left-1/2 top-9 hidden w-max max-w-36 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEventId(selectedEventId === event.id ? null : event.id)}
+                      aria-expanded={selectedEventId === event.id}
+                      aria-label={`${event.label}, ${formatDate(event.date)}. Afficher les détails`}
+                      className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full border-[3px] bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300"
+                      style={{ borderColor: event.color, color: event.color }}
+                      title={`${event.label} · ${formatDate(event.date)}`}
+                    >
+                      <EventIcon kind={event.kind} />
+                    </button>
+                    <span className="pointer-events-none absolute left-1/2 top-12 hidden w-max max-w-40 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-center text-[10px] font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
                       {event.label} · {formatDate(event.date)}
                     </span>
                   </div>
@@ -446,9 +558,21 @@ export default function ReproductiveCycleTimeline({
 
               <div className="absolute z-30 -translate-x-1/2 -translate-y-1/2" style={markerPosition}>
                 <span className="flex min-h-10 min-w-10 items-center justify-center rounded-full border-[3px] bg-white px-2 text-[11px] font-extrabold shadow-md" style={{ borderColor: activeColor, color: activeColor }}>
-                  J+{model.trackedDays}
+                  {markerText}
                 </span>
               </div>
+
+              {selectedEvent && (
+                <div className="absolute inset-x-[12%] bottom-[5%] z-40 rounded-xl border border-slate-200 bg-white/95 p-3 text-center shadow-xl backdrop-blur-sm" role="status">
+                  <div className="flex items-center justify-center gap-2">
+                    <span style={{ color: selectedEvent.color }}><EventIcon kind={selectedEvent.kind} /></span>
+                    <p className="text-sm font-extrabold text-slate-900">{selectedEvent.label}</p>
+                  </div>
+                  <p className="mt-1 text-xs font-semibold text-slate-700">{formatDate(selectedEvent.date)}</p>
+                  {selectedEvent.details.map((detail) => <p key={detail} className="mt-0.5 text-[11px] text-slate-600">{detail}</p>)}
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wide" style={{ color: selectedEvent.color }}>{selectedEvent.transition}</p>
+                </div>
+              )}
 
               <div className="absolute inset-[20%] flex flex-col items-center justify-center rounded-full bg-white px-4 text-center shadow-[inset_0_0_0_1px_#f1f5f9]">
                 <span className="text-[10px] font-medium text-slate-400 sm:text-xs">Aujourd’hui</span>
