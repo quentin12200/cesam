@@ -262,25 +262,48 @@ export default function ReproductiveCycleTimeline({
     } else if (breedingDate && daysSinceBreeding !== null) {
       const expectedEchoDate = addDays(breedingDate, ECHOGRAPHY_WAIT_DAYS);
       const effectiveEchoDate = echoDate && echoDate >= breedingDate ? echoDate : null;
+      const negativeSince = isEmptyAfterEcho ? effectiveEchoDate ?? statusModifiedAt ?? breedingDate : null;
+      const gestationConfirmedAt =
+        (status === "VERT" || status === "ROSE")
+          ? effectiveEchoDate ?? (statusModifiedAt && statusModifiedAt >= breedingDate ? statusModifiedAt : null) ?? expectedEchoDate
+          : null;
+      const conclusionDate = gestationConfirmedAt ?? negativeSince;
+
+      if (lastCalvingDate && lastCalvingDate < breedingDate) {
+        addSegment(segments, {
+          id: "repos-post-velage",
+          label: "Repos",
+          days: elapsedDays(lastCalvingDate, breedingDate),
+          color: STAGE_COLORS.rest,
+          detail: `Du vêlage au ${breedingType === "IA" ? "début IA" : "début saillie"}`,
+        });
+      }
+
       const waitingEnd =
-        effectiveEchoDate && effectiveEchoDate < expectedEchoDate ? effectiveEchoDate : expectedEchoDate;
-      const waitingDays = elapsedDays(breedingDate, waitingEnd > today ? today : waitingEnd);
+        conclusionDate && conclusionDate < expectedEchoDate
+          ? conclusionDate
+          : today < expectedEchoDate && !conclusionDate
+            ? today
+            : expectedEchoDate;
+      const waitingDays = elapsedDays(breedingDate, waitingEnd);
 
       addSegment(segments, {
         id: "attente",
-        label: "Repos",
+        label: "Attente",
         days: waitingDays || (daysSinceBreeding === 0 ? 1 : 0),
         color: STAGE_COLORS.waiting,
         current: status === "GRIS",
-        detail: `Repos post-${breedingType === "IA" ? "IA" : "saillie"} jusqu’au ${formatDate(expectedEchoDate)}`,
+        detail: `Attente post-${breedingType === "IA" ? "IA" : "saillie"} jusqu’au ${formatDate(expectedEchoDate)}`,
       });
 
-      const echoWaitingEnd = effectiveEchoDate ?? today;
+      const echoWaitingEnd = conclusionDate
+        ? conclusionDate > expectedEchoDate ? conclusionDate : expectedEchoDate
+        : today;
       const echoWaitingDays =
         echoWaitingEnd > expectedEchoDate ? elapsedDays(expectedEchoDate, echoWaitingEnd) : 0;
       addSegment(segments, {
         id: "echo-wait",
-        label: "Phase d’écho",
+        label: "À échographier",
         shortLabel: "Écho",
         days: echoWaitingDays || (status === "JAUNE" ? 1 : 0),
         color: STAGE_COLORS.scan,
@@ -289,7 +312,7 @@ export default function ReproductiveCycleTimeline({
       });
 
       if (isEmptyAfterEcho) {
-        const emptySince = effectiveEchoDate ?? statusModifiedAt ?? breedingDate;
+        const emptySince = negativeSince ?? breedingDate;
         const availableDays = elapsedDays(emptySince, today);
         addSegment(segments, {
           id: "a-remettre",
@@ -306,7 +329,7 @@ export default function ReproductiveCycleTimeline({
         usefulDate = formatDate(emptySince);
         tone = "text-fuchsia-700";
       } else if ((status === "VERT" || status === "ROSE") && gestation) {
-        const confirmedAt = effectiveEchoDate ?? expectedEchoDate;
+        const confirmedAt = gestationConfirmedAt ?? expectedEchoDate;
         const calculatedDueDate = dueDate ?? addDays(breedingDate, GESTATION_REFERENCE_DAYS);
         const imminentAt = subDays(calculatedDueDate, VELAGE_IMMINENT_DAYS);
         const gestationEnd = today < imminentAt ? today : imminentAt;
@@ -343,7 +366,12 @@ export default function ReproductiveCycleTimeline({
           }
         }
 
-        horizonDays = Math.max(1, elapsedDays(breedingDate, calculatedDueDate));
+        horizonDays = Math.max(
+          1,
+          lastCalvingDate && lastCalvingDate < calculatedDueDate
+            ? elapsedDays(lastCalvingDate, calculatedDueDate)
+            : elapsedDays(breedingDate, calculatedDueDate)
+        );
         if (status === "ROSE") {
           title = gestation.remainingDays < 0 ? "Terme dépassé" : "Vêlage imminent";
           main =
