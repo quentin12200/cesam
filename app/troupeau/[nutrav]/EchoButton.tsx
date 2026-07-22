@@ -10,9 +10,10 @@ interface Props {
   aEchographier: boolean;
   saillieId?: string | null;
   saillieDate?: string | null;
+  prominent?: boolean;
 }
 
-export default function EchoButton({ nutrav, aEchographier, saillieId, saillieDate }: Props) {
+export default function EchoButton({ nutrav, aEchographier, saillieId, saillieDate, prominent = false }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -37,7 +38,7 @@ export default function EchoButton({ nutrav, aEchographier, saillieId, saillieDa
       <>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 text-xs rounded-lg px-2.5 py-1.5 border font-medium transition-colors shadow-sm bg-yellow-400 border-yellow-500 text-yellow-900 hover:bg-yellow-500 animate-pulse"
+          className={`flex items-center justify-center gap-1.5 rounded-lg border font-semibold transition-colors shadow-sm bg-yellow-400 border-yellow-500 text-yellow-900 hover:bg-yellow-500 ${prominent ? "min-h-11 px-4 py-2 text-sm" : "px-2.5 py-1.5 text-xs animate-pulse"}`}
         >
           <ScanLine size={12} />
           Saisir l&apos;écho
