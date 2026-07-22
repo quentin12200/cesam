@@ -286,7 +286,7 @@ export default function ReproductiveCycleTimeline({
         details: breedingReference
           ? [`${isIa ? "Référence IA" : "Taureau"} : ${breedingReference}`]
           : [],
-        transition: isIa ? "Début du repos post-IA" : "Début du repos post-saillie",
+        transition: isIa ? "Début de l’attente post-IA" : "Début de l’attente post-saillie",
       });
     }
     if (echoDate) {
@@ -374,7 +374,7 @@ export default function ReproductiveCycleTimeline({
           });
           alerts.push({
             id: "repro-delay",
-            title: `Retard repro · +${delayDays} j`,
+            title: `Retard repro passé · +${delayDays} j`,
             lines: [
               `Repos réel : ${restBeforeBreedingDays} j`,
               `Objectif : ${safeRestObjectiveDays} j`,
@@ -592,6 +592,22 @@ export default function ReproductiveCycleTimeline({
       offset: ringOffset,
       midAngle: (startRatio + segment.days / model.scaleDays / 2) * 360 - 90,
       displayColor: segmentDisplayColor(segment, model.scaleDays),
+      labelDetail:
+        segment.id.startsWith("repos")
+          ? `${restObjectiveDays} j objectif`
+          : segment.id.includes("retard")
+            ? `+${segment.days} j`
+            : segment.id === "attente"
+              ? "Après saillie / IA"
+              : segment.id === "gestante" && model.gestation
+                ? model.gestation.remainingDays >= 0
+                  ? `J-${model.gestation.remainingDays}`
+                  : `Terme +${Math.abs(model.gestation.remainingDays)} j`
+                : segment.id === "imminent"
+                  ? `≈ J-${VELAGE_IMMINENT_DAYS}`
+                  : segment.id === "a-remettre"
+                    ? `Depuis ${segment.days} j`
+                    : pluralDays(segment.days),
     };
     ringOffset += slot;
     return item;
@@ -669,7 +685,9 @@ export default function ReproductiveCycleTimeline({
       icon: Syringe,
       color: STAGE_COLORS.service,
       main: breedingDate ? `${breedingType === "IA" ? "IA" : "Saillie"} réalisée` : "Non enregistrée",
-      detail: breedingDate ? formatDate(breedingDate) : "À renseigner",
+      detail: breedingDate
+        ? `${formatDate(breedingDate)}${breedingReference ? ` · ${breedingReference}` : ""}`
+        : "À renseigner",
     },
     {
       id: "echo",
@@ -803,7 +821,7 @@ export default function ReproductiveCycleTimeline({
                         <circle cx={dotX} cy={dotY} r={stage.current ? 2 : 1.6} fill={stage.displayColor} />
                         <text
                           x={x}
-                          y={y}
+                          y={y - 2.2}
                           textAnchor={x < 92 ? "end" : x > 108 ? "start" : "middle"}
                           dominantBaseline="central"
                           className="font-bold [paint-order:stroke] [stroke-width:2.8px]"
@@ -814,6 +832,16 @@ export default function ReproductiveCycleTimeline({
                           }}
                         >
                           {stage.shortLabel ?? stage.label}
+                        </text>
+                        <text
+                          x={x}
+                          y={y + 3.2}
+                          textAnchor={x < 92 ? "end" : x > 108 ? "start" : "middle"}
+                          dominantBaseline="central"
+                          className="font-semibold [paint-order:stroke] [stroke-width:2.5px]"
+                          style={{ fill: "#64748b", stroke: "#ffffff", fontSize: "3.35px" }}
+                        >
+                          {stage.labelDetail}
                         </text>
                       </g>
                     );
@@ -860,11 +888,11 @@ export default function ReproductiveCycleTimeline({
                       onClick={() => setSelectedEventId(selectedEventId === event.id ? null : event.id)}
                       aria-expanded={selected}
                       aria-label={`${event.label}, ${formatDate(event.date)}. Afficher les détails`}
-                      className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 ${selected ? "scale-110 border-[4px] shadow-lg ring-4 ring-white" : "border-[3px]"}`}
+                      className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:h-16 sm:w-16 ${selected ? "scale-110 border-[4px] shadow-lg ring-4 ring-white" : "border-[3px]"}`}
                       style={{ borderColor: event.color, color: event.color }}
                       title={`${event.label} · ${formatDate(event.date)}`}
                     >
-                      <EventIcon kind={event.kind} />
+                      <span className="sm:scale-125"><EventIcon kind={event.kind} /></span>
                     </button>
                     {event.kind === "calving" && (
                       <span className="pointer-events-none absolute left-1/2 top-[-1.25rem] w-max -translate-x-1/2 rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500 shadow-sm ring-1 ring-slate-200">
@@ -872,7 +900,7 @@ export default function ReproductiveCycleTimeline({
                       </span>
                     )}
                     {showText && (
-                      <span className="pointer-events-none absolute left-1/2 top-12 w-max max-w-[7.5rem] -translate-x-1/2 text-center">
+                      <span className="pointer-events-none absolute left-1/2 top-12 w-max max-w-[7.5rem] -translate-x-1/2 text-center sm:top-16">
                         <span className="block text-[10px] font-extrabold leading-tight" style={{ color: event.color }}>{event.label}</span>
                         <span className="block text-[9px] font-semibold leading-tight text-slate-500">{formatDate(event.date)}</span>
                       </span>
