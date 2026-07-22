@@ -36,6 +36,7 @@ type View = "cycle" | "suivi" | "analyse";
 interface Segment {
   id: string;
   label: string;
+  shortLabel?: string;
   days: number;
   color: string;
   current?: boolean;
@@ -116,6 +117,21 @@ function pluralDays(days: number) {
   return `${days} ${days === 1 ? "jour" : "jours"}`;
 }
 
+function softenColor(hex: string, amount = 0.66) {
+  const normalized = hex.replace("#", "");
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  const mix = (value: number) => Math.round(value + (255 - value) * amount);
+  return `rgb(${mix(red)}, ${mix(green)}, ${mix(blue)})`;
+}
+
+function calfSexLabel(sex: string | null) {
+  if (sex === "F") return "Femelle";
+  if (sex === "M") return "Mâle";
+  return null;
+}
+
 export default function ReproductiveCycleTimeline({
   status,
   breedingDate,
@@ -157,6 +173,7 @@ export default function ReproductiveCycleTimeline({
     let title = "Cycle à renseigner";
     let main = "Aucune étape connue";
     let secondary = "Ajoutez un événement de reproduction pour démarrer le suivi.";
+    let usefulDate: string | null = null;
     let tone = "text-slate-700";
     let horizonDays = OPEN_CYCLE_SCALE_DAYS;
 
@@ -171,7 +188,10 @@ export default function ReproductiveCycleTimeline({
           : calfSex === "F"
             ? STAGE_COLORS.femaleCalf
             : STAGE_COLORS.unknownCalf,
-        details: calfNumber ? [`Veau n° ${calfNumber}`] : [],
+        details: [
+          ...(calfNumber ? [`Veau n° ${calfNumber}`] : []),
+          ...(calfSexLabel(calfSex) ? [`Sexe : ${calfSexLabel(calfSex)}`] : []),
+        ],
         transition: "Début du repos",
       });
     }
@@ -230,11 +250,13 @@ export default function ReproductiveCycleTimeline({
         title = "Retard";
         main = pluralDays(delayDays);
         secondary = "Retard de remise à la reproduction";
+        usefulDate = formatDate(addDays(lastCalvingDate, POST_CALVING_REST_DAYS));
         tone = "text-red-700";
       } else {
         title = "Repos post-vêlage";
         main = pluralDays(daysSinceCalving);
         secondary = `Vêlage le ${formatDate(lastCalvingDate)}`;
+        usefulDate = formatDate(lastCalvingDate);
         tone = "text-sky-700";
       }
     } else if (breedingDate && daysSinceBreeding !== null) {
@@ -259,6 +281,7 @@ export default function ReproductiveCycleTimeline({
       addSegment(segments, {
         id: "echo-wait",
         label: "Phase d’écho",
+        shortLabel: "Écho",
         days: echoWaitingDays || (status === "JAUNE" ? 1 : 0),
         color: STAGE_COLORS.scan,
         current: status === "JAUNE",
@@ -279,7 +302,8 @@ export default function ReproductiveCycleTimeline({
         title = "À remettre à la reproduction";
         main = `Depuis ${pluralDays(availableDays)}`;
         secondary = effectiveEchoDate ? `Échographie le ${formatDate(effectiveEchoDate)}` : "Cycle ouvert";
-        tone = "text-fuchsia-700";
+        usefulDate = formatDate(emptySince);
+        tone = "text-red-700";
       } else if ((status === "VERT" || status === "ROSE") && gestation) {
         const confirmedAt = effectiveEchoDate ?? expectedEchoDate;
         const calculatedDueDate = dueDate ?? addDays(breedingDate, GESTATION_REFERENCE_DAYS);
@@ -300,6 +324,7 @@ export default function ReproductiveCycleTimeline({
           addSegment(segments, {
             id: "imminent",
             label: "Vêlage imminent",
+            shortLabel: "Imminent",
             days: Math.max(1, elapsedDays(imminentAt, imminentEnd)),
             color: STAGE_COLORS.imminent,
             current: gestation.remainingDays >= 0,
@@ -324,15 +349,20 @@ export default function ReproductiveCycleTimeline({
             gestation.remainingDays < 0
               ? `De ${pluralDays(Math.abs(gestation.remainingDays))}`
               : `J-${gestation.remainingDays}`;
-          secondary = `Vêlage prévu le ${formatDate(calculatedDueDate)}`;
+          secondary =
+            gestation.remainingDays < 0
+              ? `Vêlage prévu dépassé de ${pluralDays(Math.abs(gestation.remainingDays))}`
+              : `Vêlage prévu dans ${pluralDays(gestation.remainingDays)}`;
+          usefulDate = formatDate(calculatedDueDate);
           tone = gestation.remainingDays < 0 ? "text-red-700" : "text-orange-700";
         } else {
           title = "Gestante";
           main = formatGestationElapsed(gestation.elapsedDays);
           secondary =
             gestation.remainingDays >= 0 && gestation.remainingDays <= 60
-              ? `J-${gestation.remainingDays} · Vêlage le ${formatDate(calculatedDueDate)}`
+              ? `Vêlage prévu dans ${pluralDays(gestation.remainingDays)}`
               : `Vêlage prévu le ${formatDate(calculatedDueDate)}`;
+          usefulDate = formatDate(calculatedDueDate);
           tone = "text-green-700";
         }
       } else if (status === "JAUNE") {
@@ -340,12 +370,14 @@ export default function ReproductiveCycleTimeline({
         title = "À échographier";
         main = waitingForEchoDays === 0 ? "Dès aujourd’hui" : `Depuis ${pluralDays(waitingForEchoDays)}`;
         secondary = `Saillie / IA le ${formatDate(breedingDate)}`;
+        usefulDate = formatDate(expectedEchoDate);
         tone = "text-amber-700";
       } else if (status === "GRIS") {
         const remaining = Math.max(0, ECHOGRAPHY_WAIT_DAYS - daysSinceBreeding);
         title = "Attente avant écho";
         main = remaining === 0 ? "Échographie possible" : `Encore ${pluralDays(remaining)}`;
         secondary = `${breedingType === "IA" ? "IA" : "Saillie"} le ${formatDate(breedingDate)}`;
+        usefulDate = formatDate(expectedEchoDate);
         tone = "text-slate-700";
       } else if (status === "ROUGE") {
         const availableSince = statusModifiedAt ?? breedingDate;
@@ -360,13 +392,14 @@ export default function ReproductiveCycleTimeline({
         title = "À remettre à la reproduction";
         main = `Depuis ${pluralDays(availableDays)}`;
         secondary = "Animal disponible";
-        tone = "text-fuchsia-700";
+        usefulDate = formatDate(availableSince);
+        tone = "text-red-700";
       }
     } else if (status === "ROUGE") {
       title = "À remettre à la reproduction";
       main = "Disponible";
       secondary = "Aucune date de saillie enregistrée";
-      tone = "text-fuchsia-700";
+      tone = "text-red-700";
     }
 
     const trackedDays = segments.reduce((total, segment) => total + segment.days, 0);
@@ -379,6 +412,7 @@ export default function ReproductiveCycleTimeline({
       title,
       main,
       secondary,
+      usefulDate,
       tone,
       scaleDays,
       futureDays,
@@ -423,6 +457,7 @@ export default function ReproductiveCycleTimeline({
       length: Math.max(2, slot - 3),
       offset: ringOffset,
       midAngle: (startRatio + segment.days / model.scaleDays / 2) * 360 - 90,
+      displayColor: segment.current ? segment.color : softenColor(segment.color),
     };
     ringOffset += slot;
     return item;
@@ -496,8 +531,8 @@ export default function ReproductiveCycleTimeline({
                         cy="100"
                         r={RING_RADIUS}
                         fill="none"
-                        stroke={stage.color}
-                        strokeWidth={stage.current ? 17 : 15}
+                        stroke={stage.displayColor}
+                        strokeWidth={stage.current ? 17 : 13}
                         strokeLinecap="round"
                         strokeDasharray={`${stage.length} ${RING_CIRCUMFERENCE - stage.length}`}
                         strokeDashoffset={-stage.offset}
@@ -512,9 +547,11 @@ export default function ReproductiveCycleTimeline({
                 <g aria-hidden="true">
                   {elapsedRing.map((stage) => {
                     const segmentRatio = stage.days / model.scaleDays;
+                    const isShort = segmentRatio < 0.075;
                     const radians = stage.midAngle * Math.PI / 180;
-                    const x = 100 + RING_RADIUS * Math.cos(radians);
-                    const y = 100 + RING_RADIUS * Math.sin(radians);
+                    const labelRadius = isShort ? 111 : RING_RADIUS;
+                    const x = 100 + labelRadius * Math.cos(radians);
+                    const y = 100 + labelRadius * Math.sin(radians);
                     let rotation = stage.midAngle + 90;
                     if (rotation > 90 && rotation < 270) rotation += 180;
                     return (
@@ -524,11 +561,15 @@ export default function ReproductiveCycleTimeline({
                         y={y}
                         textAnchor="middle"
                         dominantBaseline="central"
-                        transform={`rotate(${rotation} ${x} ${y})`}
-                        className="fill-white font-extrabold tracking-wide [paint-order:stroke] [stroke-width:1.2px]"
-                        style={{ stroke: stage.color, fontSize: segmentRatio < 0.055 ? "4px" : "5.6px" }}
+                        transform={isShort ? undefined : `rotate(${rotation} ${x} ${y})`}
+                        className="font-extrabold tracking-wide [paint-order:stroke] [stroke-width:2px]"
+                        style={{
+                          fill: stage.current ? "#ffffff" : "#475569",
+                          stroke: stage.current ? stage.color : "#ffffff",
+                          fontSize: isShort ? "4.8px" : "5.6px",
+                        }}
                       >
-                        {stage.label}
+                        {isShort ? stage.shortLabel ?? stage.label : stage.shortLabel ?? stage.label}
                       </text>
                     );
                   })}
@@ -536,19 +577,25 @@ export default function ReproductiveCycleTimeline({
               </svg>
 
               {ringEvents.map((event) => {
+                const selected = selectedEventId === event.id;
                 return (
-                  <div key={`${event.label}-${event.date.toISOString()}`} className="group absolute z-20 -translate-x-1/2 -translate-y-1/2" style={event.position}>
+                  <div key={`${event.label}-${event.date.toISOString()}`} className={`group absolute -translate-x-1/2 -translate-y-1/2 ${selected ? "z-40" : "z-20"}`} style={event.position}>
                     <button
                       type="button"
                       onClick={() => setSelectedEventId(selectedEventId === event.id ? null : event.id)}
-                      aria-expanded={selectedEventId === event.id}
+                      aria-expanded={selected}
                       aria-label={`${event.label}, ${formatDate(event.date)}. Afficher les détails`}
-                      className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full border-[3px] bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300"
+                      className={`flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 ${selected ? "scale-110 border-[4px] shadow-lg ring-4 ring-white" : "border-[3px]"}`}
                       style={{ borderColor: event.color, color: event.color }}
                       title={`${event.label} · ${formatDate(event.date)}`}
                     >
                       <EventIcon kind={event.kind} />
                     </button>
+                    {event.kind === "calving" && (
+                      <span className="pointer-events-none absolute left-1/2 top-[-1.25rem] w-max -translate-x-1/2 rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500 shadow-sm ring-1 ring-slate-200">
+                        Début du cycle
+                      </span>
+                    )}
                     <span className="pointer-events-none absolute left-1/2 top-12 hidden w-max max-w-40 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-center text-[10px] font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
                       {event.label} · {formatDate(event.date)}
                     </span>
@@ -562,38 +609,39 @@ export default function ReproductiveCycleTimeline({
                 </span>
               </div>
 
-              {selectedEvent && (
-                <div className="absolute inset-x-[12%] bottom-[5%] z-40 rounded-xl border border-slate-200 bg-white/95 p-3 text-center shadow-xl backdrop-blur-sm" role="status">
-                  <div className="flex items-center justify-center gap-2">
-                    <span style={{ color: selectedEvent.color }}><EventIcon kind={selectedEvent.kind} /></span>
-                    <p className="text-sm font-extrabold text-slate-900">{selectedEvent.label}</p>
-                  </div>
-                  <p className="mt-1 text-xs font-semibold text-slate-700">{formatDate(selectedEvent.date)}</p>
-                  {selectedEvent.details.map((detail) => <p key={detail} className="mt-0.5 text-[11px] text-slate-600">{detail}</p>)}
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wide" style={{ color: selectedEvent.color }}>{selectedEvent.transition}</p>
-                </div>
-              )}
-
               <div className="absolute inset-[20%] flex flex-col items-center justify-center rounded-full bg-white px-4 text-center shadow-[inset_0_0_0_1px_#f1f5f9]">
-                <span className="text-[10px] font-medium text-slate-400 sm:text-xs">Aujourd’hui</span>
-                <span className={`mt-1 text-[11px] font-extrabold uppercase tracking-[0.08em] sm:text-sm ${model.tone}`}>
-                  {model.title}
-                </span>
-                <strong className="mt-1 text-lg leading-tight text-slate-900 sm:text-2xl">{model.main}</strong>
-                {model.gestation && (
+                {selectedEvent ? (
                   <>
-                    <span className="my-2 h-px w-3/5 bg-slate-200" />
-                    <span className="text-[10px] text-slate-500 sm:text-xs">Vêlage prévu dans</span>
-                    <strong className="mt-0.5 text-sm text-emerald-800 sm:text-lg">
-                      {model.gestation.remainingDays < 0
-                        ? `Terme dépassé de ${pluralDays(Math.abs(model.gestation.remainingDays))}`
-                        : formatGestationElapsed(model.gestation.remainingDays)}
-                    </strong>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400 sm:text-[10px]">Événement</span>
+                    <span className="mt-1" style={{ color: selectedEvent.color }}><EventIcon kind={selectedEvent.kind} /></span>
+                    <strong className="mt-1 text-sm leading-tight text-slate-900 sm:text-lg">{selectedEvent.label}</strong>
+                    <span className="mt-0.5 text-[11px] font-bold text-slate-700 sm:text-xs">{formatDate(selectedEvent.date)}</span>
+                    {selectedEvent.details.map((detail) => (
+                      <span key={detail} className="mt-0.5 line-clamp-1 max-w-[92%] text-[9px] leading-snug text-slate-500 sm:text-[11px]">
+                        {detail}
+                      </span>
+                    ))}
+                    <span className="mt-1 text-[9px] font-bold uppercase tracking-wide sm:text-[10px]" style={{ color: selectedEvent.color }}>
+                      {selectedEvent.transition}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[10px] font-medium text-slate-400 sm:text-xs">Aujourd’hui</span>
+                    <span className={`mt-1 text-[11px] font-extrabold uppercase tracking-[0.08em] sm:text-sm ${model.tone}`}>
+                      {model.title}
+                    </span>
+                    <strong className="mt-1 text-lg leading-tight text-slate-900 sm:text-2xl">{model.main}</strong>
+                    <span className="mt-2 line-clamp-2 max-w-[90%] text-[9px] leading-snug text-slate-500 sm:text-[11px]">
+                      {model.secondary}
+                    </span>
+                    {model.usefulDate && (
+                      <span className="mt-1 text-[9px] font-semibold text-slate-400 sm:text-[10px]">
+                        {model.usefulDate}
+                      </span>
+                    )}
                   </>
                 )}
-                <span className="mt-1 line-clamp-2 max-w-[90%] text-[9px] leading-snug text-slate-500 sm:text-[11px]">
-                  {model.secondary}
-                </span>
               </div>
             </div>
             <div className="mx-auto mt-2 flex w-fit items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-[10px] font-semibold text-slate-500 sm:text-xs">
