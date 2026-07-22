@@ -206,7 +206,7 @@ export default function ReproductiveCycleTimeline({
         details: breedingReference
           ? [`${isIa ? "Référence IA" : "Taureau"} : ${breedingReference}`]
           : [],
-        transition: "Début de l’attente",
+        transition: isIa ? "Début du repos post-IA" : "Début du repos post-saillie",
       });
     }
     if (echoDate) {
@@ -268,11 +268,11 @@ export default function ReproductiveCycleTimeline({
 
       addSegment(segments, {
         id: "attente",
-        label: "Attente",
+        label: "Repos",
         days: waitingDays || (daysSinceBreeding === 0 ? 1 : 0),
         color: STAGE_COLORS.waiting,
         current: status === "GRIS",
-        detail: `Échographie possible à partir du ${formatDate(expectedEchoDate)}`,
+        detail: `Repos post-${breedingType === "IA" ? "IA" : "saillie"} jusqu’au ${formatDate(expectedEchoDate)}`,
       });
 
       const echoWaitingEnd = effectiveEchoDate ?? today;
@@ -293,9 +293,10 @@ export default function ReproductiveCycleTimeline({
         const availableDays = elapsedDays(emptySince, today);
         addSegment(segments, {
           id: "a-remettre",
-          label: "Retard",
+          label: "À remettre",
+          shortLabel: "Repro",
           days: availableDays || 1,
-          color: STAGE_COLORS.delay,
+          color: STAGE_COLORS.service,
           current: true,
           detail: `Disponible depuis le ${formatDate(emptySince)}`,
         });
@@ -303,7 +304,7 @@ export default function ReproductiveCycleTimeline({
         main = `Depuis ${pluralDays(availableDays)}`;
         secondary = effectiveEchoDate ? `Échographie le ${formatDate(effectiveEchoDate)}` : "Cycle ouvert";
         usefulDate = formatDate(emptySince);
-        tone = "text-red-700";
+        tone = "text-fuchsia-700";
       } else if ((status === "VERT" || status === "ROSE") && gestation) {
         const confirmedAt = effectiveEchoDate ?? expectedEchoDate;
         const calculatedDueDate = dueDate ?? addDays(breedingDate, GESTATION_REFERENCE_DAYS);
@@ -374,9 +375,9 @@ export default function ReproductiveCycleTimeline({
         tone = "text-amber-700";
       } else if (status === "GRIS") {
         const remaining = Math.max(0, ECHOGRAPHY_WAIT_DAYS - daysSinceBreeding);
-        title = "Attente avant écho";
+        title = `Repos post-${breedingType === "IA" ? "IA" : "saillie"}`;
         main = remaining === 0 ? "Échographie possible" : `Encore ${pluralDays(remaining)}`;
-        secondary = `${breedingType === "IA" ? "IA" : "Saillie"} le ${formatDate(breedingDate)}`;
+        secondary = `À échographier à partir de J+${ECHOGRAPHY_WAIT_DAYS}`;
         usefulDate = formatDate(expectedEchoDate);
         tone = "text-slate-700";
       } else if (status === "ROUGE") {
@@ -384,22 +385,23 @@ export default function ReproductiveCycleTimeline({
         const availableDays = elapsedDays(availableSince, today);
         addSegment(segments, {
           id: "a-remettre",
-          label: "Retard",
+          label: "À remettre",
+          shortLabel: "Repro",
           days: availableDays || 1,
-          color: STAGE_COLORS.delay,
+          color: STAGE_COLORS.service,
           current: true,
         });
         title = "À remettre à la reproduction";
         main = `Depuis ${pluralDays(availableDays)}`;
         secondary = "Animal disponible";
         usefulDate = formatDate(availableSince);
-        tone = "text-red-700";
+        tone = "text-fuchsia-700";
       }
     } else if (status === "ROUGE") {
       title = "À remettre à la reproduction";
       main = "Disponible";
       secondary = "Aucune date de saillie enregistrée";
-      tone = "text-red-700";
+      tone = "text-fuchsia-700";
     }
 
     const trackedDays = segments.reduce((total, segment) => total + segment.days, 0);
@@ -430,12 +432,13 @@ export default function ReproductiveCycleTimeline({
       : status === "REPOS" ? "rest"
       : "delay";
 
-  const activeColor = STAGE_COLORS[activeStage];
+  const activeSegment = model.segments.find((segment) => segment.current);
+  const activeColor = activeSegment?.color ?? (status === "ROUGE" ? STAGE_COLORS.service : STAGE_COLORS[activeStage]);
   const progressRatio = Math.min(1, Math.max(0, model.trackedDays / model.scaleDays));
   const markerAngle = progressRatio * 360 - 90;
   const markerPosition = {
-    left: `${50 + 38.3 * Math.cos(markerAngle * Math.PI / 180)}%`,
-    top: `${50 + 38.3 * Math.sin(markerAngle * Math.PI / 180)}%`,
+    left: `${50 + 34.5 * Math.cos(markerAngle * Math.PI / 180)}%`,
+    top: `${50 + 34.5 * Math.sin(markerAngle * Math.PI / 180)}%`,
   };
 
   const today = new Date();
@@ -476,8 +479,8 @@ export default function ReproductiveCycleTimeline({
       return {
         ...event,
         position: {
-          left: `${50 + 46 * Math.cos(angle * Math.PI / 180)}%`,
-          top: `${50 + 46 * Math.sin(angle * Math.PI / 180)}%`,
+          left: `${50 + 48 * Math.cos(angle * Math.PI / 180)}%`,
+          top: `${50 + 48 * Math.sin(angle * Math.PI / 180)}%`,
         },
       };
     });
