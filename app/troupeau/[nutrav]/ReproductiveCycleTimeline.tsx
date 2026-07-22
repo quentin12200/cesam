@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.6 seconds
-Output:
 "use client";
 
 import { useMemo, useState } from "react";
@@ -561,4 +558,3 @@ export default function ReproductiveCycleTimeline({
     </section>
   );
 }
-
