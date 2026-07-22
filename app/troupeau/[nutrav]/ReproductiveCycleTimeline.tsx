@@ -1,8 +1,11 @@
+Exit code: 0
+Wall time: 0.4 seconds
+Output:
 "use client";
 
 import { useMemo, useState } from "react";
 import { addDays, differenceInCalendarDays, subDays } from "date-fns";
-import { BarChart3, CalendarDays, List, RefreshCw } from "lucide-react";
+import { BarChart3, CalendarDays, Check, HeartPulse, List, RefreshCw, Syringe } from "lucide-react";
 import {
   ECHOGRAPHY_WAIT_DAYS,
   POST_CALVING_REST_DAYS,
@@ -326,6 +329,14 @@ export default function ReproductiveCycleTimeline({
       : status === "REPOS" ? "rest"
       : "delay";
 
+  const activeColor = STAGE_COLORS[activeStage];
+  const progressRatio = Math.min(1, Math.max(0, model.trackedDays / model.scaleDays));
+  const markerAngle = progressRatio * 360 - 90;
+  const markerPosition = {
+    left: `${50 + 38.3 * Math.cos(markerAngle * Math.PI / 180)}%`,
+    top: `${50 + 38.3 * Math.sin(markerAngle * Math.PI / 180)}%`,
+  };
+
   const today = new Date();
   const projectedCalvingDate =
     dueDate ?? (breedingDate ? addDays(breedingDate, GESTATION_REFERENCE_DAYS) : null);
@@ -336,37 +347,35 @@ export default function ReproductiveCycleTimeline({
       ? elapsedDays(lastCalvingDate, knownCycleEnd)
       : 365;
   const cycleDays = Math.max(365, measuredCycleDays);
-  const lapCount = Math.max(1, Math.ceil(cycleDays / 365));
-  const extraLaps = Array.from({ length: Math.min(3, lapCount - 1) }, (_, index) => {
-    const days = Math.min(365, Math.max(0, cycleDays - 365 * (index + 1)));
-    return {
-      index,
-      days,
-      radius: 101 + index * 7,
-      circumference: 2 * Math.PI * (101 + index * 7),
-    };
-  });
-
-  // Ordre horaire identique à la maquette : jaune en haut, puis vert,
-  // orange, bleu, rouge et enfin gris sur la partie supérieure gauche.
-  const canonicalStages = [
-    { id: "scan", label: "À échographier", duration: "7 j", color: STAGE_COLORS.scan, share: 0.05 },
-    { id: "pregnant", label: "Gestante", duration: "~200 j", color: STAGE_COLORS.pregnant, share: 0.31 },
-    { id: "imminent", label: "Vêlage imminent", duration: `${VELAGE_IMMINENT_DAYS} j`, color: STAGE_COLORS.imminent, share: 0.10 },
-    { id: "rest", label: "Repos", duration: `${POST_CALVING_REST_DAYS} j`, color: STAGE_COLORS.rest, share: 0.19 },
-    { id: "delay", label: "Retard", duration: "Variable", color: STAGE_COLORS.delay, share: 0.10 },
-    { id: "waiting", label: "Après saillie / IA", duration: `${ECHOGRAPHY_WAIT_DAYS} j`, color: STAGE_COLORS.waiting, share: 0.25 },
-  ];
-
-  let canonicalOffset = 0;
-  const canonicalRing = canonicalStages.map((stage) => {
-    const slot = stage.share * RING_CIRCUMFERENCE;
-    // Le vide compense les extrémités arrondies : les segments restent proches sans se chevaucher.
-    const gap = 19;
-    const item = { ...stage, length: Math.max(1, slot - gap), offset: canonicalOffset };
-    canonicalOffset += slot;
+  let ringOffset = 0;
+  const elapsedRing = model.segments.map((segment) => {
+    const slot = (segment.days / model.scaleDays) * RING_CIRCUMFERENCE;
+    const item = { ...segment, length: Math.max(2, slot - 3), offset: ringOffset };
+    ringOffset += slot;
     return item;
   });
+
+  const eventStart = lastCalvingDate ?? breedingDate ?? today;
+  const eventEnd = projectedCalvingDate && projectedCalvingDate > eventStart
+    ? projectedCalvingDate
+    : addDays(eventStart, model.scaleDays);
+  const eventSpan = Math.max(1, elapsedDays(eventStart, eventEnd));
+  const ringEvents = model.events
+    .filter((event) => event.date >= eventStart && event.date <= eventEnd)
+    .map((event) => {
+      const ratio = Math.min(1, Math.max(0, elapsedDays(eventStart, event.date) / eventSpan));
+      const angle = ratio * 360 - 90;
+      const isEcho = event.label.includes("chographie");
+      const isService = event.label.includes("Saillie") || event.label.includes("Insémination");
+      return {
+        ...event,
+        Icon: isEcho ? Check : isService ? Syringe : HeartPulse,
+        position: {
+          left: `${50 + 47 * Math.cos(angle * Math.PI / 180)}%`,
+          top: `${50 + 47 * Math.sin(angle * Math.PI / 180)}%`,
+        },
+      };
+    });
 
   const nav = [
     { id: "cycle" as const, label: "Cycle", icon: RefreshCw },
@@ -392,54 +401,17 @@ export default function ReproductiveCycleTimeline({
       <div className="px-3 py-4 sm:px-5">
         {view === "cycle" && (
           <div className="mx-auto max-w-[660px]">
-            <div className="relative mx-auto aspect-square w-full max-w-[390px] sm:max-w-[500px]">
+            <div className="relative mx-auto my-3 aspect-square w-[min(88vw,390px)] sm:w-[430px]">
               <svg
-                viewBox="0 0 240 240"
+                viewBox="0 0 200 200"
                 className="-rotate-90 h-full w-full overflow-visible"
                 role="img"
                 aria-label={`${model.title} : ${model.main}`}
               >
-                <circle
-                  cx="120"
-                  cy="120"
-                  r="108"
-                  fill="none"
-                  stroke="#e2e8f0"
-                  strokeDasharray="2 5"
-                  strokeWidth="1.5"
-                />
-                <g transform="translate(20 20)">
-                  {extraLaps.map((lap) => {
-                    const visibleLength = (lap.days / 365) * lap.circumference;
-                    return (
-                      <g key={lap.index}>
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r={lap.radius}
-                          fill="none"
-                          stroke="#e2e8f0"
-                          strokeWidth="3"
-                          strokeDasharray="2 5"
-                        />
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r={lap.radius}
-                          fill="none"
-                          stroke={activeStage === "delay" ? STAGE_COLORS.delay : "#047857"}
-                          strokeWidth="4"
-                          strokeLinecap="round"
-                          strokeDasharray={`${visibleLength} ${lap.circumference - visibleLength}`}
-                          opacity="0.8"
-                        >
-                          <title>Tour {lap.index + 2} · {lap.days} jours supplémentaires</title>
-                        </circle>
-                      </g>
-                    );
-                  })}
-                  {canonicalRing.map((stage) => {
-                    const selected = stage.id === activeStage;
+                <circle cx="100" cy="100" r={RING_RADIUS} fill="none" stroke={STAGE_COLORS.future} strokeWidth="15" />
+                <circle cx="100" cy="100" r="79" fill="none" stroke="#e2e8f0" strokeWidth="1" />
+                <g>
+                  {elapsedRing.map((stage) => {
                     return (
                       <circle
                         key={stage.id}
@@ -448,82 +420,66 @@ export default function ReproductiveCycleTimeline({
                         r={RING_RADIUS}
                         fill="none"
                         stroke={stage.color}
-                        strokeOpacity={selected ? 1 : 0.72}
-                        strokeWidth={selected ? 17 : 13}
+                        strokeWidth={stage.current ? 17 : 15}
                         strokeLinecap="round"
                         strokeDasharray={`${stage.length} ${RING_CIRCUMFERENCE - stage.length}`}
                         strokeDashoffset={-stage.offset}
-                        className="transition-all duration-300"
+                        className="transition-all duration-500"
                       >
-                        <title>{stage.label} · {stage.duration}</title>
+                        <title>{stage.label} · {pluralDays(stage.days)}</title>
                       </circle>
                     );
                   })}
                 </g>
               </svg>
 
-              <div className="absolute left-1/2 top-[-1%] w-32 -translate-x-1/2 text-center">
-                <span className="text-[10px] font-bold leading-tight text-amber-500 sm:text-xs">À échographier</span>
-                <span className="block text-[10px] text-slate-500 sm:text-xs">7 j</span>
-              </div>
-              <div className="absolute left-[-1%] top-[23%] w-28 text-center sm:left-[-8%] sm:w-36">
-                <span className="text-[10px] font-semibold leading-tight text-slate-500 sm:text-xs">Après saillie / IA</span>
-                <span className="block text-[10px] text-slate-500 sm:text-xs">{ECHOGRAPHY_WAIT_DAYS} j</span>
-              </div>
-              <div className="absolute right-[-1%] top-[30%] w-24 text-center sm:right-[-8%] sm:w-32">
-                <span className="text-[10px] font-bold text-green-600 sm:text-xs">Gestante</span>
-                <span className="block text-[10px] text-slate-500 sm:text-xs">~200 j</span>
-              </div>
-              <div className="absolute bottom-[18%] right-[-1%] w-28 text-center sm:right-[-9%] sm:w-36">
-                <span className="text-[10px] font-bold leading-tight text-orange-500 sm:text-xs">Vêlage imminent</span>
-                <span className="block text-[10px] text-slate-500 sm:text-xs">{VELAGE_IMMINENT_DAYS} j</span>
-              </div>
-              <div className="absolute bottom-[-1%] left-1/2 w-24 -translate-x-1/2 text-center">
-                <span className="text-[10px] font-bold text-sky-600 sm:text-xs">Repos</span>
-                <span className="block text-[10px] text-slate-500 sm:text-xs">{POST_CALVING_REST_DAYS} j</span>
-              </div>
-              <div className="absolute bottom-[18%] left-[-1%] w-24 text-center sm:left-[-8%] sm:w-32">
-                <span className="text-[10px] font-bold text-red-500 sm:text-xs">Retard</span>
-                <span className="block text-[10px] text-slate-500 sm:text-xs">Variable</span>
+              {ringEvents.map((event) => {
+                const Icon = event.Icon;
+                return (
+                  <div key={`${event.label}-${event.date.toISOString()}`} className="group absolute z-20 -translate-x-1/2 -translate-y-1/2" style={event.position}>
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 bg-white shadow-sm" style={{ borderColor: event.color, color: event.color }} title={`${event.label} · ${formatDate(event.date)}`}>
+                      <Icon size={15} strokeWidth={2.5} />
+                    </span>
+                    <span className="pointer-events-none absolute left-1/2 top-9 hidden w-max max-w-36 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
+                      {event.label} · {formatDate(event.date)}
+                    </span>
+                  </div>
+                );
+              })}
+
+              <div className="absolute z-30 -translate-x-1/2 -translate-y-1/2" style={markerPosition}>
+                <span className="flex min-h-10 min-w-10 items-center justify-center rounded-full border-[3px] bg-white px-2 text-[11px] font-extrabold shadow-md" style={{ borderColor: activeColor, color: activeColor }}>
+                  J+{model.trackedDays}
+                </span>
               </div>
 
-              <div className="absolute inset-[24%] flex flex-col items-center justify-center rounded-full bg-white px-3 text-center">
-                <span
-                  className="mb-1 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-2xl font-black text-emerald-600 sm:h-14 sm:w-14 sm:text-3xl"
-                  aria-hidden="true"
-                >
-                  ✓
-                </span>
-                <span className={`text-[10px] font-extrabold uppercase tracking-[0.1em] sm:text-xs ${model.tone}`}>
+              <div className="absolute inset-[20%] flex flex-col items-center justify-center rounded-full bg-white px-4 text-center shadow-[inset_0_0_0_1px_#f1f5f9]">
+                <span className="text-[10px] font-medium text-slate-400 sm:text-xs">Aujourd’hui</span>
+                <span className={`mt-1 text-[11px] font-extrabold uppercase tracking-[0.08em] sm:text-sm ${model.tone}`}>
                   {model.title}
                 </span>
-                <strong className="mt-0.5 text-xl leading-tight text-emerald-900 sm:text-3xl">{model.main}</strong>
+                <strong className="mt-1 text-lg leading-tight text-slate-900 sm:text-2xl">{model.main}</strong>
                 {model.gestation && (
                   <>
-                    <span className="my-2 h-px w-4/5 bg-slate-200" />
+                    <span className="my-2 h-px w-3/5 bg-slate-200" />
                     <span className="text-[10px] text-slate-500 sm:text-xs">Vêlage prévu dans</span>
-                    <strong className="mt-0.5 text-base text-emerald-900 sm:text-xl">
+                    <strong className="mt-0.5 text-sm text-emerald-800 sm:text-lg">
                       {model.gestation.remainingDays < 0
                         ? `Terme dépassé de ${pluralDays(Math.abs(model.gestation.remainingDays))}`
                         : formatGestationElapsed(model.gestation.remainingDays)}
                     </strong>
                   </>
                 )}
-                <span className="mt-1 line-clamp-2 text-[9px] leading-snug text-slate-500 sm:text-[11px]">
+                <span className="mt-1 line-clamp-2 max-w-[90%] text-[9px] leading-snug text-slate-500 sm:text-[11px]">
                   {model.secondary}
                 </span>
               </div>
             </div>
-            <div className="mx-auto mt-1 flex w-fit flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-semibold text-slate-600 sm:text-xs">
-              <span>1 tour = 365 jours</span>
-              <span aria-hidden="true" className="text-slate-300">•</span>
-              <span>Cycle estimé : {cycleDays} jours</span>
-              {lapCount > 1 && (
-                <>
-                  <span aria-hidden="true" className="text-slate-300">•</span>
-                  <span className="text-emerald-700">{lapCount} tours</span>
-                </>
-              )}
+            <div className="mx-auto mt-2 flex w-fit items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-[10px] font-semibold text-slate-500 sm:text-xs">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: activeColor }} />
+              <span>{Math.round(progressRatio * 100)} % du cycle visualisé</span>
+              <span aria-hidden="true" className="text-slate-300">·</span>
+              <span>{cycleDays} jours estimés</span>
             </div>
           </div>
         )}
@@ -605,3 +561,4 @@ export default function ReproductiveCycleTimeline({
     </section>
   );
 }
+
