@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { addDays, addMonths, differenceInCalendarDays, subDays } from "date-fns";
 import { AlertTriangle, CheckCircle2, Clock3, Syringe } from "lucide-react";
 import {
@@ -574,9 +574,11 @@ export default function ReproductiveCycleTimeline({
   const progressRatio = Math.min(1, Math.max(0, model.trackedDays / model.scaleDays));
   const markerAngle = progressRatio * 360 - 90;
   const markerPosition = {
-    left: `${50 + 34.5 * Math.cos(markerAngle * Math.PI / 180)}%`,
-    top: `${50 + 34.5 * Math.sin(markerAngle * Math.PI / 180)}%`,
-  };
+    "--marker-x-mobile": `${31 * Math.cos(markerAngle * Math.PI / 180)}%`,
+    "--marker-y-mobile": `${31 * Math.sin(markerAngle * Math.PI / 180)}%`,
+    "--marker-x-desktop": `${34.5 * Math.cos(markerAngle * Math.PI / 180)}%`,
+    "--marker-y-desktop": `${34.5 * Math.sin(markerAngle * Math.PI / 180)}%`,
+  } as CSSProperties;
 
   const today = new Date();
   const projectedCalvingDate =
@@ -638,9 +640,11 @@ export default function ReproductiveCycleTimeline({
         ...event,
         angle,
         position: {
-          left: `${50 + 45.5 * Math.cos(angle * Math.PI / 180)}%`,
-          top: `${50 + 45.5 * Math.sin(angle * Math.PI / 180)}%`,
-        },
+          "--event-x-mobile": `${40 * Math.cos(angle * Math.PI / 180)}%`,
+          "--event-y-mobile": `${40 * Math.sin(angle * Math.PI / 180)}%`,
+          "--event-x-desktop": `${45.5 * Math.cos(angle * Math.PI / 180)}%`,
+          "--event-y-desktop": `${45.5 * Math.sin(angle * Math.PI / 180)}%`,
+        } as CSSProperties,
       };
     });
   const selectedEvent = ringEvents.find((event) => event.id === selectedEventId) ?? null;
@@ -708,18 +712,18 @@ export default function ReproductiveCycleTimeline({
       className="mt-3 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       aria-label={`Cycle reproductif : ${model.title}, ${model.main}`}
     >
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2.5 sm:px-4 sm:py-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Reproduction</p>
-          <h3 className="text-base font-bold text-slate-900">Cycle reproductif</h3>
+          <p className="hidden text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400 sm:block">Reproduction</p>
+          <h3 className="whitespace-nowrap text-sm font-bold text-slate-900 sm:text-base">Cycle reproductif</h3>
         </div>
-        <span className={`rounded-full bg-slate-50 px-2.5 py-1 text-xs font-bold ${model.tone}`}>
+        <span className={`min-w-0 truncate rounded-full bg-slate-50 px-2.5 py-1 text-xs font-bold ${model.tone}`}>
           {model.title}
         </span>
       </div>
 
-      <div className="px-3 py-4 sm:px-5">
-        <div className={`mx-auto grid max-w-5xl items-center gap-4 ${model.alerts.length > 0 ? "lg:grid-cols-[190px_minmax(0,1fr)]" : "lg:grid-cols-1"}`}>
+      <div className="px-1.5 py-2.5 sm:px-5 sm:py-4">
+        <div className={`mx-auto grid max-w-5xl items-center gap-2.5 sm:gap-4 ${model.alerts.length > 0 ? "lg:grid-cols-[190px_minmax(0,1fr)]" : "lg:grid-cols-1"}`}>
           {model.alerts.length > 0 && (
             <aside className="order-2 space-y-2 lg:order-1">
               {model.alerts.map((alert) => {
@@ -750,10 +754,10 @@ export default function ReproductiveCycleTimeline({
           )}
 
           <div className="order-1 min-w-0 lg:order-2">
-            <div className="relative mx-auto aspect-square w-[min(94vw,460px)] sm:w-[500px]">
+            <div className="relative mx-auto aspect-square w-[calc(100%-24px)] max-w-[430px] sm:w-[500px] sm:max-w-none">
               <svg
                 viewBox="0 0 200 200"
-                className="h-full w-full overflow-visible"
+                className="h-full w-full overflow-hidden sm:overflow-visible"
                 role="img"
                 aria-label={`${model.title} : ${model.main}`}
               >
@@ -804,7 +808,7 @@ export default function ReproductiveCycleTimeline({
                     );
                   })}
                 </g>
-                <g aria-hidden="true">
+                <g aria-hidden="true" className="hidden sm:block">
                   {elapsedRing.map((stage) => {
                     const segmentRatio = stage.days / model.scaleDays;
                     const isShort = segmentRatio < 0.075;
@@ -882,25 +886,29 @@ export default function ReproductiveCycleTimeline({
                 const selected = selectedEventId === event.id;
                 const showText = event.kind !== "calving";
                 return (
-                  <div key={`${event.label}-${event.date.toISOString()}`} className={`group absolute -translate-x-1/2 -translate-y-1/2 ${selected ? "z-40" : "z-20"}`} style={event.position}>
+                  <div
+                    key={`${event.label}-${event.date.toISOString()}`}
+                    className={`group absolute left-[calc(50%+var(--event-x-mobile))] top-[calc(50%+var(--event-y-mobile))] -translate-x-1/2 -translate-y-1/2 sm:left-[calc(50%+var(--event-x-desktop))] sm:top-[calc(50%+var(--event-y-desktop))] ${selected ? "z-40" : "z-20"}`}
+                    style={event.position}
+                  >
                     <button
                       type="button"
                       onClick={() => setSelectedEventId(selectedEventId === event.id ? null : event.id)}
                       aria-expanded={selected}
                       aria-label={`${event.label}, ${formatDate(event.date)}. Afficher les détails`}
-                      className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:h-16 sm:w-16 ${selected ? "scale-110 border-[4px] shadow-lg ring-4 ring-white" : "border-[3px]"}`}
+                      className={`flex h-10 w-10 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:h-16 sm:w-16 ${selected ? "scale-110 border-[3px] shadow-lg ring-2 ring-white sm:border-[4px] sm:ring-4" : "border-[2px] sm:border-[3px]"}`}
                       style={{ borderColor: event.color, color: event.color }}
                       title={`${event.label} · ${formatDate(event.date)}`}
                     >
                       <span className="sm:scale-125"><EventIcon kind={event.kind} /></span>
                     </button>
                     {event.kind === "calving" && (
-                      <span className="pointer-events-none absolute left-1/2 top-[-1.25rem] w-max -translate-x-1/2 rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500 shadow-sm ring-1 ring-slate-200">
+                      <span className="pointer-events-none absolute left-1/2 top-[-1.25rem] hidden w-max -translate-x-1/2 rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500 shadow-sm ring-1 ring-slate-200 sm:block">
                         Début cycle
                       </span>
                     )}
                     {showText && (
-                      <span className="pointer-events-none absolute left-1/2 top-12 w-max max-w-[7.5rem] -translate-x-1/2 text-center sm:top-16">
+                      <span className="pointer-events-none absolute left-1/2 top-16 hidden w-max max-w-[7.5rem] -translate-x-1/2 text-center sm:block">
                         <span className="block text-[10px] font-extrabold leading-tight" style={{ color: event.color }}>{event.label}</span>
                         <span className="block text-[9px] font-semibold leading-tight text-slate-500">{formatDate(event.date)}</span>
                       </span>
@@ -915,7 +923,7 @@ export default function ReproductiveCycleTimeline({
               <button
                 type="button"
                 onClick={() => setSelectedEventId(null)}
-                className="absolute z-30 -translate-x-1/2 -translate-y-1/2 rounded-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300"
+                className={`absolute z-30 left-[calc(50%+var(--marker-x-mobile))] top-[calc(50%+var(--marker-y-mobile))] -translate-x-1/2 -translate-y-1/2 rounded-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:left-[calc(50%+var(--marker-x-desktop))] sm:top-[calc(50%+var(--marker-y-desktop))] ${model.gestation && status === "VERT" ? "hidden sm:block" : ""}`}
                 style={markerPosition}
                 aria-label="Revenir à la situation actuelle"
               >
@@ -927,7 +935,7 @@ export default function ReproductiveCycleTimeline({
               <button
                 type="button"
                 onClick={() => selectedEvent && setSelectedEventId(null)}
-                className="absolute inset-[23%] flex flex-col items-center justify-center rounded-full bg-white px-5 text-center shadow-[inset_0_0_0_1px_#eef2f7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300"
+                className="absolute inset-[23%] flex flex-col items-center justify-center rounded-full bg-white px-2 text-center shadow-[inset_0_0_0_1px_#eef2f7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:px-5"
                 aria-label={selectedEvent ? "Revenir à la situation actuelle" : `${model.title} : ${model.main}`}
               >
                 {selectedEvent ? (
@@ -957,11 +965,16 @@ export default function ReproductiveCycleTimeline({
                       {model.main}
                     </strong>
                     <span className="mt-3 h-px w-1/2 bg-slate-200" />
-                    <span className="mt-2 line-clamp-2 max-w-[92%] text-[10px] leading-snug text-slate-600 sm:text-xs">
+                    {status === "VERT" && projectedCalvingDate && (
+                      <span className="mt-2 max-w-[92%] text-[10px] font-semibold leading-snug text-slate-600 sm:hidden">
+                        Vêlage prévu le {formatDate(projectedCalvingDate)}
+                      </span>
+                    )}
+                    <span className={`mt-2 line-clamp-2 max-w-[92%] text-[10px] leading-snug text-slate-600 sm:text-xs ${status === "VERT" && projectedCalvingDate ? "hidden sm:inline" : ""}`}>
                       {model.secondary}
                     </span>
                     {model.usefulDate && (
-                      <span className="mt-1 text-[9px] font-semibold text-slate-400 sm:text-[11px]">
+                      <span className="mt-1 hidden text-[9px] font-semibold text-slate-400 sm:inline sm:text-[11px]">
                         {model.usefulDate}
                       </span>
                     )}
@@ -970,11 +983,11 @@ export default function ReproductiveCycleTimeline({
               </button>
             </div>
 
-            <div className="mx-auto mt-4 grid max-w-3xl gap-2 sm:grid-cols-3">
+            <div className="mx-auto mt-2 flex max-w-3xl snap-x gap-2 overflow-x-auto px-1 pb-1 sm:mt-4 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
               {summaryCards.map((card) => {
                 const Icon = card.icon;
                 return (
-                  <div key={card.id} className="flex min-h-16 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm">
+                  <div key={card.id} className="flex min-h-14 min-w-[82%] snap-start items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm sm:min-h-16 sm:min-w-0">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50" style={{ color: card.color }}>
                       <Icon size={18} />
                     </span>
