@@ -146,6 +146,22 @@ function softenColor(hex: string, amount = 0.66) {
   return `rgb(${mix(red)}, ${mix(green)}, ${mix(blue)})`;
 }
 
+function delayStateColor(delayDays: number) {
+  return delayDays >= ECHOGRAPHY_WAIT_DAYS ? STAGE_COLORS.delay : STAGE_COLORS.service;
+}
+
+function segmentDisplayColor(segment: Segment, scaleDays: number) {
+  if (segment.current) {
+    if (segment.id === "gestante") return segment.color;
+    return softenColor(segment.color, 0.08);
+  }
+  if (segment.id === "attente") return softenColor(segment.color, 0.78);
+  if (segment.id.includes("retard") || segment.id === "a-remettre") return softenColor(segment.color, 0.42);
+  if (segment.id === "gestante") return softenColor(segment.color, 0.3);
+  if (segment.days / scaleDays > 0.28) return softenColor(segment.color, 0.68);
+  return softenColor(segment.color, 0.56);
+}
+
 function calfSexLabel(sex: string | null) {
   if (sex === "F") return "Femelle";
   if (sex === "M") return "Mâle";
@@ -207,15 +223,16 @@ export default function ReproductiveCycleTimeline({
 
     if (lastCalvingDate && daysSinceCalving !== null && calvingIsLatest && daysSinceCalving > safeRestObjectiveDays && !breedingDate) {
       const delayDays = daysSinceCalving - safeRestObjectiveDays;
+      const delayColor = delayStateColor(delayDays);
       alerts.push({
         id: "repro-delay",
-        title: "RETARD REPRO",
+        title: `Retard repro · +${delayDays} j`,
         lines: [
-          `Repos réel : ${pluralDays(daysSinceCalving)}`,
-          `+${delayDays} j par rapport à l’objectif`,
+          `Repos réel : ${daysSinceCalving} j`,
+          `Objectif : ${safeRestObjectiveDays} j`,
         ],
         action: "Remise à la reproduction à prévoir",
-        color: STAGE_COLORS.delay,
+        color: delayColor,
       });
     }
 
@@ -296,11 +313,12 @@ export default function ReproductiveCycleTimeline({
 
       if (isPostCalvingDelay) {
         const delayDays = daysSinceCalving - safeRestObjectiveDays;
+        const delayColor = delayStateColor(delayDays);
         addSegment(segments, {
           id: "retard",
           label: "Retard",
           days: delayDays,
-          color: STAGE_COLORS.delay,
+          color: delayColor,
           current: true,
           striped: true,
           detail: `Remise à la reproduction attendue depuis ${pluralDays(delayDays)}`,
@@ -340,23 +358,24 @@ export default function ReproductiveCycleTimeline({
         });
         if (restBeforeBreedingDays > safeRestObjectiveDays) {
           const delayDays = restBeforeBreedingDays - safeRestObjectiveDays;
+          const delayColor = delayStateColor(delayDays);
           addSegment(segments, {
             id: "retard-resolu",
             label: "Retard repro",
             shortLabel: "Retard",
             days: delayDays,
-            color: STAGE_COLORS.delay,
+            color: delayColor,
             detail: `Repos réel : ${pluralDays(restBeforeBreedingDays)}`,
           });
           alerts.push({
             id: "repro-delay",
-            title: "RETARD REPRO",
+            title: `Retard repro · +${delayDays} j`,
             lines: [
-              `Repos trop long : ${pluralDays(restBeforeBreedingDays)}`,
-              `+${delayDays} j par rapport à l’objectif`,
+              `Repos réel : ${restBeforeBreedingDays} j`,
+              `Objectif : ${safeRestObjectiveDays} j`,
             ],
             action: "Remise à la repro réalisée",
-            color: STAGE_COLORS.delay,
+            color: delayColor,
           });
         }
       }
@@ -573,7 +592,7 @@ export default function ReproductiveCycleTimeline({
       length: Math.max(2, slot - 7),
       offset: ringOffset,
       midAngle: (startRatio + segment.days / model.scaleDays / 2) * 360 - 90,
-      displayColor: segment.current ? softenColor(segment.color, 0.12) : softenColor(segment.color, 0.58),
+      displayColor: segmentDisplayColor(segment, model.scaleDays),
     };
     ringOffset += slot;
     return item;
@@ -678,22 +697,30 @@ export default function ReproductiveCycleTimeline({
         <div className={`mx-auto grid max-w-5xl items-center gap-4 ${model.alerts.length > 0 ? "lg:grid-cols-[190px_minmax(0,1fr)]" : "lg:grid-cols-1"}`}>
           {model.alerts.length > 0 && (
             <aside className="order-2 space-y-2 lg:order-1">
-              {model.alerts.map((alert) => (
-                <div key={alert.id} className="rounded-xl border border-red-200 bg-red-50 p-3 shadow-sm">
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-sm" style={{ color: alert.color }}>
-                      <AlertTriangle size={18} />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-extrabold uppercase tracking-wide" style={{ color: alert.color }}>{alert.title}</p>
-                      {alert.lines.map((line) => (
-                        <p key={line} className="mt-1 text-[11px] font-semibold text-red-800/80">{line}</p>
-                      ))}
-                      <p className="mt-2 text-[11px] font-extrabold" style={{ color: alert.color }}>{alert.action}</p>
+              {model.alerts.map((alert) => {
+                const alertSoftColor = softenColor(alert.color, 0.9);
+                const alertBorderColor = softenColor(alert.color, 0.68);
+                return (
+                  <div
+                    key={alert.id}
+                    className="rounded-xl border p-2.5 shadow-sm"
+                    style={{ backgroundColor: alertSoftColor, borderColor: alertBorderColor }}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white shadow-sm" style={{ color: alert.color }}>
+                        <AlertTriangle size={16} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-extrabold leading-tight tracking-wide" style={{ color: alert.color }}>{alert.title}</p>
+                        {alert.lines.map((line) => (
+                          <p key={line} className="mt-0.5 text-[10px] font-semibold leading-tight text-slate-700">{line}</p>
+                        ))}
+                        <p className="mt-1 text-[10px] font-extrabold leading-tight" style={{ color: alert.color }}>{alert.action}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </aside>
           )}
 
@@ -757,12 +784,15 @@ export default function ReproductiveCycleTimeline({
                     const segmentRatio = stage.days / model.scaleDays;
                     const isShort = segmentRatio < 0.075;
                     const radians = stage.midAngle * Math.PI / 180;
-                    const dotX = 100 + 91 * Math.cos(radians);
-                    const dotY = 100 + 91 * Math.sin(radians);
-                    const x = 100 + 101 * Math.cos(radians);
-                    const y = 100 + 101 * Math.sin(radians);
+                    const dotX = 100 + 87.5 * Math.cos(radians);
+                    const dotY = 100 + 87.5 * Math.sin(radians);
+                    const lineX = 100 + 93 * Math.cos(radians);
+                    const lineY = 100 + 93 * Math.sin(radians);
+                    const x = 100 + 97 * Math.cos(radians);
+                    const y = 100 + 97 * Math.sin(radians);
                     return (
                       <g key={`${stage.id}-label`}>
+                        <line x1={dotX} y1={dotY} x2={lineX} y2={lineY} stroke={stage.displayColor} strokeWidth="0.8" strokeLinecap="round" />
                         <circle cx={dotX} cy={dotY} r={stage.current ? 2 : 1.6} fill={stage.displayColor} />
                         <text
                           x={x}
@@ -785,10 +815,13 @@ export default function ReproductiveCycleTimeline({
                     const radians = stage.midAngle * Math.PI / 180;
                     const dotX = 100 + 94 * Math.cos(radians);
                     const dotY = 100 + 94 * Math.sin(radians);
-                    const x = 100 + 105 * Math.cos(radians);
-                    const y = 100 + 105 * Math.sin(radians);
+                    const lineX = 100 + 98 * Math.cos(radians);
+                    const lineY = 100 + 98 * Math.sin(radians);
+                    const x = 100 + 101 * Math.cos(radians);
+                    const y = 100 + 101 * Math.sin(radians);
                     return (
                       <g key={`${stage.id}-overlay-label`}>
+                        <line x1={dotX} y1={dotY} x2={lineX} y2={lineY} stroke={stage.displayColor} strokeWidth="0.8" strokeLinecap="round" />
                         <circle cx={dotX} cy={dotY} r={1.7} fill={stage.displayColor} />
                         <text
                           x={x}
