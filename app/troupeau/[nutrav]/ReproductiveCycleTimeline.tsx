@@ -137,6 +137,11 @@ function pluralDays(days: number) {
   return `${days} ${days === 1 ? "jour" : "jours"}`;
 }
 
+function compactDuration(days: number) {
+  if (days >= 30) return formatGestationElapsed(days);
+  return `${days} j`;
+}
+
 function softenColor(hex: string, amount = 0.66) {
   const normalized = hex.replace("#", "");
   const red = parseInt(normalized.slice(0, 2), 16);
@@ -497,14 +502,14 @@ export default function ReproductiveCycleTimeline({
         const waitingForEchoDays = Math.max(0, daysSinceBreeding - ECHOGRAPHY_WAIT_DAYS);
         title = "À échographier";
         main = waitingForEchoDays === 0 ? "Dès aujourd’hui" : `Depuis ${pluralDays(waitingForEchoDays)}`;
-        secondary = `Saillie / IA le ${formatDate(breedingDate)}`;
-        usefulDate = formatDate(expectedEchoDate);
+        secondary = `Écho possible depuis le ${formatDate(expectedEchoDate)}`;
+        usefulDate = `${ECHOGRAPHY_WAIT_DAYS} j après ${breedingType === "IA" ? "IA" : "saillie"}`;
         tone = "text-amber-700";
       } else if (status === "GRIS") {
         const remaining = Math.max(0, ECHOGRAPHY_WAIT_DAYS - daysSinceBreeding);
         title = `Repos post-${breedingType === "IA" ? "IA" : "saillie"}`;
         main = remaining === 0 ? "Échographie possible" : `Encore ${pluralDays(remaining)}`;
-        secondary = `À échographier à partir de J+${ECHOGRAPHY_WAIT_DAYS}`;
+        secondary = `Écho possible à partir du ${formatDate(expectedEchoDate)}`;
         usefulDate = formatDate(expectedEchoDate);
         tone = "text-slate-700";
       } else if (status === "ROUGE") {
@@ -576,13 +581,7 @@ export default function ReproductiveCycleTimeline({
   const today = new Date();
   const projectedCalvingDate =
     dueDate ?? (breedingDate ? addDays(breedingDate, GESTATION_REFERENCE_DAYS) : null);
-  const knownCycleEnd =
-    projectedCalvingDate && projectedCalvingDate > today ? projectedCalvingDate : today;
-  const measuredCycleDays =
-    lastCalvingDate && knownCycleEnd > lastCalvingDate
-      ? elapsedDays(lastCalvingDate, knownCycleEnd)
-      : 365;
-  const cycleDays = Math.max(365, measuredCycleDays);
+  const expectedEchoDate = breedingDate ? addDays(breedingDate, ECHOGRAPHY_WAIT_DAYS) : null;
   let ringOffset = 0;
   const elapsedRing = model.segments.map((segment) => {
     const slot = (segment.days / model.scaleDays) * RING_CIRCUMFERENCE;
@@ -622,7 +621,6 @@ export default function ReproductiveCycleTimeline({
       return {
         ...event,
         angle,
-        cycleDay: elapsedDays(eventStart, event.date),
         position: {
           left: `${50 + 45.5 * Math.cos(angle * Math.PI / 180)}%`,
           top: `${50 + 45.5 * Math.sin(angle * Math.PI / 180)}%`,
@@ -630,12 +628,19 @@ export default function ReproductiveCycleTimeline({
       };
     });
   const selectedEvent = ringEvents.find((event) => event.id === selectedEventId) ?? null;
-  const markerText =
-    model.gestation && (status === "VERT" || status === "ROSE")
-      ? model.gestation.remainingDays >= 0
+  const markerText = (() => {
+    if (model.gestation && status === "ROSE") {
+      return model.gestation.remainingDays >= 0
         ? `J-${model.gestation.remainingDays}`
-        : `J+${Math.abs(model.gestation.remainingDays)}`
-      : `J+${model.trackedDays}`;
+        : `Depuis ${Math.abs(model.gestation.remainingDays)} j`;
+    }
+    if (model.gestation && status === "VERT") return compactDuration(model.gestation.elapsedDays);
+    if (status === "JAUNE" && expectedEchoDate) return `Depuis ${elapsedDays(expectedEchoDate, today)} j`;
+    if (status === "GRIS" && breedingDate) return `Depuis ${elapsedDays(breedingDate, today)} j`;
+    if (status === "REPOS" && lastCalvingDate) return `Depuis ${elapsedDays(lastCalvingDate, today)} j`;
+    if (activeSegment?.current) return `Depuis ${activeSegment.days} j`;
+    return "Aujourd’hui";
+  })();
   const restActualDays =
     lastCalvingDate ? elapsedDays(lastCalvingDate, breedingDate && breedingDate > lastCalvingDate ? breedingDate : today) : null;
   const restDelayDays = restActualDays !== null ? Math.max(0, restActualDays - restObjectiveDays) : 0;
@@ -664,9 +669,7 @@ export default function ReproductiveCycleTimeline({
       icon: Syringe,
       color: STAGE_COLORS.service,
       main: breedingDate ? `${breedingType === "IA" ? "IA" : "Saillie"} réalisée` : "Non enregistrée",
-      detail: breedingDate
-        ? `${formatDate(breedingDate)}${lastCalvingDate ? ` — J${elapsedDays(lastCalvingDate, breedingDate)}` : ""}`
-        : "À renseigner",
+      detail: breedingDate ? formatDate(breedingDate) : "À renseigner",
     },
     {
       id: "echo",
@@ -674,7 +677,11 @@ export default function ReproductiveCycleTimeline({
       icon: CheckCircle2,
       color: echoResult === "VIDE" ? STAGE_COLORS.delay : STAGE_COLORS.pregnant,
       main: echoSummary,
-      detail: echoDate ? formatDate(echoDate) : `Dès J+${ECHOGRAPHY_WAIT_DAYS}`,
+      detail: echoDate
+        ? formatDate(echoDate)
+        : expectedEchoDate
+          ? `Dès le ${formatDate(expectedEchoDate)}`
+          : "Après saillie / IA",
     },
   ];
 
@@ -861,13 +868,13 @@ export default function ReproductiveCycleTimeline({
                     </button>
                     {event.kind === "calving" && (
                       <span className="pointer-events-none absolute left-1/2 top-[-1.25rem] w-max -translate-x-1/2 rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500 shadow-sm ring-1 ring-slate-200">
-                        Vêlage J0
+                        Début cycle
                       </span>
                     )}
                     {showText && (
                       <span className="pointer-events-none absolute left-1/2 top-12 w-max max-w-[7.5rem] -translate-x-1/2 text-center">
                         <span className="block text-[10px] font-extrabold leading-tight" style={{ color: event.color }}>{event.label}</span>
-                        <span className="block text-[9px] font-semibold leading-tight text-slate-500">J{event.cycleDay}</span>
+                        <span className="block text-[9px] font-semibold leading-tight text-slate-500">{formatDate(event.date)}</span>
                       </span>
                     )}
                     <span className="pointer-events-none absolute left-1/2 top-10 hidden w-max max-w-40 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-center text-[10px] font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
@@ -884,7 +891,7 @@ export default function ReproductiveCycleTimeline({
                 style={markerPosition}
                 aria-label="Revenir à la situation actuelle"
               >
-                <span className="flex min-h-8 min-w-8 items-center justify-center rounded-full border-2 bg-white px-1.5 text-[10px] font-extrabold shadow-sm ring-4 ring-white/90" style={{ borderColor: activeColor, color: activeColor }}>
+                <span className="flex min-h-8 min-w-8 max-w-24 items-center justify-center rounded-full border-2 bg-white px-2 text-center text-[9px] font-extrabold leading-tight shadow-sm ring-4 ring-white/90 sm:text-[10px]" style={{ borderColor: activeColor, color: activeColor }}>
                   {markerText}
                 </span>
               </button>
