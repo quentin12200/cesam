@@ -42,7 +42,6 @@ import CategorieButton from "./CategorieButton";
 import EchoButton from "./EchoButton";
 import EchoStatusBadge from "./EchoStatusBadge";
 import ReproductiveCycleTimeline from "./ReproductiveCycleTimeline";
-import ReproductiveCycleCompact from "./ReproductiveCycleCompact";
 import GroupeButton from "./GroupeButton";
 import EvenementsSection from "./EvenementsSection";
 import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
@@ -180,27 +179,6 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const perePresentExploitation = animal.taureau?.present === true;
   const affichageDelaiAttente = configAffichage.affichageDelaiAttente;
 
-  const cycleProps = {
-    status: etat,
-    breedingDate: animal.saillies[0]?.date ?? null,
-    breedingType: animal.saillies[0]?.type ?? null,
-    dueDate: animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
-    echoDate: animal.saillies[0]?.gestation?.dateEcho ?? null,
-    echoResult: animal.saillies[0]?.gestation?.resultatEcho ?? null,
-    echoObservation: animal.saillies[0]?.gestation?.sousResultat ?? null,
-    lastCalvingDate: animal.velagesVache[0]?.date ?? null,
-    calfNumber: animal.velagesVache[0]?.veau?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.nutrav ?? null,
-    calfSex: animal.velagesVache[0]?.veau?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.sexe ?? null,
-    calfBirthDate: animal.velagesVache[0]?.veau?.danais ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.danais ?? animal.velagesVache[0]?.date ?? null,
-    calfSevreDone: animal.velagesVache[0]?.veau?.sevreFait ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sevreFait ?? false,
-    breedingReference: animal.saillies[0]?.taureau?.nopere ?? animal.saillies[0]?.taureau?.nupere ?? null,
-    statusModifiedAt: animal.reproductionEtatModifieAt ?? null,
-    restObjectiveDays: configAffichage.reproReposObjectifJours,
-    dryOffCalfAgeMonths: configAffichage.tarissementVeauAgeMois,
-    dryOffDone: animal.tarieFaite,
-    dryOffDate: animal.dateTarie ?? null,
-  };
-
   const isFemelle = animal.sexbov === "F";
   const tabs = [
     { id: "identite", label: "Identité" },
@@ -285,23 +263,26 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
       {animal.sexbov === "F" && (
         <div className="px-3">
-          <div className="sm:hidden">
-            <ReproductiveCycleCompact
-              status={etat}
-              animalId={animal.id}
-              nutrav={animal.nutrav}
-              breedingDate={cycleProps.breedingDate}
-              breedingType={cycleProps.breedingType}
-              breedingId={animal.saillies[0]?.id ?? null}
-              dueDate={cycleProps.dueDate}
-              lastCalvingDate={cycleProps.lastCalvingDate}
-              restObjectiveDays={cycleProps.restObjectiveDays}
-              aEchographier={animal.aEchographier}
-            />
-          </div>
-          <div className="hidden sm:block">
-            <ReproductiveCycleTimeline {...cycleProps} />
-          </div>
+          <ReproductiveCycleTimeline
+            status={etat}
+            breedingDate={animal.saillies[0]?.date ?? null}
+            breedingType={animal.saillies[0]?.type ?? null}
+            dueDate={animal.saillies[0]?.gestation?.dateVelagePrevue ?? null}
+            echoDate={animal.saillies[0]?.gestation?.dateEcho ?? null}
+            echoResult={animal.saillies[0]?.gestation?.resultatEcho ?? null}
+            echoObservation={animal.saillies[0]?.gestation?.sousResultat ?? null}
+            lastCalvingDate={animal.velagesVache[0]?.date ?? null}
+            calfNumber={animal.velagesVache[0]?.veau?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.nutrav ?? null}
+            calfSex={animal.velagesVache[0]?.veau?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.sexe ?? null}
+            calfBirthDate={animal.velagesVache[0]?.veau?.danais ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.danais ?? animal.velagesVache[0]?.date ?? null}
+            calfSevreDone={animal.velagesVache[0]?.veau?.sevreFait ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sevreFait ?? false}
+            breedingReference={animal.saillies[0]?.taureau?.nopere ?? animal.saillies[0]?.taureau?.nupere ?? null}
+            statusModifiedAt={animal.reproductionEtatModifieAt ?? null}
+            restObjectiveDays={configAffichage.reproReposObjectifJours}
+            dryOffCalfAgeMonths={configAffichage.tarissementVeauAgeMois}
+            dryOffDone={animal.tarieFaite}
+            dryOffDate={animal.dateTarie ?? null}
+          />
         </div>
       )}
 

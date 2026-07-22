@@ -15,7 +15,7 @@ import {
   getGestationProgress,
 } from "@/lib/gestation-progress";
 
-export interface ReproductiveCycleProps {
+interface Props {
   status: EtatGestation | null;
   breedingDate: Date | null;
   breedingType: string | null;
@@ -192,7 +192,7 @@ export default function ReproductiveCycleTimeline({
   dryOffCalfAgeMonths,
   dryOffDone,
   dryOffDate,
-}: ReproductiveCycleProps) {
+}: Props) {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   const model = useMemo(() => {
