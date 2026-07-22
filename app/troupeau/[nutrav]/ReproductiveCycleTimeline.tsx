@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { addDays, differenceInCalendarDays, subDays } from "date-fns";
-import { BarChart3, CalendarDays, CheckCircle2, List, RefreshCw, Syringe } from "lucide-react";
+import { addDays, addMonths, differenceInCalendarDays, subDays } from "date-fns";
+import { AlertTriangle, BarChart3, CalendarDays, CheckCircle2, List, RefreshCw, Syringe } from "lucide-react";
 import {
   ECHOGRAPHY_WAIT_DAYS,
-  POST_CALVING_REST_DAYS,
   REPRODUCTIVE_CYCLE_COLORS,
   VELAGE_IMMINENT_DAYS,
   type EtatGestation,
@@ -27,8 +26,14 @@ interface Props {
   lastCalvingDate: Date | null;
   calfNumber: string | null;
   calfSex: string | null;
+  calfBirthDate: Date | null;
+  calfSevreDone: boolean;
   breedingReference: string | null;
   statusModifiedAt: Date | null;
+  restObjectiveDays: number;
+  dryOffCalfAgeMonths: number;
+  dryOffDone: boolean;
+  dryOffDate: Date | null;
 }
 
 type View = "cycle" | "suivi" | "analyse";
@@ -48,6 +53,14 @@ interface OverlaySegment extends Segment {
   startDays: number;
 }
 
+interface CycleAlert {
+  id: "repro-delay" | "dry-off";
+  title: string;
+  lines: string[];
+  action: string;
+  color: string;
+}
+
 interface EventItem {
   id: string;
   kind: "calving" | "natural" | "ia" | "echo-positive" | "echo-negative";
@@ -61,9 +74,9 @@ interface EventItem {
 const OPEN_CYCLE_SCALE_DAYS = 365;
 const RING_RADIUS = 82;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-const MAIN_RING_WIDTH = 10;
-const ACTIVE_RING_WIDTH = 11;
-const PAST_RING_WIDTH = 10;
+const MAIN_RING_WIDTH = 14;
+const ACTIVE_RING_WIDTH = 15;
+const PAST_RING_WIDTH = 13;
 const ECHO_OVERLAY_RADIUS = 94;
 const ECHO_OVERLAY_CIRCUMFERENCE = 2 * Math.PI * ECHO_OVERLAY_RADIUS;
 const STAGE_COLORS = REPRODUCTIVE_CYCLE_COLORS;
@@ -152,8 +165,14 @@ export default function ReproductiveCycleTimeline({
   lastCalvingDate,
   calfNumber,
   calfSex,
+  calfBirthDate,
+  calfSevreDone,
   breedingReference,
   statusModifiedAt,
+  restObjectiveDays,
+  dryOffCalfAgeMonths,
+  dryOffDone,
+  dryOffDate,
 }: Props) {
   const [view, setView] = useState<View>("cycle");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -163,6 +182,8 @@ export default function ReproductiveCycleTimeline({
     const segments: Segment[] = [];
     const overlaySegments: OverlaySegment[] = [];
     const events: EventItem[] = [];
+    const alerts: CycleAlert[] = [];
+    const safeRestObjectiveDays = Math.max(1, restObjectiveDays);
     const daysSinceBreeding = breedingDate ? elapsedDays(breedingDate, today) : null;
     const daysSinceCalving = lastCalvingDate ? elapsedDays(lastCalvingDate, today) : null;
     const calvingIsLatest = Boolean(lastCalvingDate && (!breedingDate || lastCalvingDate > breedingDate));
@@ -170,7 +191,7 @@ export default function ReproductiveCycleTimeline({
       status === "ROUGE" &&
       calvingIsLatest &&
       daysSinceCalving !== null &&
-      daysSinceCalving > POST_CALVING_REST_DAYS;
+      daysSinceCalving > safeRestObjectiveDays;
     const isEmptyAfterEcho =
       status === "ROUGE" &&
       !calvingIsLatest &&
@@ -186,6 +207,36 @@ export default function ReproductiveCycleTimeline({
     let usefulDate: string | null = null;
     let tone = "text-slate-700";
     let horizonDays = OPEN_CYCLE_SCALE_DAYS;
+
+    if (lastCalvingDate && daysSinceCalving !== null && calvingIsLatest && daysSinceCalving > safeRestObjectiveDays && !breedingDate) {
+      const delayDays = daysSinceCalving - safeRestObjectiveDays;
+      alerts.push({
+        id: "repro-delay",
+        title: "RETARD REPRO",
+        lines: [
+          `Repos réel : ${pluralDays(daysSinceCalving)}`,
+          `+${delayDays} j par rapport à l’objectif`,
+        ],
+        action: "Remise à la reproduction à prévoir",
+        color: STAGE_COLORS.delay,
+      });
+    }
+
+    if (calfBirthDate && !dryOffDone && !calfSevreDone) {
+      const advisedDryOffDate = addMonths(calfBirthDate, Math.max(1, dryOffCalfAgeMonths));
+      if (advisedDryOffDate <= today) {
+        alerts.push({
+          id: "dry-off",
+          title: "TARISSEMENT À PRÉVOIR",
+          lines: [
+            calfNumber ? `Veau ${calfNumber}` : "Dernier veau",
+            `Conseillé le ${formatDate(advisedDryOffDate)}`,
+          ],
+          action: "Confirmer seulement si le tarissement est réalisé",
+          color: STAGE_COLORS.imminent,
+        });
+      }
+    }
 
     if (lastCalvingDate) {
       events.push({
@@ -236,7 +287,7 @@ export default function ReproductiveCycleTimeline({
     }
 
     if ((status === "REPOS" || isPostCalvingDelay) && lastCalvingDate && daysSinceCalving !== null) {
-      const restDays = Math.min(daysSinceCalving, POST_CALVING_REST_DAYS);
+      const restDays = Math.min(daysSinceCalving, safeRestObjectiveDays);
       addSegment(segments, {
         id: "repos",
         label: "Repos",
@@ -247,7 +298,7 @@ export default function ReproductiveCycleTimeline({
       });
 
       if (isPostCalvingDelay) {
-        const delayDays = daysSinceCalving - POST_CALVING_REST_DAYS;
+        const delayDays = daysSinceCalving - safeRestObjectiveDays;
         addSegment(segments, {
           id: "retard",
           label: "Retard",
@@ -258,9 +309,9 @@ export default function ReproductiveCycleTimeline({
           detail: `Remise à la reproduction attendue depuis ${pluralDays(delayDays)}`,
         });
         title = "Retard";
-        main = pluralDays(delayDays);
+        main = `+${delayDays} j`;
         secondary = "Retard de remise à la reproduction";
-        usefulDate = formatDate(addDays(lastCalvingDate, POST_CALVING_REST_DAYS));
+        usefulDate = formatDate(addDays(lastCalvingDate, safeRestObjectiveDays));
         tone = "text-red-700";
       } else {
         title = "Repos post-vêlage";
@@ -448,6 +499,7 @@ export default function ReproductiveCycleTimeline({
     return {
       segments,
       overlaySegments,
+      alerts,
       events: events.sort((a, b) => b.date.getTime() - a.date.getTime()),
       title,
       main,
@@ -459,7 +511,7 @@ export default function ReproductiveCycleTimeline({
       trackedDays,
       gestation,
     };
-  }, [status, breedingDate, breedingType, breedingReference, calfNumber, calfSex, dueDate, echoDate, echoObservation, echoResult, lastCalvingDate, statusModifiedAt]);
+  }, [status, breedingDate, breedingType, breedingReference, calfBirthDate, calfNumber, calfSevreDone, calfSex, dryOffCalfAgeMonths, dryOffDone, dueDate, echoDate, echoObservation, echoResult, lastCalvingDate, restObjectiveDays, statusModifiedAt]);
 
   const activeStage =
     status === "GRIS" ? "waiting"
@@ -567,7 +619,27 @@ export default function ReproductiveCycleTimeline({
 
       <div className="px-3 py-4 sm:px-5">
         {view === "cycle" && (
-          <div className="mx-auto max-w-[660px]">
+          <div className="mx-auto max-w-[760px]">
+            {model.alerts.length > 0 && (
+              <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                {model.alerts.map((alert) => (
+                  <div key={alert.id} className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 shadow-sm">
+                    <div className="flex items-start gap-2">
+                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white shadow-sm" style={{ color: alert.color }}>
+                        <AlertTriangle size={17} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-extrabold uppercase tracking-wide" style={{ color: alert.color }}>{alert.title}</p>
+                        {alert.lines.map((line) => (
+                          <p key={line} className="mt-0.5 text-[11px] font-semibold text-red-700/80">{line}</p>
+                        ))}
+                        <p className="mt-1 text-[11px] font-bold" style={{ color: alert.color }}>{alert.action}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="relative mx-auto my-3 aspect-square w-[min(88vw,390px)] sm:w-[430px]">
               <svg
                 viewBox="0 0 200 200"
@@ -697,7 +769,7 @@ export default function ReproductiveCycleTimeline({
                     </button>
                     {event.kind === "calving" && (
                       <span className="pointer-events-none absolute left-1/2 top-[-1.25rem] w-max -translate-x-1/2 rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500 shadow-sm ring-1 ring-slate-200">
-                        Début du cycle
+                        Vêlage J0
                       </span>
                     )}
                     <span className="pointer-events-none absolute left-1/2 top-10 hidden w-max max-w-40 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-center text-[10px] font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
@@ -707,13 +779,24 @@ export default function ReproductiveCycleTimeline({
                 );
               })}
 
-              <div className="absolute z-30 -translate-x-1/2 -translate-y-1/2" style={markerPosition}>
+              <button
+                type="button"
+                onClick={() => setSelectedEventId(null)}
+                className="absolute z-30 -translate-x-1/2 -translate-y-1/2 rounded-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300"
+                style={markerPosition}
+                aria-label="Revenir à la situation actuelle"
+              >
                 <span className="flex min-h-8 min-w-8 items-center justify-center rounded-full border-2 bg-white px-1.5 text-[10px] font-extrabold shadow-sm ring-4 ring-white/90" style={{ borderColor: activeColor, color: activeColor }}>
                   {markerText}
                 </span>
-              </div>
+              </button>
 
-              <div className="absolute inset-[23%] flex flex-col items-center justify-center rounded-full bg-white px-5 text-center shadow-[inset_0_0_0_1px_#eef2f7]">
+              <button
+                type="button"
+                onClick={() => selectedEvent && setSelectedEventId(null)}
+                className="absolute inset-[23%] flex flex-col items-center justify-center rounded-full bg-white px-5 text-center shadow-[inset_0_0_0_1px_#eef2f7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300"
+                aria-label={selectedEvent ? "Revenir à la situation actuelle" : `${model.title} : ${model.main}`}
+              >
                 {selectedEvent ? (
                   <>
                     <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400 sm:text-[10px]">Événement</span>
@@ -751,8 +834,28 @@ export default function ReproductiveCycleTimeline({
                     )}
                   </>
                 )}
-              </div>
+              </button>
             </div>
+            {model.events.length > 0 && (
+              <div className="mx-auto mt-3 grid max-w-2xl gap-2 sm:grid-cols-3">
+                {model.events.slice(0, 3).map((event) => (
+                  <button
+                    key={`${event.id}-summary-${event.date.toISOString()}`}
+                    type="button"
+                    onClick={() => setSelectedEventId(event.id)}
+                    className="flex min-h-14 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm transition hover:border-slate-300"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 bg-white" style={{ borderColor: event.color, color: event.color }}>
+                      <EventIcon kind={event.kind} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[11px] font-bold text-slate-700">{event.label}</span>
+                      <span className="block truncate text-[10px] text-slate-500">{formatDate(event.date)}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="mx-auto mt-2 flex w-fit items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-[10px] font-semibold text-slate-500 sm:text-xs">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: activeColor }} />
               <span>{Math.round(progressRatio * 100)} % du cycle visualisé</span>

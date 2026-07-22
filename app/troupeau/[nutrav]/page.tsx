@@ -68,12 +68,24 @@ async function getProtocoles(): Promise<ProtocoleVaccinConfig[]> {
   return DEFAULT_PROTOCOLES;
 }
 
-async function getAffichageDelaiAttente(): Promise<string> {
+async function getExploitationDisplayConfig(): Promise<{
+  affichageDelaiAttente: string;
+  reproReposObjectifJours: number;
+  tarissementVeauAgeMois: number;
+}> {
   try {
     const config = await prisma.exploitationConfig.findUnique({ where: { id: "singleton" } });
-    return config?.affichageDelaiAttente ?? "LES_DEUX";
+    return {
+      affichageDelaiAttente: config?.affichageDelaiAttente ?? "LES_DEUX",
+      reproReposObjectifJours: config?.reproReposObjectifJours ?? 60,
+      tarissementVeauAgeMois: config?.tarissementVeauAgeMois ?? 6,
+    };
   } catch {
-    return "LES_DEUX";
+    return {
+      affichageDelaiAttente: "LES_DEUX",
+      reproReposObjectifJours: 60,
+      tarissementVeauAgeMois: 6,
+    };
   }
 }
 
@@ -99,8 +111,8 @@ async function getAnimal(nutrav: string) {
       velagesVache: {
         orderBy: { date: "desc" },
         include: {
-          veau: { select: { nutrav: true, nobovi: true, sexbov: true, statut: true } },
-          veauxDetails: { include: { animal: { select: { nutrav: true, nobovi: true, sexbov: true, statut: true } } } },
+          veau: { select: { nutrav: true, nobovi: true, danais: true, sexbov: true, statut: true, sevreFait: true } },
+          veauxDetails: { include: { animal: { select: { nutrav: true, nobovi: true, danais: true, sexbov: true, statut: true, sevreFait: true } } } },
         },
       },
       velageVeau: {
@@ -120,8 +132,8 @@ async function getAnimal(nutrav: string) {
 export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const { nutrav } = await params;
   const { onglet = "identite", pesee, poids } = await searchParams;
-  const [animal, groupes, protocoles, affichageDelaiAttente] = await Promise.all([
-    getAnimal(nutrav), getGroupes(), getProtocoles(), getAffichageDelaiAttente(),
+  const [animal, groupes, protocoles, configAffichage] = await Promise.all([
+    getAnimal(nutrav), getGroupes(), getProtocoles(), getExploitationDisplayConfig(),
   ]);
 
   if (!animal) notFound();
@@ -165,6 +177,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const protocolSteps = getVaccinProtocolSteps(animal.danais, animal.vaccinations, protocoles);
   const mheStatus = isMheVendable(animal.vaccinations);
   const perePresentExploitation = animal.taureau?.present === true;
+  const affichageDelaiAttente = configAffichage.affichageDelaiAttente;
 
   const isFemelle = animal.sexbov === "F";
   const tabs = [
@@ -261,8 +274,14 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             lastCalvingDate={animal.velagesVache[0]?.date ?? null}
             calfNumber={animal.velagesVache[0]?.veau?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.nutrav ?? null}
             calfSex={animal.velagesVache[0]?.veau?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.sexe ?? null}
+            calfBirthDate={animal.velagesVache[0]?.veau?.danais ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.danais ?? animal.velagesVache[0]?.date ?? null}
+            calfSevreDone={animal.velagesVache[0]?.veau?.sevreFait ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sevreFait ?? false}
             breedingReference={animal.saillies[0]?.taureau?.nopere ?? animal.saillies[0]?.taureau?.nupere ?? null}
             statusModifiedAt={animal.reproductionEtatModifieAt ?? null}
+            restObjectiveDays={configAffichage.reproReposObjectifJours}
+            dryOffCalfAgeMonths={configAffichage.tarissementVeauAgeMois}
+            dryOffDone={animal.tarieFaite}
+            dryOffDate={animal.dateTarie ?? null}
           />
         </div>
       )}
