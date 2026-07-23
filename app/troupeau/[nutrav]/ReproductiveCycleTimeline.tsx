@@ -247,6 +247,19 @@ function desktopDetailPosition(angle: number) {
     : "right-full top-1/2 mr-2 -translate-y-1/2 text-right";
 }
 
+function desktopLeaderPosition(angle: number) {
+  const cosine = Math.cos(angle * Math.PI / 180);
+  const sine = Math.sin(angle * Math.PI / 180);
+  if (Math.abs(cosine) > 0.46) {
+    return sine >= 0
+      ? "left-1/2 top-full h-2 border-l"
+      : "bottom-full left-1/2 h-2 border-l";
+  }
+  return cosine >= 0
+    ? "left-full top-1/2 w-2 border-t"
+    : "right-full top-1/2 w-2 border-t";
+}
+
 export default function ReproductiveCycleTimeline({
   status,
   breedingDate,
@@ -1005,10 +1018,10 @@ export default function ReproductiveCycleTimeline({
               </svg>
 
               <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 text-center">
-                <span className="block whitespace-nowrap rounded-full bg-white/95 px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-[0.14em] text-slate-400 shadow-sm ring-1 ring-slate-100 sm:text-[9px]">
+                <span className="block whitespace-nowrap bg-white/90 px-1.5 text-[8px] font-bold uppercase tracking-[0.16em] text-slate-400 sm:text-[9px]">
                   Début cycle
                 </span>
-                <span className="mx-auto block h-2 w-px bg-slate-300" />
+                <span className="mx-auto mt-0.5 block h-2 w-px bg-slate-300" />
               </div>
 
               {ringEvents.map((event) => {
@@ -1027,9 +1040,9 @@ export default function ReproductiveCycleTimeline({
                       aria-label={`${event.label}, ${formatDate(event.date)}. Afficher les détails`}
                       className={`flex touch-manipulation items-center justify-center rounded-full bg-white transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 ${
                         event.kind === "calving"
-                          ? "h-7 w-7 border-2 shadow-sm sm:h-9 sm:w-9"
-                          : "h-9 w-9 border-2 shadow-md sm:h-[52px] sm:w-[52px] sm:border-[3px]"
-                      } ${selected ? "scale-110 shadow-lg ring-2 ring-white sm:ring-4" : ""}`}
+                          ? "h-7 w-7 border bg-white sm:h-9 sm:w-9"
+                          : "h-9 w-9 border-2 bg-white shadow-sm sm:h-12 sm:w-12"
+                      } ${selected ? "scale-110 ring-2 ring-white sm:ring-4" : ""}`}
                       style={{ borderColor: event.color, color: event.color }}
                       title={`${event.label} · ${formatDate(event.date)}`}
                     >
@@ -1038,10 +1051,16 @@ export default function ReproductiveCycleTimeline({
                       </span>
                     </button>
                     {showText && (
-                      <span className={`pointer-events-none absolute hidden w-28 rounded-lg border border-slate-200 bg-white/95 px-2 py-1.5 shadow-sm sm:block ${desktopDetailPosition(event.desktopAngle)}`}>
-                        <span className="block text-[10px] font-extrabold leading-tight" style={{ color: event.color }}>{event.label}</span>
-                        <span className="mt-0.5 block text-[9px] font-semibold leading-tight text-slate-500">{formatDate(event.date)}</span>
-                      </span>
+                      <>
+                        <span
+                          className={`pointer-events-none absolute hidden border-dashed border-slate-300 sm:block ${desktopLeaderPosition(event.desktopAngle)}`}
+                          aria-hidden="true"
+                        />
+                        <span className={`pointer-events-none absolute hidden w-24 px-1 py-1 sm:block ${desktopDetailPosition(event.desktopAngle)}`}>
+                          <span className="block text-[9px] font-bold leading-tight" style={{ color: event.color }}>{event.label}</span>
+                          <span className="mt-0.5 block text-[8px] font-medium leading-tight text-slate-400">{formatDate(event.date)}</span>
+                        </span>
+                      </>
                     )}
                     {showText && !selected && (
                       <span className="pointer-events-none absolute left-1/2 top-full mt-0.5 w-max -translate-x-1/2 rounded bg-white/90 px-1 text-[8px] font-bold leading-tight text-slate-600 sm:hidden">
@@ -1059,7 +1078,7 @@ export default function ReproductiveCycleTimeline({
                 style={markerPosition}
                 aria-label="Revenir à la situation actuelle"
               >
-                <span className="flex min-h-7 min-w-7 max-w-20 items-center justify-center rounded-full border bg-white px-1.5 text-center text-[8px] font-extrabold leading-tight shadow-sm ring-2 ring-white/90 sm:text-[9px]" style={{ borderColor: activeColor, color: activeColor }}>
+                <span className="flex min-h-7 min-w-7 max-w-20 items-center justify-center rounded-full border bg-white/95 px-1.5 text-center text-[8px] font-bold leading-tight ring-2 ring-white/90 sm:text-[9px]" style={{ borderColor: activeColor, color: activeColor }}>
                   {markerText}
                 </span>
               </button>
@@ -1070,16 +1089,14 @@ export default function ReproductiveCycleTimeline({
                 className="absolute inset-[25%] flex flex-col items-center justify-center rounded-full bg-white px-2 text-center shadow-[inset_0_0_0_1px_#eef2f7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:px-5"
                 aria-label={`${model.title} : ${model.main}`}
               >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 ring-1 ring-slate-100" style={{ color: activeColor }}>
-                      <CheckCircle2 size={23} strokeWidth={2.6} />
-                    </span>
-                    <span className={`mt-2 text-lg font-extrabold leading-none sm:text-2xl ${model.tone}`}>
-                      {model.title}
-                    </span>
-                    <strong className="mt-2 rounded-full px-3 py-1 text-sm leading-tight sm:text-base" style={{ backgroundColor: softenColor(activeColor, 0.82), color: activeColor }}>
-                      {model.main}
-                    </strong>
-                    <span className="mt-3 h-px w-1/2 bg-slate-200" />
+                <span className="text-[9px] font-medium text-slate-500 sm:text-xs">Aujourd’hui</span>
+                <span className={`mt-2 text-xl font-extrabold uppercase leading-none tracking-tight sm:text-3xl ${model.tone}`}>
+                  {model.title}
+                </span>
+                <strong className="mt-2 text-sm leading-tight sm:text-lg" style={{ color: activeColor }}>
+                  {model.main}
+                </strong>
+                <span className="mt-3 h-px w-1/2" style={{ backgroundColor: softenColor(activeColor, 0.72) }} />
                     {status === "VERT" && projectedCalvingDate && (
                       <span className="mt-2 max-w-[92%] text-[10px] font-semibold leading-snug text-slate-600 sm:hidden">
                         Vêlage prévu le {formatDate(projectedCalvingDate)}
@@ -1119,18 +1136,18 @@ export default function ReproductiveCycleTimeline({
               </div>
             )}
 
-            <div className="mx-auto mt-2 flex max-w-3xl snap-x gap-2 overflow-x-auto px-1 pb-1 sm:mt-4 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
+            <div className="mx-auto mt-3 flex max-w-3xl snap-x overflow-x-auto border-t border-slate-100 px-1 pt-2 sm:mt-5 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pt-3">
               {summaryCards.map((card) => {
                 const Icon = card.icon;
                 return (
-                  <div key={card.id} className="flex min-h-14 min-w-[82%] snap-start items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm sm:min-h-16 sm:min-w-0">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50" style={{ color: card.color }}>
-                      <Icon size={18} />
+                  <div key={card.id} className="flex min-h-14 min-w-[72%] snap-start items-center gap-2 px-3 py-1.5 text-left sm:min-h-14 sm:min-w-0 sm:border-r sm:border-slate-100 sm:last:border-r-0">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center" style={{ color: card.color }}>
+                      <Icon size={17} strokeWidth={1.8} />
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-[11px] font-extrabold text-slate-700">{card.title}</span>
-                      <span className="block truncate text-[10px] font-semibold text-slate-600">{card.main}</span>
-                      <span className="block truncate text-[10px] text-slate-500">{card.detail}</span>
+                      <span className="block truncate text-[10px] font-bold uppercase tracking-wide" style={{ color: card.color }}>{card.title}</span>
+                      <span className="block truncate text-[10px] font-medium text-slate-600">{card.main}</span>
+                      <span className="block truncate text-[9px] text-slate-400">{card.detail}</span>
                     </span>
                   </div>
                 );
