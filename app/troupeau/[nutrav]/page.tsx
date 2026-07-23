@@ -39,7 +39,6 @@ import PeseeInlineForm from "./PeseeInlineForm";
 import SevrageButton from "./SevrageButton";
 import QuickActionsBar from "./QuickActionsBar";
 import CategorieButton from "./CategorieButton";
-import EchoButton from "./EchoButton";
 import EchoStatusBadge from "./EchoStatusBadge";
 import ReproductiveCycleTimeline from "./ReproductiveCycleTimeline";
 import GroupeButton from "./GroupeButton";
@@ -49,6 +48,7 @@ import LierVeauButton from "./LierVeauButton";
 import ReproductionStatusEditor from "@/components/ReproductionStatusEditor";
 import type { EtatGestation } from "@/lib/utils";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
+import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -144,6 +144,9 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   ]);
 
   if (!animal) notFound();
+  const lastCalving = animal.velagesVache[0]?.date ?? null;
+  const currentBreeding = getCurrentCycleBreeding(animal.saillies, lastCalving);
+  const activeEchoRequest = animal.demandesEchographie[0] ?? null;
 
   const etat: EtatGestation | null =
     animal.sexbov === "F"
@@ -218,7 +221,9 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               {animal.demandesEchographie.length > 0 && (
                 <EchoStatusBadge
                   nutrav={animal.nutrav}
-                  canCancel
+                  canCancel={activeEchoRequest?.origine === "MANUELLE"}
+                  saillieId={currentBreeding?.id ?? null}
+                  saillieDate={currentBreeding?.date.toISOString() ?? null}
                 />
               )}
               {animal.statut !== "ACTIF" && (
@@ -235,6 +240,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               nutrav={animal.nutrav}
               isFemelle={isFemelle}
               isActif={animal.statut === "ACTIF"}
+              saillieId={currentBreeding?.id ?? null}
+              saillieDate={currentBreeding?.date.toISOString() ?? null}
               className="p-0"
             />
             <div className="ml-auto inline-flex items-center rounded-xl border border-gray-200 bg-gray-50 p-1 [&>button]:!m-0 [&>button]:!bg-transparent [&>button]:!shadow-none">
@@ -390,14 +397,6 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     groupeNom={animal.groupe?.nom ?? null}
                     groupes={groupes}
                   />
-                  {animal.sexbov === "F" && (
-                    <EchoButton
-                      nutrav={animal.nutrav}
-                      aEchographier={animal.demandesEchographie.length > 0}
-                      saillieId={animal.saillies[0]?.id ?? null}
-                      saillieDate={animal.saillies[0]?.date.toISOString() ?? null}
-                    />
-                  )}
                 </div>
               )}
             </div>

@@ -2,25 +2,28 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X } from "lucide-react";
+import { Plus, ScanLine, X } from "lucide-react";
 import { ACTION_VISUALS } from "@/components/action-visuals";
+import EchoModal from "./EchoModal";
 
 interface Props {
   animalId: string;
   nutrav: string;
   isFemelle: boolean;
   isActif: boolean;
+  saillieId?: string | null;
+  saillieDate?: string | null;
   className?: string;
 }
 
-type Modal = "chaleur" | null;
+type Modal = "chaleur" | "echo" | null;
 
 const today = new Date().toISOString().slice(0, 10);
 const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 const SaillieIcon = ACTION_VISUALS.saillieIA.icon;
 const EvenementIcon = ACTION_VISUALS.evenementSanitaire.icon;
 
-export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, className }: Props) {
+export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, saillieId, saillieDate, className }: Props) {
   const router = useRouter();
   const [modal, setModal] = useState<Modal>(null);
   const [loading, setLoading] = useState(false);
@@ -95,6 +98,17 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
                 <button
                   type="button"
                   role="menuitem"
+                  onClick={() => { setMenuOpen(false); setModal("echo"); }}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-yellow-700 hover:bg-yellow-50"
+                >
+                  <ScanLine size={19} />
+                  Échographie
+                </button>
+              )}
+              {isFemelle && (
+                <button
+                  type="button"
+                  role="menuitem"
                   onClick={() => { setMenuOpen(false); open("chaleur"); }}
                   className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-pink-700 hover:bg-pink-50"
                 >
@@ -131,7 +145,7 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
       )}
 
       {/* Modal backdrop */}
-      {modal && (
+      {modal === "chaleur" && (
         <div
           ref={backdropRef}
           className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center"
@@ -182,6 +196,15 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
 
           </div>
         </div>
+      )}
+      {modal === "echo" && (
+        <EchoModal
+          nutrav={nutrav}
+          saillieId={saillieId}
+          saillieDate={saillieDate}
+          onClose={close}
+          onDone={() => { close(); router.refresh(); }}
+        />
       )}
     </>
   );

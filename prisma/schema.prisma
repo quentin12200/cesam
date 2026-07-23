@@ -127,6 +127,7 @@ model Gestation {
   joursGestation   Int?
   dateVelagePrevue DateTime?
   resultatEcho     String?
+  observationEcho  String?
   sousResultat     String?
 
   velage           Velage?
@@ -311,6 +312,8 @@ model DemandeEchographie {
   origine     String
   etat        String    @default("A_FAIRE")
   motif       String?
+  planifieeAt DateTime?
+  observation String?
   requestKey  String?   @unique
   clotureeAt  DateTime?
   auteurAjout String?

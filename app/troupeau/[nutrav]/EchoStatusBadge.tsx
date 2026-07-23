@@ -3,16 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import EchoModal from "./EchoModal";
 
 interface Props {
   nutrav: string;
   canCancel: boolean;
+  saillieId?: string | null;
+  saillieDate?: string | null;
 }
 
-export default function EchoStatusBadge({ nutrav, canCancel }: Props) {
+export default function EchoStatusBadge({ nutrav, canCancel, saillieId, saillieDate }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [echoOpen, setEchoOpen] = useState(false);
 
   async function cancelEchoPlanning(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -35,8 +39,10 @@ export default function EchoStatusBadge({ nutrav, canCancel }: Props) {
   }
 
   return (<>
-    <span className="inline-flex items-center rounded-full bg-yellow-400 pl-2 text-xs font-semibold text-black">
-      Écho à faire
+    <span className="inline-flex items-center rounded-full bg-yellow-400 text-xs font-semibold text-black">
+      <button type="button" onClick={() => setEchoOpen(true)} className="min-h-8 rounded-full py-1 pl-2 pr-1 font-semibold">
+        Écho à faire
+      </button>
       {canCancel && (
         <button
           type="button"
@@ -75,6 +81,16 @@ export default function EchoStatusBadge({ nutrav, canCancel }: Props) {
           </span>
         </span>
       </span>
+    )}
+    {echoOpen && (
+      <EchoModal
+        nutrav={nutrav}
+        saillieId={saillieId}
+        saillieDate={saillieDate}
+        initialMode="ENREGISTRER"
+        onClose={() => setEchoOpen(false)}
+        onDone={() => { setEchoOpen(false); router.refresh(); }}
+      />
     )}
   </>);
 }

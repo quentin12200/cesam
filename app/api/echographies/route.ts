@@ -8,7 +8,7 @@ const DUREE_GESTATION = 285; // jours — Blonde Aquitaine
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { saillieId, date, resultat, dateVelagePrevue: dateVelagePrevueStr, joursGestation } = body;
+    const { saillieId, date, resultat, dateVelagePrevue: dateVelagePrevueStr, joursGestation, remarque } = body;
 
     if (!saillieId || !date || !resultat) {
       return NextResponse.json({ error: "saillieId, date et resultat sont requis" }, { status: 400 });
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const prevAnimal = await prisma.animal.findUnique({ where: { id: saillie.animalId }, select: { aEchographier: true } });
     const prevAEchographier = prevAnimal?.aEchographier ?? false;
     const activeRequests = await prisma.demandeEchographie.findMany({
-      where: { animalId: saillie.animalId, etat: "A_FAIRE" },
+      where: { animalId: saillie.animalId, etat: "A_FAIRE", OR: [{ saillieId }, { saillieId: null }] },
       select: { id: true, etat: true, clotureeAt: true, requestKey: true },
     });
 
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
       etat: nouvelEtat,
       dateEcho: new Date(date),
       resultatEcho: resultat,
+      observationEcho: typeof remarque === "string" ? remarque.trim() || null : null,
       joursGestation: joursGestationFinal ?? null,
       dateVelagePrevue: dateVelagePrevue ?? null,
       updatedAt: new Date(),
@@ -72,14 +73,20 @@ export async function POST(request: NextRequest) {
         data: { aEchographier: false },
       }),
       prisma.demandeEchographie.updateMany({
-        where: { animalId: saillie.animalId, etat: "A_FAIRE", origine: "AUTOMATIQUE" },
+        where: { animalId: saillie.animalId, etat: "A_FAIRE", origine: "AUTOMATIQUE", OR: [{ saillieId }, { saillieId: null }] },
         data: { etat: "REALISEE", clotureeAt: new Date(date) },
       }),
       prisma.demandeEchographie.updateMany({
-        where: { animalId: saillie.animalId, etat: "A_FAIRE", origine: "MANUELLE" },
+        where: { animalId: saillie.animalId, etat: "A_FAIRE", origine: "MANUELLE", OR: [{ saillieId }, { saillieId: null }] },
         data: { etat: "REALISEE", clotureeAt: new Date(date), requestKey: null },
       }),
     ]);
+    const remainingEchoRequests = await prisma.demandeEchographie.count({
+      where: { animalId: saillie.animalId, etat: "A_FAIRE" },
+    });
+    if (remainingEchoRequests > 0) {
+      await prisma.animal.update({ where: { id: saillie.animalId }, data: { aEchographier: true } });
+    }
 
     const desc = `Échographie ${resultat === "PLEINE" ? "positive" : "négative"} enregistrée`;
     let undoId = "";
@@ -95,6 +102,7 @@ export async function POST(request: NextRequest) {
             etat: prevGestation.etat,
             dateEcho: prevGestation.dateEcho,
             resultatEcho: prevGestation.resultatEcho,
+            observationEcho: prevGestation.observationEcho,
             joursGestation: prevGestation.joursGestation,
             dateVelagePrevue: prevGestation.dateVelagePrevue,
           },
