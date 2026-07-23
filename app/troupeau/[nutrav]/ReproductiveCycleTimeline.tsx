@@ -69,6 +69,12 @@ interface EventItem {
   transition: string;
 }
 
+interface PositionedEvent extends EventItem {
+  angle: number;
+  desktopAngle: number;
+  position: CSSProperties;
+}
+
 const OPEN_CYCLE_SCALE_DAYS = 365;
 const RING_RADIUS = 78;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
@@ -171,6 +177,68 @@ function calfSexLabel(sex: string | null) {
   if (sex === "F") return "Femelle";
   if (sex === "M") return "Mâle";
   return null;
+}
+
+function angularPosition(angle: number, radius: number) {
+  const radians = angle * Math.PI / 180;
+  return {
+    x: radius * Math.cos(radians),
+    y: radius * Math.sin(radians),
+  };
+}
+
+function distanceBetween(
+  left: { x: number; y: number },
+  right: { x: number; y: number }
+) {
+  return Math.hypot(left.x - right.x, left.y - right.y);
+}
+
+function avoidRingCollisions(
+  events: Array<EventItem & { angle: number }>,
+  radius: number,
+  markerAngle: number,
+  minimumEventDistance: number,
+  minimumMarkerDistance: number
+) {
+  const marker = angularPosition(markerAngle, radius - 7);
+  const placed: Array<{ x: number; y: number }> = [];
+
+  return events.map((event) => {
+    let displayAngle = event.angle;
+    let point = angularPosition(displayAngle, radius);
+    let attempts = 0;
+
+    // Les dates restent ancrées à leur angle réel. Seul le rendu est décalé
+    // progressivement dans le sens chronologique lorsqu'une zone est occupée.
+    while (
+      attempts < 12
+      && (
+        distanceBetween(point, marker) < minimumMarkerDistance
+        || placed.some((candidate) => distanceBetween(point, candidate) < minimumEventDistance)
+      )
+    ) {
+      displayAngle += 9;
+      point = angularPosition(displayAngle, radius);
+      attempts += 1;
+    }
+
+    placed.push(point);
+    return { angle: displayAngle, point };
+  });
+}
+
+function desktopDetailPosition(angle: number) {
+  const cosine = Math.cos(angle * Math.PI / 180);
+  const sine = Math.sin(angle * Math.PI / 180);
+  if (Math.abs(cosine) > 0.46) {
+    return sine >= 0
+      ? "left-1/2 top-full mt-2 -translate-x-1/2 text-center"
+      : "bottom-full left-1/2 mb-2 -translate-x-1/2 text-center";
+  }
+  return cosine >= 0
+    ? "left-full top-1/2 ml-2 -translate-y-1/2 text-left"
+    : "right-full top-1/2 mr-2 -translate-y-1/2 text-right";
 }
 
 export default function ReproductiveCycleTimeline({
@@ -631,22 +699,25 @@ export default function ReproductiveCycleTimeline({
     ? projectedCalvingDate
     : addDays(eventStart, model.scaleDays);
   const eventSpan = Math.max(1, elapsedDays(eventStart, eventEnd));
-  const ringEvents = model.events
+  const eventAngles = model.events
     .filter((event) => event.date >= eventStart && event.date <= eventEnd)
     .map((event) => {
       const ratio = Math.min(1, Math.max(0, elapsedDays(eventStart, event.date) / eventSpan));
       const angle = ratio * 360 - 90;
-      return {
-        ...event,
-        angle,
-        position: {
-          "--event-x-mobile": `${40 * Math.cos(angle * Math.PI / 180)}%`,
-          "--event-y-mobile": `${40 * Math.sin(angle * Math.PI / 180)}%`,
-          "--event-x-desktop": `${45.5 * Math.cos(angle * Math.PI / 180)}%`,
-          "--event-y-desktop": `${45.5 * Math.sin(angle * Math.PI / 180)}%`,
-        } as CSSProperties,
-      };
+      return { ...event, angle };
     });
+  const mobileEventLayout = avoidRingCollisions(eventAngles, 39, markerAngle, 13.5, 19);
+  const desktopEventLayout = avoidRingCollisions(eventAngles, 39, markerAngle, 13, 16);
+  const ringEvents: PositionedEvent[] = eventAngles.map((event, index) => ({
+    ...event,
+    desktopAngle: desktopEventLayout[index].angle,
+    position: {
+      "--event-x-mobile": `${mobileEventLayout[index].point.x}%`,
+      "--event-y-mobile": `${mobileEventLayout[index].point.y}%`,
+      "--event-x-desktop": `${desktopEventLayout[index].point.x}%`,
+      "--event-y-desktop": `${desktopEventLayout[index].point.y}%`,
+    } as CSSProperties,
+  }));
   const selectedEvent = ringEvents.find((event) => event.id === selectedEventId) ?? null;
   const markerText = (() => {
     if (model.gestation && status === "ROSE") {
@@ -882,13 +953,38 @@ export default function ReproductiveCycleTimeline({
                 </g>
               </svg>
 
+              <svg
+                viewBox="0 0 200 200"
+                className="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible sm:block"
+                aria-hidden="true"
+              >
+                {ringEvents.map((event, index) => {
+                  const anchor = angularPosition(event.angle, 78);
+                  const displaced = angularPosition(desktopEventLayout[index].angle, 78);
+                  if (distanceBetween(anchor, displaced) < 1) return null;
+                  return (
+                    <line
+                      key={`${event.id}-connector`}
+                      x1={100 + anchor.x}
+                      y1={100 + anchor.y}
+                      x2={100 + displaced.x}
+                      y2={100 + displaced.y}
+                      stroke={softenColor(event.color, 0.42)}
+                      strokeWidth="0.9"
+                      strokeLinecap="round"
+                      strokeDasharray="2 2"
+                    />
+                  );
+                })}
+              </svg>
+
               {ringEvents.map((event) => {
                 const selected = selectedEventId === event.id;
                 const showText = event.kind !== "calving";
                 return (
                   <div
                     key={`${event.label}-${event.date.toISOString()}`}
-                    className={`group absolute left-[calc(50%+var(--event-x-mobile))] top-[calc(50%+var(--event-y-mobile))] -translate-x-1/2 -translate-y-1/2 sm:left-[calc(50%+var(--event-x-desktop))] sm:top-[calc(50%+var(--event-y-desktop))] ${selected ? "z-40" : "z-20"}`}
+                    className={`group absolute left-[calc(50%+var(--event-x-mobile))] top-[calc(50%+var(--event-y-mobile))] -translate-x-1/2 -translate-y-1/2 sm:left-[calc(50%+var(--event-x-desktop))] sm:top-[calc(50%+var(--event-y-desktop))] ${selected ? "z-[25]" : "z-20"}`}
                     style={event.position}
                   >
                     <button
@@ -896,7 +992,7 @@ export default function ReproductiveCycleTimeline({
                       onClick={() => setSelectedEventId(selectedEventId === event.id ? null : event.id)}
                       aria-expanded={selected}
                       aria-label={`${event.label}, ${formatDate(event.date)}. Afficher les détails`}
-                      className={`flex h-10 w-10 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:h-16 sm:w-16 ${selected ? "scale-110 border-[3px] shadow-lg ring-2 ring-white sm:border-[4px] sm:ring-4" : "border-[2px] sm:border-[3px]"}`}
+                      className={`flex h-10 w-10 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:h-14 sm:w-14 ${selected ? "scale-110 border-[3px] shadow-lg ring-2 ring-white sm:ring-4" : "border-[2px] sm:border-[3px]"}`}
                       style={{ borderColor: event.color, color: event.color }}
                       title={`${event.label} · ${formatDate(event.date)}`}
                     >
@@ -908,14 +1004,16 @@ export default function ReproductiveCycleTimeline({
                       </span>
                     )}
                     {showText && (
-                      <span className="pointer-events-none absolute left-1/2 top-16 hidden w-max max-w-[7.5rem] -translate-x-1/2 text-center sm:block">
+                      <span className={`pointer-events-none absolute hidden w-28 rounded-lg border border-slate-200 bg-white/95 px-2 py-1.5 shadow-sm sm:block ${desktopDetailPosition(event.desktopAngle)}`}>
                         <span className="block text-[10px] font-extrabold leading-tight" style={{ color: event.color }}>{event.label}</span>
-                        <span className="block text-[9px] font-semibold leading-tight text-slate-500">{formatDate(event.date)}</span>
+                        <span className="mt-0.5 block text-[9px] font-semibold leading-tight text-slate-500">{formatDate(event.date)}</span>
                       </span>
                     )}
-                    <span className="pointer-events-none absolute left-1/2 top-10 hidden w-max max-w-40 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-center text-[10px] font-semibold text-white shadow-lg group-hover:block group-focus-within:block">
-                      {event.label} · {formatDate(event.date)}
-                    </span>
+                    {showText && !selected && (
+                      <span className="pointer-events-none absolute left-1/2 top-full mt-0.5 w-max -translate-x-1/2 rounded bg-white/90 px-1 text-[8px] font-bold leading-tight text-slate-600 sm:hidden">
+                        {event.kind.startsWith("echo") ? "Écho" : event.kind === "ia" ? "IA" : "Saillie"}
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -934,27 +1032,10 @@ export default function ReproductiveCycleTimeline({
 
               <button
                 type="button"
-                onClick={() => selectedEvent && setSelectedEventId(null)}
+                onClick={() => setSelectedEventId(null)}
                 className="absolute inset-[23%] flex flex-col items-center justify-center rounded-full bg-white px-2 text-center shadow-[inset_0_0_0_1px_#eef2f7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:px-5"
-                aria-label={selectedEvent ? "Revenir à la situation actuelle" : `${model.title} : ${model.main}`}
+                aria-label={`${model.title} : ${model.main}`}
               >
-                {selectedEvent ? (
-                  <>
-                    <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400 sm:text-[10px]">Événement</span>
-                    <span className="mt-1" style={{ color: selectedEvent.color }}><EventIcon kind={selectedEvent.kind} /></span>
-                    <strong className="mt-1 text-sm leading-tight text-slate-900 sm:text-lg">{selectedEvent.label}</strong>
-                    <span className="mt-0.5 text-[11px] font-bold text-slate-700 sm:text-xs">{formatDate(selectedEvent.date)}</span>
-                    {selectedEvent.details.map((detail) => (
-                      <span key={detail} className="mt-0.5 line-clamp-1 max-w-[92%] text-[9px] leading-snug text-slate-500 sm:text-[11px]">
-                        {detail}
-                      </span>
-                    ))}
-                    <span className="mt-1 text-[9px] font-bold uppercase tracking-wide sm:text-[10px]" style={{ color: selectedEvent.color }}>
-                      {selectedEvent.transition}
-                    </span>
-                  </>
-                ) : (
-                  <>
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 ring-1 ring-slate-100" style={{ color: activeColor }}>
                       <CheckCircle2 size={23} strokeWidth={2.6} />
                     </span>
@@ -978,10 +1059,31 @@ export default function ReproductiveCycleTimeline({
                         {model.usefulDate}
                       </span>
                     )}
-                  </>
-                )}
               </button>
             </div>
+
+            {selectedEvent && (
+              <div
+                className="mx-auto mt-2 max-w-xl rounded-xl border bg-white px-3 py-2 shadow-sm"
+                style={{ borderColor: softenColor(selectedEvent.color, 0.58) }}
+                aria-live="polite"
+              >
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 shrink-0" style={{ color: selectedEvent.color }}>
+                    <EventIcon kind={selectedEvent.kind} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <strong className="text-sm text-slate-900">{selectedEvent.label}</strong>
+                      <span className="text-xs font-bold text-slate-600">{formatDate(selectedEvent.date)}</span>
+                    </div>
+                    {selectedEvent.details.map((detail) => (
+                      <p key={detail} className="truncate text-[11px] text-slate-500">{detail}</p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="mx-auto mt-2 flex max-w-3xl snap-x gap-2 overflow-x-auto px-1 pb-1 sm:mt-4 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
               {summaryCards.map((card) => {
