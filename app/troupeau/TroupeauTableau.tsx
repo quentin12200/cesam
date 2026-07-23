@@ -331,7 +331,7 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                         ? new Date(animal.gestationVelagePrevue)
                         : null,
                       animal.velageDate ? new Date(animal.velageDate) : null,
-                      animal.aEchographier
+                      false
                     )
                   : null;
 

@@ -3,8 +3,10 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { subMonths } from "date-fns";
+import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 
 export async function GET() {
+  await syncAutomaticEchoRequests();
   const now = new Date();
   const dateMin24Mois = subMonths(now, 24);
 
@@ -37,6 +39,12 @@ export async function GET() {
       danais: true,
       estGenisse: true,
       aEchographier: true,
+      demandesEchographie: {
+        where: { etat: "A_FAIRE" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { origine: true, motif: true },
+      },
       reproductionEtatManuel: true,
       reproductionEtatPrecedent: true,
       reproductionEtatModifieAt: true,
@@ -90,7 +98,9 @@ export async function GET() {
       if (saillieDate && saillieDate >= chaleur) return null;
       return chaleur.toISOString();
     })(),
-    aEchographier: v.aEchographier,
+    aEchographier: v.demandesEchographie.length > 0,
+    echoRequestOrigine: v.demandesEchographie[0]?.origine ?? null,
+    echoRequestMotif: v.demandesEchographie[0]?.motif ?? null,
     reproductionEtatManuel: v.reproductionEtatManuel,
     reproductionEtatPrecedent: v.reproductionEtatPrecedent,
     reproductionEtatModifieAt: v.reproductionEtatModifieAt?.toISOString() ?? null,

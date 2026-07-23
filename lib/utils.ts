@@ -186,11 +186,9 @@ export function getEtatGestation(
     return joursDepuisVelage <= POST_CALVING_REST_DAYS ? "REPOS" : "ROUGE";
   }
 
-  // Échographie de recontrôle demandée manuellement (ex: doute sur une
-  // gestation déjà confirmée) : passe dans la liste "à écho" comme une
-  // saillie classique en attente, sans jamais toucher à la saillie/
-  // gestation enregistrée — l'historique reste intact tant que le résultat
-  // de l'écho n'est pas saisi.
+  // Compatibilité des consommateurs historiques : les vues de gestion de
+  // reproduction passent désormais explicitement `false` et affichent la
+  // demande comme une tâche secondaire.
   if (aEchographier) return "JAUNE";
 
   // Vide explicitement confirmé par écho ou annulation manuelle — priorité absolue
@@ -216,9 +214,7 @@ export function getEtatGestation(
   }
 
   // Saillie enregistrée — calcul par délai
-  const joursDepuisSaillie = differenceInDays(now, derniereSaillie);
-  if (joursDepuisSaillie < ECHOGRAPHY_WAIT_DAYS) return "GRIS";
-  return "JAUNE";
+  return "GRIS";
 }
 
 export function getBadgeClass(etat: EtatGestation): string {

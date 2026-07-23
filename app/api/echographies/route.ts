@@ -27,6 +27,10 @@ export async function POST(request: NextRequest) {
     const prevGestation = saillie.gestation ? { ...saillie.gestation } : null;
     const prevAnimal = await prisma.animal.findUnique({ where: { id: saillie.animalId }, select: { aEchographier: true } });
     const prevAEchographier = prevAnimal?.aEchographier ?? false;
+    const activeRequests = await prisma.demandeEchographie.findMany({
+      where: { animalId: saillie.animalId, etat: "A_FAIRE" },
+      select: { id: true, etat: true, clotureeAt: true, requestKey: true },
+    });
 
     const nouvelEtat = resultat === "PLEINE" ? "VERT" : "ROUGE";
 
@@ -67,6 +71,14 @@ export async function POST(request: NextRequest) {
         where: { id: saillie.animalId },
         data: { aEchographier: false },
       }),
+      prisma.demandeEchographie.updateMany({
+        where: { animalId: saillie.animalId, etat: "A_FAIRE", origine: "AUTOMATIQUE" },
+        data: { etat: "REALISEE", clotureeAt: new Date(date) },
+      }),
+      prisma.demandeEchographie.updateMany({
+        where: { animalId: saillie.animalId, etat: "A_FAIRE", origine: "MANUELLE" },
+        data: { etat: "REALISEE", clotureeAt: new Date(date), requestKey: null },
+      }),
     ]);
 
     const desc = `Échographie ${resultat === "PLEINE" ? "positive" : "négative"} enregistrée`;
@@ -93,6 +105,14 @@ export async function POST(request: NextRequest) {
       }
       // Restore animal's aEchographier flag
       revertSteps.push({ op: "update", model: "animal", where: { id: saillie.animalId }, data: { aEchographier: prevAEchographier } });
+      for (const echoRequest of activeRequests) {
+        revertSteps.push({
+          op: "update",
+          model: "demandeEchographie",
+          where: { id: echoRequest.id },
+          data: { etat: echoRequest.etat, clotureeAt: echoRequest.clotureeAt, requestKey: echoRequest.requestKey },
+        });
+      }
 
       undoId = await logAction("CREATE_ECHOGRAPHIE", desc, revertSteps);
     } catch {}

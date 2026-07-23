@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getEtatGestation, type EtatGestation } from "@/lib/utils";
 
-const STATUTS: EtatGestation[] = ["VERT", "ROUGE", "JAUNE", "REPOS", "ROSE", "GRIS"];
+const STATUTS: EtatGestation[] = ["VERT", "ROUGE", "REPOS", "ROSE", "GRIS"];
 
 function statutAutomatique(animal: {
   aEchographier: boolean;
@@ -17,7 +17,7 @@ function statutAutomatique(animal: {
     saillie?.gestation?.etat ?? null,
     saillie?.gestation?.dateVelagePrevue ?? null,
     animal.velagesVache[0]?.date ?? null,
-    animal.aEchographier
+    false
   );
 }
 

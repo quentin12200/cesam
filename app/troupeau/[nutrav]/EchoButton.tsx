@@ -20,10 +20,10 @@ export default function EchoButton({ nutrav, aEchographier, saillieId, saillieDa
   async function toggle() {
     setLoading(true);
     try {
-      await fetch(`/api/animaux/${nutrav}`, {
-        method: "PATCH",
+      await fetch(`/api/animaux/${nutrav}/echo-request`, {
+        method: aEchographier ? "DELETE" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aEchographier: !aEchographier }),
+        ...(aEchographier ? {} : { body: JSON.stringify({}) }),
       });
       router.refresh();
     } finally {

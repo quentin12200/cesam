@@ -48,6 +48,7 @@ import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
 import LierVeauButton from "./LierVeauButton";
 import ReproductionStatusEditor from "@/components/ReproductionStatusEditor";
 import type { EtatGestation } from "@/lib/utils";
+import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -90,6 +91,7 @@ async function getExploitationDisplayConfig(): Promise<{
 }
 
 async function getAnimal(nutrav: string) {
+  await syncAutomaticEchoRequests();
   return prisma.animal.findUnique({
     where: { nutrav },
     include: {
@@ -124,6 +126,11 @@ async function getAnimal(nutrav: string) {
         orderBy: { date: "desc" },
         include: { gestation: true, taureau: true },
       },
+      demandesEchographie: {
+        where: { etat: "A_FAIRE" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
       sortie: true,
     },
   });
@@ -145,7 +152,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
           animal.saillies[0]?.gestation?.etat ?? null,
           animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
           animal.velagesVache[0]?.date ?? null,
-          animal.aEchographier
+          false
         )
       : null;
 
@@ -208,10 +215,10 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
               </span>
               <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">{formatAge(animal.danais)}</span>
-              {animal.aEchographier && (
+              {animal.demandesEchographie.length > 0 && (
                 <EchoStatusBadge
                   nutrav={animal.nutrav}
-                  canCancel={!animal.saillies[0]?.gestation}
+                  canCancel
                 />
               )}
               {animal.statut !== "ACTIF" && (
@@ -386,7 +393,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   {animal.sexbov === "F" && (
                     <EchoButton
                       nutrav={animal.nutrav}
-                      aEchographier={animal.aEchographier}
+                      aEchographier={animal.demandesEchographie.length > 0}
                       saillieId={animal.saillies[0]?.id ?? null}
                       saillieDate={animal.saillies[0]?.date.toISOString() ?? null}
                     />

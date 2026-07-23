@@ -9,7 +9,6 @@ import SelectionModal from "@/components/SelectionModal";
 const OPTIONS: { value: EtatGestation; label: string }[] = [
   { value: "VERT", label: "Pleine" },
   { value: "ROUGE", label: "Vide" },
-  { value: "JAUNE", label: "À écho" },
   { value: "REPOS", label: "Repos post-vêlage" },
   { value: "ROSE", label: "Imminent" },
   { value: "GRIS", label: "Saillie récente" },

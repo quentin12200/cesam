@@ -22,6 +22,7 @@ import TroupeauScrollRestorer from "./TroupeauScrollRestorer";
 import TroupeauTableau, { type AnimalRow } from "./TroupeauTableau";
 import MoreMenu from "./MoreMenu";
 import TroupeauTabs from "@/components/TroupeauTabs";
+import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 
 interface PageProps {
   searchParams: Promise<{
@@ -49,6 +50,7 @@ async function getAnimaux(params: {
   groupe?: string;
   tri?: string;
 }) {
+  await syncAutomaticEchoRequests();
   const { sexe, q, categorie, tarie, repro, sanitaire, groupe, tri } = params;
   const now = new Date();
   const where: Prisma.AnimalWhereInput = {};
@@ -84,12 +86,7 @@ async function getAnimaux(params: {
     where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } } };
   } else if (repro === "A_ECO") {
     where.sexbov = "F";
-    where.saillies = {
-      some: {
-        date: { lte: subDays(now, 35) },
-        gestation: { etat: { notIn: ["VERT", "ROUGE"] } },
-      },
-    };
+    where.demandesEchographie = { some: { etat: "A_FAIRE" } };
   }
 
   // Filtre statut sanitaire
@@ -171,6 +168,12 @@ async function getAnimaux(params: {
         groupeId: true,
         tarieFaite: true,
         aEchographier: true,
+        demandesEchographie: {
+          where: { etat: "A_FAIRE" },
+          orderBy: { createdAt: "desc" as const },
+          take: 1,
+          select: { origine: true, motif: true },
+        },
         reproductionEtatManuel: true,
         reproductionEtatPrecedent: true,
         groupe: { select: { id: true, nom: true, couleur: true } },
@@ -646,7 +649,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               sexbov: a.sexbov,
               estGenisse: a.estGenisse,
               tarieFaite: a.tarieFaite,
-              aEchographier: a.aEchographier,
+              aEchographier: a.demandesEchographie.length > 0,
               reproductionEtatManuel: a.reproductionEtatManuel as AnimalRow["reproductionEtatManuel"],
               reproductionEtatPrecedent: a.reproductionEtatPrecedent as AnimalRow["reproductionEtatPrecedent"],
               categorie: a.categorie,
@@ -680,7 +683,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                     animal.saillies[0]?.gestation?.etat ?? null,
                     animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
                     animal.velagesVache[0]?.date ?? null,
-                    animal.aEchographier
+                    false
                   ))
                 : null;
             const veau = animal.velagesVache[0]?.veau;
@@ -722,9 +725,12 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                               : "Vide"}
                           </span>
                         )}
-                        {animal.aEchographier && etat !== "JAUNE" && (
-                          <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
-                            À échographier
+                        {animal.demandesEchographie.length > 0 && (
+                          <span
+                            className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full"
+                            title={animal.demandesEchographie[0]?.origine === "AUTOMATIQUE" ? "Demande automatique" : "Demande manuelle"}
+                          >
+                            Écho à faire
                           </span>
                         )}
                         {veau && veau.statut === "ACTIF" && !veau.sevreFait && !animal.tarieFaite && (

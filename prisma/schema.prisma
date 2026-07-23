@@ -54,6 +54,7 @@ model Animal {
   localisation   Localisation? @relation(fields: [localisationId], references: [id])
 
   saillies        Saillie[]
+  demandesEchographie DemandeEchographie[]
   velagesVache    Velage[]        @relation("VelageVache")
   velageVeau      Velage?         @relation("VelageVeau")
   veauxVelage     VeauVelage[]
@@ -111,6 +112,7 @@ model Saillie {
   taureau     Taureau? @relation(fields: [taureauId], references: [id])
 
   gestation   Gestation?
+  demandesEchographie DemandeEchographie[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -298,6 +300,26 @@ model Parage {
   updatedAt  DateTime @updatedAt
 
   @@index([statut, date])
+}
+
+model DemandeEchographie {
+  id          String    @id @default(cuid())
+  animalId    String
+  animal      Animal    @relation(fields: [animalId], references: [id])
+  saillieId   String?
+  saillie     Saillie?  @relation(fields: [saillieId], references: [id])
+  origine     String
+  etat        String    @default("A_FAIRE")
+  motif       String?
+  requestKey  String?   @unique
+  clotureeAt  DateTime?
+  auteurAjout String?
+  auteurRetrait String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([animalId, etat])
+  @@index([saillieId, etat])
 }
 
 model ValeurReferentielPreconisation {

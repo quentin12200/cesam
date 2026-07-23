@@ -66,7 +66,7 @@ export async function getGestationCalendar(): Promise<GestationCalendarRow[]> {
         saillie.gestation.etat,
         new Date(saillie.gestation.dateVelagePrevue),
         v.velagesVache[0]?.date ? new Date(v.velagesVache[0].date) : null,
-        v.aEchographier
+        false
       ) as EtatGestation;
       if (etat !== "VERT" && etat !== "ROSE") return [];
       return [{

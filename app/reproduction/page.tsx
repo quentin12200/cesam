@@ -35,6 +35,8 @@ interface VacheRepro {
   taureauNom: string | null;
   derniereChaleur: string | null;
   aEchographier: boolean;
+  echoRequestOrigine: "AUTOMATIQUE" | "MANUELLE" | null;
+  echoRequestMotif: string | null;
   estGenisse: boolean;
   categorie: string | null;
   reproductionEtatManuel: EtatGestation | null;
@@ -506,13 +508,20 @@ function ReproductionContent() {
       v.gestationEtat,
       v.dateVelagePrevue ? new Date(v.dateVelagePrevue) : null,
       v.dernierVelage ? new Date(v.dernierVelage) : null,
-      v.aEchographier
+      false
     ) as EtatGestation,
   }));
 
-  const filtered = filterEtat === "TOUS" ? vachesAvecEtat : vachesAvecEtat.filter((v) => v.etat === filterEtat);
+  const filtered = filterEtat === "TOUS"
+    ? vachesAvecEtat
+    : filterEtat === "JAUNE"
+      ? vachesAvecEtat.filter((v) => v.aEchographier)
+      : vachesAvecEtat.filter((v) => v.etat === filterEtat);
   const counts: Record<EtatGestation, number> = { GRIS: 0, JAUNE: 0, VERT: 0, ROUGE: 0, ROSE: 0, REPOS: 0 };
-  vachesAvecEtat.forEach((v) => counts[v.etat]++);
+  vachesAvecEtat.forEach((v) => {
+    if (v.etat !== "JAUNE") counts[v.etat]++;
+    if (v.aEchographier) counts.JAUNE++;
+  });
 
   const farmBulls = taureaux.filter((t) => t.present);
   const iaBulls = taureaux.filter((t) => !t.present);
@@ -537,17 +546,17 @@ function ReproductionContent() {
 
   async function passerSelectionAEcho() {
     if (selectedAnimalIds.length === 0) return;
-    if (!window.confirm(`Passer ${selectedAnimalIds.length} animal(aux) au statut « À écho » ?`)) return;
+    if (!window.confirm(`Ajouter ${selectedAnimalIds.length} animal(aux) à la liste « À échographier » ?`)) return;
     setSaving(true);
     try {
-      const response = await fetch("/api/reproduction/statut", {
+      const selected = vaches.filter((vache) => selectedAnimalIds.includes(vache.id));
+      const responses = await Promise.all(selected.map((vache) => fetch(`/api/animaux/${vache.nutrav}/echo-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ animalIds: selectedAnimalIds, statut: "JAUNE" }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Modification impossible");
-      setMessage(`${selectedAnimalIds.length} animal(aux) passé(s) à écho`);
+        body: JSON.stringify({}),
+      })));
+      if (responses.some((response) => !response.ok)) throw new Error("Modification impossible");
+      setMessage(`${selectedAnimalIds.length} animal(aux) ajouté(s) à la liste`);
       setSelectedAnimalIds([]);
       setSelectionMode(false);
       await fetchData();
@@ -875,6 +884,14 @@ function ReproductionContent() {
                     {vache.nobovi ?? "Sans nom"}
                   </Link>
                   <div className="flex shrink-0 items-center">
+                    {vache.aEchographier && (
+                      <span
+                        className="mr-2 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800"
+                        title={vache.echoRequestOrigine === "AUTOMATIQUE" ? "Demande automatique" : "Demande manuelle"}
+                      >
+                        Écho à faire · {vache.echoRequestOrigine === "AUTOMATIQUE" ? "Auto" : "Manuelle"}
+                      </span>
+                    )}
                     <span className={`max-w-28 text-right text-[11px] font-bold leading-tight ${carteEtat.text}`}>
                       {carteEtat.label}
                     </span>
@@ -968,7 +985,7 @@ function ReproductionContent() {
                           <SaillieIcon size={18} />
                           Saillie / IA
                         </button>
-                        {(vache.etat === "JAUNE" || vache.etat === "GRIS") && vache.saillieId && (
+                        {vache.aEchographier && vache.saillieId && (
                           <button
                             type="button"
                             role="menuitem"

@@ -13,6 +13,7 @@ import ChecklistSection, {
 } from "@/app/components/ChecklistSection";
 import AccueilQuickActions from "@/app/components/AccueilQuickActions";
 import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
+import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import AccueilTodoSection, { type AccueilTodoGroup } from "@/app/components/AccueilTodoSection";
 import NotesTerrain from "@/app/components/NotesTerrain";
 import RapportGestationButton from "@/app/components/RapportGestationButton";
@@ -31,6 +32,7 @@ import {
   } from "lucide-react";
 
 async function getDashboardData() {
+  await syncAutomaticEchoRequests();
   const now = new Date();
   const sevenDaysLater = addDays(now, 7);
   const thirtyDaysLater = addDays(now, 30);
@@ -200,11 +202,11 @@ async function getDashboardData() {
       etatGestation,
       dateVelagePrevue,
       dernierVelage,
-      vache.aEchographier
+      false
     );
 
     if (etat === "VERT" || etat === "ROSE") vachesPleine++;
-    if (etat === "JAUNE") aEchographier++;
+    if (vache.aEchographier) aEchographier++;
     if (etat === "ROUGE") vachesVidesEnRetard++;
   }
 
