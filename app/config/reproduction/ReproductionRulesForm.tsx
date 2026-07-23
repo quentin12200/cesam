@@ -7,6 +7,7 @@ import {
   EVENT_FIELD_CATALOG,
   REPRODUCTION_COLOR_PALETTE,
   describeActionWindow,
+  describeEchoTiming,
   describePhaseRule,
   validateReproductionRules,
   type AnimalCategory,
@@ -62,7 +63,7 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
   const [message, setMessage] = useState("");
   const validation = useMemo(() => validateReproductionRules(config), [config]);
 
-  function restoreSection(section: "phases" | "alerts" | "actionWindows" | "events") {
+  function restoreSection(section: "phases" | "echoTiming" | "alerts" | "actionWindows" | "events") {
     if (!window.confirm("Restaurer les valeurs CESAM de ce bloc ? Les personnalisations de ce bloc seront remplacées après enregistrement.")) return;
     const defaults = copyDefaults();
     setConfig((current) => ({ ...current, [section]: defaults[section] }));
@@ -171,6 +172,70 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
               </div>
             </details>
           ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <SectionHeader
+          title="Échographie après saillie / IA"
+          summary="Entrée dans la liste et passage au statut prêt"
+          onRestore={() => restoreSection("echoTiming")}
+        />
+        <div className="mt-3 space-y-3">
+          <Toggle
+            label="Utiliser une phase préparatoire avant l’échographie"
+            checked={config.echoTiming.usePreparationPhase}
+            onChange={(usePreparationPhase) => setConfig((current) => ({
+              ...current,
+              echoTiming: { ...current.echoTiming, usePreparationPhase },
+            }))}
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={`text-xs font-semibold ${config.echoTiming.usePreparationPhase ? "text-slate-600" : "text-slate-400"}`}>
+              Afficher dans la liste des échos à partir de
+              <span className="mt-1 flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3">
+                <input
+                  type="number"
+                  min={0}
+                  disabled={!config.echoTiming.usePreparationPhase}
+                  value={config.echoTiming.listFromDays}
+                  onChange={(event) => setConfig((current) => ({
+                    ...current,
+                    echoTiming: { ...current.echoTiming, listFromDays: Math.max(0, Number(event.target.value)) },
+                  }))}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none disabled:text-slate-400"
+                />
+                <span className="text-xs text-slate-500">jours après saillie / IA</span>
+              </span>
+            </label>
+            <label className="text-xs font-semibold text-slate-600">
+              Considérer comme « À échographier » à partir de
+              <span className="mt-1 flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3">
+                <input
+                  type="number"
+                  min={0}
+                  value={config.echoTiming.dueFromDays}
+                  onChange={(event) => setConfig((current) => ({
+                    ...current,
+                    echoTiming: { ...current.echoTiming, dueFromDays: Math.max(0, Number(event.target.value)) },
+                  }))}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none"
+                />
+                <span className="text-xs text-slate-500">jours après saillie / IA</span>
+              </span>
+            </label>
+          </div>
+          {config.echoTiming.usePreparationPhase && config.echoTiming.listFromDays > config.echoTiming.dueFromDays && (
+            <p className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs font-semibold text-red-700">
+              La femelle ne peut pas entrer dans la liste après la date à laquelle elle devient « À échographier ». Réduisez le premier délai ou augmentez le second.
+            </p>
+          )}
+          {!config.echoTiming.usePreparationPhase && (
+            <p className="text-xs text-slate-500">La femelle entrera directement dans la liste au jour où elle devient « À échographier ».</p>
+          )}
+          <p className="rounded-lg bg-yellow-50 p-3 text-sm font-semibold leading-5 text-yellow-900">
+            {describeEchoTiming(config.echoTiming)}
+          </p>
         </div>
       </section>
 

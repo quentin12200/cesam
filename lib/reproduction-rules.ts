@@ -5,7 +5,7 @@ import {
   VELAGE_IMMINENT_DAYS,
 } from "@/lib/utils";
 
-export const REPRODUCTION_RULES_VERSION = 2;
+export const REPRODUCTION_RULES_VERSION = 3;
 
 export const REPRODUCTION_COLOR_PALETTE = {
   blue: { label: "Bleu", value: REPRODUCTIVE_CYCLE_COLORS.rest },
@@ -52,6 +52,7 @@ export interface ReproductionEventRule {
 
 export interface ReproductionRulesConfig {
   version: number; phases: ReproductionPhaseRule[];
+  echoTiming: { usePreparationPhase: boolean; listFromDays: number; dueFromDays: number };
   alerts: { reproductionDelay: boolean; echoDue: boolean; imminentCalving: boolean; dryOff: boolean };
   actionWindows: ReproductionActionWindow[]; events: ReproductionEventRule[];
   categoryRules: Array<{ id: string; category: AnimalCategory; phaseId: string; start?: number; end?: number | null }>;
@@ -78,6 +79,7 @@ const ordered = (fields: ReproductionEventField[]) => fields.map((item, order) =
 
 export const CESAM_REPRODUCTION_RULES: ReproductionRulesConfig = {
   version: REPRODUCTION_RULES_VERSION,
+  echoTiming: { usePreparationPhase: true, listFromDays: ECHOGRAPHY_WAIT_DAYS, dueFromDays: 40 },
   phases: [
     { id: "post_calving_rest", fundamental: true, displayedName: "Repos post-vêlage", color: "blue", startRule: { reference: "CALVING", position: "AFTER", offset: 1, unit: "DAYS", condition: "ALWAYS" }, endRule: { type: "AFTER_DURATION", duration: POST_CALVING_REST_DAYS, unit: "DAYS", earlierEvent: "BREEDING" }, mainMessage: "Repos post-vêlage normal", priority: "NORMAL", showOnHome: true, enabledAlert: true, action: "NONE" },
     { id: "breeding_period", fundamental: true, displayedName: "Mise à la reproduction", color: "fuchsia", startRule: { reference: "CALVING", position: "AFTER", offset: POST_CALVING_REST_DAYS + 1, unit: "DAYS", condition: "ALWAYS" }, endRule: { type: "AT_EVENT", event: "BREEDING" }, mainMessage: "Mise à la reproduction recommandée", priority: "NORMAL", showOnHome: true, enabledAlert: true, action: "RECORD_BREEDING" },
@@ -132,8 +134,24 @@ export function parseReproductionRules(raw: string | null | undefined): Reproduc
     const saved = JSON.parse(raw) as Partial<ReproductionRulesConfig> & { phases?: Array<Record<string, unknown>>; events?: Array<Record<string, unknown>> };
     const defaults = cloneDefaults(); const savedPhases = Array.isArray(saved.phases) ? saved.phases : [];
     const savedWindows = Array.isArray(saved.actionWindows) ? saved.actionWindows : []; const savedEvents = Array.isArray(saved.events) ? saved.events : [];
+    const savedPreEcho = savedWindows.find((item) => item?.id === "pre_echo");
+    const savedEchoPhase = savedPhases.find((item) => item?.id === "echo_due");
+    const savedEchoTiming = saved.echoTiming as Partial<ReproductionRulesConfig["echoTiming"]> | undefined;
+    const legacyListFromDays = typeof savedPreEcho?.start === "number" ? savedPreEcho.start : defaults.echoTiming.listFromDays;
+    const legacyDueFromDays = typeof savedEchoPhase?.startRule === "object"
+      && savedEchoPhase.startRule !== null
+      && "offset" in savedEchoPhase.startRule
+      && typeof savedEchoPhase.startRule.offset === "number"
+      ? savedEchoPhase.startRule.offset
+      : defaults.echoTiming.dueFromDays;
     return {
       ...defaults, ...saved, version: REPRODUCTION_RULES_VERSION, alerts: { ...defaults.alerts, ...(saved.alerts ?? {}) },
+      echoTiming: {
+        ...defaults.echoTiming,
+        listFromDays: legacyListFromDays,
+        dueFromDays: legacyDueFromDays,
+        ...(savedEchoTiming ?? {}),
+      },
       phases: defaults.phases.map((phase) => ({ ...phase, ...migrateLegacyPhase((savedPhases.find((item) => item?.id === phase.id) ?? {}) as Record<string, unknown>, phase), id: phase.id, fundamental: true })),
       actionWindows: [...defaults.actionWindows.filter((item) => item.fundamental).map((item) => ({ ...item, ...(savedWindows.find((candidate) => candidate?.id === item.id) ?? {}), id: item.id, fundamental: true })), ...savedWindows.filter((item) => item && !defaults.actionWindows.some((candidate) => candidate.id === item.id)).map((item) => ({ ...item, fundamental: false }))],
       events: [...defaults.events.map((event) => { const stored = savedEvents.find((item) => item?.id === event.id); return { ...event, ...(stored ?? {}), fields: secureFundamentalFields(stored?.fields, event.fields), id: event.id, fundamental: true, action: (stored?.action as ExistingReproductionAction | undefined) ?? event.action }; }), ...savedEvents.filter((item) => item && !defaults.events.some((candidate) => candidate.id === item.id)).map((item) => ({ ...item, fields: migrateFields(item.fields, []), fundamental: false, action: (item.action as ExistingReproductionAction | undefined) ?? "NONE" } as ReproductionEventRule))],
@@ -164,8 +182,17 @@ export function describeActionWindow(windowRule: ReproductionActionWindow) {
   return `Commence ${unitLabel(windowRule.start, windowRule.unit)} ${windowRule.direction === "BEFORE" ? "avant" : "après"} ${referenceLabel[windowRule.reference]} et se termine ${end}.`;
 }
 
+export function describeEchoTiming(timing: ReproductionRulesConfig["echoTiming"]) {
+  if (!timing.usePreparationPhase) {
+    return `Les femelles deviennent À échographier à J${timing.dueFromDays} après saillie/IA.`;
+  }
+  return `Les femelles apparaissent dans la liste des échos à partir de J${timing.listFromDays} après saillie/IA et deviennent À échographier à J${timing.dueFromDays}.`;
+}
+
 export function validateReproductionRules(config: ReproductionRulesConfig) {
   const errors: string[] = []; const warnings: string[] = [];
+  if (config.echoTiming.listFromDays < 0 || config.echoTiming.dueFromDays < 0) errors.push("Les délais d’échographie ne peuvent pas être négatifs.");
+  if (config.echoTiming.usePreparationPhase && config.echoTiming.listFromDays > config.echoTiming.dueFromDays) errors.push("L’entrée dans la liste des échos doit avoir lieu avant ou le même jour que le statut « À échographier ».");
   if (new Set(config.phases.map((item) => item.id)).size !== config.phases.length) errors.push("Deux phases ne peuvent pas avoir le même identifiant.");
   if (new Set(config.actionWindows.map((item) => item.id)).size !== config.actionWindows.length) errors.push("Deux fenêtres d’action ne peuvent pas avoir le même identifiant.");
   if (new Set(config.events.map((item) => item.id)).size !== config.events.length) errors.push("Deux événements ne peuvent pas avoir le même identifiant.");
