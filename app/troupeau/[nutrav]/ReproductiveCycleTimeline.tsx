@@ -71,6 +71,7 @@ interface EventItem {
 
 interface PositionedEvent extends EventItem {
   angle: number;
+  mobileAngle: number;
   desktopAngle: number;
   position: CSSProperties;
 }
@@ -239,12 +240,12 @@ function desktopDetailPosition(angle: number) {
   const sine = Math.sin(angle * Math.PI / 180);
   if (Math.abs(cosine) > 0.46) {
     return sine >= 0
-      ? "left-1/2 top-full mt-2 -translate-x-1/2 text-center"
-      : "bottom-full left-1/2 mb-2 -translate-x-1/2 text-center";
+      ? "left-1/2 top-full mt-4 -translate-x-1/2 text-center"
+      : "bottom-full left-1/2 mb-4 -translate-x-1/2 text-center";
   }
   return cosine >= 0
-    ? "left-full top-1/2 ml-2 -translate-y-1/2 text-left"
-    : "right-full top-1/2 mr-2 -translate-y-1/2 text-right";
+    ? "left-full top-1/2 ml-4 -translate-y-1/2 text-left"
+    : "right-full top-1/2 mr-4 -translate-y-1/2 text-right";
 }
 
 function desktopLeaderPosition(angle: number) {
@@ -252,12 +253,22 @@ function desktopLeaderPosition(angle: number) {
   const sine = Math.sin(angle * Math.PI / 180);
   if (Math.abs(cosine) > 0.46) {
     return sine >= 0
-      ? "left-1/2 top-full h-2 border-l"
-      : "bottom-full left-1/2 h-2 border-l";
+      ? "left-1/2 top-full h-4 border-l"
+      : "bottom-full left-1/2 h-4 border-l";
   }
   return cosine >= 0
-    ? "left-full top-1/2 w-2 border-t"
-    : "right-full top-1/2 w-2 border-t";
+    ? "left-full top-1/2 w-4 border-t"
+    : "right-full top-1/2 w-4 border-t";
+}
+
+function mobileDetailPosition(angle: number) {
+  const cosine = Math.cos(angle * Math.PI / 180);
+  const sine = Math.sin(angle * Math.PI / 180);
+  if (cosine > 0.5) return "right-0 top-full mt-2 text-right";
+  if (cosine < -0.5) return "left-0 top-full mt-2 text-left";
+  return sine >= 0
+    ? "left-1/2 top-full mt-2 -translate-x-1/2 text-center"
+    : "bottom-full left-1/2 mb-2 -translate-x-1/2 text-center";
 }
 
 export default function ReproductiveCycleTimeline({
@@ -727,10 +738,11 @@ export default function ReproductiveCycleTimeline({
     "--marker-x-desktop": `${markerDesktopRadius * Math.cos(markerAngle * Math.PI / 180)}%`,
     "--marker-y-desktop": `${markerDesktopRadius * Math.sin(markerAngle * Math.PI / 180)}%`,
   } as CSSProperties;
-  const mobileEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerMobileRadius, 13, 17);
-  const desktopEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerDesktopRadius, 12.5, 15);
+  const mobileEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerMobileRadius, 20, 17);
+  const desktopEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerDesktopRadius, 26, 15);
   const ringEvents: PositionedEvent[] = eventAngles.map((event, index) => ({
     ...event,
+    mobileAngle: event.kind === "calving" ? -90 : mobileEventLayout[index].angle,
     desktopAngle: event.kind === "calving" ? -90 : desktopEventLayout[index].angle,
     position: {
       "--event-x-mobile": `${event.kind === "calving" ? 0 : mobileEventLayout[index].point.x}%`,
@@ -798,6 +810,9 @@ export default function ReproductiveCycleTimeline({
           : "Après saillie / IA",
     },
   ];
+  const mobilePhaseLabels = elapsedRing.filter(
+    (stage, index, stages) => stages.findIndex((candidate) => candidate.label === stage.label) === index
+  );
 
   return (
     <section
@@ -910,9 +925,9 @@ export default function ReproductiveCycleTimeline({
                       .slice(0, stageIndex)
                       .filter((candidate) => angularDistance(candidate.midAngle, stage.midAngle) < 14)
                       .length;
-                    const nearEvent = desktopEventLayout.some((event) => angularDistance(event.angle, stage.midAngle) < 16);
+                    const nearEvent = desktopEventLayout.some((event) => angularDistance(event.angle, stage.midAngle) < 24);
                     const nearMarker = angularDistance(markerAngle, stage.midAngle) < 16;
-                    const labelRadius = 108 + nearbyLabelCount * 8 + (nearEvent ? 8 : 0) + (nearMarker ? 8 : 0);
+                    const labelRadius = 114 + nearbyLabelCount * 12 + (nearEvent ? 12 : 0) + (nearMarker ? 10 : 0);
                     const dotX = 100 + 91 * Math.cos(radians);
                     const dotY = 100 + 91 * Math.sin(radians);
                     const lineX = 100 + 99 * Math.cos(radians);
@@ -928,25 +943,25 @@ export default function ReproductiveCycleTimeline({
                         <circle cx={dotX} cy={dotY} r={stage.current ? 2 : 1.6} fill={stage.displayColor} />
                         <text
                           x={x}
-                          y={y - 2.2}
+                          y={y - 3.8}
                           textAnchor={x < 92 ? "end" : x > 108 ? "start" : "middle"}
                           dominantBaseline="central"
                           className="font-bold [paint-order:stroke] [stroke-width:2.8px]"
                           style={{
                             fill: stage.current ? stage.color : "#64748b",
                             stroke: "#ffffff",
-                            fontSize: isShort ? "3.8px" : "4.25px",
+                            fontSize: isShort ? "6.8px" : "7.6px",
                           }}
                         >
                           {stage.shortLabel ?? stage.label}
                         </text>
                         <text
                           x={x}
-                          y={y + 3.2}
+                          y={y + 5.4}
                           textAnchor={x < 92 ? "end" : x > 108 ? "start" : "middle"}
                           dominantBaseline="central"
                           className="font-semibold [paint-order:stroke] [stroke-width:2.5px]"
-                          style={{ fill: "#64748b", stroke: "#ffffff", fontSize: "3.05px" }}
+                          style={{ fill: "#64748b", stroke: "#ffffff", fontSize: "6px" }}
                         >
                           {stage.labelDetail}
                         </text>
@@ -955,9 +970,9 @@ export default function ReproductiveCycleTimeline({
                   })}
                   {overlayRing.map((stage) => {
                     const radians = stage.midAngle * Math.PI / 180;
-                    const nearEvent = desktopEventLayout.some((event) => angularDistance(event.angle, stage.midAngle) < 16);
+                    const nearEvent = desktopEventLayout.some((event) => angularDistance(event.angle, stage.midAngle) < 24);
                     const nearMarker = angularDistance(markerAngle, stage.midAngle) < 16;
-                    const labelRadius = 112 + (nearEvent ? 10 : 0) + (nearMarker ? 8 : 0);
+                    const labelRadius = 118 + (nearEvent ? 12 : 0) + (nearMarker ? 10 : 0);
                     const dotX = 100 + 96 * Math.cos(radians);
                     const dotY = 100 + 96 * Math.sin(radians);
                     const lineX = 100 + 103 * Math.cos(radians);
@@ -980,7 +995,7 @@ export default function ReproductiveCycleTimeline({
                           style={{
                             fill: "#b45309",
                             stroke: "#ffffff",
-                            fontSize: "4px",
+                            fontSize: "7px",
                           }}
                         >
                           {stage.shortLabel ?? stage.label}
@@ -1018,7 +1033,7 @@ export default function ReproductiveCycleTimeline({
               </svg>
 
               <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 text-center">
-                <span className="block whitespace-nowrap bg-white/90 px-1.5 text-[8px] font-bold uppercase tracking-[0.16em] text-slate-400 sm:text-[9px]">
+                <span className="block whitespace-nowrap bg-white/90 px-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
                   Début cycle
                 </span>
                 <span className="mx-auto mt-0.5 block h-2 w-px bg-slate-300" />
@@ -1056,14 +1071,14 @@ export default function ReproductiveCycleTimeline({
                           className={`pointer-events-none absolute hidden border-dashed border-slate-300 sm:block ${desktopLeaderPosition(event.desktopAngle)}`}
                           aria-hidden="true"
                         />
-                        <span className={`pointer-events-none absolute hidden w-24 px-1 py-1 sm:block ${desktopDetailPosition(event.desktopAngle)}`}>
-                          <span className="block text-[9px] font-bold leading-tight" style={{ color: event.color }}>{event.label}</span>
-                          <span className="mt-0.5 block text-[8px] font-medium leading-tight text-slate-400">{formatDate(event.date)}</span>
+                        <span className={`pointer-events-none absolute hidden w-36 px-1 py-1 sm:block ${desktopDetailPosition(event.desktopAngle)}`}>
+                          <span className="block text-base font-semibold leading-tight" style={{ color: event.color }}>{event.label}</span>
+                          <span className="mt-1 block text-sm font-medium leading-tight text-slate-500">{formatDate(event.date)}</span>
                         </span>
                       </>
                     )}
                     {showText && !selected && (
-                      <span className="pointer-events-none absolute left-1/2 top-full mt-0.5 w-max -translate-x-1/2 rounded bg-white/90 px-1 text-[8px] font-bold leading-tight text-slate-600 sm:hidden">
+                      <span className={`pointer-events-none absolute w-max max-w-20 bg-white/90 px-1 text-sm font-semibold leading-tight text-slate-600 sm:hidden ${mobileDetailPosition(event.mobileAngle)}`}>
                         {event.kind.startsWith("echo") ? "Écho" : event.kind === "ia" ? "IA" : "Saillie"}
                       </span>
                     )}
@@ -1111,6 +1126,15 @@ export default function ReproductiveCycleTimeline({
                       </span>
                     )}
               </button>
+            </div>
+
+            <div className="mx-auto mt-3 flex max-w-full gap-4 overflow-x-auto px-2 pb-1 sm:hidden" aria-label="Phases du cycle">
+              {mobilePhaseLabels.map((stage) => (
+                <span key={stage.id} className="flex shrink-0 items-center gap-2 text-sm font-semibold" style={{ color: stage.color }}>
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.displayColor }} />
+                  {stage.shortLabel ?? stage.label}
+                </span>
+              ))}
             </div>
 
             {selectedEvent && (
