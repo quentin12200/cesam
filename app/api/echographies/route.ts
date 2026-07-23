@@ -8,7 +8,7 @@ const DUREE_GESTATION = 285; // jours — Blonde Aquitaine
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { saillieId, date, resultat, dateVelagePrevue: dateVelagePrevueStr, joursGestation, remarque } = body;
+    const { saillieId, date, resultat, dateVelagePrevue: dateVelagePrevueStr, joursGestation, remarque, updateTaureau, taureauId } = body;
 
     if (!saillieId || !date || !resultat) {
       return NextResponse.json({ error: "saillieId, date et resultat sont requis" }, { status: 400 });
@@ -87,6 +87,12 @@ export async function POST(request: NextRequest) {
     if (remainingEchoRequests > 0) {
       await prisma.animal.update({ where: { id: saillie.animalId }, data: { aEchographier: true } });
     }
+    if (updateTaureau === true) {
+      await prisma.saillie.update({
+        where: { id: saillieId },
+        data: { taureauId: typeof taureauId === "string" && taureauId ? taureauId : null },
+      });
+    }
 
     const desc = `Échographie ${resultat === "PLEINE" ? "positive" : "négative"} enregistrée`;
     let undoId = "";
@@ -119,6 +125,14 @@ export async function POST(request: NextRequest) {
           model: "demandeEchographie",
           where: { id: echoRequest.id },
           data: { etat: echoRequest.etat, clotureeAt: echoRequest.clotureeAt, requestKey: echoRequest.requestKey },
+        });
+      }
+      if (updateTaureau === true) {
+        revertSteps.push({
+          op: "update",
+          model: "saillie",
+          where: { id: saillieId },
+          data: { taureauId: saillie.taureauId },
         });
       }
 

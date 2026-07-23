@@ -151,9 +151,9 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const etat: EtatGestation | null =
     animal.sexbov === "F"
       ? (animal.reproductionEtatManuel as EtatGestation | null) ?? getEtatGestation(
-          animal.saillies[0]?.date ?? null,
-          animal.saillies[0]?.gestation?.etat ?? null,
-          animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
+          currentBreeding?.date ?? null,
+          currentBreeding?.gestation?.etat ?? null,
+          currentBreeding?.gestation?.dateVelagePrevue ?? null,
           animal.velagesVache[0]?.date ?? null,
           false
         )
@@ -279,18 +279,18 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
         <div className="px-3">
           <ReproductiveCycleTimeline
             status={etat}
-            breedingDate={animal.saillies[0]?.date ?? null}
-            breedingType={animal.saillies[0]?.type ?? null}
-            dueDate={animal.saillies[0]?.gestation?.dateVelagePrevue ?? null}
-            echoDate={animal.saillies[0]?.gestation?.dateEcho ?? null}
-            echoResult={animal.saillies[0]?.gestation?.resultatEcho ?? null}
-            echoObservation={animal.saillies[0]?.gestation?.sousResultat ?? null}
+            breedingDate={currentBreeding?.date ?? null}
+            breedingType={currentBreeding?.type ?? null}
+            dueDate={currentBreeding?.gestation?.dateVelagePrevue ?? null}
+            echoDate={currentBreeding?.gestation?.dateEcho ?? null}
+            echoResult={currentBreeding?.gestation?.resultatEcho ?? null}
+            echoObservation={currentBreeding?.gestation?.sousResultat ?? null}
             lastCalvingDate={animal.velagesVache[0]?.date ?? null}
             calfNumber={animal.velagesVache[0]?.veau?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.nutrav ?? null}
             calfSex={animal.velagesVache[0]?.veau?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.sexe ?? null}
             calfBirthDate={animal.velagesVache[0]?.veau?.danais ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.danais ?? animal.velagesVache[0]?.date ?? null}
             calfSevreDone={animal.velagesVache[0]?.veau?.sevreFait ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sevreFait ?? false}
-            breedingReference={animal.saillies[0]?.taureau?.nopere ?? animal.saillies[0]?.taureau?.nupere ?? null}
+            breedingReference={currentBreeding?.taureau?.nopere ?? currentBreeding?.taureau?.nupere ?? null}
             statusModifiedAt={animal.reproductionEtatModifieAt ?? null}
             restObjectiveDays={configAffichage.reproReposObjectifJours}
             dryOffCalfAgeMonths={configAffichage.tarissementVeauAgeMois}
@@ -772,16 +772,16 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     previousStatus={animal.reproductionEtatPrecedent as EtatGestation | null}
                   />
                 </div>
-                {animal.saillies[0]?.gestation?.dateVelagePrevue && (
+                {currentBreeding?.gestation?.dateVelagePrevue && (
                   <div className="text-sm text-gray-700">
                     Vélage prévu:{" "}
                     <span className="font-semibold">
-                      {formatDate(animal.saillies[0].gestation.dateVelagePrevue)}
+                      {formatDate(currentBreeding.gestation.dateVelagePrevue)}
                     </span>
                     <span className="text-xs text-gray-500 ml-1">
                       (J-
                       {differenceInDays(
-                        animal.saillies[0].gestation.dateVelagePrevue,
+                        currentBreeding.gestation.dateVelagePrevue,
                         new Date()
                       )}
                       )
@@ -805,9 +805,18 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-medium">{formatDate(saillie.date)}</span>
-                        <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
-                          {saillie.type}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {saillie.estimation && (
+                            <span className="text-xs bg-violet-50 text-violet-700 px-2 py-0.5 rounded">
+                              {saillie.type === "IA"
+                                ? "IA probable estimée par échographie"
+                                : "Saillie probable estimée par échographie"}
+                            </span>
+                          )}
+                          <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
+                            {saillie.type}
+                          </span>
+                        </div>
                       </div>
                       {saillie.taureau && (
                         <div className="text-xs text-gray-500 mt-1">
