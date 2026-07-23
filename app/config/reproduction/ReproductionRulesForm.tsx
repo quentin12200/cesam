@@ -56,6 +56,42 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (che
   return <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 text-sm font-semibold text-slate-700"><span>{label}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 accent-green-700" /></label>;
 }
 
+function EchoTimingFields({ timing, onChange }: {
+  timing: ReproductionRulesConfig["echoTiming"];
+  onChange: (timing: ReproductionRulesConfig["echoTiming"]) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <Toggle label="Utiliser une phase préparatoire" checked={timing.usePreparationPhase} onChange={(usePreparationPhase) => onChange({ ...timing, usePreparationPhase })} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        {timing.usePreparationPhase && (
+          <label className="text-xs font-semibold text-slate-600">
+            Afficher les femelles dans la liste des échos à partir de
+            <span className="mt-1 flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3">
+              <input type="number" min={0} value={timing.listFromDays} onChange={(event) => onChange({ ...timing, listFromDays: Math.max(0, Number(event.target.value)) })} className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none" />
+              <span className="text-xs text-slate-500">jours après saillie / IA</span>
+            </span>
+          </label>
+        )}
+        <label className="text-xs font-semibold text-slate-600">
+          Considérer comme « À échographier » à partir de
+          <span className="mt-1 flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3">
+            <input type="number" min={0} value={timing.dueFromDays} onChange={(event) => onChange({ ...timing, dueFromDays: Math.max(0, Number(event.target.value)) })} className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none" />
+            <span className="text-xs text-slate-500">jours après saillie / IA</span>
+          </span>
+        </label>
+      </div>
+      {timing.usePreparationPhase && (
+        <p className="text-xs text-slate-500">Entre les deux seuils : « Bientôt prête pour l’échographie », avec un compte à rebours comme « Prête dans 5 jours ».</p>
+      )}
+      {timing.usePreparationPhase && timing.listFromDays > timing.dueFromDays && (
+        <p className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs font-semibold text-red-700">Le seuil d’apparition doit être inférieur ou égal au seuil « À échographier ».</p>
+      )}
+      <p className="rounded-lg bg-yellow-50 p-3 text-sm font-semibold leading-5 text-yellow-900">{describeEchoTiming(timing)}</p>
+    </div>
+  );
+}
+
 export default function ReproductionRulesForm({ initial }: { initial: ReproductionRulesConfig }) {
   const [config, setConfig] = useState(initial);
   const [advanced, setAdvanced] = useState(false);
@@ -147,18 +183,26 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
             <details key={phase.id} className="group rounded-xl border border-slate-200 bg-white open:bg-slate-50">
               <summary className="min-h-12 cursor-pointer list-none px-3 py-2.5">
                 <span className="flex items-center gap-3"><span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: REPRODUCTION_COLOR_PALETTE[phase.color].value }} /><span className="min-w-0 flex-1 text-sm font-bold text-slate-800">{phase.displayedName}</span><ChevronDown size={16} className="shrink-0 text-slate-400 group-open:rotate-180" /></span>
-                <span className="mt-1 block pl-7 text-xs leading-relaxed text-slate-500">{describePhaseRule(phase, config.phases)}</span>
+                <span className="mt-1 block pl-7 text-xs leading-relaxed text-slate-500">{phase.id === "echo_due" ? describeEchoTiming(config.echoTiming) : describePhaseRule(phase, config.phases)}</span>
               </summary>
               <div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2">
                 <label className="text-xs font-semibold text-slate-500">Nom affiché<input value={phase.displayedName} onChange={(event) => updatePhase(phase.id, { displayedName: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-900" /></label>
                 <label className="text-xs font-semibold text-slate-500">Couleur<select value={phase.color} onChange={(event) => updatePhase(phase.id, { color: event.target.value as ReproductionPhaseRule["color"] })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-900">{Object.entries(REPRODUCTION_COLOR_PALETTE).map(([key, color]) => <option key={key} value={key}>{color.label}</option>)}</select></label>
-                <label className="text-xs font-semibold text-slate-500">Durée ou seuil principal<input type="number" min={0} value={primaryValue(phase)} onChange={(event) => updatePrimaryValue(phase, Number(event.target.value))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
-                <label className="text-xs font-semibold text-slate-500">Unité<select value={phase.endRule.type === "AFTER_DURATION" ? phase.endRule.unit ?? "DAYS" : phase.startRule.unit} onChange={(event) => phase.endRule.type === "AFTER_DURATION" ? updatePhase(phase.id, { endRule: { ...phase.endRule, unit: event.target.value as ReproductionUnit } }) : updatePhase(phase.id, { startRule: { ...phase.startRule, unit: event.target.value as ReproductionUnit } })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm">{UNITS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                {phase.id === "echo_due" ? (
+                  <div className="sm:col-span-2">
+                    <EchoTimingFields timing={config.echoTiming} onChange={(echoTiming) => setConfig((current) => ({ ...current, echoTiming }))} />
+                  </div>
+                ) : <>
+                  <label className="text-xs font-semibold text-slate-500">Durée ou seuil principal<input type="number" min={0} value={primaryValue(phase)} onChange={(event) => updatePrimaryValue(phase, Number(event.target.value))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
+                  <label className="text-xs font-semibold text-slate-500">Unité<select value={phase.endRule.type === "AFTER_DURATION" ? phase.endRule.unit ?? "DAYS" : phase.startRule.unit} onChange={(event) => phase.endRule.type === "AFTER_DURATION" ? updatePhase(phase.id, { endRule: { ...phase.endRule, unit: event.target.value as ReproductionUnit } }) : updatePhase(phase.id, { startRule: { ...phase.startRule, unit: event.target.value as ReproductionUnit } })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm">{UNITS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                </>}
                 {advanced && <>
-                  <label className="text-xs font-semibold text-slate-500">Référence de départ<select value={phase.startRule.reference} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, reference: event.target.value as ReproductionReference } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm">{REFERENCES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                  <label className="text-xs font-semibold text-slate-500">Position<select value={phase.startRule.position} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, position: event.target.value as ReproductionPosition } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"><option value="AT">Au moment de</option><option value="AFTER">Après</option><option value="BEFORE">Avant</option></select></label>
-                  <label className="text-xs font-semibold text-slate-500">Décalage<input type="number" min={0} value={phase.startRule.offset} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, offset: Number(event.target.value) } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm" /></label>
-                  <label className="text-xs font-semibold text-slate-500">Condition de départ<select value={phase.startRule.condition} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, condition: event.target.value as PhaseStartCondition } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"><option value="ALWAYS">Toujours</option><option value="IF_NO_BREEDING">Si aucune saillie / IA</option><option value="FERTILIZING_ATTEMPT">Tentative retenue comme fécondante</option></select></label>
+                  {phase.id !== "echo_due" && <>
+                    <label className="text-xs font-semibold text-slate-500">Référence de départ<select value={phase.startRule.reference} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, reference: event.target.value as ReproductionReference } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm">{REFERENCES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                    <label className="text-xs font-semibold text-slate-500">Position<select value={phase.startRule.position} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, position: event.target.value as ReproductionPosition } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"><option value="AT">Au moment de</option><option value="AFTER">Après</option><option value="BEFORE">Avant</option></select></label>
+                    <label className="text-xs font-semibold text-slate-500">Décalage<input type="number" min={0} value={phase.startRule.offset} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, offset: Number(event.target.value) } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm" /></label>
+                    <label className="text-xs font-semibold text-slate-500">Condition de départ<select value={phase.startRule.condition} onChange={(event) => updatePhase(phase.id, { startRule: { ...phase.startRule, condition: event.target.value as PhaseStartCondition } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"><option value="ALWAYS">Toujours</option><option value="IF_NO_BREEDING">Si aucune saillie / IA</option><option value="FERTILIZING_ATTEMPT">Tentative retenue comme fécondante</option></select></label>
+                  </>}
                   <label className="text-xs font-semibold text-slate-500">Condition de fin<select value={phase.endRule.type} onChange={(event) => updatePhase(phase.id, { endRule: { type: event.target.value as PhaseEndType, unit: "DAYS", duration: 0 } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"><option value="AFTER_DURATION">Après une durée</option><option value="AT_EVENT">À un événement</option><option value="AT_PHASE_START">Au début d’une autre phase</option><option value="UNTIL_EVENT">Jusqu’à un événement</option><option value="OPEN">Sans fin définie</option></select></label>
                   {phase.endRule.type === "AFTER_DURATION" && <label className="text-xs font-semibold text-slate-500">Durée avant la fin<input type="number" min={0} value={phase.endRule.duration ?? 0} onChange={(event) => updatePhase(phase.id, { endRule: { ...phase.endRule, duration: Number(event.target.value) } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm" /></label>}
                   {(phase.endRule.type === "AT_EVENT" || phase.endRule.type === "UNTIL_EVENT") && <label className="text-xs font-semibold text-slate-500">Événement de fin<select value={phase.endRule.event ?? "CALVING"} onChange={(event) => updatePhase(phase.id, { endRule: { ...phase.endRule, event: event.target.value as ReproductionReference } })} className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm">{REFERENCES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
@@ -168,74 +212,13 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
                   <label className="text-xs font-semibold text-slate-500">Action existante<select value={phase.action} onChange={(event) => updatePhase(phase.id, { action: event.target.value as ExistingReproductionAction })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm">{ACTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                   <Toggle label="Visible sur l’accueil" checked={phase.showOnHome} onChange={(showOnHome) => updatePhase(phase.id, { showOnHome })} />
                 </>}
-                <Toggle label="Alerte active" checked={phase.enabledAlert} onChange={(enabledAlert) => updatePhase(phase.id, { enabledAlert })} />
+                <div className="sm:col-span-2">
+                  <Toggle label="Afficher dans les priorités et les listes" checked={phase.enabledAlert} onChange={(enabledAlert) => updatePhase(phase.id, { enabledAlert })} />
+                  <p className="mt-1 px-1 text-xs text-slate-500">Si activé, les animaux concernés apparaissent dans les listes et priorités de CESAM. Cette option ne modifie pas leur phase calculée.</p>
+                </div>
               </div>
             </details>
           ))}
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <SectionHeader
-          title="Échographie après saillie / IA"
-          summary="Entrée dans la liste et passage au statut prêt"
-          onRestore={() => restoreSection("echoTiming")}
-        />
-        <div className="mt-3 space-y-3">
-          <Toggle
-            label="Utiliser une phase préparatoire avant l’échographie"
-            checked={config.echoTiming.usePreparationPhase}
-            onChange={(usePreparationPhase) => setConfig((current) => ({
-              ...current,
-              echoTiming: { ...current.echoTiming, usePreparationPhase },
-            }))}
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className={`text-xs font-semibold ${config.echoTiming.usePreparationPhase ? "text-slate-600" : "text-slate-400"}`}>
-              Afficher dans la liste des échos à partir de
-              <span className="mt-1 flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3">
-                <input
-                  type="number"
-                  min={0}
-                  disabled={!config.echoTiming.usePreparationPhase}
-                  value={config.echoTiming.listFromDays}
-                  onChange={(event) => setConfig((current) => ({
-                    ...current,
-                    echoTiming: { ...current.echoTiming, listFromDays: Math.max(0, Number(event.target.value)) },
-                  }))}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none disabled:text-slate-400"
-                />
-                <span className="text-xs text-slate-500">jours après saillie / IA</span>
-              </span>
-            </label>
-            <label className="text-xs font-semibold text-slate-600">
-              Considérer comme « À échographier » à partir de
-              <span className="mt-1 flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3">
-                <input
-                  type="number"
-                  min={0}
-                  value={config.echoTiming.dueFromDays}
-                  onChange={(event) => setConfig((current) => ({
-                    ...current,
-                    echoTiming: { ...current.echoTiming, dueFromDays: Math.max(0, Number(event.target.value)) },
-                  }))}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none"
-                />
-                <span className="text-xs text-slate-500">jours après saillie / IA</span>
-              </span>
-            </label>
-          </div>
-          {config.echoTiming.usePreparationPhase && config.echoTiming.listFromDays > config.echoTiming.dueFromDays && (
-            <p className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs font-semibold text-red-700">
-              La femelle ne peut pas entrer dans la liste après la date à laquelle elle devient « À échographier ». Réduisez le premier délai ou augmentez le second.
-            </p>
-          )}
-          {!config.echoTiming.usePreparationPhase && (
-            <p className="text-xs text-slate-500">La femelle entrera directement dans la liste au jour où elle devient « À échographier ».</p>
-          )}
-          <p className="rounded-lg bg-yellow-50 p-3 text-sm font-semibold leading-5 text-yellow-900">
-            {describeEchoTiming(config.echoTiming)}
-          </p>
         </div>
       </section>
 

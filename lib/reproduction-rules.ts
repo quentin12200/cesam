@@ -184,9 +184,9 @@ export function describeActionWindow(windowRule: ReproductionActionWindow) {
 
 export function describeEchoTiming(timing: ReproductionRulesConfig["echoTiming"]) {
   if (!timing.usePreparationPhase) {
-    return `Les femelles deviennent À échographier à J${timing.dueFromDays} après saillie/IA.`;
+    return `Les femelles deviennent À échographier à J${timing.dueFromDays} après saillie ou IA.`;
   }
-  return `Les femelles apparaissent dans la liste des échos à partir de J${timing.listFromDays} après saillie/IA et deviennent À échographier à J${timing.dueFromDays}.`;
+  return `Les femelles apparaissent dans la liste des échos à J${timing.listFromDays} et deviennent À échographier à J${timing.dueFromDays} après saillie ou IA.`;
 }
 
 export function validateReproductionRules(config: ReproductionRulesConfig) {
