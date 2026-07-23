@@ -215,11 +215,6 @@ function avoidRingCollisions(
     let point = angularPosition(displayAngle, radius);
     let attempts = 0;
 
-    if (event.kind === "calving" && angularDistance(displayAngle, -90) < 14) {
-      displayAngle += 18;
-      point = angularPosition(displayAngle, radius);
-    }
-
     // Les dates restent ancrées à leur angle réel. Seul le rendu est décalé
     // progressivement dans le sens chronologique lorsqu'une zone est occupée.
     while (
@@ -711,9 +706,8 @@ export default function ReproductiveCycleTimeline({
       const angle = ratio * 360 - 90;
       return { ...event, angle };
     });
-  const markerNeedsOuterTrack = eventAngles.some((event) => angularDistance(event.angle, markerAngle) < 18);
-  const markerMobileRadius = markerNeedsOuterTrack ? 40.5 : 30.5;
-  const markerDesktopRadius = markerNeedsOuterTrack ? 40 : 31;
+  const markerMobileRadius = 28.5;
+  const markerDesktopRadius = 29;
   const markerPosition = {
     "--marker-x-mobile": `${markerMobileRadius * Math.cos(markerAngle * Math.PI / 180)}%`,
     "--marker-y-mobile": `${markerMobileRadius * Math.sin(markerAngle * Math.PI / 180)}%`,
@@ -724,12 +718,12 @@ export default function ReproductiveCycleTimeline({
   const desktopEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerDesktopRadius, 12.5, 15);
   const ringEvents: PositionedEvent[] = eventAngles.map((event, index) => ({
     ...event,
-    desktopAngle: desktopEventLayout[index].angle,
+    desktopAngle: event.kind === "calving" ? -90 : desktopEventLayout[index].angle,
     position: {
-      "--event-x-mobile": `${mobileEventLayout[index].point.x}%`,
-      "--event-y-mobile": `${mobileEventLayout[index].point.y}%`,
-      "--event-x-desktop": `${desktopEventLayout[index].point.x}%`,
-      "--event-y-desktop": `${desktopEventLayout[index].point.y}%`,
+      "--event-x-mobile": `${event.kind === "calving" ? 0 : mobileEventLayout[index].point.x}%`,
+      "--event-y-mobile": `${event.kind === "calving" ? -41 : mobileEventLayout[index].point.y}%`,
+      "--event-x-desktop": `${event.kind === "calving" ? 0 : desktopEventLayout[index].point.x}%`,
+      "--event-y-desktop": `${event.kind === "calving" ? -41 : desktopEventLayout[index].point.y}%`,
     } as CSSProperties,
   }));
   const selectedEvent = ringEvents.find((event) => event.id === selectedEventId) ?? null;
@@ -910,7 +904,10 @@ export default function ReproductiveCycleTimeline({
                     const dotY = 100 + 91 * Math.sin(radians);
                     const lineX = 100 + 99 * Math.cos(radians);
                     const lineY = 100 + 99 * Math.sin(radians);
-                    const x = 100 + labelRadius * Math.cos(radians);
+                    const startZoneShift = angularDistance(stage.midAngle, -90) < 18
+                      ? (Math.cos(radians) >= 0 ? 14 : -14)
+                      : 0;
+                    const x = 100 + labelRadius * Math.cos(radians) + startZoneShift;
                     const y = 100 + labelRadius * Math.sin(radians);
                     return (
                       <g key={`${stage.id}-label`}>
@@ -952,7 +949,10 @@ export default function ReproductiveCycleTimeline({
                     const dotY = 100 + 96 * Math.sin(radians);
                     const lineX = 100 + 103 * Math.cos(radians);
                     const lineY = 100 + 103 * Math.sin(radians);
-                    const x = 100 + labelRadius * Math.cos(radians);
+                    const startZoneShift = angularDistance(stage.midAngle, -90) < 18
+                      ? (Math.cos(radians) >= 0 ? 14 : -14)
+                      : 0;
+                    const x = 100 + labelRadius * Math.cos(radians) + startZoneShift;
                     const y = 100 + labelRadius * Math.sin(radians);
                     return (
                       <g key={`${stage.id}-overlay-label`}>
@@ -983,9 +983,10 @@ export default function ReproductiveCycleTimeline({
                 className="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible sm:block"
                 aria-hidden="true"
               >
-                {ringEvents.map((event, index) => {
-                  const anchor = angularPosition(event.angle, 99.2);
-                  const displaced = angularPosition(desktopEventLayout[index].angle, 99.2);
+                {ringEvents.map((event) => {
+                  const connectorRadius = event.kind === "calving" ? 93.5 : 99.2;
+                  const anchor = angularPosition(event.angle, connectorRadius);
+                  const displaced = angularPosition(event.desktopAngle, connectorRadius);
                   if (distanceBetween(anchor, displaced) < 1) return null;
                   return (
                     <line
@@ -1024,11 +1025,17 @@ export default function ReproductiveCycleTimeline({
                       onClick={() => setSelectedEventId(selectedEventId === event.id ? null : event.id)}
                       aria-expanded={selected}
                       aria-label={`${event.label}, ${formatDate(event.date)}. Afficher les détails`}
-                      className={`flex h-9 w-9 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:h-[52px] sm:w-[52px] ${selected ? "scale-110 border-[3px] shadow-lg ring-2 ring-white sm:ring-4" : "border-[2px] sm:border-[3px]"}`}
+                      className={`flex touch-manipulation items-center justify-center rounded-full bg-white transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 ${
+                        event.kind === "calving"
+                          ? "h-7 w-7 border-2 shadow-sm sm:h-9 sm:w-9"
+                          : "h-9 w-9 border-2 shadow-md sm:h-[52px] sm:w-[52px] sm:border-[3px]"
+                      } ${selected ? "scale-110 shadow-lg ring-2 ring-white sm:ring-4" : ""}`}
                       style={{ borderColor: event.color, color: event.color }}
                       title={`${event.label} · ${formatDate(event.date)}`}
                     >
-                      <span className="sm:scale-125"><EventIcon kind={event.kind} /></span>
+                      <span className={event.kind === "calving" ? "scale-75 sm:scale-90" : "sm:scale-125"}>
+                        <EventIcon kind={event.kind} />
+                      </span>
                     </button>
                     {showText && (
                       <span className={`pointer-events-none absolute hidden w-28 rounded-lg border border-slate-200 bg-white/95 px-2 py-1.5 shadow-sm sm:block ${desktopDetailPosition(event.desktopAngle)}`}>
@@ -1052,7 +1059,7 @@ export default function ReproductiveCycleTimeline({
                 style={markerPosition}
                 aria-label="Revenir à la situation actuelle"
               >
-                <span className="flex min-h-8 min-w-8 max-w-24 items-center justify-center rounded-full border-2 bg-white px-2 text-center text-[9px] font-extrabold leading-tight shadow-sm ring-4 ring-white/90 sm:text-[10px]" style={{ borderColor: activeColor, color: activeColor }}>
+                <span className="flex min-h-7 min-w-7 max-w-20 items-center justify-center rounded-full border bg-white px-1.5 text-center text-[8px] font-extrabold leading-tight shadow-sm ring-2 ring-white/90 sm:text-[9px]" style={{ borderColor: activeColor, color: activeColor }}>
                   {markerText}
                 </span>
               </button>
@@ -1060,7 +1067,7 @@ export default function ReproductiveCycleTimeline({
               <button
                 type="button"
                 onClick={() => setSelectedEventId(null)}
-                className="absolute inset-[23%] flex flex-col items-center justify-center rounded-full bg-white px-2 text-center shadow-[inset_0_0_0_1px_#eef2f7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:px-5"
+                className="absolute inset-[25%] flex flex-col items-center justify-center rounded-full bg-white px-2 text-center shadow-[inset_0_0_0_1px_#eef2f7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:px-5"
                 aria-label={`${model.title} : ${model.main}`}
               >
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 ring-1 ring-slate-100" style={{ color: activeColor }}>
