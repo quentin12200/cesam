@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { subMonths } from "date-fns";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
+import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
 
 export async function GET() {
   await syncAutomaticEchoRequests();
@@ -51,7 +52,6 @@ export async function GET() {
       categorie: true,
       saillies: {
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-        take: 1,
         select: {
           id: true,
           date: true,
@@ -80,21 +80,24 @@ export async function GET() {
     orderBy: { nutrav: "asc" },
   });
 
-  const result = vaches.map((v) => ({
+  const result = vaches.map((v) => {
+    const lastCalving = v.velagesVache[0]?.date ?? null;
+    const currentBreeding = getCurrentCycleBreeding(v.saillies, lastCalving);
+    return {
     id: v.id,
     nutrav: v.nutrav,
     nobovi: v.nobovi,
     danais: v.danais.toISOString(),
-    derniereSaillie: v.saillies[0]?.date?.toISOString() ?? null,
-    gestationEtat: v.saillies[0]?.gestation?.etat ?? null,
-    dateVelagePrevue: v.saillies[0]?.gestation?.dateVelagePrevue?.toISOString() ?? null,
+    derniereSaillie: currentBreeding?.date.toISOString() ?? null,
+    gestationEtat: currentBreeding?.gestation?.etat ?? null,
+    dateVelagePrevue: currentBreeding?.gestation?.dateVelagePrevue?.toISOString() ?? null,
     dernierVelage: v.velagesVache[0]?.date?.toISOString() ?? null,
-    saillieId: v.saillies[0]?.id ?? null,
-    taureauNom: v.saillies[0]?.taureau?.nopere ?? v.saillies[0]?.taureau?.nupere ?? null,
+    saillieId: currentBreeding?.id ?? null,
+    taureauNom: currentBreeding?.taureau?.nopere ?? currentBreeding?.taureau?.nupere ?? null,
     derniereChaleur: (() => {
       const chaleur = v.chaleurs[0]?.date ?? null;
       if (!chaleur) return null;
-      const saillieDate = v.saillies[0]?.date ?? null;
+      const saillieDate = currentBreeding?.date ?? null;
       if (saillieDate && saillieDate >= chaleur) return null;
       return chaleur.toISOString();
     })(),
@@ -106,7 +109,7 @@ export async function GET() {
     reproductionEtatModifieAt: v.reproductionEtatModifieAt?.toISOString() ?? null,
     estGenisse: v.estGenisse,
     categorie: v.categorie ?? null,
-  }));
+  }});
 
   return NextResponse.json({ vaches: result });
 }

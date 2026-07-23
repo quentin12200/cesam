@@ -1,6 +1,7 @@
 import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { parseReproductionRules } from "@/lib/reproduction-rules";
+import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
 
 export const ACTIVE_ECHO_REQUEST_WHERE = { etat: "A_FAIRE" } as const;
 
@@ -15,22 +16,54 @@ export async function syncAutomaticEchoRequests() {
     ? Math.max(0, echoPhase.startRule.offset)
     : 40;
 
-  const candidates = await prisma.saillie.findMany({
+  const females = await prisma.animal.findMany({
     where: {
-      date: { lte: subDays(new Date(), thresholdDays) },
-      animal: { statut: "ACTIF", sexbov: "F" },
-      OR: [
-        { gestation: null },
-        { gestation: { etat: { notIn: ["VERT", "ROUGE"] } } },
-      ],
+      statut: "ACTIF",
+      sexbov: "F",
     },
-    orderBy: [{ animalId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
-    select: { id: true, animalId: true },
+    select: {
+      id: true,
+      saillies: {
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        select: { id: true, date: true, gestation: { select: { etat: true } } },
+      },
+      velagesVache: {
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        take: 1,
+        select: { date: true },
+      },
+    },
   });
 
   const latestByAnimal = new Map<string, string>();
-  for (const candidate of candidates) {
-    if (!latestByAnimal.has(candidate.animalId)) latestByAnimal.set(candidate.animalId, candidate.id);
+  const currentAttemptByAnimal = new Map<string, string>();
+  const thresholdDate = subDays(new Date(), thresholdDays);
+  for (const female of females) {
+    const lastCalving = female.velagesVache[0]?.date ?? null;
+    const currentAttempt = getCurrentCycleBreeding(female.saillies, lastCalving);
+    if (!currentAttempt) continue;
+    currentAttemptByAnimal.set(female.id, currentAttempt.id);
+    if (
+      currentAttempt.date <= thresholdDate
+      && currentAttempt.gestation?.etat !== "VERT"
+      && currentAttempt.gestation?.etat !== "ROUGE"
+    ) {
+      latestByAnimal.set(female.id, currentAttempt.id);
+    }
+  }
+
+  const activeAutomaticRequests = await prisma.demandeEchographie.findMany({
+    where: { origine: "AUTOMATIQUE", etat: "A_FAIRE" },
+    select: { id: true, animalId: true, saillieId: true },
+  });
+  const obsoleteRequestIds = activeAutomaticRequests
+    .filter((request) => currentAttemptByAnimal.get(request.animalId) !== request.saillieId)
+    .map((request) => request.id);
+  if (obsoleteRequestIds.length > 0) {
+    await prisma.demandeEchographie.updateMany({
+      where: { id: { in: obsoleteRequestIds } },
+      data: { etat: "RETIREE", clotureeAt: new Date() },
+    });
   }
 
   for (const [animalId, saillieId] of latestByAnimal) {
@@ -48,14 +81,19 @@ export async function syncAutomaticEchoRequests() {
     });
   }
 
-  if (latestByAnimal.size > 0) {
-    const activeAnimalIds = await prisma.demandeEchographie.findMany({
-      where: { animalId: { in: [...latestByAnimal.keys()] }, etat: "A_FAIRE" },
-      distinct: ["animalId"],
-      select: { animalId: true },
-    });
+  const activeAnimalIds = await prisma.demandeEchographie.findMany({
+    where: { etat: "A_FAIRE" },
+    distinct: ["animalId"],
+    select: { animalId: true },
+  });
+  const activeIds = activeAnimalIds.map((request) => request.animalId);
+  await prisma.animal.updateMany({
+    where: { aEchographier: true, id: { notIn: activeIds } },
+    data: { aEchographier: false },
+  });
+  if (activeIds.length > 0) {
     await prisma.animal.updateMany({
-      where: { id: { in: activeAnimalIds.map((request) => request.animalId) } },
+      where: { id: { in: activeIds } },
       data: { aEchographier: true },
     });
   }
