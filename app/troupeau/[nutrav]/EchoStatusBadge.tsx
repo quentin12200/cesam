@@ -27,7 +27,7 @@ export default function EchoStatusBadge({ nutrav, canCancel, saillieId, saillieD
       const response = await fetch(`/api/animaux/${nutrav}/echo-request`, { method: "DELETE" });
 
       if (!response.ok) {
-        window.alert("Impossible de retirer l’animal de la liste À échographier.");
+        window.alert("Impossible de retirer cette vache de la liste des vaches à échographier.");
         return;
       }
 
@@ -48,8 +48,8 @@ export default function EchoStatusBadge({ nutrav, canCancel, saillieId, saillieD
           type="button"
           onClick={(event) => { event.preventDefault(); event.stopPropagation(); setConfirmOpen(true); }}
           disabled={loading}
-          aria-label="Retirer de la liste À échographier"
-          title="Retirer de la liste À échographier"
+          aria-label="Retirer cette vache de la liste des vaches à échographier"
+          title="Retirer cette vache de la liste des vaches à échographier"
           className="ml-0.5 inline-flex size-8 items-center justify-center rounded-full text-yellow-950 transition-colors hover:bg-yellow-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-700 disabled:opacity-50"
         >
           <X size={14} aria-hidden="true" />
@@ -66,7 +66,7 @@ export default function EchoStatusBadge({ nutrav, canCancel, saillieId, saillieD
       >
         <span className="block w-full max-w-sm rounded-2xl bg-white p-4 text-left shadow-xl">
           <strong id="remove-echo-title" className="block text-base text-gray-900">
-            Retirer cette vache de la liste à échographier ?
+            Retirer cette vache de la liste des vaches à échographier ?
           </strong>
           <span className="mt-2 block text-sm font-normal leading-5 text-gray-600">
             Elle ne sera plus proposée pour cette tentative, sauf si vous l’ajoutez de nouveau manuellement.
