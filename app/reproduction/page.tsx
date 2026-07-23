@@ -32,11 +32,16 @@ interface VacheRepro {
   dateVelagePrevue: string | null;
   dernierVelage: string | null;
   saillieId: string | null;
+  saillieType: string | null;
   taureauNom: string | null;
   derniereChaleur: string | null;
   aEchographier: boolean;
   echoRequestOrigine: "AUTOMATIQUE" | "MANUELLE" | null;
   echoRequestMotif: string | null;
+  echoStatusLabel: "Bientôt prête pour l’échographie" | "À échographier" | null;
+  echoCountdown: string | null;
+  echoSortGroup: number | null;
+  echoDueDate: string | null;
   estGenisse: boolean;
   categorie: string | null;
   reproductionEtatManuel: EtatGestation | null;
@@ -512,11 +517,17 @@ function ReproductionContent() {
     ) as EtatGestation,
   }));
 
-  const filtered = filterEtat === "TOUS"
+  const filtered = (filterEtat === "TOUS"
     ? vachesAvecEtat
     : filterEtat === "JAUNE"
       ? vachesAvecEtat.filter((v) => v.aEchographier)
-      : vachesAvecEtat.filter((v) => v.etat === filterEtat);
+      : vachesAvecEtat.filter((v) => v.etat === filterEtat))
+    .sort((left, right) => {
+      if (filterEtat !== "JAUNE") return 0;
+      const groupDifference = (left.echoSortGroup ?? 99) - (right.echoSortGroup ?? 99);
+      if (groupDifference !== 0) return groupDifference;
+      return new Date(left.echoDueDate ?? 0).getTime() - new Date(right.echoDueDate ?? 0).getTime();
+    });
   const counts: Record<EtatGestation, number> = { GRIS: 0, JAUNE: 0, VERT: 0, ROUGE: 0, ROSE: 0, REPOS: 0 };
   vachesAvecEtat.forEach((v) => {
     if (v.etat !== "JAUNE") counts[v.etat]++;
@@ -841,6 +852,38 @@ function ReproductionContent() {
       ) : (
         <div className="space-y-2">
           {filtered.map((vache) => {
+            if (filterEtat === "JAUNE") {
+              const isLate = vache.echoCountdown?.startsWith("En retard") === true;
+              return (
+                <article key={vache.id} className={`rounded-xl border bg-white p-3 shadow-sm ${isLate ? "border-red-300" : "border-yellow-300"}`}>
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-baseline gap-2">
+                        <Link href={`/troupeau/${vache.nutrav}`} className="shrink-0 font-mono text-lg font-extrabold text-green-800 hover:underline">{vache.nutrav}</Link>
+                        {vache.nobovi && <span className="truncate text-sm font-bold text-gray-800">{vache.nobovi}</span>}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {vache.saillieType === "IA" ? "IA" : "Saillie naturelle"} · {vache.derniereSaillie ? formatDateCompacte(new Date(vache.derniereSaillie)) : ""}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${isLate ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-800"}`}>
+                      {vache.echoStatusLabel}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <p className={`min-w-0 flex-1 text-sm font-bold ${isLate ? "text-red-700" : "text-yellow-800"}`}>{vache.echoCountdown}</p>
+                    <button
+                      type="button"
+                      onClick={() => openEchoForm(vache)}
+                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 px-4 text-sm font-extrabold text-yellow-950 hover:bg-yellow-500 sm:w-auto"
+                    >
+                      <RefreshCw size={17} />
+                      Saisir l’écho
+                    </button>
+                  </div>
+                </article>
+              );
+            }
             const joursDepuisChaleur = vache.derniereChaleur
               ? differenceInDays(now, new Date(vache.derniereChaleur)) : null;
             const joursAvantVelage = vache.dateVelagePrevue

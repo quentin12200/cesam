@@ -2,6 +2,7 @@ import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { parseReproductionRules } from "@/lib/reproduction-rules";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
+import { getEchoListEntryDays } from "@/lib/echo-list-status";
 
 export const ACTIVE_ECHO_REQUEST_WHERE = { etat: "A_FAIRE" } as const;
 
@@ -12,9 +13,8 @@ export async function syncAutomaticEchoRequests() {
   }).catch(() => null);
   const rules = parseReproductionRules(storedRules?.reproductionRulesJson);
   const echoPhase = rules.phases.find((phase) => phase.id === "echo_due");
-  const thresholdDays = echoPhase?.startRule.unit === "DAYS"
-    ? Math.max(0, echoPhase.startRule.offset)
-    : 40;
+  const listDisplayEnabled = echoPhase?.enabledAlert ?? true;
+  const thresholdDays = getEchoListEntryDays(rules.echoTiming);
 
   const females = await prisma.animal.findMany({
     where: {
@@ -25,7 +25,7 @@ export async function syncAutomaticEchoRequests() {
       id: true,
       saillies: {
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-        select: { id: true, date: true, gestation: { select: { etat: true } } },
+        select: { id: true, date: true, gestation: { select: { dateEcho: true } } },
       },
       velagesVache: {
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -44,9 +44,9 @@ export async function syncAutomaticEchoRequests() {
     if (!currentAttempt) continue;
     currentAttemptByAnimal.set(female.id, currentAttempt.id);
     if (
-      currentAttempt.date <= thresholdDate
-      && currentAttempt.gestation?.etat !== "VERT"
-      && currentAttempt.gestation?.etat !== "ROUGE"
+      listDisplayEnabled
+      && currentAttempt.date <= thresholdDate
+      && !currentAttempt.gestation?.dateEcho
     ) {
       latestByAnimal.set(female.id, currentAttempt.id);
     }

@@ -2,14 +2,23 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { subMonths } from "date-fns";
+import { addDays, differenceInDays, subMonths } from "date-fns";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
+import { getEchoListEntryDays, getEchoListStatus } from "@/lib/echo-list-status";
+import { parseReproductionRules } from "@/lib/reproduction-rules";
 
 export async function GET() {
   await syncAutomaticEchoRequests();
   const now = new Date();
   const dateMin24Mois = subMonths(now, 24);
+  const storedRules = await prisma.exploitationConfig.findUnique({
+    where: { id: "singleton" },
+    select: { reproductionRulesJson: true },
+  }).catch(() => null);
+  const rules = parseReproductionRules(storedRules?.reproductionRulesJson);
+  const echoListEnabled = rules.phases.find((phase) => phase.id === "echo_due")?.enabledAlert ?? true;
+  const echoEntryDays = getEchoListEntryDays(rules.echoTiming);
 
   const vaches = await prisma.animal.findMany({
     where: {
@@ -55,12 +64,14 @@ export async function GET() {
         select: {
           id: true,
           date: true,
+          type: true,
           taureauId: true,
           taureau: { select: { nopere: true, nupere: true } },
           gestation: {
             select: {
               id: true,
               etat: true,
+              dateEcho: true,
               dateVelagePrevue: true,
             },
           },
@@ -83,6 +94,20 @@ export async function GET() {
   const result = vaches.map((v) => {
     const lastCalving = v.velagesVache[0]?.date ?? null;
     const currentBreeding = getCurrentCycleBreeding(v.saillies, lastCalving);
+    const activeRequest = v.demandesEchographie[0] ?? null;
+    const daysSinceBreeding = currentBreeding ? differenceInDays(now, currentBreeding.date) : null;
+    const explicitControl = activeRequest?.origine === "MANUELLE";
+    const belongsToEchoList = Boolean(
+      echoListEnabled
+      && activeRequest
+      && currentBreeding
+      && (explicitControl || !currentBreeding.gestation?.dateEcho)
+      && (explicitControl || (daysSinceBreeding !== null && daysSinceBreeding >= echoEntryDays))
+    );
+    const echoStatus = belongsToEchoList && daysSinceBreeding !== null
+      ? getEchoListStatus(daysSinceBreeding, rules.echoTiming.dueFromDays)
+      : null;
+    const echoDueDate = currentBreeding ? addDays(currentBreeding.date, rules.echoTiming.dueFromDays) : null;
     return {
     id: v.id,
     nutrav: v.nutrav,
@@ -93,6 +118,7 @@ export async function GET() {
     dateVelagePrevue: currentBreeding?.gestation?.dateVelagePrevue?.toISOString() ?? null,
     dernierVelage: v.velagesVache[0]?.date?.toISOString() ?? null,
     saillieId: currentBreeding?.id ?? null,
+    saillieType: currentBreeding?.type ?? null,
     taureauNom: currentBreeding?.taureau?.nopere ?? currentBreeding?.taureau?.nupere ?? null,
     derniereChaleur: (() => {
       const chaleur = v.chaleurs[0]?.date ?? null;
@@ -101,9 +127,13 @@ export async function GET() {
       if (saillieDate && saillieDate >= chaleur) return null;
       return chaleur.toISOString();
     })(),
-    aEchographier: v.demandesEchographie.length > 0,
-    echoRequestOrigine: v.demandesEchographie[0]?.origine ?? null,
-    echoRequestMotif: v.demandesEchographie[0]?.motif ?? null,
+    aEchographier: belongsToEchoList,
+    echoRequestOrigine: activeRequest?.origine ?? null,
+    echoRequestMotif: activeRequest?.motif ?? null,
+    echoStatusLabel: echoStatus?.label ?? null,
+    echoCountdown: echoStatus?.countdown ?? null,
+    echoSortGroup: echoStatus?.sortGroup ?? null,
+    echoDueDate: echoDueDate?.toISOString() ?? null,
     reproductionEtatManuel: v.reproductionEtatManuel,
     reproductionEtatPrecedent: v.reproductionEtatPrecedent,
     reproductionEtatModifieAt: v.reproductionEtatModifieAt?.toISOString() ?? null,
