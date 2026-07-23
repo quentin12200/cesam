@@ -78,9 +78,9 @@ interface PositionedEvent extends EventItem {
 const OPEN_CYCLE_SCALE_DAYS = 365;
 const RING_RADIUS = 78;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-const MAIN_RING_WIDTH = 18;
-const ACTIVE_RING_WIDTH = 20;
-const PAST_RING_WIDTH = 17;
+const MAIN_RING_WIDTH = 15;
+const ACTIVE_RING_WIDTH = 17;
+const PAST_RING_WIDTH = 14;
 const ECHO_OVERLAY_RADIUS = 91;
 const ECHO_OVERLAY_CIRCUMFERENCE = 2 * Math.PI * ECHO_OVERLAY_RADIUS;
 const STAGE_COLORS = REPRODUCTIVE_CYCLE_COLORS;
@@ -194,20 +194,31 @@ function distanceBetween(
   return Math.hypot(left.x - right.x, left.y - right.y);
 }
 
+function angularDistance(left: number, right: number) {
+  const rawDistance = Math.abs((left - right) % 360);
+  return Math.min(rawDistance, 360 - rawDistance);
+}
+
 function avoidRingCollisions(
   events: Array<EventItem & { angle: number }>,
   radius: number,
   markerAngle: number,
+  markerRadius: number,
   minimumEventDistance: number,
   minimumMarkerDistance: number
 ) {
-  const marker = angularPosition(markerAngle, radius - 7);
+  const marker = angularPosition(markerAngle, markerRadius);
   const placed: Array<{ x: number; y: number }> = [];
 
   return events.map((event) => {
     let displayAngle = event.angle;
     let point = angularPosition(displayAngle, radius);
     let attempts = 0;
+
+    if (event.kind === "calving" && angularDistance(displayAngle, -90) < 14) {
+      displayAngle += 18;
+      point = angularPosition(displayAngle, radius);
+    }
 
     // Les dates restent ancrées à leur angle réel. Seul le rendu est décalé
     // progressivement dans le sens chronologique lorsqu'une zone est occupée.
@@ -641,12 +652,6 @@ export default function ReproductiveCycleTimeline({
       : activeSegment?.color ?? (status === "ROUGE" ? STAGE_COLORS.service : STAGE_COLORS[activeStage]);
   const progressRatio = Math.min(1, Math.max(0, model.trackedDays / model.scaleDays));
   const markerAngle = progressRatio * 360 - 90;
-  const markerPosition = {
-    "--marker-x-mobile": `${31 * Math.cos(markerAngle * Math.PI / 180)}%`,
-    "--marker-y-mobile": `${31 * Math.sin(markerAngle * Math.PI / 180)}%`,
-    "--marker-x-desktop": `${34.5 * Math.cos(markerAngle * Math.PI / 180)}%`,
-    "--marker-y-desktop": `${34.5 * Math.sin(markerAngle * Math.PI / 180)}%`,
-  } as CSSProperties;
 
   const today = new Date();
   const projectedCalvingDate =
@@ -706,8 +711,17 @@ export default function ReproductiveCycleTimeline({
       const angle = ratio * 360 - 90;
       return { ...event, angle };
     });
-  const mobileEventLayout = avoidRingCollisions(eventAngles, 39, markerAngle, 13.5, 19);
-  const desktopEventLayout = avoidRingCollisions(eventAngles, 39, markerAngle, 13, 16);
+  const markerNeedsOuterTrack = eventAngles.some((event) => angularDistance(event.angle, markerAngle) < 18);
+  const markerMobileRadius = markerNeedsOuterTrack ? 40.5 : 30.5;
+  const markerDesktopRadius = markerNeedsOuterTrack ? 40 : 31;
+  const markerPosition = {
+    "--marker-x-mobile": `${markerMobileRadius * Math.cos(markerAngle * Math.PI / 180)}%`,
+    "--marker-y-mobile": `${markerMobileRadius * Math.sin(markerAngle * Math.PI / 180)}%`,
+    "--marker-x-desktop": `${markerDesktopRadius * Math.cos(markerAngle * Math.PI / 180)}%`,
+    "--marker-y-desktop": `${markerDesktopRadius * Math.sin(markerAngle * Math.PI / 180)}%`,
+  } as CSSProperties;
+  const mobileEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerMobileRadius, 13, 17);
+  const desktopEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerDesktopRadius, 12.5, 15);
   const ringEvents: PositionedEvent[] = eventAngles.map((event, index) => ({
     ...event,
     desktopAngle: desktopEventLayout[index].angle,
@@ -827,7 +841,7 @@ export default function ReproductiveCycleTimeline({
           <div className="order-1 min-w-0 lg:order-2">
             <div className="relative mx-auto aspect-square w-[calc(100%-24px)] max-w-[430px] sm:w-[500px] sm:max-w-none">
               <svg
-                viewBox="0 0 200 200"
+                viewBox="-14 -14 228 228"
                 className="h-full w-full overflow-hidden sm:overflow-visible"
                 role="img"
                 aria-label={`${model.title} : ${model.main}`}
@@ -884,12 +898,20 @@ export default function ReproductiveCycleTimeline({
                     const segmentRatio = stage.days / model.scaleDays;
                     const isShort = segmentRatio < 0.075;
                     const radians = stage.midAngle * Math.PI / 180;
-                    const dotX = 100 + 87.5 * Math.cos(radians);
-                    const dotY = 100 + 87.5 * Math.sin(radians);
-                    const lineX = 100 + 93 * Math.cos(radians);
-                    const lineY = 100 + 93 * Math.sin(radians);
-                    const x = 100 + 97 * Math.cos(radians);
-                    const y = 100 + 97 * Math.sin(radians);
+                    const stageIndex = elapsedRing.findIndex((candidate) => candidate.id === stage.id);
+                    const nearbyLabelCount = elapsedRing
+                      .slice(0, stageIndex)
+                      .filter((candidate) => angularDistance(candidate.midAngle, stage.midAngle) < 14)
+                      .length;
+                    const nearEvent = desktopEventLayout.some((event) => angularDistance(event.angle, stage.midAngle) < 16);
+                    const nearMarker = angularDistance(markerAngle, stage.midAngle) < 16;
+                    const labelRadius = 108 + nearbyLabelCount * 8 + (nearEvent ? 8 : 0) + (nearMarker ? 8 : 0);
+                    const dotX = 100 + 91 * Math.cos(radians);
+                    const dotY = 100 + 91 * Math.sin(radians);
+                    const lineX = 100 + 99 * Math.cos(radians);
+                    const lineY = 100 + 99 * Math.sin(radians);
+                    const x = 100 + labelRadius * Math.cos(radians);
+                    const y = 100 + labelRadius * Math.sin(radians);
                     return (
                       <g key={`${stage.id}-label`}>
                         <line x1={dotX} y1={dotY} x2={lineX} y2={lineY} stroke={stage.displayColor} strokeWidth="0.8" strokeLinecap="round" />
@@ -903,7 +925,7 @@ export default function ReproductiveCycleTimeline({
                           style={{
                             fill: stage.current ? stage.color : "#64748b",
                             stroke: "#ffffff",
-                            fontSize: isShort ? "4.3px" : "4.8px",
+                            fontSize: isShort ? "3.8px" : "4.25px",
                           }}
                         >
                           {stage.shortLabel ?? stage.label}
@@ -914,7 +936,7 @@ export default function ReproductiveCycleTimeline({
                           textAnchor={x < 92 ? "end" : x > 108 ? "start" : "middle"}
                           dominantBaseline="central"
                           className="font-semibold [paint-order:stroke] [stroke-width:2.5px]"
-                          style={{ fill: "#64748b", stroke: "#ffffff", fontSize: "3.35px" }}
+                          style={{ fill: "#64748b", stroke: "#ffffff", fontSize: "3.05px" }}
                         >
                           {stage.labelDetail}
                         </text>
@@ -923,12 +945,15 @@ export default function ReproductiveCycleTimeline({
                   })}
                   {overlayRing.map((stage) => {
                     const radians = stage.midAngle * Math.PI / 180;
-                    const dotX = 100 + 94 * Math.cos(radians);
-                    const dotY = 100 + 94 * Math.sin(radians);
-                    const lineX = 100 + 98 * Math.cos(radians);
-                    const lineY = 100 + 98 * Math.sin(radians);
-                    const x = 100 + 101 * Math.cos(radians);
-                    const y = 100 + 101 * Math.sin(radians);
+                    const nearEvent = desktopEventLayout.some((event) => angularDistance(event.angle, stage.midAngle) < 16);
+                    const nearMarker = angularDistance(markerAngle, stage.midAngle) < 16;
+                    const labelRadius = 112 + (nearEvent ? 10 : 0) + (nearMarker ? 8 : 0);
+                    const dotX = 100 + 96 * Math.cos(radians);
+                    const dotY = 100 + 96 * Math.sin(radians);
+                    const lineX = 100 + 103 * Math.cos(radians);
+                    const lineY = 100 + 103 * Math.sin(radians);
+                    const x = 100 + labelRadius * Math.cos(radians);
+                    const y = 100 + labelRadius * Math.sin(radians);
                     return (
                       <g key={`${stage.id}-overlay-label`}>
                         <line x1={dotX} y1={dotY} x2={lineX} y2={lineY} stroke={stage.displayColor} strokeWidth="0.8" strokeLinecap="round" />
@@ -942,7 +967,7 @@ export default function ReproductiveCycleTimeline({
                           style={{
                             fill: "#b45309",
                             stroke: "#ffffff",
-                            fontSize: "4.6px",
+                            fontSize: "4px",
                           }}
                         >
                           {stage.shortLabel ?? stage.label}
@@ -954,13 +979,13 @@ export default function ReproductiveCycleTimeline({
               </svg>
 
               <svg
-                viewBox="0 0 200 200"
+                viewBox="-14 -14 228 228"
                 className="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible sm:block"
                 aria-hidden="true"
               >
                 {ringEvents.map((event, index) => {
-                  const anchor = angularPosition(event.angle, 78);
-                  const displaced = angularPosition(desktopEventLayout[index].angle, 78);
+                  const anchor = angularPosition(event.angle, 99.2);
+                  const displaced = angularPosition(desktopEventLayout[index].angle, 99.2);
                   if (distanceBetween(anchor, displaced) < 1) return null;
                   return (
                     <line
@@ -978,6 +1003,13 @@ export default function ReproductiveCycleTimeline({
                 })}
               </svg>
 
+              <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 text-center">
+                <span className="block whitespace-nowrap rounded-full bg-white/95 px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-[0.14em] text-slate-400 shadow-sm ring-1 ring-slate-100 sm:text-[9px]">
+                  Début cycle
+                </span>
+                <span className="mx-auto block h-2 w-px bg-slate-300" />
+              </div>
+
               {ringEvents.map((event) => {
                 const selected = selectedEventId === event.id;
                 const showText = event.kind !== "calving";
@@ -992,17 +1024,12 @@ export default function ReproductiveCycleTimeline({
                       onClick={() => setSelectedEventId(selectedEventId === event.id ? null : event.id)}
                       aria-expanded={selected}
                       aria-label={`${event.label}, ${formatDate(event.date)}. Afficher les détails`}
-                      className={`flex h-10 w-10 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:h-14 sm:w-14 ${selected ? "scale-110 border-[3px] shadow-lg ring-2 ring-white sm:ring-4" : "border-[2px] sm:border-[3px]"}`}
+                      className={`flex h-9 w-9 touch-manipulation items-center justify-center rounded-full bg-white shadow-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:h-[52px] sm:w-[52px] ${selected ? "scale-110 border-[3px] shadow-lg ring-2 ring-white sm:ring-4" : "border-[2px] sm:border-[3px]"}`}
                       style={{ borderColor: event.color, color: event.color }}
                       title={`${event.label} · ${formatDate(event.date)}`}
                     >
                       <span className="sm:scale-125"><EventIcon kind={event.kind} /></span>
                     </button>
-                    {event.kind === "calving" && (
-                      <span className="pointer-events-none absolute left-1/2 top-[-1.25rem] hidden w-max -translate-x-1/2 rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500 shadow-sm ring-1 ring-slate-200 sm:block">
-                        Début cycle
-                      </span>
-                    )}
                     {showText && (
                       <span className={`pointer-events-none absolute hidden w-28 rounded-lg border border-slate-200 bg-white/95 px-2 py-1.5 shadow-sm sm:block ${desktopDetailPosition(event.desktopAngle)}`}>
                         <span className="block text-[10px] font-extrabold leading-tight" style={{ color: event.color }}>{event.label}</span>
