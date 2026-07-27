@@ -76,6 +76,7 @@ interface EventItem {
 
 interface PositionedEvent extends EventItem {
   angle: number;
+  mobileAngle: number;
   desktopAngle: number;
   position: CSSProperties;
 }
@@ -215,33 +216,65 @@ function avoidRingCollisions(
   markerAngle: number,
   markerRadius: number,
   minimumEventDistance: number,
-  minimumMarkerDistance: number
+  minimumMarkerDistance: number,
+  maximumDisplacement: number
 ) {
   const marker = angularPosition(markerAngle, markerRadius);
-  const placed: Array<{ x: number; y: number }> = [];
+  const minimumAngleGap =
+    2 * Math.asin(Math.min(1, minimumEventDistance / (2 * radius))) * 180 / Math.PI;
+  const maximumAngleShift =
+    2 * Math.asin(Math.min(1, maximumDisplacement / (2 * radius))) * 180 / Math.PI;
+  const sorted = events
+    .map((event, index) => ({ event, index, displayAngle: event.angle }))
+    .sort((left, right) => left.event.angle - right.event.angle);
 
-  return events.map((event) => {
-    let displayAngle = event.angle;
-    let point = angularPosition(displayAngle, radius);
-    let attempts = 0;
-
-    // Les dates restent ancrées à leur angle réel. Seul le rendu est décalé
-    // progressivement dans le sens chronologique lorsqu'une zone est occupée.
+  for (let clusterStart = 0; clusterStart < sorted.length;) {
+    let clusterEnd = clusterStart;
     while (
-      attempts < 12
-      && (
-        distanceBetween(point, marker) < minimumMarkerDistance
-        || placed.some((candidate) => distanceBetween(point, candidate) < minimumEventDistance)
-      )
+      clusterEnd + 1 < sorted.length
+      && sorted[clusterEnd + 1].event.angle - sorted[clusterEnd].event.angle < minimumAngleGap
     ) {
-      displayAngle += 9;
-      point = angularPosition(displayAngle, radius);
-      attempts += 1;
+      clusterEnd += 1;
     }
 
-    placed.push(point);
-    return { angle: displayAngle, point };
-  });
+    if (clusterEnd > clusterStart) {
+      const cluster = sorted.slice(clusterStart, clusterEnd + 1);
+      const rawCenter =
+        cluster.reduce((sum, item) => sum + item.event.angle, 0) / cluster.length;
+      const firstTarget = rawCenter - minimumAngleGap * (cluster.length - 1) / 2;
+      const shifts = cluster.map((item, index) =>
+        firstTarget + index * minimumAngleGap - item.event.angle
+      );
+      const largestShift = Math.max(...shifts.map((shift) => Math.abs(shift)));
+      const scale = largestShift > maximumAngleShift ? maximumAngleShift / largestShift : 1;
+
+      cluster.forEach((item, index) => {
+        item.displayAngle = item.event.angle + shifts[index] * scale;
+      });
+    }
+
+    clusterStart = clusterEnd + 1;
+  }
+
+  return sorted
+    .map((item) => {
+      let displayAngle = item.displayAngle;
+      let point = angularPosition(displayAngle, radius);
+
+      if (distanceBetween(point, marker) < minimumMarkerDistance) {
+        const backwardAngle = item.event.angle - maximumAngleShift;
+        const forwardAngle = item.event.angle + maximumAngleShift;
+        const backwardPoint = angularPosition(backwardAngle, radius);
+        const forwardPoint = angularPosition(forwardAngle, radius);
+        const useBackward =
+          distanceBetween(backwardPoint, marker) > distanceBetween(forwardPoint, marker);
+        displayAngle = useBackward ? backwardAngle : forwardAngle;
+        point = useBackward ? backwardPoint : forwardPoint;
+      }
+
+      return { index: item.index, angle: displayAngle, point };
+    })
+    .sort((left, right) => left.index - right.index);
 }
 
 export default function ReproductiveCycleTimeline({
@@ -752,10 +785,11 @@ export default function ReproductiveCycleTimeline({
     "--marker-x-desktop": `${markerDesktopRadius * Math.cos(markerAngle * Math.PI / 180)}%`,
     "--marker-y-desktop": `${markerDesktopRadius * Math.sin(markerAngle * Math.PI / 180)}%`,
   } as CSSProperties;
-  const mobileEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerMobileRadius, 20, 17);
-  const desktopEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerDesktopRadius, 26, 15);
+  const mobileEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerMobileRadius, 10.8, 10, 5.2);
+  const desktopEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerDesktopRadius, 8.8, 8.3, 4.1);
   const ringEvents: PositionedEvent[] = eventAngles.map((event, index) => ({
     ...event,
+    mobileAngle: event.kind === "calving" ? -90 : mobileEventLayout[index].angle,
     desktopAngle: event.kind === "calving" ? -90 : desktopEventLayout[index].angle,
     position: {
       "--event-x-mobile": `${event.kind === "calving" ? 0 : mobileEventLayout[index].point.x}%`,
@@ -1048,26 +1082,46 @@ export default function ReproductiveCycleTimeline({
 
               <svg
                 viewBox="-14 -14 228 228"
-                className="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible sm:block"
+                className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
                 aria-hidden="true"
               >
                 {ringEvents.map((event) => {
                   const connectorRadius = event.kind === "calving" ? 93.5 : 99.2;
                   const anchor = angularPosition(event.angle, connectorRadius);
-                  const displaced = angularPosition(event.desktopAngle, connectorRadius);
-                  if (distanceBetween(anchor, displaced) < 1) return null;
+                  const mobileDisplaced = angularPosition(event.mobileAngle, connectorRadius);
+                  const desktopDisplaced = angularPosition(event.desktopAngle, connectorRadius);
+                  const showMobile = distanceBetween(anchor, mobileDisplaced) >= 1;
+                  const showDesktop = distanceBetween(anchor, desktopDisplaced) >= 1;
+                  if (!showMobile && !showDesktop) return null;
                   return (
-                    <line
-                      key={`${event.id}-connector`}
-                      x1={100 + anchor.x}
-                      y1={100 + anchor.y}
-                      x2={100 + displaced.x}
-                      y2={100 + displaced.y}
-                      stroke={softenColor(event.color, 0.42)}
-                      strokeWidth="0.9"
-                      strokeLinecap="round"
-                      strokeDasharray="2 2"
-                    />
+                    <g key={`${event.id}-connector`}>
+                      {showMobile && (
+                        <line
+                          className="sm:hidden"
+                          x1={100 + anchor.x}
+                          y1={100 + anchor.y}
+                          x2={100 + mobileDisplaced.x}
+                          y2={100 + mobileDisplaced.y}
+                          stroke={softenColor(event.color, 0.42)}
+                          strokeWidth="0.9"
+                          strokeLinecap="round"
+                          strokeDasharray="2 2"
+                        />
+                      )}
+                      {showDesktop && (
+                        <line
+                          className="hidden sm:block"
+                          x1={100 + anchor.x}
+                          y1={100 + anchor.y}
+                          x2={100 + desktopDisplaced.x}
+                          y2={100 + desktopDisplaced.y}
+                          stroke={softenColor(event.color, 0.42)}
+                          strokeWidth="0.9"
+                          strokeLinecap="round"
+                          strokeDasharray="2 2"
+                        />
+                      )}
+                    </g>
                   );
                 })}
               </svg>
