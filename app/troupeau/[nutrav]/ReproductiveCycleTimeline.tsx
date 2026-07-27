@@ -77,12 +77,12 @@ interface PositionedEvent extends EventItem {
 }
 
 const OPEN_CYCLE_SCALE_DAYS = 365;
-const RING_RADIUS = 78;
+const RING_RADIUS = 82;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-const MAIN_RING_WIDTH = 15;
-const ACTIVE_RING_WIDTH = 17;
-const PAST_RING_WIDTH = 14;
-const ECHO_OVERLAY_RADIUS = 91;
+const MAIN_RING_WIDTH = 14;
+const ACTIVE_RING_WIDTH = 15;
+const PAST_RING_WIDTH = 13;
+const ECHO_OVERLAY_RADIUS = 94;
 const ECHO_OVERLAY_CIRCUMFERENCE = 2 * Math.PI * ECHO_OVERLAY_RADIUS;
 const STAGE_COLORS = REPRODUCTIVE_CYCLE_COLORS;
 
@@ -233,32 +233,6 @@ function avoidRingCollisions(
     placed.push(point);
     return { angle: displayAngle, point };
   });
-}
-
-function desktopDetailPosition(angle: number) {
-  const cosine = Math.cos(angle * Math.PI / 180);
-  const sine = Math.sin(angle * Math.PI / 180);
-  if (Math.abs(cosine) > 0.46) {
-    return sine >= 0
-      ? "left-1/2 top-full mt-4 -translate-x-1/2 text-center"
-      : "bottom-full left-1/2 mb-4 -translate-x-1/2 text-center";
-  }
-  return cosine >= 0
-    ? "left-full top-1/2 ml-4 -translate-y-1/2 text-left"
-    : "right-full top-1/2 mr-4 -translate-y-1/2 text-right";
-}
-
-function desktopLeaderPosition(angle: number) {
-  const cosine = Math.cos(angle * Math.PI / 180);
-  const sine = Math.sin(angle * Math.PI / 180);
-  if (Math.abs(cosine) > 0.46) {
-    return sine >= 0
-      ? "left-1/2 top-full h-4 border-l"
-      : "bottom-full left-1/2 h-4 border-l";
-  }
-  return cosine >= 0
-    ? "left-full top-1/2 w-4 border-t"
-    : "right-full top-1/2 w-4 border-t";
 }
 
 function mobileDetailPosition(angle: number) {
@@ -861,7 +835,7 @@ export default function ReproductiveCycleTimeline({
           )}
 
           <div className="order-1 min-w-0 lg:order-2">
-            <div className="relative mx-auto aspect-square w-[calc(100%-24px)] max-w-[430px] sm:w-[500px] sm:max-w-none">
+            <div className="relative mx-auto my-3 aspect-square w-[min(88vw,390px)] sm:w-[430px]">
               <svg
                 viewBox="-14 -14 228 228"
                 className="h-full w-full overflow-hidden sm:overflow-visible"
@@ -1053,30 +1027,12 @@ export default function ReproductiveCycleTimeline({
                       onClick={() => setSelectedEventId(selectedEventId === event.id ? null : event.id)}
                       aria-expanded={selected}
                       aria-label={`${event.label}, ${formatDate(event.date)}. Afficher les détails`}
-                      className={`flex touch-manipulation items-center justify-center rounded-full bg-white transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 ${
-                        event.kind === "calving"
-                          ? "h-7 w-7 border bg-white sm:h-9 sm:w-9"
-                          : "h-9 w-9 border-2 bg-white shadow-sm sm:h-12 sm:w-12"
-                      } ${selected ? "scale-110 ring-2 ring-white sm:ring-4" : ""}`}
+                      className={`flex h-9 w-9 touch-manipulation items-center justify-center rounded-full border-2 bg-white shadow-sm transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 ${selected ? "scale-110 border-[3px] shadow-md ring-2 ring-white sm:ring-4" : ""}`}
                       style={{ borderColor: event.color, color: event.color }}
                       title={`${event.label} · ${formatDate(event.date)}`}
                     >
-                      <span className={event.kind === "calving" ? "scale-75 sm:scale-90" : "sm:scale-125"}>
-                        <EventIcon kind={event.kind} />
-                      </span>
+                      <EventIcon kind={event.kind} />
                     </button>
-                    {showText && (
-                      <>
-                        <span
-                          className={`pointer-events-none absolute hidden border-dashed border-slate-300 sm:block ${desktopLeaderPosition(event.desktopAngle)}`}
-                          aria-hidden="true"
-                        />
-                        <span className={`pointer-events-none absolute hidden w-36 px-1 py-1 sm:block ${desktopDetailPosition(event.desktopAngle)}`}>
-                          <span className="block text-base font-semibold leading-tight" style={{ color: event.color }}>{event.label}</span>
-                          <span className="mt-1 block text-sm font-medium leading-tight text-slate-500">{formatDate(event.date)}</span>
-                        </span>
-                      </>
-                    )}
                     {showText && !selected && (
                       <span className={`pointer-events-none absolute w-max max-w-20 bg-white/90 px-1 text-sm font-semibold leading-tight text-slate-600 sm:hidden ${mobileDetailPosition(event.mobileAngle)}`}>
                         {event.kind.startsWith("echo") ? "Écho" : event.kind === "ia" ? "IA" : "Saillie"}
