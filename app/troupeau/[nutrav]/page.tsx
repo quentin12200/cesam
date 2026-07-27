@@ -59,6 +59,7 @@ import {
   type ReproductionUnit,
 } from "@/lib/reproduction-rules";
 import { ACTION_VISUALS } from "@/components/action-visuals";
+import ChaleursHistory from "./ChaleursHistory";
 
 const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 
@@ -843,29 +844,14 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             )}
 
             {/* Chaleurs observées */}
-            {animal.chaleurs.length > 0 && (
-              <div className="rounded-xl bg-white p-4 shadow">
-                <h3 className="mb-3 flex items-center gap-2 font-semibold text-gray-800">
-                  <ChaleurIcon size={17} className="text-pink-600" />
-                  Historique reproductif — chaleurs ({animal.chaleurs.length})
-                </h3>
-                <div className="space-y-2">
-                  {animal.chaleurs.map((chaleur) => (
-                    <div key={chaleur.id} className="rounded-lg border border-pink-100 bg-pink-50/40 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold text-pink-800">Chaleur observée</span>
-                        <time className="shrink-0 text-xs font-medium text-gray-600">
-                          {formatDate(chaleur.date)}
-                        </time>
-                      </div>
-                      {chaleur.notes && (
-                        <p className="mt-1 text-sm text-gray-600">{chaleur.notes}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <ChaleursHistory
+              initialChaleurs={animal.chaleurs.map((chaleur) => ({
+                id: chaleur.id,
+                date: chaleur.date.toISOString(),
+                notes: chaleur.notes,
+              }))}
+              testReproEnabled={testReproEnabled}
+            />
 
             {/* Saillies */}
             {animal.saillies.length > 0 && (

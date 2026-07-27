@@ -11,9 +11,19 @@ export async function POST(request: NextRequest) {
     if (animalIds.length === 0 || !date) {
       return NextResponse.json({ error: "animalId(s) et date requis" }, { status: 400 });
     }
+    const chaleurDate = new Date(date);
+    if (Number.isNaN(chaleurDate.getTime())) {
+      return NextResponse.json({ error: "Date invalide" }, { status: 400 });
+    }
+    const existingDuplicates = await prisma.chaleur.groupBy({
+      by: ["animalId"],
+      where: { animalId: { in: animalIds }, date: chaleurDate },
+      _count: { _all: true },
+    });
+    const duplicateAnimalIds = existingDuplicates.map((row) => row.animalId);
     const chaleurs = await prisma.$transaction(
       animalIds.map((id) => prisma.chaleur.create({
-        data: { animalId: id, date: new Date(date), notes: notes?.trim() || null, updatedAt: new Date() },
+        data: { animalId: id, date: chaleurDate, notes: notes?.trim() || null, updatedAt: new Date() },
       }))
     );
 
@@ -26,7 +36,14 @@ export async function POST(request: NextRequest) {
       undoId = await logAction("CREATE_CHALEUR", desc, chaleurs.map((chaleur) => ({ op: "delete", model: "chaleur", id: chaleur.id })));
     } catch {}
 
-    return NextResponse.json({ ...chaleurs[0], count: chaleurs.length, _undoId: undoId, _undoDesc: desc }, { status: 201 });
+    return NextResponse.json({
+      ...chaleurs[0],
+      count: chaleurs.length,
+      duplicateWarning: duplicateAnimalIds.length > 0,
+      duplicateAnimalIds,
+      _undoId: undoId,
+      _undoDesc: desc,
+    }, { status: 201 });
   } catch (err) {
     console.error("POST /api/chaleurs error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

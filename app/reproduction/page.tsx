@@ -644,8 +644,12 @@ function ReproductionContent() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ animalIds, date: chaleurDate, notes: chaleurNotes.trim() || null }),
       });
+      const result = await res.json().catch(() => null);
       if (!res.ok) throw new Error();
-      setMessage(animalIds.length > 1 ? `✓ Chaleur enregistrée pour ${animalIds.length} vaches !` : "✓ Chaleur enregistrée !");
+      const baseMessage = animalIds.length > 1 ? `✓ Chaleur enregistrée pour ${animalIds.length} vaches !` : "✓ Chaleur enregistrée !";
+      setMessage(result?.duplicateWarning
+        ? `${baseMessage} Attention : une chaleur existait déjà à cette date.`
+        : baseMessage);
       setShowChaleurForm(false);
       await fetchData();
     } catch {

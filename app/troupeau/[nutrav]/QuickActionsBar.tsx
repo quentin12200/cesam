@@ -95,7 +95,9 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
         throw new Error(result?.error ?? `Erreur API ${res.status}`);
       }
       close();
-      setConfirmation("Chaleur enregistrée");
+      setConfirmation(result?.duplicateWarning
+        ? "Chaleur enregistrée — attention : une chaleur existait déjà à cette date."
+        : "Chaleur enregistrée");
       router.refresh();
     } catch (error) {
       console.error("Enregistrement de la chaleur impossible :", error);
