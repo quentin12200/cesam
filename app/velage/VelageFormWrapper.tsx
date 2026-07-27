@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { getMomentActuel } from "@/lib/evenements-sanitaires";
 import { normaliserNutrav, numeroNationalDuLot } from "@/lib/identification";
+import { useRouter } from "next/navigation";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 type Qualificatif = "NORMAL" | "DIFFICILE" | "AVORTEMENT" | "MORT_NEE";
 type Veau = { nutrav: string; nunati: string; sexe: "M" | "F" | ""; nom: string; statut: "VIVANT" | "MORT_NE" };
@@ -24,6 +26,8 @@ const PRECISIONS: Record<Qualificatif, { value: string; label: string }[]> = {
 interface Props { initialOpen?: boolean; initialMere?: string; initialDate?: string; initialSexe?: "M" | "F" | ""; capteurs?: Capteur[]; numeroVeauPropose: string; numeroNationalPropose: string; numerosUtilises: string[]; numerosNationauxUtilises: string[]; lotBoucles: { quantite: number; restantes: number } | null }
 
 export default function VelageFormWrapper({ initialOpen = false, initialMere = "", initialDate, initialSexe = "", capteurs = [], numeroVeauPropose, numeroNationalPropose, numerosUtilises, numerosNationauxUtilises, lotBoucles }: Props) {
+  const router = useRouter();
+  const { closeToOrigin, completeToOrigin } = useOriginNavigation();
   const today = new Date().toISOString().split("T")[0];
   const [open, setOpen] = useState(initialOpen), [mere, setMere] = useState(initialMere);
   const [mereNom, setMereNom] = useState<string | null>(null), [date, setDate] = useState(initialDate || today);
@@ -62,6 +66,7 @@ export default function VelageFormWrapper({ initialOpen = false, initialMere = "
     });
   }
   function reset() { setMere(""); setMereNom(null); setDate(today); setVeaux([{ ...vide(), nutrav: numeroVeauPropose, nunati: numeroNationalPropose }]); setQualificatif("NORMAL"); setPrecision("SEULE"); setCapteur(""); setPereNom(""); setPereAuto(false); setComplications(new Set()); }
+  function fermer() { setOpen(false); reset(); closeToOrigin(); }
 
   async function enregistrer(e: React.FormEvent) {
     e.preventDefault(); setSaving(true);
@@ -77,14 +82,17 @@ export default function VelageFormWrapper({ initialOpen = false, initialMere = "
       const res = await fetch("/api/velages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vacheNutrav: mere, date, qualificatif, sousType: precision || undefined, capteur: capteur ? Number(capteur) : undefined, pereNom: pereNom || undefined, veaux }) });
       const data = await res.json(); if (!res.ok) throw new Error(data.error ?? "Erreur");
       if (qualificatif === "DIFFICILE") { const types = new Set(complications); if (precision === "CESARIENNE") types.add("Césarienne"); await Promise.all(Array.from(types).map((type) => fetch("/api/evenements/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ animalIds: [data.vacheId], date, moment: getMomentActuel(), categorie: "INTERVENTION", type, description: `Suite au vêlage du ${new Date(date).toLocaleDateString("fr-FR")}` }) }).catch(() => {}))); }
-      setOpen(false); reset(); setMessage({ text: "Vêlage enregistré !", ok: true });
+      setOpen(false); reset();
+      if (completeToOrigin("✓ Vêlage enregistré !")) return;
+      setMessage({ text: "Vêlage enregistré !", ok: true });
+      router.refresh();
     } catch (err) { setMessage({ text: String(err).replace("Error: ", ""), ok: false }); } finally { setSaving(false); }
   }
 
   return <>
     {message && <div className={`px-4 py-3 rounded-xl text-sm border ${message.ok ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"}`}>{message.text}</div>}
     <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-2 bg-pink-500 text-white py-4 rounded-xl font-medium"><Plus size={20} /> Enregistrer un vêlage</button>
-    {open && <div className="fixed inset-0 bg-black/50 z-50 flex items-end"><div className="bg-white rounded-t-2xl w-full p-4 max-h-[92vh] overflow-y-auto"><div className="flex justify-between mb-3"><h3 className="text-lg font-bold">Enregistrer un vêlage</h3><button onClick={() => { setOpen(false); reset(); }} className="text-2xl text-gray-400 px-2">×</button></div>
+    {open && <div className="fixed inset-0 bg-black/50 z-50 flex items-end"><div className="bg-white rounded-t-2xl w-full p-4 max-h-[92vh] overflow-y-auto"><div className="flex justify-between mb-3"><h3 className="text-lg font-bold">Enregistrer un vêlage</h3><button onClick={fermer} className="text-2xl text-gray-400 px-2">×</button></div>
       <form onSubmit={enregistrer} className="space-y-3">
         {lotBoucles && lotBoucles.restantes <= Math.ceil(lotBoucles.quantite * 0.25) && <div className={`rounded-lg border px-3 py-2 text-sm ${lotBoucles.restantes === 0 ? "border-red-300 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>{lotBoucles.restantes === 0 ? "Lot de boucles épuisé. Ajoutez un nouveau lot dans les Paramètres." : "Le lot de boucles arrive bientôt à sa fin. Pensez à commander un nouveau lot."}</div>}
         <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium mb-1">NUTRAV de la vache</label><input value={mere} onChange={(e) => changerMere(e.target.value)} required className="w-full border rounded-lg px-3 py-2.5 font-mono" />{mereNom && <p className="text-xs text-emerald-600 mt-1">{mereNom}</p>}</div><div><label className="block text-sm font-medium mb-1">Date du vêlage</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full border rounded-lg px-3 py-2.5" /></div></div>

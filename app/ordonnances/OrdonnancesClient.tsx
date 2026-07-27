@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Plus, ScanLine, Loader2, Archive, FileText, Save, X, Camera, ClipboardCheck } from "lucide-react";
 import { scanAndCreateExtraction, type OrdonnanceExtracted } from "@/lib/scan-ordonnance-client";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 export interface OrdonnanceItem {
   id: string;
@@ -175,6 +176,7 @@ function OrdonnanceForm({
 
 function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
   const router = useRouter();
+  const { hrefWithOrigin } = useOriginNavigation();
   const [archiving, setArchiving] = useState(false);
 
   async function archive() {
@@ -195,7 +197,7 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
   return (
     <div className={`bg-white rounded-xl shadow border p-4 ${ord.statut === "ARCHIVE" ? "opacity-60" : ""}`}>
       <div className="flex items-start justify-between gap-3">
-        <Link href={`/ordonnances/${ord.id}`} className="flex-1 min-w-0">
+        <Link href={hrefWithOrigin(`/ordonnances/${ord.id}`)} className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded font-bold text-gray-700">
               {dateStr}
@@ -255,6 +257,7 @@ export default function OrdonnancesClient({
   extractionsAVerifier?: ExtractionAVerifierItem[];
 }) {
   const router = useRouter();
+  const { hrefWithOrigin } = useOriginNavigation();
   const [showForm, setShowForm] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState("");
@@ -269,7 +272,7 @@ export default function OrdonnancesClient({
     setScanError("");
     try {
       const { extractionId } = await scanAndCreateExtraction(files);
-      router.push(`/ordonnances/a-verifier/${extractionId}`);
+      router.push(hrefWithOrigin(`/ordonnances/a-verifier/${extractionId}`));
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "L’analyse du document a échoué");
     } finally {
@@ -323,7 +326,7 @@ export default function OrdonnancesClient({
             {extractionsAVerifier.map((extraction) => (
               <Link
                 key={extraction.id}
-                href={`/ordonnances/a-verifier/${extraction.id}`}
+                href={hrefWithOrigin(`/ordonnances/a-verifier/${extraction.id}`)}
                 className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm hover:bg-amber-50"
               >
                 <span className="min-w-0 truncate font-medium text-gray-800">

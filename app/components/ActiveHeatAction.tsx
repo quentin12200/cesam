@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
 import { Thermometer } from "lucide-react";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 interface Props {
   animalId: string;
@@ -20,8 +20,7 @@ export default function ActiveHeatAction({
   variant,
   simulationAware = false,
 }: Props) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const { hrefWithOrigin } = useOriginNavigation();
   const [simulationActive, setSimulationActive] = useState(false);
   const [expired, setExpired] = useState(false);
 
@@ -48,10 +47,8 @@ export default function ActiveHeatAction({
 
   if (simulationActive || expired) return null;
 
-  const search = searchParams.toString();
-  const returnTo = `${pathname}${search ? `?${search}` : ""}`;
   const actionHref = (type: "NATURELLE" | "IA") =>
-    `/reproduction?action=saillie&animaux=${encodeURIComponent(animalId)}&type=${type}&returnTo=${encodeURIComponent(returnTo)}`;
+    hrefWithOrigin(`/reproduction?action=saillie&animaux=${encodeURIComponent(animalId)}&type=${type}`);
 
   return (
     <section

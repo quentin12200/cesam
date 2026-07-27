@@ -19,6 +19,7 @@ import {
   type VoiceParageDraft,
   type VoiceReproductionDraft,
 } from "@/lib/voice-actions";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 declare global {
   interface Window {
@@ -90,6 +91,7 @@ interface TaureauOption {
 
 export default function VoiceButton() {
   const router = useRouter();
+  const { hrefWithOrigin } = useOriginNavigation();
   const [supported, setSupported] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [transcript, setTranscript] = useState<string | null>(null);
@@ -372,14 +374,14 @@ export default function VoiceButton() {
         .map((nutrav) => animaux.find((animal) => animal.nutrav === nutrav)?.id)
         .filter((id): id is string => Boolean(id));
       setAnalysis(null);
-      router.push(`/reproduction?action=chaleur&animaux=${encodeURIComponent(ids.join(","))}`);
+      router.push(hrefWithOrigin(`/reproduction?action=chaleur&animaux=${encodeURIComponent(ids.join(","))}`));
       return;
     }
     if (chosenAction === "pesee") {
       const nutrav = analysis.draft.target.nutravs[0];
       const poids = analysis.draft.poids === null ? "" : `&poids=${encodeURIComponent(String(analysis.draft.poids))}`;
       setAnalysis(null);
-      router.push(`/troupeau/${encodeURIComponent(nutrav)}?onglet=identite&pesee=1${poids}`);
+      router.push(hrefWithOrigin(`/troupeau/${encodeURIComponent(nutrav)}?onglet=identite&pesee=1${poids}`));
       return;
     }
     if (chosenAction === "velage") {
@@ -389,7 +391,7 @@ export default function VoiceButton() {
       if (analysis.draft.momentMentionne && analysis.draft.moment) params.set("moment", analysis.draft.moment);
       if (analysis.draft.veauSexe) params.set("sexe", analysis.draft.veauSexe);
       setAnalysis(null);
-      router.push(`/velage?${params.toString()}`);
+      router.push(hrefWithOrigin(`/velage?${params.toString()}`));
       return;
     }
     if (chosenAction === "parage") {
@@ -415,7 +417,7 @@ export default function VoiceButton() {
       sessionStorage.setItem(VOICE_SANITARY_STORAGE_KEY, JSON.stringify(analysis.draft));
     }
     setAnalysis(null);
-    router.push(action.href);
+    router.push(hrefWithOrigin(action.href));
   }
 
   function dismiss() {

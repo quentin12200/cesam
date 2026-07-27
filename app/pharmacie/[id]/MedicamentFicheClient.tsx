@@ -17,6 +17,7 @@ import MedicamentDetailClient from "./MedicamentDetailClient";
 import PreconisationFields from "./PreconisationFields";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import ConditionnementsSection from "./ConditionnementsSection";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 interface MedicamentData {
   id: string;
@@ -150,6 +151,7 @@ function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicame
 }
 
 export default function MedicamentFicheClient({ medicament, preconisations, termes, conditionnements, ordonnances, historique }: Props) {
+  const { hrefWithOrigin } = useOriginNavigation();
   const router = useRouter();
   const [editMode, setEditMode] = useState(false);
   const [savingFavori, setSavingFavori] = useState(false);
@@ -197,7 +199,7 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
         <div className="flex items-center gap-1.5 border-t pt-2 text-xs text-gray-700"><Package size={14} className="text-gray-400" /><span><b>Stock :</b> {medicament.stockActuel ?? "—"} {medicament.stockUnite ?? ""}{medicament.stockSeuilAlert != null && <> · <b>Alerte :</b> {medicament.stockSeuilAlert} {medicament.stockUnite ?? ""}</>}</span></div>
       </div>
 
-      <Link href={`/sanitaire/nouvel-evenement?medicament=${medicament.id}`}
+      <Link href={hrefWithOrigin(`/sanitaire/nouvel-evenement?medicament=${medicament.id}`)}
           className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700">
           <Stethoscope size={14} /> Créer un événement sanitaire avec ce médicament
       </Link>

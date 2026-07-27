@@ -14,6 +14,7 @@ import NavigationRestoration from "@/app/components/NavigationRestoration";
 import { UserPreferencesProvider } from "@/components/UserPreferencesProvider";
 import GlobalSettingsButton from "@/components/GlobalSettingsButton";
 import LayoutPersonalizer from "@/components/LayoutPersonalizer";
+import ReturnNavigationConfirmation from "@/app/components/ReturnNavigationConfirmation";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -69,6 +70,7 @@ export default function RootLayout({
         <UndoProvider>
           <Suspense fallback={null}>
             <NavigationRestoration />
+            <ReturnNavigationConfirmation />
           </Suspense>
           <SplashScreen />
           <main className="flex-1 overflow-auto">

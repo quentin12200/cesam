@@ -10,6 +10,7 @@ import {
   type PropositionOrdonnance,
 } from "@/lib/ordonnance-types";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 interface ExtractionInfo {
   id: string;
@@ -107,6 +108,7 @@ export default function VerificationOrdonnanceClient({
   propositionInitiale: PropositionOrdonnance;
 }) {
   const router = useRouter();
+  const { completeToOrigin, returnTo } = useOriginNavigation();
   const medsInitiaux = medicamentsDepuisProposition(propositionInitiale);
 
   const [dateDebut, setDateDebut] = useState(propositionInitiale.dateDebut?.slice(0, 10) ?? "");
@@ -159,6 +161,7 @@ export default function VerificationOrdonnanceClient({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? "La validation a échoué");
+      if (completeToOrigin("✓ Ordonnance enregistrée !")) return;
       if (data.count > 1) {
         router.push("/ordonnances");
       } else {
@@ -308,7 +311,7 @@ export default function VerificationOrdonnanceClient({
           {error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
           <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Link href="/ordonnances" className="inline-flex min-h-12 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-600 hover:bg-gray-50">
+            <Link href={returnTo ?? "/ordonnances"} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-600 hover:bg-gray-50">
               Vérifier plus tard
             </Link>
             <button

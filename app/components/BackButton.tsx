@@ -2,6 +2,7 @@
 
 import type { ButtonHTMLAttributes } from "react";
 import { ArrowLeft } from "lucide-react";
+import { safeReturnTo, SCROLL_RESTORE_KEY } from "@/lib/origin-navigation";
 
 interface BackButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "type"> {
   label?: string;
@@ -15,7 +16,12 @@ export default function BackButton({
   ...props
 }: BackButtonProps) {
   function handleBack() {
-    sessionStorage.setItem("cesam:restore-scroll", "1");
+    sessionStorage.setItem(SCROLL_RESTORE_KEY, "1");
+    const returnTo = safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
+    if (returnTo) {
+      window.location.assign(returnTo);
+      return;
+    }
 
     if (window.opener && window.history.length <= 1) {
       window.close();

@@ -12,6 +12,7 @@ import EvenementEditPanel from "./EvenementEditPanel";
 import TraitementForm from "./TraitementForm";
 import TraitementEditForm from "./TraitementEditForm";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 export interface TraitementRow {
   id: string;
@@ -76,6 +77,7 @@ function TraitementCard({ t, affichageDelaiAttente, onTerminer, nested }: {
   nested?: boolean;
 }) {
   const router = useRouter();
+  const { hrefWithOrigin } = useOriginNavigation();
   const [editionOuverte, setEditionOuverte] = useState(false);
   const now = new Date();
   const dateDebut = new Date(t.dateDebut);
@@ -125,7 +127,7 @@ function TraitementCard({ t, affichageDelaiAttente, onTerminer, nested }: {
             {t.veterinaire && <span>Vét. {t.veterinaire}</span>}
             {t.ordonnanceNumero && (
               t.ordonnanceId ? (
-                <Link href={`/ordonnances/${t.ordonnanceId}`} className="text-blue-600 hover:underline">
+                <Link href={hrefWithOrigin(`/ordonnances/${t.ordonnanceId}`)} className="text-blue-600 hover:underline">
                   N° ordonnance : {t.ordonnanceNumero}
                 </Link>
               ) : (

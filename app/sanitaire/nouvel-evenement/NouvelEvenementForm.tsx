@@ -21,6 +21,7 @@ import type { PatteParage } from "@/lib/parage";
 import HoofPrintIcon from "@/components/HoofPrintIcon";
 import { VOICE_SANITARY_STORAGE_KEY, type VoiceSanitaryDraft } from "@/lib/voice-sanitary";
 import { VOICE_PARAGE_STORAGE_KEY, type VoiceParageDraft } from "@/lib/voice-actions";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 interface Groupe {
   id: string;
@@ -43,6 +44,7 @@ function nouveauDraft(): TraitementDraft {
 
 export default function NouvelEvenementForm({ presetNutrav, presetNutravs, presetMedicamentId }: { presetNutrav?: string; presetNutravs?: string[]; presetMedicamentId?: string }) {
   const router = useRouter();
+  const { completeToOrigin } = useOriginNavigation();
 
   const [targetMode, setTargetMode] = useState<TargetMode>("animal");
   const [selectedAnimaux, setSelectedAnimaux] = useState<AnimalOption[]>([]);
@@ -337,6 +339,8 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
             note: parageNote || description,
           }
         : null;
+      const confirmation = `✓ Événement enregistré pour ${data.count} animal${data.count > 1 ? "aux" : ""}`;
+      if (!parageDraft && completeToOrigin(confirmation)) return;
       setResult({ count: data.count, warning: photoWarning, parageDraft });
       router.refresh();
     } catch (e) {

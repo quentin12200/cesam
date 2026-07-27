@@ -8,6 +8,7 @@ import { normalizeSearch } from "@/lib/fuzzy-search";
 import { CATEGORIES_MEDICAMENT, getCategorieMedicament, formatVoie, formatDoseBase, formatStatutConsultation } from "@/lib/medicament-categories";
 import OrdonnancesClient, { type OrdonnanceItem } from "@/app/ordonnances/OrdonnancesClient";
 import SaisiePrixClient from "./SaisiePrixClient";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -151,6 +152,7 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
 // ── Ligne annuaire (compacte, extensible) ──────────────────────────────────────
 
 function MedicamentRow({ med, expanded, onToggle }: { med: MedicamentItem; expanded: boolean; onToggle: () => void }) {
+  const { hrefWithOrigin } = useOriginNavigation();
   const router = useRouter();
   const [favBusy, setFavBusy] = useState(false);
   const cat = getCategorieMedicament(med.categorie);
@@ -264,7 +266,7 @@ function MedicamentRow({ med, expanded, onToggle }: { med: MedicamentItem; expan
               className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-white">
               Consulter la fiche complète
             </Link>
-            <Link href={`/sanitaire/nouvel-evenement?medicament=${med.id}`}
+            <Link href={hrefWithOrigin(`/sanitaire/nouvel-evenement?medicament=${med.id}`)}
               className="flex items-center gap-1 text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               <Stethoscope size={12} /> Créer un événement sanitaire avec ce médicament
             </Link>

@@ -8,6 +8,7 @@ import MedicamentPicker, {
   type MedicamentOption,
   type PreconisationOption,
 } from "@/app/sanitaire/nouvel-evenement/MedicamentPicker";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 type Medicament = MedicamentOption;
 
@@ -35,6 +36,7 @@ const today = new Date().toISOString().slice(0, 10);
 
 export default function TraitementForm({ animalId, evenementId, onClose, initialScan, initialOrdonnanceId }: Props) {
   const router = useRouter();
+  const { hrefWithOrigin } = useOriginNavigation();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [medicaments, setMedicaments] = useState<Medicament[]>([]);
@@ -207,7 +209,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
 
     try {
       const { extractionId } = await scanAndCreateExtraction([file]);
-      router.push(`/ordonnances/a-verifier/${extractionId}`);
+      router.push(hrefWithOrigin(`/ordonnances/a-verifier/${extractionId}`));
     } catch (err) {
       setScanStatus("error");
       setScanMsg(err instanceof Error ? err.message : "Erreur lors du scan");

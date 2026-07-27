@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X, Save } from "lucide-react";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 export default function PeseeInlineForm({ nutrav, initialOpen = false, initialPoids = "" }: { nutrav: string; initialOpen?: boolean; initialPoids?: string }) {
   const router = useRouter();
+  const { closeToOrigin, completeToOrigin } = useOriginNavigation();
   const [open, setOpen] = useState(initialOpen);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [poids, setPoids] = useState(initialPoids);
@@ -22,6 +24,7 @@ export default function PeseeInlineForm({ nutrav, initialOpen = false, initialPo
       });
       setOpen(false);
       setPoids("");
+      if (completeToOrigin("✓ Pesée enregistrée !")) return;
       router.refresh();
     } finally {
       setSaving(false);
@@ -44,7 +47,7 @@ export default function PeseeInlineForm({ nutrav, initialOpen = false, initialPo
     <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-semibold text-blue-800">Nouvelle pesée</span>
-        <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600">
+        <button onClick={() => { setOpen(false); closeToOrigin(); }} className="text-gray-400 hover:text-gray-600">
           <X size={16} />
         </button>
       </div>

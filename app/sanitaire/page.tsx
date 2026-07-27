@@ -290,7 +290,7 @@ export default async function SanitairePage() {
       </div>
 
       <Link
-        href="/sanitaire/nouvel-evenement"
+        href="/sanitaire/nouvel-evenement?returnTo=%2Fsanitaire"
         className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl font-semibold shadow hover:bg-blue-700 transition-colors"
       >
         <Plus size={18} />

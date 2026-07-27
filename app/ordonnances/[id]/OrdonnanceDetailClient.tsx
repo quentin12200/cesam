@@ -8,6 +8,7 @@ import { fileToDocumentDataUrl } from "@/lib/image-client";
 import { uploadDataUrlToStorage } from "@/lib/firebase-client";
 import { formatDate } from "@/lib/utils";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
+import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 interface OrdonnanceData {
   id: string;
@@ -64,6 +65,7 @@ export default function OrdonnanceDetailClient({
   vaccinations: LinkedVaccination[];
 }) {
   const router = useRouter();
+  const { completeToOrigin } = useOriginNavigation();
   const replaceRef = useRef<HTMLInputElement>(null);
 
   const [date, setDate] = useState(ordonnance.date.slice(0, 10));
@@ -101,6 +103,7 @@ export default function OrdonnanceDetailClient({
           motif: motif || null, animaux: animaux || null,
         }),
       });
+      if (completeToOrigin("✓ Ordonnance enregistrée !")) return;
       setSaved(true);
       router.refresh();
     } finally {
@@ -193,6 +196,7 @@ export default function OrdonnanceDetailClient({
       setError(err.error ?? "Suppression impossible");
       return;
     }
+    if (completeToOrigin("✓ Ordonnance supprimée")) return;
     router.push("/ordonnances");
   }
 

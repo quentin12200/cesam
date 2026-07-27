@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { REPRODUCTION_RETURN_CONFIRMATION_KEY } from "@/lib/reproduction-return";
+import { ORIGIN_CONFIRMATION_KEY } from "@/lib/origin-navigation";
 
 export default function ReturnNavigationConfirmation() {
   const pathname = usePathname();
@@ -11,9 +11,9 @@ export default function ReturnNavigationConfirmation() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const stored = window.sessionStorage.getItem(REPRODUCTION_RETURN_CONFIRMATION_KEY);
+    const stored = window.sessionStorage.getItem(ORIGIN_CONFIRMATION_KEY);
     if (!stored) return;
-    window.sessionStorage.removeItem(REPRODUCTION_RETURN_CONFIRMATION_KEY);
+    window.sessionStorage.removeItem(ORIGIN_CONFIRMATION_KEY);
     setMessage(stored);
     const timer = window.setTimeout(() => setMessage(""), 3500);
     return () => window.clearTimeout(timer);
