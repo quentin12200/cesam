@@ -40,7 +40,12 @@ import SevrageButton from "./SevrageButton";
 import QuickActionsBar from "./QuickActionsBar";
 import CategorieButton from "./CategorieButton";
 import EchoStatusBadge from "./EchoStatusBadge";
-import ReproductiveCycleTimeline from "./ReproductiveCycleTimeline";
+import ReproductiveCycleTimeline, {
+  type ReproductiveCycleTimelineProps,
+} from "./ReproductiveCycleTimeline";
+import ReproductiveCyclePreview, {
+  type ReproductionPreviewRules,
+} from "./ReproductiveCyclePreview";
 import GroupeButton from "./GroupeButton";
 import EvenementsSection from "./EvenementsSection";
 import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
@@ -49,10 +54,14 @@ import ReproductionStatusEditor from "@/components/ReproductionStatusEditor";
 import type { EtatGestation } from "@/lib/utils";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
+import {
+  parseReproductionRules,
+  type ReproductionUnit,
+} from "@/lib/reproduction-rules";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
-  searchParams: Promise<{ onglet?: string; pesee?: string; poids?: string }>;
+  searchParams: Promise<{ onglet?: string; pesee?: string; poids?: string; testRepro?: string }>;
 }
 
 async function getGroupes() {
@@ -73,19 +82,40 @@ async function getExploitationDisplayConfig(): Promise<{
   affichageDelaiAttente: string;
   reproReposObjectifJours: number;
   tarissementVeauAgeMois: number;
+  reproductionPreviewRules: ReproductionPreviewRules;
 }> {
+  const toDays = (value: number, unit: ReproductionUnit) =>
+    unit === "WEEKS" ? value * 7 : unit === "MONTHS" ? value * 30 : value;
+  const previewRules = (rawRules: string | null | undefined): ReproductionPreviewRules => {
+    const rules = parseReproductionRules(rawRules);
+    const phaseStart = (id: string, fallback: number) => {
+      const phase = rules.phases.find((item) => item.id === id);
+      return phase ? toDays(phase.startRule.offset, phase.startRule.unit) : fallback;
+    };
+    return {
+      breedingStartDays: phaseStart("breeding_period", 61),
+      reproductionDelayDays: phaseStart("reproduction_delay", 81),
+      echoPreparationEnabled: rules.echoTiming.usePreparationPhase,
+      echoPreparationDays: rules.echoTiming.listFromDays,
+      echoDueDays: rules.echoTiming.dueFromDays,
+      imminentCalvingDays: phaseStart("imminent_calving", 21),
+    };
+  };
+
   try {
     const config = await prisma.exploitationConfig.findUnique({ where: { id: "singleton" } });
     return {
       affichageDelaiAttente: config?.affichageDelaiAttente ?? "LES_DEUX",
       reproReposObjectifJours: config?.reproReposObjectifJours ?? 60,
       tarissementVeauAgeMois: config?.tarissementVeauAgeMois ?? 6,
+      reproductionPreviewRules: previewRules(config?.reproductionRulesJson),
     };
   } catch {
     return {
       affichageDelaiAttente: "LES_DEUX",
       reproReposObjectifJours: 60,
       tarissementVeauAgeMois: 6,
+      reproductionPreviewRules: previewRules(null),
     };
   }
 }
@@ -138,7 +168,7 @@ async function getAnimal(nutrav: string) {
 
 export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const { nutrav } = await params;
-  const { onglet = "identite", pesee, poids } = await searchParams;
+  const { onglet = "identite", pesee, poids, testRepro } = await searchParams;
   const [animal, groupes, protocoles, configAffichage] = await Promise.all([
     getAnimal(nutrav), getGroupes(), getProtocoles(), getExploitationDisplayConfig(),
   ]);
@@ -188,6 +218,27 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const mheStatus = isMheVendable(animal.vaccinations);
   const perePresentExploitation = animal.taureau?.present === true;
   const affichageDelaiAttente = configAffichage.affichageDelaiAttente;
+  const testReproEnabled = animal.nutrav === "0000" && testRepro === "1";
+  const reproductiveCycleProps = {
+    status: etat,
+    breedingDate: currentBreeding?.date ?? null,
+    breedingType: currentBreeding?.type ?? null,
+    dueDate: currentBreeding?.gestation?.dateVelagePrevue ?? null,
+    echoDate: currentBreeding?.gestation?.dateEcho ?? null,
+    echoResult: currentBreeding?.gestation?.resultatEcho ?? null,
+    echoObservation: currentBreeding?.gestation?.sousResultat ?? null,
+    lastCalvingDate: animal.velagesVache[0]?.date ?? null,
+    calfNumber: animal.velagesVache[0]?.veau?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.nutrav ?? null,
+    calfSex: animal.velagesVache[0]?.veau?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.sexe ?? null,
+    calfBirthDate: animal.velagesVache[0]?.veau?.danais ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.danais ?? animal.velagesVache[0]?.date ?? null,
+    calfSevreDone: animal.velagesVache[0]?.veau?.sevreFait ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sevreFait ?? false,
+    breedingReference: currentBreeding?.taureau?.nopere ?? currentBreeding?.taureau?.nupere ?? null,
+    statusModifiedAt: animal.reproductionEtatModifieAt ?? null,
+    restObjectiveDays: configAffichage.reproReposObjectifJours,
+    dryOffCalfAgeMonths: configAffichage.tarissementVeauAgeMois,
+    dryOffDone: animal.tarieFaite,
+    dryOffDate: animal.dateTarie ?? null,
+  } satisfies ReproductiveCycleTimelineProps;
 
   const isFemelle = animal.sexbov === "F";
   const tabs = [
@@ -197,7 +248,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   ];
 
   function tabHref(id: string) {
-    return `/troupeau/${animal!.nutrav}?onglet=${id}`;
+    const testParam = testReproEnabled ? "&testRepro=1" : "";
+    return `/troupeau/${animal!.nutrav}?onglet=${id}${testParam}`;
   }
 
   return (
@@ -277,26 +329,14 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
       {animal.sexbov === "F" && (
         <div className="px-3">
-          <ReproductiveCycleTimeline
-            status={etat}
-            breedingDate={currentBreeding?.date ?? null}
-            breedingType={currentBreeding?.type ?? null}
-            dueDate={currentBreeding?.gestation?.dateVelagePrevue ?? null}
-            echoDate={currentBreeding?.gestation?.dateEcho ?? null}
-            echoResult={currentBreeding?.gestation?.resultatEcho ?? null}
-            echoObservation={currentBreeding?.gestation?.sousResultat ?? null}
-            lastCalvingDate={animal.velagesVache[0]?.date ?? null}
-            calfNumber={animal.velagesVache[0]?.veau?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.nutrav ?? null}
-            calfSex={animal.velagesVache[0]?.veau?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.sexe ?? null}
-            calfBirthDate={animal.velagesVache[0]?.veau?.danais ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.danais ?? animal.velagesVache[0]?.date ?? null}
-            calfSevreDone={animal.velagesVache[0]?.veau?.sevreFait ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sevreFait ?? false}
-            breedingReference={currentBreeding?.taureau?.nopere ?? currentBreeding?.taureau?.nupere ?? null}
-            statusModifiedAt={animal.reproductionEtatModifieAt ?? null}
-            restObjectiveDays={configAffichage.reproReposObjectifJours}
-            dryOffCalfAgeMonths={configAffichage.tarissementVeauAgeMois}
-            dryOffDone={animal.tarieFaite}
-            dryOffDate={animal.dateTarie ?? null}
-          />
+          {testReproEnabled ? (
+            <ReproductiveCyclePreview
+              realProps={reproductiveCycleProps}
+              rules={configAffichage.reproductionPreviewRules}
+            />
+          ) : (
+            <ReproductiveCycleTimeline {...reproductiveCycleProps} />
+          )}
         </div>
       )}
 
