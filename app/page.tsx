@@ -20,6 +20,7 @@ import RapportGestationButton from "@/app/components/RapportGestationButton";
 import PrintSectionButton from "@/app/components/PrintSectionButton";
 import AutoPrint from "@/app/components/AutoPrint";
 import ActiveHeatAction from "@/app/components/ActiveHeatAction";
+import ReturnNavigationConfirmation from "@/app/components/ReturnNavigationConfirmation";
 import { activeHeatSince, getActiveHeat } from "@/lib/active-heat-action";
 import {
   Baby,
@@ -421,15 +422,6 @@ export default async function Dashboard({ searchParams }: PageProps) {
         <RapportGestationButton />
       </div>
       <div className="space-y-2">
-        {data.activeHeats.map(({ animal, heat }) => (
-          <ActiveHeatAction
-            key={animal.id}
-            animalId={animal.id}
-            animalLabel={animal.nutrav}
-            observedAt={heat.date.toISOString()}
-            variant="home"
-          />
-        ))}
         {data.vachesVidesEnRetard > 0 && (
           <Link
             href="/reproduction?filtre=ROUGE"
@@ -897,6 +889,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-4 md:max-w-3xl lg:max-w-4xl">
+      <ReturnNavigationConfirmation />
       <AccueilQuickActions />
 
       <Link
@@ -919,6 +912,27 @@ export default async function Dashboard({ searchParams }: PageProps) {
 
       {notesTerrain.length > 0 && (
         <NotesTerrain initialNotes={notesTerrain.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() }))} />
+      )}
+
+      {data.activeHeats.length > 0 && (
+        <section
+          data-layout-section="accueil-actualites-chaleurs"
+          data-layout-label="Actualités chaleurs"
+          className="rounded-xl bg-white p-3 shadow"
+        >
+          <h2 className="mb-2 text-base font-bold text-gray-900">Actualités</h2>
+          <div className="space-y-2">
+            {data.activeHeats.map(({ animal, heat }) => (
+              <ActiveHeatAction
+                key={animal.id}
+                animalId={animal.id}
+                animalLabel={`${animal.nutrav}${animal.nobovi ? ` — ${animal.nobovi}` : ""}`}
+                observedAt={heat.date.toISOString()}
+                variant="home"
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       <AccueilTodoSection groups={todoGroups} />

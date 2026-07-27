@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Thermometer } from "lucide-react";
 
 interface Props {
@@ -19,6 +20,8 @@ export default function ActiveHeatAction({
   variant,
   simulationAware = false,
 }: Props) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [simulationActive, setSimulationActive] = useState(false);
   const [expired, setExpired] = useState(false);
 
@@ -45,17 +48,10 @@ export default function ActiveHeatAction({
 
   if (simulationActive || expired) return null;
 
+  const search = searchParams.toString();
+  const returnTo = `${pathname}${search ? `?${search}` : ""}`;
   const actionHref = (type: "NATURELLE" | "IA") =>
-    `/reproduction?action=saillie&animaux=${encodeURIComponent(animalId)}&type=${type}`;
-  const observed = new Date(observedAt);
-  const today = new Date();
-  const franceDay = new Intl.DateTimeFormat("fr-CA", {
-    timeZone: "Europe/Paris",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const isToday = franceDay.format(observed) === franceDay.format(today);
+    `/reproduction?action=saillie&animaux=${encodeURIComponent(animalId)}&type=${type}&returnTo=${encodeURIComponent(returnTo)}`;
 
   return (
     <section
@@ -69,7 +65,7 @@ export default function ActiveHeatAction({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-pink-900">
             {variant === "home"
-              ? `${animalLabel} — Chaleur observée${isToday ? " aujourd’hui" : ""}`
+              ? `Chaleur observée pour ${animalLabel}`
               : "Chaleur observée"}
           </p>
           <p className="mt-0.5 text-xs text-pink-800">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate, VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 import Link from "next/link";
@@ -19,6 +19,10 @@ import {
   type VoiceReproductionDraft,
 } from "@/lib/voice-actions";
 import { normalizeSearch } from "@/lib/fuzzy-search";
+import {
+  REPRODUCTION_RETURN_CONFIRMATION_KEY,
+  safeReturnTo,
+} from "@/lib/reproduction-return";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
@@ -316,10 +320,12 @@ function localDateValue(date = new Date()) {
 }
 
 function ReproductionContent() {
+  const router = useRouter();
   const [vaches, setVaches] = useState<VacheRepro[]>([]);
   const [taureaux, setTaureaux] = useState<Taureau[]>([]);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
+  const returnTo = safeReturnTo(searchParams.get("returnTo"));
   const initialFiltre = (searchParams.get("filtre") as FilterEtat) ?? "TOUS";
   const [filterEtat, setFilterEtat] = useState<FilterEtat>(initialFiltre);
   const [saving, setSaving] = useState(false);
@@ -492,6 +498,22 @@ function ReproductionContent() {
     setShowChaleurForm(true);
   }
 
+  function navigateToOrigin(refreshData = false) {
+    if (!returnTo) return false;
+    window.sessionStorage.setItem("cesam:restore-scroll", "1");
+    if (refreshData) {
+      window.location.assign(returnTo);
+    } else {
+      router.push(returnTo);
+    }
+    return true;
+  }
+
+  function closeSaillieForm() {
+    setShowSaillieForm(false);
+    navigateToOrigin();
+  }
+
   function openEchoForm(vache: VacheRepro) {
     setSelectedVache(vache);
     setEchoSaillieId(vache.saillieId!);
@@ -632,8 +654,16 @@ function ReproductionContent() {
         setSaillieError((await res.json().catch(() => ({}))).error ?? "Erreur serveur");
         return;
       }
-      setMessage(animalIds.length > 1 ? `✓ Saillie enregistrée pour ${animalIds.length} vaches !` : "✓ Saillie enregistrée !");
+      const confirmationMessage = animalIds.length > 1
+        ? `✓ Saillie enregistrée pour ${animalIds.length} vaches !`
+        : "✓ Saillie enregistrée !";
       setShowSaillieForm(false);
+      if (returnTo) {
+        window.sessionStorage.setItem(REPRODUCTION_RETURN_CONFIRMATION_KEY, confirmationMessage);
+        navigateToOrigin(true);
+        return;
+      }
+      setMessage(confirmationMessage);
       setFilterEtat("TOUS");
       await fetchData();
     } catch (err) {
@@ -1205,7 +1235,7 @@ function ReproductionContent() {
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="flex items-center gap-2 text-lg font-bold text-gray-800"><SaillieIcon size={20} className="text-fuchsia-600" /> Saillie / IA</h3>
-              <button onClick={() => setShowSaillieForm(false)} className="text-gray-400 text-2xl leading-none">×</button>
+              <button onClick={closeSaillieForm} className="text-gray-400 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={handleSaillieSubmit} className="space-y-4">
               <div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Plus, ScanLine, X } from "lucide-react";
 import { ACTION_VISUALS } from "@/components/action-visuals";
 import EchoModal from "./EchoModal";
@@ -36,6 +36,8 @@ const EvenementIcon = ACTION_VISUALS.evenementSanitaire.icon;
 
 export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, saillieId, saillieDate, testReproEnabled = false, className }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [modal, setModal] = useState<Modal>(null);
   const [loading, setLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -175,7 +177,9 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
                   role="menuitem"
                   onClick={() => {
                     setMenuOpen(false);
-                    router.push(`/reproduction?action=saillie&animaux=${encodeURIComponent(animalId)}`);
+                    const search = searchParams.toString();
+                    const returnTo = `${pathname}${search ? `?${search}` : ""}`;
+                    router.push(`/reproduction?action=saillie&animaux=${encodeURIComponent(animalId)}&returnTo=${encodeURIComponent(returnTo)}`);
                   }}
                   className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-fuchsia-700 hover:bg-fuchsia-50"
                 >

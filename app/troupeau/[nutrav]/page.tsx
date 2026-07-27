@@ -60,6 +60,7 @@ import {
 } from "@/lib/reproduction-rules";
 import { getActiveHeat } from "@/lib/active-heat-action";
 import ActiveHeatAction from "@/app/components/ActiveHeatAction";
+import ReturnNavigationConfirmation from "@/app/components/ReturnNavigationConfirmation";
 import ChaleursHistory from "./ChaleursHistory";
 
 interface PageProps {
@@ -267,6 +268,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
   return (
     <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto min-h-screen bg-gray-50">
+      <ReturnNavigationConfirmation />
       {/* Header */}
       <div className="px-3 pt-3">
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm sm:grid-cols-[auto_minmax(0,1fr)_auto]">
