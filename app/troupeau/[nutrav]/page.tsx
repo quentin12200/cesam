@@ -58,6 +58,9 @@ import {
   parseReproductionRules,
   type ReproductionUnit,
 } from "@/lib/reproduction-rules";
+import { ACTION_VISUALS } from "@/components/action-visuals";
+
+const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -156,6 +159,7 @@ async function getAnimal(nutrav: string) {
         orderBy: { date: "desc" },
         include: { gestation: true, taureau: true },
       },
+      chaleurs: { orderBy: { date: "desc" } },
       demandesEchographie: {
         where: { etat: "A_FAIRE" },
         orderBy: { createdAt: "desc" },
@@ -300,6 +304,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               isActif={animal.statut === "ACTIF"}
               saillieId={currentBreeding?.id ?? null}
               saillieDate={currentBreeding?.date.toISOString() ?? null}
+              testReproEnabled={testReproEnabled}
               className="p-0"
             />
             <div className="ml-auto inline-flex items-center rounded-xl border border-gray-200 bg-gray-50 p-1 [&>button]:!m-0 [&>button]:!bg-transparent [&>button]:!shadow-none">
@@ -834,6 +839,31 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     </span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Chaleurs observées */}
+            {animal.chaleurs.length > 0 && (
+              <div className="rounded-xl bg-white p-4 shadow">
+                <h3 className="mb-3 flex items-center gap-2 font-semibold text-gray-800">
+                  <ChaleurIcon size={17} className="text-pink-600" />
+                  Historique reproductif — chaleurs ({animal.chaleurs.length})
+                </h3>
+                <div className="space-y-2">
+                  {animal.chaleurs.map((chaleur) => (
+                    <div key={chaleur.id} className="rounded-lg border border-pink-100 bg-pink-50/40 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-pink-800">Chaleur observée</span>
+                        <time className="shrink-0 text-xs font-medium text-gray-600">
+                          {formatDate(chaleur.date)}
+                        </time>
+                      </div>
+                      {chaleur.notes && (
+                        <p className="mt-1 text-sm text-gray-600">{chaleur.notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

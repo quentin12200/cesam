@@ -232,6 +232,7 @@ export default function ReproductiveCyclePreview({ realProps, rules }: Props) {
           <label className="min-w-0 sm:w-[min(100%,430px)]">
             <span className="sr-only">Scénario de test</span>
             <select
+              data-reproduction-preview-scenario
               value={scenario}
               onChange={(event) => setScenario(event.target.value as ScenarioId)}
               className="min-h-11 w-full rounded-lg border border-violet-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"

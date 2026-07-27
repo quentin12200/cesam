@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, ScanLine, X } from "lucide-react";
 import { ACTION_VISUALS } from "@/components/action-visuals";
@@ -13,6 +13,7 @@ interface Props {
   isActif: boolean;
   saillieId?: string | null;
   saillieDate?: string | null;
+  testReproEnabled?: boolean;
   className?: string;
 }
 
@@ -23,11 +24,13 @@ const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 const SaillieIcon = ACTION_VISUALS.saillieIA.icon;
 const EvenementIcon = ACTION_VISUALS.evenementSanitaire.icon;
 
-export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, saillieId, saillieDate, className }: Props) {
+export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, saillieId, saillieDate, testReproEnabled = false, className }: Props) {
   const router = useRouter();
   const [modal, setModal] = useState<Modal>(null);
   const [loading, setLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [confirmation, setConfirmation] = useState("");
 
   // Chaleur state
   const [chaleurDate, setChaleurDate] = useState(today);
@@ -35,6 +38,7 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
 
   const backdropRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const submissionInFlight = useRef(false);
 
   useEffect(() => {
     function closeMenu(event: MouseEvent) {
@@ -47,28 +51,57 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
     return () => document.removeEventListener("mousedown", closeMenu);
   }, []);
 
+  useEffect(() => {
+    if (!confirmation) return;
+    const timer = window.setTimeout(() => setConfirmation(""), 3500);
+    return () => window.clearTimeout(timer);
+  }, [confirmation]);
+
   function open(m: Modal) {
     setChaleurDate(today);
     setChaleurNotes("");
+    setSubmitError("");
     setModal(m);
   }
 
   function close() {
+    setSubmitError("");
     setModal(null);
   }
 
-  async function submitChaleur() {
+  async function submitChaleur(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submissionInFlight.current || !chaleurDate) return;
+
+    if (testReproEnabled) {
+      const scenario = document.querySelector<HTMLSelectElement>("[data-reproduction-preview-scenario]")?.value;
+      if (scenario !== "real") {
+        setSubmitError("Revenez sur Données réelles pour enregistrer un événement.");
+        return;
+      }
+    }
+
+    submissionInFlight.current = true;
+    setSubmitError("");
     setLoading(true);
     try {
       const res = await fetch("/api/chaleurs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ animalId, date: chaleurDate, notes: chaleurNotes || null }),
+        body: JSON.stringify({ animalId, date: chaleurDate, notes: chaleurNotes.trim() || null }),
       });
-      if (!res.ok) throw new Error("Erreur");
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error ?? `Erreur API ${res.status}`);
+      }
       close();
+      setConfirmation("Chaleur enregistrée");
       router.refresh();
+    } catch (error) {
+      console.error("Enregistrement de la chaleur impossible :", error);
+      setSubmitError("La chaleur n’a pas pu être enregistrée. Réessayez.");
     } finally {
+      submissionInFlight.current = false;
       setLoading(false);
     }
   }
@@ -162,10 +195,11 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
                   </h3>
                   <button onClick={close} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
                 </div>
-                <div className="space-y-3">
+                <form className="space-y-3" onSubmit={submitChaleur}>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                    <label htmlFor="chaleur-date" className="block text-xs font-medium text-gray-500 mb-1">Date</label>
                     <input
+                      id="chaleur-date"
                       type="date"
                       value={chaleurDate}
                       max={today}
@@ -174,8 +208,9 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Notes (optionnel)</label>
+                    <label htmlFor="chaleur-notes" className="block text-xs font-medium text-gray-500 mb-1">Notes (optionnel)</label>
                     <input
+                      id="chaleur-notes"
                       type="text"
                       value={chaleurNotes}
                       onChange={(e) => setChaleurNotes(e.target.value)}
@@ -184,13 +219,18 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
                     />
                   </div>
                   <button
-                    onClick={submitChaleur}
+                    type="submit"
                     disabled={!chaleurDate || loading}
                     className="w-full py-2.5 bg-pink-600 text-white rounded-lg font-semibold text-sm disabled:opacity-50 active:scale-98 transition-all"
                   >
                     {loading ? "Enregistrement…" : "Enregistrer la chaleur"}
                   </button>
-                </div>
+                  {submitError && (
+                    <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                      {submitError}
+                    </p>
+                  )}
+                </form>
               </>
             )}
 
@@ -205,6 +245,15 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
           onClose={close}
           onDone={() => { close(); router.refresh(); }}
         />
+      )}
+      {confirmation && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-20 left-1/2 z-[70] -translate-x-1/2 rounded-xl bg-green-700 px-4 py-3 text-sm font-bold text-white shadow-lg sm:bottom-6"
+        >
+          {confirmation}
+        </div>
       )}
     </>
   );
