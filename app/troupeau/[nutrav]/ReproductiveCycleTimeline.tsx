@@ -6,7 +6,6 @@ import { AlertTriangle, CheckCircle2, Clock3, Syringe } from "lucide-react";
 import {
   ECHOGRAPHY_WAIT_DAYS,
   REPRODUCTIVE_CYCLE_COLORS,
-  VELAGE_IMMINENT_DAYS,
   type EtatGestation,
 } from "@/lib/utils";
 import {
@@ -31,6 +30,12 @@ export interface ReproductiveCycleTimelineProps {
   breedingReference: string | null;
   statusModifiedAt: Date | null;
   restObjectiveDays: number;
+  breedingStartDays: number;
+  reproductionDelayDays: number;
+  echoPreparationEnabled: boolean;
+  echoPreparationDays: number;
+  echoDueDays: number;
+  imminentCalvingDays: number;
   dryOffCalfAgeMonths: number;
   dryOffDone: boolean;
   dryOffDate: Date | null;
@@ -71,12 +76,12 @@ interface EventItem {
 
 interface PositionedEvent extends EventItem {
   angle: number;
-  mobileAngle: number;
   desktopAngle: number;
   position: CSSProperties;
 }
 
 const OPEN_CYCLE_SCALE_DAYS = 365;
+// Version visuelle 1 gelée après validation des scénarios reproductifs.
 const RING_RADIUS = 82;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const MAIN_RING_WIDTH = 14;
@@ -145,7 +150,11 @@ function pluralDays(days: number) {
 }
 
 function compactDuration(days: number) {
-  if (days >= 30) return formatGestationElapsed(days);
+  if (days >= 30) {
+    const months = Math.floor(days / 30);
+    const remainingDays = days % 30;
+    return remainingDays > 0 ? `${months} mois ${remainingDays} j` : `${months} mois`;
+  }
   return `${days} j`;
 }
 
@@ -235,16 +244,6 @@ function avoidRingCollisions(
   });
 }
 
-function mobileDetailPosition(angle: number) {
-  const cosine = Math.cos(angle * Math.PI / 180);
-  const sine = Math.sin(angle * Math.PI / 180);
-  if (cosine > 0.5) return "right-0 top-full mt-2 text-right";
-  if (cosine < -0.5) return "left-0 top-full mt-2 text-left";
-  return sine >= 0
-    ? "left-1/2 top-full mt-2 -translate-x-1/2 text-center"
-    : "bottom-full left-1/2 mb-2 -translate-x-1/2 text-center";
-}
-
 export default function ReproductiveCycleTimeline({
   status,
   breedingDate,
@@ -261,6 +260,12 @@ export default function ReproductiveCycleTimeline({
   breedingReference,
   statusModifiedAt,
   restObjectiveDays,
+  breedingStartDays,
+  reproductionDelayDays,
+  echoPreparationEnabled,
+  echoPreparationDays,
+  echoDueDays,
+  imminentCalvingDays,
   dryOffCalfAgeMonths,
   dryOffDone,
   dryOffDate,
@@ -274,14 +279,20 @@ export default function ReproductiveCycleTimeline({
     const events: EventItem[] = [];
     const alerts: CycleAlert[] = [];
     const safeRestObjectiveDays = Math.max(1, restObjectiveDays);
+    const safeBreedingStartDays = Math.max(safeRestObjectiveDays + 1, breedingStartDays);
+    const safeReproductionDelayDays = Math.max(safeBreedingStartDays + 1, reproductionDelayDays);
+    const safeEchoDueDays = Math.max(1, echoDueDays);
+    const safeEchoPreparationDays = echoPreparationEnabled
+      ? Math.min(Math.max(0, echoPreparationDays), safeEchoDueDays)
+      : safeEchoDueDays;
+    const safeImminentCalvingDays = Math.max(1, imminentCalvingDays);
     const daysSinceBreeding = breedingDate ? elapsedDays(breedingDate, today) : null;
     const daysSinceCalving = lastCalvingDate ? elapsedDays(lastCalvingDate, today) : null;
     const calvingIsLatest = Boolean(lastCalvingDate && (!breedingDate || lastCalvingDate > breedingDate));
-    const isPostCalvingDelay =
+    const isPostCalvingFollowUp =
       status === "ROUGE" &&
       calvingIsLatest &&
-      daysSinceCalving !== null &&
-      daysSinceCalving > safeRestObjectiveDays;
+      daysSinceCalving !== null;
     const isEmptyAfterEcho =
       status === "ROUGE" &&
       !calvingIsLatest &&
@@ -298,15 +309,15 @@ export default function ReproductiveCycleTimeline({
     let tone = "text-slate-700";
     let horizonDays = OPEN_CYCLE_SCALE_DAYS;
 
-    if (lastCalvingDate && daysSinceCalving !== null && calvingIsLatest && daysSinceCalving > safeRestObjectiveDays && !breedingDate) {
-      const delayDays = daysSinceCalving - safeRestObjectiveDays;
+    if (lastCalvingDate && daysSinceCalving !== null && calvingIsLatest && daysSinceCalving >= safeReproductionDelayDays && !breedingDate) {
+      const delayDays = daysSinceCalving - safeReproductionDelayDays + 1;
       const delayColor = delayStateColor(delayDays);
       alerts.push({
         id: "repro-delay",
-        title: `Retard repro · +${delayDays} j`,
+        title: "Retard repro",
         lines: [
-          `Repos réel : ${daysSinceCalving} j`,
-          `Objectif : ${safeRestObjectiveDays} j`,
+          `Depuis vêlage : ${daysSinceCalving} j`,
+          `Retard à partir de J${safeReproductionDelayDays}`,
         ],
         action: "Remise à la reproduction à prévoir",
         color: delayColor,
@@ -377,19 +388,34 @@ export default function ReproductiveCycleTimeline({
       });
     }
 
-    if ((status === "REPOS" || isPostCalvingDelay) && lastCalvingDate && daysSinceCalving !== null) {
-      const restDays = Math.min(daysSinceCalving, safeRestObjectiveDays);
+    if ((status === "REPOS" || isPostCalvingFollowUp) && lastCalvingDate && daysSinceCalving !== null) {
+      const restEndDay = safeBreedingStartDays - 1;
+      const breedingEndDay = safeReproductionDelayDays - 1;
+      const restDays = Math.min(daysSinceCalving, restEndDay);
       addSegment(segments, {
         id: "repos",
         label: "Repos",
         days: restDays || 1,
         color: STAGE_COLORS.rest,
-        current: status === "REPOS",
+        current: daysSinceCalving < safeBreedingStartDays,
         detail: `Depuis le ${formatDate(lastCalvingDate)}`,
       });
 
-      if (isPostCalvingDelay) {
-        const delayDays = daysSinceCalving - safeRestObjectiveDays;
+      if (daysSinceCalving >= safeBreedingStartDays) {
+        const breedingPhaseDays =
+          Math.min(daysSinceCalving, breedingEndDay) - safeBreedingStartDays + 1;
+        addSegment(segments, {
+          id: "mise-repro",
+          label: "Mise à la reproduction",
+          days: breedingPhaseDays,
+          color: STAGE_COLORS.service,
+          current: daysSinceCalving < safeReproductionDelayDays,
+          detail: `Du J${safeBreedingStartDays} au J${breedingEndDay}`,
+        });
+      }
+
+      if (daysSinceCalving >= safeReproductionDelayDays) {
+        const delayDays = daysSinceCalving - safeReproductionDelayDays + 1;
         const delayColor = delayStateColor(delayDays);
         addSegment(segments, {
           id: "retard",
@@ -402,18 +428,25 @@ export default function ReproductiveCycleTimeline({
         });
         title = "Retard";
         main = `+${delayDays} j`;
-        secondary = "Retard de remise à la reproduction";
-        usefulDate = formatDate(addDays(lastCalvingDate, safeRestObjectiveDays));
+        secondary = `Remise à la reproduction attendue depuis le ${formatDate(addDays(lastCalvingDate, safeReproductionDelayDays))}`;
+        usefulDate = null;
         tone = "text-red-700";
+      } else if (daysSinceCalving >= safeBreedingStartDays) {
+        title = "Mise à la reproduction";
+        main = `${daysSinceCalving} j`;
+        secondary = `Mise à la reproduction recommandée depuis le ${formatDate(addDays(lastCalvingDate, safeBreedingStartDays))}`;
+        usefulDate = null;
+        tone = "text-fuchsia-700";
       } else {
         title = "Repos post-vêlage";
         main = pluralDays(daysSinceCalving);
         secondary = `Vêlage le ${formatDate(lastCalvingDate)}`;
-        usefulDate = formatDate(lastCalvingDate);
+        usefulDate = null;
         tone = "text-sky-700";
       }
     } else if (breedingDate && daysSinceBreeding !== null) {
-      const expectedEchoDate = addDays(breedingDate, ECHOGRAPHY_WAIT_DAYS);
+      const expectedEchoDate = addDays(breedingDate, safeEchoDueDays);
+      const echoOverlayStartDate = addDays(breedingDate, safeEchoPreparationDays);
       const effectiveEchoDate = echoDate && echoDate >= breedingDate ? echoDate : null;
       const negativeSince = isEmptyAfterEcho ? effectiveEchoDate ?? statusModifiedAt ?? breedingDate : null;
       const gestationConfirmedAt =
@@ -425,7 +458,9 @@ export default function ReproductiveCycleTimeline({
 
       if (lastCalvingDate && lastCalvingDate < breedingDate) {
         const restBeforeBreedingDays = elapsedDays(lastCalvingDate, breedingDate);
-        const normalRestDays = Math.min(restBeforeBreedingDays, safeRestObjectiveDays);
+        const restEndDay = safeBreedingStartDays - 1;
+        const breedingEndDay = safeReproductionDelayDays - 1;
+        const normalRestDays = Math.min(restBeforeBreedingDays, restEndDay);
         addSegment(segments, {
           id: "repos-post-velage",
           label: "Repos",
@@ -433,8 +468,19 @@ export default function ReproductiveCycleTimeline({
           color: STAGE_COLORS.rest,
           detail: `Du vêlage au ${breedingType === "IA" ? "début IA" : "début saillie"}`,
         });
-        if (restBeforeBreedingDays > safeRestObjectiveDays) {
-          const delayDays = restBeforeBreedingDays - safeRestObjectiveDays;
+
+        if (restBeforeBreedingDays >= safeBreedingStartDays) {
+          addSegment(segments, {
+            id: "mise-repro-resolue",
+            label: "Mise à la reproduction",
+            days: Math.min(restBeforeBreedingDays, breedingEndDay) - safeBreedingStartDays + 1,
+            color: STAGE_COLORS.service,
+            detail: `Du J${safeBreedingStartDays} au J${breedingEndDay}`,
+          });
+        }
+
+        if (restBeforeBreedingDays >= safeReproductionDelayDays) {
+          const delayDays = restBeforeBreedingDays - safeReproductionDelayDays + 1;
           const delayColor = delayStateColor(delayDays);
           addSegment(segments, {
             id: "retard-resolu",
@@ -446,10 +492,10 @@ export default function ReproductiveCycleTimeline({
           });
           alerts.push({
             id: "repro-delay",
-            title: `Retard repro passé · +${delayDays} j`,
+            title: "Retard repro passé",
             lines: [
-              `Repos réel : ${restBeforeBreedingDays} j`,
-              `Objectif : ${safeRestObjectiveDays} j`,
+              `Depuis vêlage : ${restBeforeBreedingDays} j`,
+              `Retard à partir de J${safeReproductionDelayDays}`,
             ],
             action: "Remise à la repro réalisée",
             color: delayColor,
@@ -470,16 +516,16 @@ export default function ReproductiveCycleTimeline({
       });
 
       const echoWaitingEnd = conclusionDate
-        ? conclusionDate > expectedEchoDate ? conclusionDate : expectedEchoDate
+        ? conclusionDate > echoOverlayStartDate ? conclusionDate : echoOverlayStartDate
         : today;
       const echoWaitingDays =
-        echoWaitingEnd > expectedEchoDate ? elapsedDays(expectedEchoDate, echoWaitingEnd) : 0;
+        echoWaitingEnd > echoOverlayStartDate ? elapsedDays(echoOverlayStartDate, echoWaitingEnd) : 0;
       if (echoWaitingDays > 0 || status === "JAUNE") {
         overlaySegments.push({
           id: "echo-wait",
           label: "À échographier",
           shortLabel: "Écho",
-          startDays: elapsedDays(cycleStartDate, expectedEchoDate),
+          startDays: elapsedDays(cycleStartDate, echoOverlayStartDate),
           days: echoWaitingDays || 1,
           color: STAGE_COLORS.scan,
           current: status === "JAUNE",
@@ -492,8 +538,7 @@ export default function ReproductiveCycleTimeline({
         const availableDays = elapsedDays(emptySince, today);
         addSegment(segments, {
           id: "a-remettre",
-          label: "À remettre",
-          shortLabel: "Repro",
+          label: "Retard",
           days: availableDays || 1,
           color: STAGE_COLORS.service,
           current: true,
@@ -501,13 +546,13 @@ export default function ReproductiveCycleTimeline({
         });
         title = "À remettre à la reproduction";
         main = `Depuis ${pluralDays(availableDays)}`;
-        secondary = effectiveEchoDate ? `Échographie le ${formatDate(effectiveEchoDate)}` : "Cycle ouvert";
-        usefulDate = formatDate(emptySince);
+        secondary = effectiveEchoDate ? `Échographie négative le ${formatDate(effectiveEchoDate)}` : "Cycle ouvert";
+        usefulDate = null;
         tone = "text-fuchsia-700";
       } else if ((status === "VERT" || status === "ROSE") && gestation) {
         const confirmedAt = gestationConfirmedAt ?? expectedEchoDate;
         const calculatedDueDate = dueDate ?? addDays(breedingDate, GESTATION_REFERENCE_DAYS);
-        const imminentAt = subDays(calculatedDueDate, VELAGE_IMMINENT_DAYS);
+        const imminentAt = subDays(calculatedDueDate, safeImminentCalvingDays);
         const gestationEnd = today < imminentAt ? today : imminentAt;
 
         addSegment(segments, {
@@ -554,43 +599,36 @@ export default function ReproductiveCycleTimeline({
             gestation.remainingDays < 0
               ? `De ${pluralDays(Math.abs(gestation.remainingDays))}`
               : `J-${gestation.remainingDays}`;
-          secondary =
-            gestation.remainingDays < 0
-              ? `Vêlage prévu dépassé de ${pluralDays(Math.abs(gestation.remainingDays))}`
-              : `Vêlage prévu dans ${pluralDays(gestation.remainingDays)}`;
-          usefulDate = formatDate(calculatedDueDate);
+          secondary = `Vêlage prévu le ${formatDate(calculatedDueDate)}`;
+          usefulDate = null;
           tone = gestation.remainingDays < 0 ? "text-red-700" : "text-orange-700";
         } else {
           title = "Gestante";
           main = formatGestationElapsed(gestation.elapsedDays);
-          secondary =
-            gestation.remainingDays >= 0 && gestation.remainingDays <= 60
-              ? `Vêlage prévu dans ${pluralDays(gestation.remainingDays)}`
-              : `Vêlage prévu le ${formatDate(calculatedDueDate)}`;
-          usefulDate = formatDate(calculatedDueDate);
+          secondary = `Vêlage prévu le ${formatDate(calculatedDueDate)}`;
+          usefulDate = null;
           tone = "text-green-700";
         }
       } else if (status === "JAUNE") {
-        const waitingForEchoDays = Math.max(0, daysSinceBreeding - ECHOGRAPHY_WAIT_DAYS);
+        const waitingForEchoDays = Math.max(0, daysSinceBreeding - safeEchoDueDays);
         title = "À échographier";
         main = waitingForEchoDays === 0 ? "Dès aujourd’hui" : `Depuis ${pluralDays(waitingForEchoDays)}`;
         secondary = `Écho possible depuis le ${formatDate(expectedEchoDate)}`;
-        usefulDate = `${ECHOGRAPHY_WAIT_DAYS} j après ${breedingType === "IA" ? "IA" : "saillie"}`;
+        usefulDate = null;
         tone = "text-amber-700";
       } else if (status === "GRIS") {
-        const remaining = Math.max(0, ECHOGRAPHY_WAIT_DAYS - daysSinceBreeding);
+        const remaining = Math.max(0, safeEchoDueDays - daysSinceBreeding);
         title = `Repos post-${breedingType === "IA" ? "IA" : "saillie"}`;
         main = remaining === 0 ? "Échographie possible" : `Encore ${pluralDays(remaining)}`;
         secondary = `Écho possible à partir du ${formatDate(expectedEchoDate)}`;
-        usefulDate = formatDate(expectedEchoDate);
+        usefulDate = null;
         tone = "text-slate-700";
       } else if (status === "ROUGE") {
         const availableSince = statusModifiedAt ?? breedingDate;
         const availableDays = elapsedDays(availableSince, today);
         addSegment(segments, {
           id: "a-remettre",
-          label: "À remettre",
-          shortLabel: "Repro",
+          label: "Retard",
           days: availableDays || 1,
           color: STAGE_COLORS.service,
           current: true,
@@ -598,7 +636,7 @@ export default function ReproductiveCycleTimeline({
         title = "À remettre à la reproduction";
         main = `Depuis ${pluralDays(availableDays)}`;
         secondary = "Animal disponible";
-        usefulDate = formatDate(availableSince);
+        usefulDate = null;
         tone = "text-fuchsia-700";
       }
     } else if (status === "ROUGE") {
@@ -627,7 +665,7 @@ export default function ReproductiveCycleTimeline({
       trackedDays,
       gestation,
     };
-  }, [status, breedingDate, breedingType, breedingReference, calfBirthDate, calfNumber, calfSevreDone, calfSex, dryOffCalfAgeMonths, dryOffDone, dueDate, echoDate, echoObservation, echoResult, lastCalvingDate, restObjectiveDays, statusModifiedAt]);
+  }, [status, breedingDate, breedingType, breedingReference, breedingStartDays, calfBirthDate, calfNumber, calfSevreDone, calfSex, dryOffCalfAgeMonths, dryOffDone, dueDate, echoDate, echoDueDays, echoObservation, echoPreparationDays, echoPreparationEnabled, echoResult, imminentCalvingDays, lastCalvingDate, reproductionDelayDays, restObjectiveDays, statusModifiedAt]);
 
   const activeStage =
     status === "GRIS" ? "waiting"
@@ -647,9 +685,13 @@ export default function ReproductiveCycleTimeline({
   const markerAngle = progressRatio * 360 - 90;
 
   const today = new Date();
+  const displayBreedingStartDays = Math.max(restObjectiveDays + 1, breedingStartDays);
+  const displayReproductionDelayDays = Math.max(displayBreedingStartDays + 1, reproductionDelayDays);
+  const displayEchoDueDays = Math.max(1, echoDueDays);
+  const displayImminentCalvingDays = Math.max(1, imminentCalvingDays);
   const projectedCalvingDate =
     dueDate ?? (breedingDate ? addDays(breedingDate, GESTATION_REFERENCE_DAYS) : null);
-  const expectedEchoDate = breedingDate ? addDays(breedingDate, ECHOGRAPHY_WAIT_DAYS) : null;
+  const expectedEchoDate = breedingDate ? addDays(breedingDate, displayEchoDueDays) : null;
   let ringOffset = 0;
   const elapsedRing = model.segments.map((segment) => {
     const slot = (segment.days / model.scaleDays) * RING_CIRCUMFERENCE;
@@ -662,20 +704,18 @@ export default function ReproductiveCycleTimeline({
       displayColor: segmentDisplayColor(segment, model.scaleDays),
       labelDetail:
         segment.id.startsWith("repos")
-          ? `${restObjectiveDays} j objectif`
-          : segment.id.includes("retard")
-            ? `+${segment.days} j`
+          ? `objectif ${restObjectiveDays} j`
+          : segment.id.startsWith("mise-repro")
+            ? null
+            : segment.id.includes("retard")
+              ? null
             : segment.id === "attente"
-              ? "Après saillie / IA"
-              : segment.id === "gestante" && model.gestation
-                ? model.gestation.remainingDays >= 0
-                  ? `J-${model.gestation.remainingDays}`
-                  : `Terme +${Math.abs(model.gestation.remainingDays)} j`
+              ? null
+              : segment.id === "gestante"
+                ? null
                 : segment.id === "imminent"
-                  ? `≈ J-${VELAGE_IMMINENT_DAYS}`
-                  : segment.id === "a-remettre"
-                    ? `Depuis ${segment.days} j`
-                    : pluralDays(segment.days),
+                  ? `environ J-${displayImminentCalvingDays}`
+                  : null,
     };
     ringOffset += slot;
     return item;
@@ -716,7 +756,6 @@ export default function ReproductiveCycleTimeline({
   const desktopEventLayout = avoidRingCollisions(eventAngles, 43.5, markerAngle, markerDesktopRadius, 26, 15);
   const ringEvents: PositionedEvent[] = eventAngles.map((event, index) => ({
     ...event,
-    mobileAngle: event.kind === "calving" ? -90 : mobileEventLayout[index].angle,
     desktopAngle: event.kind === "calving" ? -90 : desktopEventLayout[index].angle,
     position: {
       "--event-x-mobile": `${event.kind === "calving" ? 0 : mobileEventLayout[index].point.x}%`,
@@ -726,7 +765,16 @@ export default function ReproductiveCycleTimeline({
     } as CSSProperties,
   }));
   const selectedEvent = ringEvents.find((event) => event.id === selectedEventId) ?? null;
+  const currentPostCalvingDays =
+    lastCalvingDate && (!breedingDate || lastCalvingDate > breedingDate)
+      ? elapsedDays(lastCalvingDate, today)
+      : null;
   const markerText = (() => {
+    if (currentPostCalvingDays !== null) {
+      return currentPostCalvingDays >= displayReproductionDelayDays
+        ? `+${currentPostCalvingDays - displayReproductionDelayDays + 1} j`
+        : `${currentPostCalvingDays} j`;
+    }
     if (model.gestation && status === "ROSE") {
       return model.gestation.remainingDays >= 0
         ? `J-${model.gestation.remainingDays}`
@@ -734,14 +782,22 @@ export default function ReproductiveCycleTimeline({
     }
     if (model.gestation && status === "VERT") return compactDuration(model.gestation.elapsedDays);
     if (status === "JAUNE" && expectedEchoDate) return `Depuis ${elapsedDays(expectedEchoDate, today)} j`;
-    if (status === "GRIS" && breedingDate) return `Depuis ${elapsedDays(breedingDate, today)} j`;
-    if (status === "REPOS" && lastCalvingDate) return `Depuis ${elapsedDays(lastCalvingDate, today)} j`;
-    if (activeSegment?.current) return `Depuis ${activeSegment.days} j`;
+    if (status === "GRIS" && breedingDate) return `${elapsedDays(breedingDate, today)} j`;
+    if (activeSegment?.current) {
+      return activeSegment.id === "a-remettre"
+        ? `Depuis ${activeSegment.days} j`
+        : `${activeSegment.days} j`;
+    }
     return "Aujourd’hui";
   })();
   const restActualDays =
     lastCalvingDate ? elapsedDays(lastCalvingDate, breedingDate && breedingDate > lastCalvingDate ? breedingDate : today) : null;
-  const restDelayDays = restActualDays !== null ? Math.max(0, restActualDays - restObjectiveDays) : 0;
+  const restPhaseDays = restActualDays !== null
+    ? Math.min(restActualDays, displayBreedingStartDays - 1)
+    : null;
+  const restDelayDays = restActualDays !== null
+    ? Math.max(0, restActualDays - displayReproductionDelayDays + 1)
+    : 0;
   const echoSummary =
     echoDate
       ? echoResult === "PLEINE"
@@ -758,8 +814,13 @@ export default function ReproductiveCycleTimeline({
       title: "Repos",
       icon: Clock3,
       color: STAGE_COLORS.rest,
-      main: restActualDays !== null ? `${restActualDays} j — objectif ${restObjectiveDays}` : `Objectif ${restObjectiveDays} j`,
-      detail: restDelayDays > 0 ? `+${restDelayDays} j de retard` : "Dans l’objectif",
+      main: restPhaseDays !== null ? `${restPhaseDays} j — objectif ${restObjectiveDays}` : `Objectif ${restObjectiveDays} j`,
+      detail:
+        restDelayDays > 0
+          ? breedingDate ? "Remise à la repro réalisée" : "Remise à la repro à prévoir"
+          : restActualDays !== null && restActualDays >= displayBreedingStartDays
+            ? "Mise à la reproduction"
+            : "Dans l’objectif",
     },
     {
       id: "service",
@@ -893,6 +954,8 @@ export default function ReproductiveCycleTimeline({
                   {elapsedRing.map((stage) => {
                     const segmentRatio = stage.days / model.scaleDays;
                     const isShort = segmentRatio < 0.075;
+                    const label = stage.shortLabel ?? stage.label;
+                    const isLongLabel = label.length > 16;
                     const radians = stage.midAngle * Math.PI / 180;
                     const stageIndex = elapsedRing.findIndex((candidate) => candidate.id === stage.id);
                     const nearbyLabelCount = elapsedRing
@@ -924,21 +987,23 @@ export default function ReproductiveCycleTimeline({
                           style={{
                             fill: stage.current ? stage.color : "#64748b",
                             stroke: "#ffffff",
-                            fontSize: isShort ? "6.8px" : "7.6px",
+                            fontSize: isLongLabel ? "5.6px" : isShort ? "6.8px" : "7.6px",
                           }}
                         >
-                          {stage.shortLabel ?? stage.label}
+                          {label}
                         </text>
-                        <text
-                          x={x}
-                          y={y + 5.4}
-                          textAnchor={x < 92 ? "end" : x > 108 ? "start" : "middle"}
-                          dominantBaseline="central"
-                          className="font-semibold [paint-order:stroke] [stroke-width:2.5px]"
-                          style={{ fill: "#64748b", stroke: "#ffffff", fontSize: "6px" }}
-                        >
-                          {stage.labelDetail}
-                        </text>
+                        {stage.labelDetail && (
+                          <text
+                            x={x}
+                            y={y + 5.4}
+                            textAnchor={x < 92 ? "end" : x > 108 ? "start" : "middle"}
+                            dominantBaseline="central"
+                            className="font-semibold [paint-order:stroke] [stroke-width:2.5px]"
+                            style={{ fill: "#64748b", stroke: "#ffffff", fontSize: "6px" }}
+                          >
+                            {stage.labelDetail}
+                          </text>
+                        )}
                       </g>
                     );
                   })}
@@ -946,7 +1011,8 @@ export default function ReproductiveCycleTimeline({
                     const radians = stage.midAngle * Math.PI / 180;
                     const nearEvent = desktopEventLayout.some((event) => angularDistance(event.angle, stage.midAngle) < 24);
                     const nearMarker = angularDistance(markerAngle, stage.midAngle) < 16;
-                    const labelRadius = 118 + (nearEvent ? 12 : 0) + (nearMarker ? 10 : 0);
+                    const nearPhaseLabel = elapsedRing.some((segment) => angularDistance(segment.midAngle, stage.midAngle) < 22);
+                    const labelRadius = 118 + (nearEvent ? 12 : 0) + (nearMarker ? 10 : 0) + (nearPhaseLabel ? 28 : 0);
                     const dotX = 100 + 96 * Math.cos(radians);
                     const dotY = 100 + 96 * Math.sin(radians);
                     const lineX = 100 + 103 * Math.cos(radians);
@@ -1015,7 +1081,6 @@ export default function ReproductiveCycleTimeline({
 
               {ringEvents.map((event) => {
                 const selected = selectedEventId === event.id;
-                const showText = event.kind !== "calving";
                 return (
                   <div
                     key={`${event.label}-${event.date.toISOString()}`}
@@ -1033,11 +1098,6 @@ export default function ReproductiveCycleTimeline({
                     >
                       <EventIcon kind={event.kind} />
                     </button>
-                    {showText && !selected && (
-                      <span className={`pointer-events-none absolute w-max max-w-20 bg-white/90 px-1 text-sm font-semibold leading-tight text-slate-600 sm:hidden ${mobileDetailPosition(event.mobileAngle)}`}>
-                        {event.kind.startsWith("echo") ? "Écho" : event.kind === "ia" ? "IA" : "Saillie"}
-                      </span>
-                    )}
                   </div>
                 );
               })}
@@ -1045,7 +1105,7 @@ export default function ReproductiveCycleTimeline({
               <button
                 type="button"
                 onClick={() => setSelectedEventId(null)}
-                className={`absolute z-30 left-[calc(50%+var(--marker-x-mobile))] top-[calc(50%+var(--marker-y-mobile))] -translate-x-1/2 -translate-y-1/2 rounded-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:left-[calc(50%+var(--marker-x-desktop))] sm:top-[calc(50%+var(--marker-y-desktop))] ${model.gestation && status === "VERT" ? "hidden sm:block" : ""}`}
+                className="absolute z-30 left-[calc(50%+var(--marker-x-mobile))] top-[calc(50%+var(--marker-y-mobile))] -translate-x-1/2 -translate-y-1/2 rounded-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:left-[calc(50%+var(--marker-x-desktop))] sm:top-[calc(50%+var(--marker-y-desktop))]"
                 style={markerPosition}
                 aria-label="Revenir à la situation actuelle"
               >
@@ -1058,29 +1118,15 @@ export default function ReproductiveCycleTimeline({
                 type="button"
                 onClick={() => setSelectedEventId(null)}
                 className="absolute inset-[25%] flex flex-col items-center justify-center rounded-full bg-white px-2 text-center shadow-[inset_0_0_0_1px_#eef2f7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300 sm:px-5"
-                aria-label={`${model.title} : ${model.main}`}
+                aria-label={`${model.title} : ${model.secondary}`}
               >
-                <span className="text-[9px] font-medium text-slate-500 sm:text-xs">Aujourd’hui</span>
-                <span className={`mt-2 text-xl font-extrabold uppercase leading-none tracking-tight sm:text-3xl ${model.tone}`}>
+                <span className={`max-w-[92%] font-extrabold uppercase leading-tight tracking-tight ${model.title.length > 22 ? "text-xs sm:text-lg" : "text-lg sm:text-2xl"} ${model.tone}`}>
                   {model.title}
                 </span>
-                <strong className="mt-2 text-sm leading-tight sm:text-lg" style={{ color: activeColor }}>
-                  {model.main}
-                </strong>
                 <span className="mt-3 h-px w-1/2" style={{ backgroundColor: softenColor(activeColor, 0.72) }} />
-                    {status === "VERT" && projectedCalvingDate && (
-                      <span className="mt-2 max-w-[92%] text-[10px] font-semibold leading-snug text-slate-600 sm:hidden">
-                        Vêlage prévu le {formatDate(projectedCalvingDate)}
-                      </span>
-                    )}
-                    <span className={`mt-2 line-clamp-2 max-w-[92%] text-[10px] leading-snug text-slate-600 sm:text-xs ${status === "VERT" && projectedCalvingDate ? "hidden sm:inline" : ""}`}>
-                      {model.secondary}
-                    </span>
-                    {model.usefulDate && (
-                      <span className="mt-1 hidden text-[9px] font-semibold text-slate-400 sm:inline sm:text-[11px]">
-                        {model.usefulDate}
-                      </span>
-                    )}
+                <span className="mt-3 line-clamp-3 max-w-[88%] text-[10px] font-medium leading-snug text-slate-600 sm:text-xs">
+                  {model.secondary}
+                </span>
               </button>
             </div>
 
