@@ -58,10 +58,9 @@ import {
   parseReproductionRules,
   type ReproductionUnit,
 } from "@/lib/reproduction-rules";
-import { ACTION_VISUALS } from "@/components/action-visuals";
+import { getActiveHeat } from "@/lib/active-heat-action";
+import ActiveHeatAction from "@/app/components/ActiveHeatAction";
 import ChaleursHistory from "./ChaleursHistory";
-
-const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -252,6 +251,9 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   } satisfies ReproductiveCycleTimelineProps;
 
   const isFemelle = animal.sexbov === "F";
+  const activeHeat = animal.statut === "ACTIF"
+    ? getActiveHeat(animal.chaleurs, animal.saillies)
+    : null;
   const tabs = [
     { id: "identite", label: "Identité" },
     { id: "sante", label: "Santé" },
@@ -340,16 +342,27 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
       </div>
 
       {animal.sexbov === "F" && (
-        <div className="px-3">
-          {testReproEnabled ? (
-            <ReproductiveCyclePreview
-              realProps={reproductiveCycleProps}
-              rules={configAffichage.reproductionPreviewRules}
+        <>
+          <div className="px-3">
+            {testReproEnabled ? (
+              <ReproductiveCyclePreview
+                realProps={reproductiveCycleProps}
+                rules={configAffichage.reproductionPreviewRules}
+              />
+            ) : (
+              <ReproductiveCycleTimeline {...reproductiveCycleProps} />
+            )}
+          </div>
+          {activeHeat && (
+            <ActiveHeatAction
+              animalId={animal.id}
+              animalLabel={animal.nobovi ?? animal.nutrav}
+              observedAt={activeHeat.date.toISOString()}
+              variant="animal"
+              simulationAware={testReproEnabled}
             />
-          ) : (
-            <ReproductiveCycleTimeline {...reproductiveCycleProps} />
           )}
-        </div>
+        </>
       )}
 
       {/* Onglets */}

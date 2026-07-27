@@ -7,13 +7,16 @@ export async function PATCH(
 ) {
   const { id } = await params;
   try {
-    const { date, notes } = await request.json();
+    const { date, observedAt, notes } = await request.json();
     if (!date) {
       return NextResponse.json({ error: "Date requise" }, { status: 400 });
     }
-    const chaleurDate = new Date(date);
+    const chaleurDate = new Date(observedAt ?? date);
     if (Number.isNaN(chaleurDate.getTime())) {
       return NextResponse.json({ error: "Date invalide" }, { status: 400 });
+    }
+    if (chaleurDate.getTime() > Date.now()) {
+      return NextResponse.json({ error: "La date et l’heure ne peuvent pas être dans le futur" }, { status: 400 });
     }
     const chaleur = await prisma.chaleur.update({
       where: { id },

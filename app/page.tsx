@@ -19,6 +19,8 @@ import NotesTerrain from "@/app/components/NotesTerrain";
 import RapportGestationButton from "@/app/components/RapportGestationButton";
 import PrintSectionButton from "@/app/components/PrintSectionButton";
 import AutoPrint from "@/app/components/AutoPrint";
+import ActiveHeatAction from "@/app/components/ActiveHeatAction";
+import { activeHeatSince, getActiveHeat } from "@/lib/active-heat-action";
 import {
   Baby,
   Wifi,
@@ -61,6 +63,7 @@ async function getDashboardData() {
     nbGenissesMoyennes,
     nbGenissesGrandes,
     nbMales,
+    activeHeatCandidates,
   ] = await Promise.all([
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: false } }),
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
@@ -184,7 +187,42 @@ async function getDashboardData() {
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: true, danais: { gte: addDays(now, -730), lt: addDays(now, -365) } } }),
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: true, danais: { gte: addDays(now, -1095), lt: addDays(now, -730) } } }),
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "M" } }),
+    prisma.animal.findMany({
+      where: {
+        statut: "ACTIF",
+        sexbov: "F",
+        chaleurs: { some: { date: { gte: activeHeatSince(now), lte: now } } },
+      },
+      select: {
+        id: true,
+        nutrav: true,
+        nobovi: true,
+        chaleurs: {
+          where: { date: { gte: activeHeatSince(now), lte: now } },
+          orderBy: { date: "desc" },
+          take: 1,
+          select: { date: true },
+        },
+        saillies: {
+          where: {
+            OR: [
+              { date: { gte: activeHeatSince(now) } },
+              { createdAt: { gte: activeHeatSince(now) } },
+            ],
+          },
+          select: { date: true, createdAt: true },
+        },
+      },
+    }),
   ]);
+
+  const activeHeats = activeHeatCandidates
+    .map((animal) => ({
+      animal,
+      heat: getActiveHeat(animal.chaleurs, animal.saillies, now),
+    }))
+    .filter((item): item is typeof item & { heat: { date: Date } } => item.heat !== null)
+    .sort((a, b) => b.heat.date.getTime() - a.heat.date.getTime());
 
   let vachesPleine = 0;
   let aEchographier = 0;
@@ -320,6 +358,7 @@ async function getDashboardData() {
     mortsParCause,
     mortsAnneeSansProbleme,
     tauxMortaliteAnnee,
+    activeHeats,
   };
 }
 
@@ -357,6 +396,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
     data.vachesVidesEnRetard > 0 ||
     data.aEchographier > 0 ||
     data.velagesSemaine > 0 ||
+    data.activeHeats.length > 0 ||
     data.genissesArapatrier.length > 0 ||
     vachesACapteurSansCapteur.length > 0;
 
@@ -381,6 +421,15 @@ export default async function Dashboard({ searchParams }: PageProps) {
         <RapportGestationButton />
       </div>
       <div className="space-y-2">
+        {data.activeHeats.map(({ animal, heat }) => (
+          <ActiveHeatAction
+            key={animal.id}
+            animalId={animal.id}
+            animalLabel={animal.nutrav}
+            observedAt={heat.date.toISOString()}
+            variant="home"
+          />
+        ))}
         {data.vachesVidesEnRetard > 0 && (
           <Link
             href="/reproduction?filtre=ROUGE"
@@ -778,13 +827,16 @@ export default async function Dashboard({ searchParams }: PageProps) {
   const reproductionTotal =
     data.vachesVidesEnRetard +
     data.aEchographier +
-    data.genissesArapatrier.length;
+    data.genissesArapatrier.length +
+    data.activeHeats.length;
   if (reproductionTotal > 0) {
     const reproductionSummary = data.vachesVidesEnRetard > 0
       ? `${data.vachesVidesEnRetard} vache${data.vachesVidesEnRetard > 1 ? "s" : ""} vide${data.vachesVidesEnRetard > 1 ? "s" : ""} en retard`
       : data.aEchographier > 0
         ? `${data.aEchographier} échographie${data.aEchographier > 1 ? "s" : ""} à programmer`
-        : `${data.genissesArapatrier.length} génisse${data.genissesArapatrier.length > 1 ? "s" : ""} à rapatrier`;
+        : data.genissesArapatrier.length > 0
+          ? `${data.genissesArapatrier.length} génisse${data.genissesArapatrier.length > 1 ? "s" : ""} à rapatrier`
+          : `${data.activeHeats.length} chaleur${data.activeHeats.length > 1 ? "s" : ""} observée${data.activeHeats.length > 1 ? "s" : ""} — saillie ou IA ?`;
     todoGroups.push({
       id: "reproduction",
       title: "Reproduction",

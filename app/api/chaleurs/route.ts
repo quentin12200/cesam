@@ -4,20 +4,28 @@ import { logAction } from "@/lib/action-log";
 
 export async function POST(request: NextRequest) {
   try {
-    const { animalId, animalIds: requestedAnimalIds, date, notes } = await request.json();
+    const { animalId, animalIds: requestedAnimalIds, date, observedAt, notes } = await request.json();
     const animalIds = [...new Set<string>(
       Array.isArray(requestedAnimalIds) ? requestedAnimalIds.filter((id): id is string => typeof id === "string" && id.length > 0) : animalId ? [animalId] : []
     )];
     if (animalIds.length === 0 || !date) {
       return NextResponse.json({ error: "animalId(s) et date requis" }, { status: 400 });
     }
-    const chaleurDate = new Date(date);
+    const chaleurDate = new Date(observedAt ?? date);
     if (Number.isNaN(chaleurDate.getTime())) {
       return NextResponse.json({ error: "Date invalide" }, { status: 400 });
     }
+    if (chaleurDate.getTime() > Date.now()) {
+      return NextResponse.json({ error: "La date et l’heure ne peuvent pas être dans le futur" }, { status: 400 });
+    }
+    const duplicateDayStart = new Date(`${date}T00:00:00.000Z`);
+    const duplicateDayEnd = new Date(duplicateDayStart.getTime() + 24 * 60 * 60 * 1000);
     const existingDuplicates = await prisma.chaleur.groupBy({
       by: ["animalId"],
-      where: { animalId: { in: animalIds }, date: chaleurDate },
+      where: {
+        animalId: { in: animalIds },
+        date: { gte: duplicateDayStart, lt: duplicateDayEnd },
+      },
       _count: { _all: true },
     });
     const duplicateAnimalIds = existingDuplicates.map((row) => row.animalId);

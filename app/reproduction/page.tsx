@@ -309,6 +309,12 @@ function TaureauSearch({
 }
 
 // ── Contenu principal ──────────────────────────────────────────────────────
+function localDateValue(date = new Date()) {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
 function ReproductionContent() {
   const [vaches, setVaches] = useState<VacheRepro[]>([]);
   const [taureaux, setTaureaux] = useState<Taureau[]>([]);
@@ -343,6 +349,7 @@ function ReproductionContent() {
   const [chaleurAnimalId, setChaleurAnimalId] = useState("");
   const [chaleurAnimalIds, setChaleurAnimalIds] = useState<string[]>([]);
   const [chaleurDate, setChaleurDate] = useState("");
+  const [chaleurTime, setChaleurTime] = useState("");
   const [chaleurNotes, setChaleurNotes] = useState("");
 
   // ── Echo form state ──
@@ -386,14 +393,15 @@ function ReproductionContent() {
     if (action === "chaleur") {
       setChaleurAnimalIds(ids);
       setChaleurAnimalId("");
-      setChaleurDate(new Date().toISOString().split("T")[0]);
+      setChaleurDate(localDateValue());
+      setChaleurTime(new Date().toTimeString().slice(0, 5));
       setChaleurNotes("");
       setShowChaleurForm(true);
     } else {
       setSaillieAnimalIds(ids);
       setSaillieAnimalId("");
-      setSaillieDate(new Date().toISOString().split("T")[0]);
-      setSaillieType("NATURELLE");
+      setSaillieDate(localDateValue());
+      setSaillieType(searchParams.get("type") === "IA" ? "IA" : "NATURELLE");
       setSaillieTaureauId("");
       setSaillieTaureauNom("");
       setIaSelectedId("");
@@ -461,7 +469,7 @@ function ReproductionContent() {
     }
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateValue();
 
   function openSaillieForm(vache?: VacheRepro) {
     setSaillieAnimalId(vache?.id ?? "");
@@ -479,6 +487,7 @@ function ReproductionContent() {
     setChaleurAnimalId(vache?.id ?? "");
     setChaleurAnimalIds([]);
     setChaleurDate(today);
+    setChaleurTime(new Date().toTimeString().slice(0, 5));
     setChaleurNotes("");
     setShowChaleurForm(true);
   }
@@ -642,7 +651,12 @@ function ReproductionContent() {
     try {
       const res = await fetch("/api/chaleurs", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ animalIds, date: chaleurDate, notes: chaleurNotes.trim() || null }),
+        body: JSON.stringify({
+          animalIds,
+          date: chaleurDate,
+          observedAt: new Date(`${chaleurDate}T${chaleurTime}`).toISOString(),
+          notes: chaleurNotes.trim() || null,
+        }),
       });
       const result = await res.json().catch(() => null);
       if (!res.ok) throw new Error();
@@ -1152,10 +1166,23 @@ function ReproductionContent() {
                   <VacheSearch vaches={vaches} selectedId={chaleurAnimalId} onSelect={setChaleurAnimalId} placeholder="Numéro ou nom de la vache…" />
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;observation</label>
-                <DateInput value={chaleurDate} onChange={setChaleurDate} required
-                  className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
+              <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;observation</label>
+                  <DateInput value={chaleurDate} onChange={setChaleurDate} required
+                    className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
+                </div>
+                <div>
+                  <label htmlFor="reproduction-chaleur-time" className="block text-sm font-medium text-gray-700 mb-1">Heure</label>
+                  <input
+                    id="reproduction-chaleur-time"
+                    type="time"
+                    value={chaleurTime}
+                    onChange={(event) => setChaleurTime(event.target.value)}
+                    required
+                    className="w-full border border-gray-200 rounded-xl p-3 text-sm"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes <span className="text-gray-400 font-normal">(optionnel)</span></label>
@@ -1163,7 +1190,7 @@ function ReproductionContent() {
                   placeholder="ex : chaleur forte, montée, mucus…"
                   className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
               </div>
-              <button type="submit" disabled={saving || (chaleurAnimalIds.length === 0 && !chaleurAnimalId)}
+              <button type="submit" disabled={saving || !chaleurDate || !chaleurTime || (chaleurAnimalIds.length === 0 && !chaleurAnimalId)}
                 className="w-full bg-pink-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50">
                 {saving ? "Enregistrement…" : chaleurAnimalIds.length > 1 ? `Enregistrer pour ${chaleurAnimalIds.length} vaches` : "Enregistrer la chaleur"}
               </button>

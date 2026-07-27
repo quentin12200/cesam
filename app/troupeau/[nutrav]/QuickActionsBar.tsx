@@ -19,7 +19,17 @@ interface Props {
 
 type Modal = "chaleur" | "echo" | null;
 
-const today = new Date().toISOString().slice(0, 10);
+function currentObservationFields() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60_000;
+  return {
+    date: new Date(now.getTime() - offset).toISOString().slice(0, 10),
+    time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+  };
+}
+
+const initialObservation = currentObservationFields();
+const today = initialObservation.date;
 const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 const SaillieIcon = ACTION_VISUALS.saillieIA.icon;
 const EvenementIcon = ACTION_VISUALS.evenementSanitaire.icon;
@@ -33,7 +43,8 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
   const [confirmation, setConfirmation] = useState("");
 
   // Chaleur state
-  const [chaleurDate, setChaleurDate] = useState(today);
+  const [chaleurDate, setChaleurDate] = useState(initialObservation.date);
+  const [chaleurTime, setChaleurTime] = useState(initialObservation.time);
   const [chaleurNotes, setChaleurNotes] = useState("");
 
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -58,7 +69,9 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
   }, [confirmation]);
 
   function open(m: Modal) {
-    setChaleurDate(today);
+    const current = currentObservationFields();
+    setChaleurDate(current.date);
+    setChaleurTime(current.time);
     setChaleurNotes("");
     setSubmitError("");
     setModal(m);
@@ -88,7 +101,12 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
       const res = await fetch("/api/chaleurs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ animalId, date: chaleurDate, notes: chaleurNotes.trim() || null }),
+        body: JSON.stringify({
+          animalId,
+          date: chaleurDate,
+          observedAt: new Date(`${chaleurDate}T${chaleurTime}`).toISOString(),
+          notes: chaleurNotes.trim() || null,
+        }),
       });
       const result = await res.json().catch(() => null);
       if (!res.ok) {
@@ -198,16 +216,29 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
                   <button onClick={close} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
                 </div>
                 <form className="space-y-3" onSubmit={submitChaleur}>
-                  <div>
-                    <label htmlFor="chaleur-date" className="block text-xs font-medium text-gray-500 mb-1">Date</label>
-                    <input
-                      id="chaleur-date"
-                      type="date"
-                      value={chaleurDate}
-                      max={today}
-                      onChange={(e) => setChaleurDate(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
-                    />
+                  <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+                    <div>
+                      <label htmlFor="chaleur-date" className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                      <input
+                        id="chaleur-date"
+                        type="date"
+                        value={chaleurDate}
+                        max={today}
+                        onChange={(e) => setChaleurDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="chaleur-time" className="block text-xs font-medium text-gray-500 mb-1">Heure</label>
+                      <input
+                        id="chaleur-time"
+                        type="time"
+                        value={chaleurTime}
+                        onChange={(e) => setChaleurTime(e.target.value)}
+                        required
+                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label htmlFor="chaleur-notes" className="block text-xs font-medium text-gray-500 mb-1">Notes (optionnel)</label>
@@ -222,7 +253,7 @@ export default function QuickActionsBar({ animalId, nutrav, isFemelle, isActif, 
                   </div>
                   <button
                     type="submit"
-                    disabled={!chaleurDate || loading}
+                    disabled={!chaleurDate || !chaleurTime || loading}
                     className="w-full py-2.5 bg-pink-600 text-white rounded-lg font-semibold text-sm disabled:opacity-50 active:scale-98 transition-all"
                   >
                     {loading ? "Enregistrement…" : "Enregistrer la chaleur"}

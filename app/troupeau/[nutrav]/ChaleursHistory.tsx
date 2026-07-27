@@ -19,7 +19,14 @@ interface Props {
 const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 
 function dateForInput(date: string) {
-  return date.slice(0, 10);
+  const value = new Date(date);
+  const offset = value.getTimezoneOffset() * 60_000;
+  return new Date(value.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function timeForInput(date: string) {
+  const value = new Date(date);
+  return `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
 }
 
 function formatDate(date: string) {
@@ -27,7 +34,8 @@ function formatDate(date: string) {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    timeZone: "UTC",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(new Date(date));
 }
 
@@ -36,6 +44,7 @@ export default function ChaleursHistory({ initialChaleurs, testReproEnabled }: P
   const [chaleurs, setChaleurs] = useState(initialChaleurs);
   const [selected, setSelected] = useState<Chaleur | null>(null);
   const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -54,6 +63,7 @@ export default function ChaleursHistory({ initialChaleurs, testReproEnabled }: P
   function open(chaleur: Chaleur) {
     setSelected(chaleur);
     setDate(dateForInput(chaleur.date));
+    setTime(timeForInput(chaleur.date));
     setNotes(chaleur.notes ?? "");
     setError("");
   }
@@ -66,7 +76,7 @@ export default function ChaleursHistory({ initialChaleurs, testReproEnabled }: P
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selected || !date || saving) return;
+    if (!selected || !date || !time || saving) return;
     if (isSimulationActive()) {
       setError("Revenez sur Données réelles pour modifier une chaleur.");
       return;
@@ -77,7 +87,11 @@ export default function ChaleursHistory({ initialChaleurs, testReproEnabled }: P
       const response = await fetch(`/api/chaleurs/${selected.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, notes }),
+        body: JSON.stringify({
+          date,
+          observedAt: new Date(`${date}T${time}`).toISOString(),
+          notes,
+        }),
       });
       const result = await response.json().catch(() => null);
       if (!response.ok) throw new Error(result?.error ?? "Modification impossible");
@@ -167,17 +181,30 @@ export default function ChaleursHistory({ initialChaleurs, testReproEnabled }: P
               </button>
             </div>
             <form className="space-y-3" onSubmit={save}>
-              <div>
-                <label htmlFor="edit-chaleur-date" className="mb-1 block text-xs font-medium text-gray-500">Date</label>
-                <input
-                  id="edit-chaleur-date"
-                  type="date"
-                  value={date}
-                  max={new Date().toISOString().slice(0, 10)}
-                  onChange={(event) => setDate(event.target.value)}
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
-                />
+              <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+                <div>
+                  <label htmlFor="edit-chaleur-date" className="mb-1 block text-xs font-medium text-gray-500">Date</label>
+                  <input
+                    id="edit-chaleur-date"
+                    type="date"
+                    value={date}
+                    max={dateForInput(new Date().toISOString())}
+                    onChange={(event) => setDate(event.target.value)}
+                    required
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-chaleur-time" className="mb-1 block text-xs font-medium text-gray-500">Heure</label>
+                  <input
+                    id="edit-chaleur-time"
+                    type="time"
+                    value={time}
+                    onChange={(event) => setTime(event.target.value)}
+                    required
+                    className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  />
+                </div>
               </div>
               <div>
                 <label htmlFor="edit-chaleur-notes" className="mb-1 block text-xs font-medium text-gray-500">Notes (optionnel)</label>
@@ -195,7 +222,7 @@ export default function ChaleursHistory({ initialChaleurs, testReproEnabled }: P
                   <Trash2 size={16} />
                   Supprimer
                 </button>
-                <button type="submit" disabled={saving || !date} className="min-h-11 flex-1 rounded-lg bg-pink-600 px-4 text-sm font-semibold text-white hover:bg-pink-700 disabled:opacity-50">
+                <button type="submit" disabled={saving || !date || !time} className="min-h-11 flex-1 rounded-lg bg-pink-600 px-4 text-sm font-semibold text-white hover:bg-pink-700 disabled:opacity-50">
                   {saving ? "Enregistrement…" : "Enregistrer"}
                 </button>
               </div>
