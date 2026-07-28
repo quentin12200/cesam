@@ -5,7 +5,7 @@ import {
   VELAGE_IMMINENT_DAYS,
 } from "@/lib/utils";
 
-export const REPRODUCTION_RULES_VERSION = 3;
+export const REPRODUCTION_RULES_VERSION = 4;
 
 export const REPRODUCTION_COLOR_PALETTE = {
   blue: { label: "Bleu", value: REPRODUCTIVE_CYCLE_COLORS.rest },
@@ -53,6 +53,7 @@ export interface ReproductionEventRule {
 export interface ReproductionRulesConfig {
   version: number; phases: ReproductionPhaseRule[];
   echoTiming: { usePreparationPhase: boolean; listFromDays: number; dueFromDays: number };
+  heatReturnMonitoring: { enabled: boolean; startDay: number; endDay: number; showOnHome: boolean };
   alerts: { reproductionDelay: boolean; echoDue: boolean; imminentCalving: boolean; dryOff: boolean };
   actionWindows: ReproductionActionWindow[]; events: ReproductionEventRule[];
   categoryRules: Array<{ id: string; category: AnimalCategory; phaseId: string; start?: number; end?: number | null }>;
@@ -80,6 +81,7 @@ const ordered = (fields: ReproductionEventField[]) => fields.map((item, order) =
 export const CESAM_REPRODUCTION_RULES: ReproductionRulesConfig = {
   version: REPRODUCTION_RULES_VERSION,
   echoTiming: { usePreparationPhase: true, listFromDays: ECHOGRAPHY_WAIT_DAYS, dueFromDays: 40 },
+  heatReturnMonitoring: { enabled: true, startDay: 18, endDay: 24, showOnHome: true },
   phases: [
     { id: "post_calving_rest", fundamental: true, displayedName: "Repos post-vêlage", color: "blue", startRule: { reference: "CALVING", position: "AFTER", offset: 1, unit: "DAYS", condition: "ALWAYS" }, endRule: { type: "AFTER_DURATION", duration: POST_CALVING_REST_DAYS, unit: "DAYS", earlierEvent: "BREEDING" }, mainMessage: "Repos post-vêlage normal", priority: "NORMAL", showOnHome: true, enabledAlert: true, action: "NONE" },
     { id: "breeding_period", fundamental: true, displayedName: "Mise à la reproduction", color: "fuchsia", startRule: { reference: "CALVING", position: "AFTER", offset: POST_CALVING_REST_DAYS + 1, unit: "DAYS", condition: "ALWAYS" }, endRule: { type: "AT_EVENT", event: "BREEDING" }, mainMessage: "Mise à la reproduction recommandée", priority: "NORMAL", showOnHome: true, enabledAlert: true, action: "RECORD_BREEDING" },
@@ -146,6 +148,10 @@ export function parseReproductionRules(raw: string | null | undefined): Reproduc
       : defaults.echoTiming.dueFromDays;
     return {
       ...defaults, ...saved, version: REPRODUCTION_RULES_VERSION, alerts: { ...defaults.alerts, ...(saved.alerts ?? {}) },
+      heatReturnMonitoring: {
+        ...defaults.heatReturnMonitoring,
+        ...(saved.heatReturnMonitoring ?? {}),
+      },
       echoTiming: {
         ...defaults.echoTiming,
         listFromDays: legacyListFromDays,
@@ -189,10 +195,17 @@ export function describeEchoTiming(timing: ReproductionRulesConfig["echoTiming"]
   return `Les femelles apparaissent dans la liste des échos à J${timing.listFromDays} et deviennent À échographier à J${timing.dueFromDays} après saillie ou IA.`;
 }
 
+export function describeHeatReturnMonitoring(rule: ReproductionRulesConfig["heatReturnMonitoring"]) {
+  if (!rule.enabled) return "La surveillance du retour en chaleur est désactivée.";
+  return `Surveiller un éventuel retour en chaleur de J${rule.startDay} à J${rule.endDay} après chaque chaleur observée.`;
+}
+
 export function validateReproductionRules(config: ReproductionRulesConfig) {
   const errors: string[] = []; const warnings: string[] = [];
   if (config.echoTiming.listFromDays < 0 || config.echoTiming.dueFromDays < 0) errors.push("Les délais d’échographie ne peuvent pas être négatifs.");
   if (config.echoTiming.usePreparationPhase && config.echoTiming.listFromDays > config.echoTiming.dueFromDays) errors.push("L’entrée dans la liste des échos doit avoir lieu avant ou le même jour que le statut « À échographier ».");
+  if (!Number.isInteger(config.heatReturnMonitoring.startDay) || !Number.isInteger(config.heatReturnMonitoring.endDay) || config.heatReturnMonitoring.startDay <= 0 || config.heatReturnMonitoring.endDay <= 0) errors.push("Les jours de surveillance du retour en chaleur doivent être des nombres entiers positifs.");
+  if (config.heatReturnMonitoring.startDay > config.heatReturnMonitoring.endDay) errors.push("Le début de la surveillance du retour en chaleur doit précéder ou être égal à sa fin.");
   if (new Set(config.phases.map((item) => item.id)).size !== config.phases.length) errors.push("Deux phases ne peuvent pas avoir le même identifiant.");
   if (new Set(config.actionWindows.map((item) => item.id)).size !== config.actionWindows.length) errors.push("Deux fenêtres d’action ne peuvent pas avoir le même identifiant.");
   if (new Set(config.events.map((item) => item.id)).size !== config.events.length) errors.push("Deux événements ne peuvent pas avoir le même identifiant.");

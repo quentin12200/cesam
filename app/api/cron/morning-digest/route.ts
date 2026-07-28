@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { webpush } from "@/lib/push";
 import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getVaccinsManquants } from "@/lib/utils";
+import { getHeatReturnReminder } from "@/lib/heat-return-monitoring";
+import { parseReproductionRules } from "@/lib/reproduction-rules";
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get("authorization");
@@ -25,8 +27,8 @@ export async function GET(request: NextRequest) {
     const dateMaxVelle = new Date(now); dateMaxVelle.setDate(dateMaxVelle.getDate() - 351);
 
     const [vachesAvecSaillies, animaux, velagesSemaine, veauxABoucler, genissesArapatrier,
-           surveillanceActive, cryptoRotavecCount, bolusCount, chaleurJ19Raw, vellesUrgentes,
-           traitementsEnCoursRaw, ordonnancesAAssocierCount, medicamentsRaw] =
+           surveillanceActive, cryptoRotavecCount, bolusCount, heatReturnCandidates, vellesUrgentes,
+           traitementsEnCoursRaw, ordonnancesAAssocierCount, medicamentsRaw, reproductionConfig] =
       await Promise.all([
         prisma.animal.findMany({
           where: { statut: "ACTIF", sexbov: "F", estGenisse: false, OR: [{ categorie: null }, { categorie: { not: "ENGRAISSEMENT" } }] },
@@ -73,16 +75,26 @@ export async function GET(request: NextRequest) {
             dateVelagePrevue: { gte: addDays(now, 21), lte: addDays(now, 45) },
           },
         }),
-        // Chaleurs J+19 à J+21 (fenêtre 72h : surveiller retour de cycle)
+        // La règle de surveillance est lue dans la configuration de l'exploitation.
         prisma.animal.findMany({
           where: {
             statut: "ACTIF",
             sexbov: "F",
-            chaleurs: { some: { date: { gte: addDays(now, -21), lte: addDays(now, -19) } } },
+            chaleurs: { some: {} },
           },
-          include: {
-            chaleurs: { orderBy: { date: "desc" }, take: 1, select: { date: true } },
-            saillies: { orderBy: { date: "desc" }, take: 1, select: { date: true } },
+          select: {
+            id: true,
+            nutrav: true,
+            nobovi: true,
+            reproductionEtatManuel: true,
+            chaleurs: { orderBy: { date: "desc" }, take: 1, select: { id: true, date: true } },
+            saillies: {
+              select: {
+                date: true,
+                gestation: { select: { etat: true } },
+              },
+            },
+            velagesVache: { orderBy: { date: "desc" }, take: 1, select: { date: true } },
           },
         }),
         // Velles bientôt 1 an (11.5 à 12 mois)
@@ -104,6 +116,10 @@ export async function GET(request: NextRequest) {
           where: { actif: true, stockActuel: { not: null }, stockSeuilAlert: { not: null } },
           select: { stockActuel: true, stockSeuilAlert: true },
         }),
+        prisma.exploitationConfig.findUnique({
+          where: { id: "singleton" },
+          select: { reproductionRulesJson: true },
+        }).catch(() => null),
       ]);
 
     const traitementsEnRetard = traitementsEnCoursRaw.filter(
@@ -127,14 +143,22 @@ export async function GET(request: NextRequest) {
       if (etat === "ROUGE") videsEnRetard++;
     }
 
-    // Chaleurs J+19 : garder seulement celles sans saillie postérieure
-    const chaleurJ19 = chaleurJ19Raw.filter((a) => {
-      const derniereChaleur = a.chaleurs[0]?.date ?? null;
-      if (!derniereChaleur) return false;
-      const derniereSaillie = a.saillies[0]?.date ?? null;
-      if (derniereSaillie && derniereSaillie >= derniereChaleur) return false;
-      return true;
-    });
+    const heatReturnRule = parseReproductionRules(reproductionConfig?.reproductionRulesJson).heatReturnMonitoring;
+    const heatReturnNotifications = heatReturnCandidates
+      .map((animal) => ({
+        animal,
+        reminder: getHeatReturnReminder(
+          animal.chaleurs,
+          animal.saillies,
+          animal.velagesVache[0]?.date ?? null,
+          heatReturnRule,
+          now,
+          animal.reproductionEtatManuel === "VERT" || animal.reproductionEtatManuel === "ROSE"
+        ),
+      }))
+      .filter((item): item is typeof item & { reminder: NonNullable<typeof item.reminder> } =>
+        item.reminder?.day === heatReturnRule.startDay
+      );
 
     let veauxAVacciner = 0;
     for (const a of animaux) {
@@ -167,8 +191,6 @@ export async function GET(request: NextRequest) {
       items.push(`${cryptoRotavecCount} Crypto/Rotavec pré-vélage`);
     if (bolusCount > 0)
       items.push(`${bolusCount} bolus pré-vélage`);
-    if (chaleurJ19.length > 0)
-      items.push(`${chaleurJ19.length} vache${chaleurJ19.length > 1 ? "s" : ""} à surveiller retour chaleur (J+19)`);
     if (traitementsEnRetard > 0)
       items.push(`${traitementsEnRetard} traitement${traitementsEnRetard > 1 ? "s" : ""} en retard à clôturer`);
     if (ordonnancesAAssocierCount > 0)
@@ -189,32 +211,45 @@ export async function GET(request: NextRequest) {
       ? `🚨 URGENT — ${vellesUrgentes.length} velle${vellesUrgentes.length > 1 ? "s" : ""} à vendre`
       : "Bonjour 🌅 — GAEC CESAM";
 
-    const payload = JSON.stringify({
+    const digestPayload = JSON.stringify({
       title,
       body,
       url: vellesUrgentes.length > 0 ? "/troupeau" : "/",
     });
+    const heatReturnPayloads = heatReturnNotifications.map(({ animal }) => JSON.stringify({
+      title: "Retour en chaleur à surveiller",
+      body: `Vérifier ${animal.nutrav}${animal.nobovi ? ` — ${animal.nobovi}` : ""}.`,
+      url: `/troupeau/${encodeURIComponent(animal.nutrav)}`,
+    }));
+    const payloads = [...heatReturnPayloads, digestPayload];
 
     let sent = 0;
     const toDelete: string[] = [];
 
     await Promise.all(
       subscriptions.map(async (sub) => {
-        try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            payload
-          );
-          sent++;
+        let sentToSubscription = false;
+        for (const payload of payloads) {
+          try {
+            await webpush.sendNotification(
+              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+              payload
+            );
+            sent++;
+            sentToSubscription = true;
+          } catch (err: unknown) {
+            const status = (err as { statusCode?: number }).statusCode;
+            if (status === 410 || status === 404) {
+              toDelete.push(sub.id);
+              break;
+            }
+          }
+        }
+        if (sentToSubscription) {
           await prisma.pushSubscription.update({
             where: { id: sub.id },
             data: { lastNotifAt: now, updatedAt: now },
           });
-        } catch (err: unknown) {
-          const status = (err as { statusCode?: number }).statusCode;
-          if (status === 410 || status === 404) {
-            toDelete.push(sub.id);
-          }
         }
       })
     );
@@ -223,7 +258,7 @@ export async function GET(request: NextRequest) {
       await prisma.pushSubscription.deleteMany({ where: { id: { in: toDelete } } });
     }
 
-    return NextResponse.json({ sent, items: items.length });
+    return NextResponse.json({ sent, items: items.length, heatReturnNotifications: heatReturnNotifications.length });
   } catch (err) {
     console.error("GET /api/cron/morning-digest error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

@@ -8,6 +8,7 @@ import {
   REPRODUCTION_COLOR_PALETTE,
   describeActionWindow,
   describeEchoTiming,
+  describeHeatReturnMonitoring,
   describePhaseRule,
   validateReproductionRules,
   type AnimalCategory,
@@ -99,7 +100,7 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
   const [message, setMessage] = useState("");
   const validation = useMemo(() => validateReproductionRules(config), [config]);
 
-  function restoreSection(section: "phases" | "echoTiming" | "alerts" | "actionWindows" | "events") {
+  function restoreSection(section: "phases" | "echoTiming" | "heatReturnMonitoring" | "alerts" | "actionWindows" | "events") {
     if (!window.confirm("Restaurer les valeurs CESAM de ce bloc ? Les personnalisations de ce bloc seront remplacées après enregistrement.")) return;
     const defaults = copyDefaults();
     setConfig((current) => ({ ...current, [section]: defaults[section] }));
@@ -219,6 +220,60 @@ export default function ReproductionRulesForm({ initial }: { initial: Reproducti
               </div>
             </details>
           ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <SectionHeader
+          title="Surveillance du retour en chaleur"
+          summary={describeHeatReturnMonitoring(config.heatReturnMonitoring)}
+          onRestore={() => restoreSection("heatReturnMonitoring")}
+        />
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Toggle
+            label="Activer le rappel"
+            checked={config.heatReturnMonitoring.enabled}
+            onChange={(enabled) => setConfig((current) => ({
+              ...current,
+              heatReturnMonitoring: { ...current.heatReturnMonitoring, enabled },
+            }))}
+          />
+          <Toggle
+            label="Afficher dans les actualités et priorités"
+            checked={config.heatReturnMonitoring.showOnHome}
+            onChange={(showOnHome) => setConfig((current) => ({
+              ...current,
+              heatReturnMonitoring: { ...current.heatReturnMonitoring, showOnHome },
+            }))}
+          />
+          <label className="text-xs font-semibold text-slate-500">
+            Jour de début
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={config.heatReturnMonitoring.startDay}
+              onChange={(event) => setConfig((current) => ({
+                ...current,
+                heatReturnMonitoring: { ...current.heatReturnMonitoring, startDay: Number(event.target.value) },
+              }))}
+              className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"
+            />
+          </label>
+          <label className="text-xs font-semibold text-slate-500">
+            Jour de fin inclus
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={config.heatReturnMonitoring.endDay}
+              onChange={(event) => setConfig((current) => ({
+                ...current,
+                heatReturnMonitoring: { ...current.heatReturnMonitoring, endDay: Number(event.target.value) },
+              }))}
+              className="mt-1 min-h-11 w-full rounded-lg border px-3 text-sm"
+            />
+          </label>
         </div>
       </section>
 

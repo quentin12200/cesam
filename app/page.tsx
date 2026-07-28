@@ -20,7 +20,10 @@ import RapportGestationButton from "@/app/components/RapportGestationButton";
 import PrintSectionButton from "@/app/components/PrintSectionButton";
 import AutoPrint from "@/app/components/AutoPrint";
 import ActiveHeatAction from "@/app/components/ActiveHeatAction";
-import { activeHeatSince, getActiveHeat } from "@/lib/active-heat-action";
+import { getActiveHeat } from "@/lib/active-heat-action";
+import HeatReturnReminder from "@/app/components/HeatReturnReminder";
+import { getHeatReturnReminder } from "@/lib/heat-return-monitoring";
+import { parseReproductionRules } from "@/lib/reproduction-rules";
 import {
   Baby,
   Wifi,
@@ -64,6 +67,7 @@ async function getDashboardData() {
     nbGenissesGrandes,
     nbMales,
     activeHeatCandidates,
+    reproductionConfig,
   ] = await Promise.all([
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: false } }),
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
@@ -191,31 +195,39 @@ async function getDashboardData() {
       where: {
         statut: "ACTIF",
         sexbov: "F",
-        chaleurs: { some: { date: { gte: activeHeatSince(now), lte: now } } },
+        chaleurs: { some: {} },
       },
       select: {
         id: true,
         nutrav: true,
         nobovi: true,
+        reproductionEtatManuel: true,
         chaleurs: {
-          where: { date: { gte: activeHeatSince(now), lte: now } },
+          orderBy: { date: "desc" },
+          take: 1,
+          select: { id: true, date: true },
+        },
+        saillies: {
+          select: {
+            date: true,
+            createdAt: true,
+            gestation: { select: { etat: true } },
+          },
+        },
+        velagesVache: {
           orderBy: { date: "desc" },
           take: 1,
           select: { date: true },
         },
-        saillies: {
-          where: {
-            OR: [
-              { date: { gte: activeHeatSince(now) } },
-              { createdAt: { gte: activeHeatSince(now) } },
-            ],
-          },
-          select: { date: true, createdAt: true },
-        },
       },
     }),
+    prisma.exploitationConfig.findUnique({
+      where: { id: "singleton" },
+      select: { reproductionRulesJson: true },
+    }).catch(() => null),
   ]);
 
+  const reproductionRules = parseReproductionRules(reproductionConfig?.reproductionRulesJson);
   const activeHeats = activeHeatCandidates
     .map((animal) => ({
       animal,
@@ -223,6 +235,22 @@ async function getDashboardData() {
     }))
     .filter((item): item is typeof item & { heat: { date: Date } } => item.heat !== null)
     .sort((a, b) => b.heat.date.getTime() - a.heat.date.getTime());
+  const heatReturnReminders = reproductionRules.heatReturnMonitoring.showOnHome
+    ? activeHeatCandidates
+      .map((animal) => ({
+        animal,
+        reminder: getHeatReturnReminder(
+          animal.chaleurs,
+          animal.saillies,
+          animal.velagesVache[0]?.date ?? null,
+          reproductionRules.heatReturnMonitoring,
+          now,
+          animal.reproductionEtatManuel === "VERT" || animal.reproductionEtatManuel === "ROSE"
+        ),
+      }))
+      .filter((item): item is typeof item & { reminder: NonNullable<typeof item.reminder> } => item.reminder !== null)
+      .sort((left, right) => right.reminder.heat.date.getTime() - left.reminder.heat.date.getTime())
+    : [];
 
   let vachesPleine = 0;
   let aEchographier = 0;
@@ -359,6 +387,7 @@ async function getDashboardData() {
     mortsAnneeSansProbleme,
     tauxMortaliteAnnee,
     activeHeats,
+    heatReturnReminders,
   };
 }
 
@@ -397,6 +426,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
     data.aEchographier > 0 ||
     data.velagesSemaine > 0 ||
     data.activeHeats.length > 0 ||
+    data.heatReturnReminders.length > 0 ||
     data.genissesArapatrier.length > 0 ||
     vachesACapteurSansCapteur.length > 0;
 
@@ -819,7 +849,8 @@ export default async function Dashboard({ searchParams }: PageProps) {
     data.vachesVidesEnRetard +
     data.aEchographier +
     data.genissesArapatrier.length +
-    data.activeHeats.length;
+    data.activeHeats.length +
+    data.heatReturnReminders.length;
   if (reproductionTotal > 0) {
     const reproductionSummary = data.vachesVidesEnRetard > 0
       ? `${data.vachesVidesEnRetard} vache${data.vachesVidesEnRetard > 1 ? "s" : ""} vide${data.vachesVidesEnRetard > 1 ? "s" : ""} en retard`
@@ -827,7 +858,9 @@ export default async function Dashboard({ searchParams }: PageProps) {
         ? `${data.aEchographier} échographie${data.aEchographier > 1 ? "s" : ""} à programmer`
         : data.genissesArapatrier.length > 0
           ? `${data.genissesArapatrier.length} génisse${data.genissesArapatrier.length > 1 ? "s" : ""} à rapatrier`
-          : `${data.activeHeats.length} chaleur${data.activeHeats.length > 1 ? "s" : ""} observée${data.activeHeats.length > 1 ? "s" : ""} — saillie ou IA ?`;
+          : data.activeHeats.length > 0
+            ? `${data.activeHeats.length} chaleur${data.activeHeats.length > 1 ? "s" : ""} observée${data.activeHeats.length > 1 ? "s" : ""} — saillie ou IA ?`
+            : `${data.heatReturnReminders.length} retour${data.heatReturnReminders.length > 1 ? "s" : ""} en chaleur à surveiller`;
     todoGroups.push({
       id: "reproduction",
       title: "Reproduction",
@@ -912,7 +945,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
         <NotesTerrain initialNotes={notesTerrain.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() }))} />
       )}
 
-      {data.activeHeats.length > 0 && (
+      {(data.activeHeats.length > 0 || data.heatReturnReminders.length > 0) && (
         <section
           data-layout-section="accueil-actualites-chaleurs"
           data-layout-label="Actualités chaleurs"
@@ -926,6 +959,18 @@ export default async function Dashboard({ searchParams }: PageProps) {
                 animalId={animal.id}
                 animalLabel={`${animal.nutrav}${animal.nobovi ? ` — ${animal.nobovi}` : ""}`}
                 observedAt={heat.date.toISOString()}
+                variant="home"
+              />
+            ))}
+            {data.heatReturnReminders.map(({ animal, reminder }) => (
+              <HeatReturnReminder
+                key={`heat-return-${animal.id}`}
+                animalId={animal.id}
+                animalNumber={animal.nutrav}
+                animalName={animal.nobovi}
+                heatDate={reminder.heat.date.toISOString()}
+                day={reminder.day}
+                hasBreedingAfterHeat={reminder.hasBreedingAfterHeat}
                 variant="home"
               />
             ))}

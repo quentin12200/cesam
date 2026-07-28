@@ -60,6 +60,8 @@ import {
 } from "@/lib/reproduction-rules";
 import { getActiveHeat } from "@/lib/active-heat-action";
 import ActiveHeatAction from "@/app/components/ActiveHeatAction";
+import HeatReturnReminder from "@/app/components/HeatReturnReminder";
+import { getHeatReturnReminder } from "@/lib/heat-return-monitoring";
 import ChaleursHistory from "./ChaleursHistory";
 
 interface PageProps {
@@ -86,6 +88,7 @@ async function getExploitationDisplayConfig(): Promise<{
   reproReposObjectifJours: number;
   tarissementVeauAgeMois: number;
   reproductionPreviewRules: ReproductionPreviewRules;
+  heatReturnMonitoring: ReturnType<typeof parseReproductionRules>["heatReturnMonitoring"];
 }> {
   const toDays = (value: number, unit: ReproductionUnit) =>
     unit === "WEEKS" ? value * 7 : unit === "MONTHS" ? value * 30 : value;
@@ -112,6 +115,7 @@ async function getExploitationDisplayConfig(): Promise<{
       reproReposObjectifJours: config?.reproReposObjectifJours ?? 60,
       tarissementVeauAgeMois: config?.tarissementVeauAgeMois ?? 6,
       reproductionPreviewRules: previewRules(config?.reproductionRulesJson),
+      heatReturnMonitoring: parseReproductionRules(config?.reproductionRulesJson).heatReturnMonitoring,
     };
   } catch {
     return {
@@ -119,6 +123,7 @@ async function getExploitationDisplayConfig(): Promise<{
       reproReposObjectifJours: 60,
       tarissementVeauAgeMois: 6,
       reproductionPreviewRules: previewRules(null),
+      heatReturnMonitoring: parseReproductionRules(null).heatReturnMonitoring,
     };
   }
 }
@@ -254,6 +259,16 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const activeHeat = animal.statut === "ACTIF"
     ? getActiveHeat(animal.chaleurs, animal.saillies)
     : null;
+  const heatReturnReminder = animal.statut === "ACTIF" && !testReproEnabled
+    ? getHeatReturnReminder(
+        animal.chaleurs,
+        animal.saillies,
+        lastCalving,
+        configAffichage.heatReturnMonitoring,
+        new Date(),
+        etat === "VERT" || etat === "ROSE"
+      )
+    : null;
   const tabs = [
     { id: "identite", label: "Identité" },
     { id: "sante", label: "Santé" },
@@ -360,6 +375,17 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               observedAt={activeHeat.date.toISOString()}
               variant="animal"
               simulationAware={testReproEnabled}
+            />
+          )}
+          {heatReturnReminder && (
+            <HeatReturnReminder
+              animalId={animal.id}
+              animalNumber={animal.nutrav}
+              animalName={animal.nobovi}
+              heatDate={heatReturnReminder.heat.date.toISOString()}
+              day={heatReturnReminder.day}
+              hasBreedingAfterHeat={heatReturnReminder.hasBreedingAfterHeat}
+              variant="animal"
             />
           )}
         </>
