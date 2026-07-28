@@ -22,10 +22,11 @@ test("la page présente les six rubriques dans l’ordre demandé", () => {
   }
 });
 
-test("les cinq destinations disponibles sont liées", () => {
+test("les six destinations disponibles sont liées", () => {
   for (const href of [
     "/config/profil",
     "/config/exploitation",
+    "/config/troupeau",
     "/config/reproduction",
     "/config/protocoles",
     "/config/notifications",
@@ -33,9 +34,8 @@ test("les cinq destinations disponibles sont liées", () => {
     assert.match(source, new RegExp(`href: "${href.replaceAll("/", "\\/")}"`));
   }
 
-  assert.equal((source.match(/href: "\/config\//g) ?? []).length, 5);
-  assert.equal((source.match(/pending: true/g) ?? []).length, 1);
-  assert.match(source, /Encore disponible dans le menu actuel/);
+  assert.equal((source.match(/href: "\/config\//g) ?? []).length, 6);
+  assert.doesNotMatch(source, /pending: true|Encore disponible dans le menu actuel/);
 });
 
 test("le bouton retour, la grille mobile et la légende des portées sont présents", () => {

@@ -27,7 +27,7 @@ const sections = [
     title: "Troupeau et identification",
     description: "Lots de boucles et numérotation des animaux.",
     icon: Tags,
-    pending: true,
+    href: "/config/troupeau",
   },
   {
     title: "Reproduction",
@@ -68,15 +68,8 @@ function SectionContent({
         <span className="mt-0.5 block text-xs leading-5 text-slate-500">
           {section.description}
         </span>
-        {"pending" in section && section.pending && (
-          <span className="mt-1 block text-[11px] font-semibold text-slate-400">
-            Encore disponible dans le menu actuel
-          </span>
-        )}
       </span>
-      {"href" in section && section.href && (
-        <ChevronRight size={18} className="shrink-0 text-slate-400" aria-hidden="true" />
-      )}
+      <ChevronRight size={18} className="shrink-0 text-slate-400" aria-hidden="true" />
     </>
   );
 }
@@ -100,22 +93,14 @@ export default function ConfigPage() {
           const className =
             "flex min-h-24 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left shadow-sm";
 
-          if ("href" in section && section.href) {
-            return (
-              <Link
-                key={section.title}
-                href={section.href}
-                className={`${className} transition hover:border-green-300 hover:bg-green-50/40 active:scale-[0.99]`}
-              >
-                <SectionContent section={section} />
-              </Link>
-            );
-          }
-
           return (
-            <article key={section.title} className={className}>
+            <Link
+              key={section.title}
+              href={section.href}
+              className={`${className} transition hover:border-green-300 hover:bg-green-50/40 active:scale-[0.99]`}
+            >
               <SectionContent section={section} />
-            </article>
+            </Link>
           );
         })}
       </div>
