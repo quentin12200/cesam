@@ -15,7 +15,7 @@ const sections = [
     title: "Profil et personnalisation",
     description: "Profil actif, disposition des écrans et actions rapides.",
     icon: UserRound,
-    pending: true,
+    href: "/config/profil",
   },
   {
     title: "Exploitation",

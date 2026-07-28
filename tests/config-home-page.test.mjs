@@ -22,8 +22,9 @@ test("la page présente les six rubriques dans l’ordre demandé", () => {
   }
 });
 
-test("seules les quatre destinations disponibles sont liées", () => {
+test("les cinq destinations disponibles sont liées", () => {
   for (const href of [
+    "/config/profil",
     "/config/exploitation",
     "/config/reproduction",
     "/config/protocoles",
@@ -32,8 +33,8 @@ test("seules les quatre destinations disponibles sont liées", () => {
     assert.match(source, new RegExp(`href: "${href.replaceAll("/", "\\/")}"`));
   }
 
-  assert.equal((source.match(/href: "\/config\//g) ?? []).length, 4);
-  assert.equal((source.match(/pending: true/g) ?? []).length, 2);
+  assert.equal((source.match(/href: "\/config\//g) ?? []).length, 5);
+  assert.equal((source.match(/pending: true/g) ?? []).length, 1);
   assert.match(source, /Encore disponible dans le menu actuel/);
 });
 
