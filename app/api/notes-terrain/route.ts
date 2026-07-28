@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { webpush } from "@/lib/push";
 import { logAction } from "@/lib/action-log";
+import { parseNotificationPreferences } from "@/lib/notification-preferences";
 
 export async function GET(request: NextRequest) {
   // ?historique=1 renvoie tout l'historique (notes traitées incluses).
@@ -26,7 +27,9 @@ export async function POST(request: NextRequest) {
 
   // Push notification instantanée à tous les abonnés
   try {
-    const subscriptions = await prisma.pushSubscription.findMany();
+    const subscriptions = (await prisma.pushSubscription.findMany()).filter(
+      (subscription) => parseNotificationPreferences(subscription.preferencesJson).fieldNotes
+    );
     if (subscriptions.length > 0) {
       const body = texte.length > 100 ? texte.slice(0, 97) + "…" : texte;
       const payload = JSON.stringify({

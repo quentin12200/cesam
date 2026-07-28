@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isValidSubscriptionCredentials } from "@/lib/notification-preferences";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,9 +22,16 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { endpoint } = await request.json();
-    if (!endpoint) return NextResponse.json({ error: "endpoint requis" }, { status: 400 });
-    await prisma.pushSubscription.deleteMany({ where: { endpoint } });
+    const body = await request.json();
+    if (!isValidSubscriptionCredentials(body)) {
+      return NextResponse.json({ error: "Identification de l’appareil incomplète" }, { status: 400 });
+    }
+    const result = await prisma.pushSubscription.deleteMany({
+      where: { endpoint: body.endpoint, auth: body.auth },
+    });
+    if (result.count === 0) {
+      return NextResponse.json({ error: "Abonnement introuvable pour cet appareil" }, { status: 404 });
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/push/subscribe error:", err);

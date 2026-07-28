@@ -12,6 +12,11 @@ import {
   heatReturnNotificationTag,
   morningDigestNotificationTag,
 } from "@/lib/web-push-payload";
+import {
+  parseNotificationPreferences,
+  selectDailyNotificationItems,
+  type DailyNotificationGroups,
+} from "@/lib/notification-preferences";
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get("authorization");
@@ -177,64 +182,84 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const items: string[] = [];
+    const groups: DailyNotificationGroups = {
+      general: [],
+      imminentCalving: [],
+      reproductionDelay: [],
+      echoDue: [],
+      healthTreatments: [],
+      prescriptionsStocks: [],
+    };
     if (videsEnRetard > 0)
-      items.push(`${videsEnRetard} vache${videsEnRetard > 1 ? "s" : ""} vide${videsEnRetard > 1 ? "s" : ""} en retard`);
+      groups.reproductionDelay.push(`${videsEnRetard} vache${videsEnRetard > 1 ? "s" : ""} vide${videsEnRetard > 1 ? "s" : ""} en retard`);
     if (aEchographier > 0)
-      items.push(`${aEchographier} à échographier`);
+      groups.echoDue.push(`${aEchographier} à échographier`);
     if (surveillanceActive > 0)
-      items.push(`${surveillanceActive} en surveillance vélage`);
+      groups.imminentCalving.push(`${surveillanceActive} en surveillance vélage`);
     if (velagesSemaine > 0)
-      items.push(`${velagesSemaine} vélage${velagesSemaine > 1 ? "s" : ""} cette semaine`);
+      groups.imminentCalving.push(`${velagesSemaine} vélage${velagesSemaine > 1 ? "s" : ""} cette semaine`);
     if (veauxABoucler > 0)
-      items.push(`${veauxABoucler} veau${veauxABoucler > 1 ? "x" : ""} à boucler`);
+      groups.general.push(`${veauxABoucler} veau${veauxABoucler > 1 ? "x" : ""} à boucler`);
     if (veauxAVacciner > 0)
-      items.push(`${veauxAVacciner} vaccin${veauxAVacciner > 1 ? "s" : ""} en retard`);
+      groups.healthTreatments.push(`${veauxAVacciner} vaccin${veauxAVacciner > 1 ? "s" : ""} en retard`);
     if (genissesArapatrier > 0)
-      items.push(`${genissesArapatrier} génisse${genissesArapatrier > 1 ? "s" : ""} à rapatrier`);
+      groups.general.push(`${genissesArapatrier} génisse${genissesArapatrier > 1 ? "s" : ""} à rapatrier`);
     if (cryptoRotavecCount > 0)
-      items.push(`${cryptoRotavecCount} Crypto/Rotavec pré-vélage`);
+      groups.healthTreatments.push(`${cryptoRotavecCount} Crypto/Rotavec pré-vélage`);
     if (bolusCount > 0)
-      items.push(`${bolusCount} bolus pré-vélage`);
+      groups.healthTreatments.push(`${bolusCount} bolus pré-vélage`);
     if (traitementsEnRetard > 0)
-      items.push(`${traitementsEnRetard} traitement${traitementsEnRetard > 1 ? "s" : ""} en retard à clôturer`);
+      groups.healthTreatments.push(`${traitementsEnRetard} traitement${traitementsEnRetard > 1 ? "s" : ""} en retard à clôturer`);
     if (ordonnancesAAssocierCount > 0)
-      items.push(`${ordonnancesAAssocierCount} ordonnance${ordonnancesAAssocierCount > 1 ? "s" : ""} à associer`);
+      groups.prescriptionsStocks.push(`${ordonnancesAAssocierCount} ordonnance${ordonnancesAAssocierCount > 1 ? "s" : ""} à associer`);
     if (medicamentsStockBasCount > 0)
-      items.push(`${medicamentsStockBasCount} médicament${medicamentsStockBasCount > 1 ? "s" : ""} en stock bas`);
+      groups.prescriptionsStocks.push(`${medicamentsStockBasCount} médicament${medicamentsStockBasCount > 1 ? "s" : ""} en stock bas`);
     if (vellesUrgentes.length > 0) {
       const noms = vellesUrgentes.map((v) => v.nobovi ?? v.nutrav).join(", ");
-      items.unshift(`🚨 ${vellesUrgentes.length} velle${vellesUrgentes.length > 1 ? "s" : ""} à vendre rapidement (bientôt 1 an) : ${noms}`);
+      groups.general.unshift(`🚨 ${vellesUrgentes.length} velle${vellesUrgentes.length > 1 ? "s" : ""} à vendre rapidement (bientôt 1 an) : ${noms}`);
     }
 
-    const body =
-      items.length === 0
-        ? "Rien de particulier aujourd'hui — bonne journée ! 🌿"
-        : `Aujourd'hui : ${items.join(", ")}.`;
-
-    const title = vellesUrgentes.length > 0
-      ? `🚨 URGENT — ${vellesUrgentes.length} velle${vellesUrgentes.length > 1 ? "s" : ""} à vendre`
-      : "Bonjour 🌅 — GAEC CESAM";
-
-    const digestPayload = createWebPushPayload({
-      title,
-      body,
-      url: vellesUrgentes.length > 0 ? "/troupeau" : "/",
-      tag: morningDigestNotificationTag(now),
-    });
-    const heatReturnPayloads = heatReturnNotifications.map(({ animal, reminder }) => createWebPushPayload({
-      title: "Retour en chaleur à surveiller",
-      body: `Vérifier ${animal.nutrav}${animal.nobovi ? ` — ${animal.nobovi}` : ""}.`,
-      url: `/troupeau/${encodeURIComponent(animal.nutrav)}`,
-      tag: heatReturnNotificationTag(animal.id, reminder.heat.id),
-    }));
-    const payloads = [...heatReturnPayloads, digestPayload];
+    const defaultItems = selectDailyNotificationItems(
+      groups,
+      parseNotificationPreferences(null)
+    );
 
     let sent = 0;
     const toDelete: string[] = [];
 
     await Promise.all(
       subscriptions.map(async (sub) => {
+        const preferences = parseNotificationPreferences(sub.preferencesJson);
+        const items = selectDailyNotificationItems(groups, preferences);
+        const payloads: string[] = [];
+        if (preferences.heatReturn) {
+          payloads.push(...heatReturnNotifications.map(({ animal, reminder }) => createWebPushPayload({
+            title: "Retour en chaleur à surveiller",
+            body: `Vérifier ${animal.nutrav}${animal.nobovi ? ` — ${animal.nobovi}` : ""}.`,
+            url: `/troupeau/${encodeURIComponent(animal.nutrav)}`,
+            tag: heatReturnNotificationTag(animal.id, reminder.heat.id),
+          })));
+        }
+        if (preferences.morningDigest || items.length > 0) {
+          const isMorningDigest = preferences.morningDigest;
+          const title = isMorningDigest && vellesUrgentes.length > 0
+            ? `🚨 URGENT — ${vellesUrgentes.length} velle${vellesUrgentes.length > 1 ? "s" : ""} à vendre`
+            : isMorningDigest
+              ? "Bonjour 🌅 — GAEC CESAM"
+              : "Alertes CESAM";
+          const body = items.length === 0
+            ? "Rien de particulier aujourd'hui — bonne journée ! 🌿"
+            : `${isMorningDigest ? "Aujourd'hui" : "À surveiller"} : ${items.join(", ")}.`;
+          payloads.push(createWebPushPayload({
+            title,
+            body,
+            url: isMorningDigest && vellesUrgentes.length > 0 ? "/troupeau" : "/",
+            tag: isMorningDigest
+              ? morningDigestNotificationTag(now)
+              : `cesam-daily-alerts-${now.toISOString().slice(0, 10)}`,
+          }));
+        }
+
         let sentToSubscription = false;
         for (const payload of payloads) {
           try {
@@ -265,7 +290,7 @@ export async function GET(request: NextRequest) {
       await prisma.pushSubscription.deleteMany({ where: { id: { in: toDelete } } });
     }
 
-    return NextResponse.json({ sent, items: items.length, heatReturnNotifications: heatReturnNotifications.length });
+    return NextResponse.json({ sent, items: defaultItems.length, heatReturnNotifications: heatReturnNotifications.length });
   } catch (err) {
     console.error("GET /api/cron/morning-digest error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

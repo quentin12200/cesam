@@ -5,6 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { webpush } from "@/lib/push";
 import { differenceInDays, addDays, subHours } from "date-fns";
 import { getEtatGestation, getVaccinsManquants } from "@/lib/utils";
+import {
+  parseNotificationPreferences,
+  selectDailyNotificationItems,
+  type DailyNotificationGroups,
+} from "@/lib/notification-preferences";
 
 export async function POST() {
   try {
@@ -21,8 +26,6 @@ export async function POST() {
     }
 
     // Calculate alerts
-    const alerts: string[] = [];
-
     const [vachesAvecSaillies, animaux, velagesSemaine, veauxABoucler, genissesArapatrier,
            surveillanceActive, cryptoRotavecCount, bolusCount] =
       await Promise.all([
@@ -102,40 +105,54 @@ export async function POST() {
       }
     }
 
+    const groups: DailyNotificationGroups = {
+      general: [],
+      imminentCalving: [],
+      reproductionDelay: [],
+      echoDue: [],
+      healthTreatments: [],
+      prescriptionsStocks: [],
+    };
     if (videsEnRetard > 0)
-      alerts.push(`🔴 ${videsEnRetard} vache${videsEnRetard > 1 ? "s" : ""} vide${videsEnRetard > 1 ? "s" : ""} en retard`);
+      groups.reproductionDelay.push(`🔴 ${videsEnRetard} vache${videsEnRetard > 1 ? "s" : ""} vide${videsEnRetard > 1 ? "s" : ""} en retard`);
     if (aEchographier > 0)
-      alerts.push(`🟡 ${aEchographier} à échographier`);
+      groups.echoDue.push(`🟡 ${aEchographier} à échographier`);
     if (surveillanceActive > 0)
-      alerts.push(`🔔 ${surveillanceActive} vache${surveillanceActive > 1 ? "s" : ""} en surveillance active (vélage <21j)`);
+      groups.imminentCalving.push(`🔔 ${surveillanceActive} vache${surveillanceActive > 1 ? "s" : ""} en surveillance active (vélage <21j)`);
     if (velagesSemaine > 0)
-      alerts.push(`🍼 ${velagesSemaine} vélage${velagesSemaine > 1 ? "s" : ""} cette semaine`);
+      groups.imminentCalving.push(`🍼 ${velagesSemaine} vélage${velagesSemaine > 1 ? "s" : ""} cette semaine`);
     if (veauxABoucler > 0)
-      alerts.push(`🏷️ ${veauxABoucler} veau${veauxABoucler > 1 ? "x" : ""} à boucler`);
+      groups.general.push(`🏷️ ${veauxABoucler} veau${veauxABoucler > 1 ? "x" : ""} à boucler`);
     if (veauxAVacciner > 0)
-      alerts.push(`💉 ${veauxAVacciner} vaccin${veauxAVacciner > 1 ? "s" : ""} en retard`);
+      groups.healthTreatments.push(`💉 ${veauxAVacciner} vaccin${veauxAVacciner > 1 ? "s" : ""} en retard`);
     if (genissesArapatrier > 0)
-      alerts.push(`⚠️ ${genissesArapatrier} génisse${genissesArapatrier > 1 ? "s" : ""} à rapatrier`);
+      groups.general.push(`⚠️ ${genissesArapatrier} génisse${genissesArapatrier > 1 ? "s" : ""} à rapatrier`);
     if (cryptoRotavecCount > 0)
-      alerts.push(`💊 ${cryptoRotavecCount} Crypto/Rotavec pré-vélage`);
+      groups.healthTreatments.push(`💊 ${cryptoRotavecCount} Crypto/Rotavec pré-vélage`);
     if (bolusCount > 0)
-      alerts.push(`🔵 ${bolusCount} bolus pré-vélage`);
+      groups.healthTreatments.push(`🔵 ${bolusCount} bolus pré-vélage`);
 
-    if (alerts.length === 0) {
+    const defaultAlerts = selectDailyNotificationItems(
+      groups,
+      parseNotificationPreferences(null)
+    );
+    if (defaultAlerts.length === 0) {
       return NextResponse.json({ sent: 0, reason: "no_alerts" });
     }
-
-    const payload = JSON.stringify({
-      title: "GAEC CESAM 🐄",
-      body: alerts.join(" • "),
-      url: "/",
-    });
 
     let sent = 0;
     const toDelete: string[] = [];
 
     await Promise.all(
       subscriptions.map(async (sub) => {
+        const preferences = parseNotificationPreferences(sub.preferencesJson);
+        const alerts = selectDailyNotificationItems(groups, preferences);
+        if (alerts.length === 0) return;
+        const payload = JSON.stringify({
+          title: preferences.morningDigest ? "GAEC CESAM 🐄" : "Alertes CESAM",
+          body: alerts.join(" • "),
+          url: "/",
+        });
         try {
           await webpush.sendNotification(
             { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
@@ -159,7 +176,7 @@ export async function POST() {
       await prisma.pushSubscription.deleteMany({ where: { id: { in: toDelete } } });
     }
 
-    return NextResponse.json({ sent, alerts: alerts.length });
+    return NextResponse.json({ sent, alerts: defaultAlerts.length });
   } catch (err) {
     console.error("POST /api/push/send error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

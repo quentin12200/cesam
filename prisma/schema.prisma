@@ -481,12 +481,13 @@ model FcmToken {
 }
 
 model PushSubscription {
-  id          String    @id @default(cuid())
-  endpoint    String    @unique
-  p256dh      String
-  auth        String
-  device      String?
-  lastNotifAt DateTime?
+  id              String    @id @default(cuid())
+  endpoint        String    @unique
+  p256dh          String
+  auth            String
+  device          String?
+  lastNotifAt     DateTime?
+  preferencesJson String    @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

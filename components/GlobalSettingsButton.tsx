@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Settings, X, UserRound, Mic, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useUserPreferences, type CesamProfile } from "@/components/UserPreferencesProvider";
-import NotificationBell from "@/app/components/NotificationBell";
 import IdentificationSettings from "@/components/IdentificationSettings";
 import PreconisationReferentielsSettings from "@/components/PreconisationReferentielsSettings";
 
@@ -109,7 +108,9 @@ export default function GlobalSettingsButton() {
 
             <div className="mt-5 border-t border-gray-100 pt-4">
               <h3 className="mb-2 text-sm font-bold text-gray-800">Notifications</h3>
-              <NotificationBell />
+              <Link href="/config/notifications" onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-700 hover:border-green-300 hover:bg-green-50">
+                <span><span className="block font-bold">Notifications sur cet appareil</span><span className="block text-xs font-normal text-gray-500">Activation et choix des alertes reçues</span></span><span aria-hidden="true">›</span>
+              </Link>
             </div>
 
             <IdentificationSettings />
