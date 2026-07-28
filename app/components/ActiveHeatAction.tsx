@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Thermometer } from "lucide-react";
-import { useOriginNavigation } from "@/lib/use-origin-navigation";
+import { useReproductionModal } from "@/app/components/ReproductionModalProvider";
 
 interface Props {
   animalId: string;
@@ -20,7 +19,7 @@ export default function ActiveHeatAction({
   variant,
   simulationAware = false,
 }: Props) {
-  const { hrefWithOrigin } = useOriginNavigation();
+  const { openReproductionModal } = useReproductionModal();
   const [simulationActive, setSimulationActive] = useState(false);
   const [expired, setExpired] = useState(false);
 
@@ -47,8 +46,14 @@ export default function ActiveHeatAction({
 
   if (simulationActive || expired) return null;
 
-  const actionHref = (type: "NATURELLE" | "IA") =>
-    hrefWithOrigin(`/reproduction?action=saillie&animaux=${encodeURIComponent(animalId)}&type=${type}`);
+  const openBreeding = (type: "NATURELLE" | "IA") => {
+    openReproductionModal({
+      action: "saillie",
+      animals: [{ id: animalId, nutrav: animalLabel }],
+      type,
+      simulationAware,
+    });
+  };
 
   return (
     <section
@@ -71,18 +76,20 @@ export default function ActiveHeatAction({
               : `Enregistrer une saillie ou une IA pour ${animalLabel} ?`}
           </p>
           <div className="mt-2 flex gap-2">
-            <Link
-              href={actionHref("NATURELLE")}
+            <button
+              type="button"
+              onClick={() => openBreeding("NATURELLE")}
               className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg bg-green-700 px-3 text-sm font-semibold text-white hover:bg-green-800"
             >
               Saillie
-            </Link>
-            <Link
-              href={actionHref("IA")}
+            </button>
+            <button
+              type="button"
+              onClick={() => openBreeding("IA")}
               className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
             >
               IA
-            </Link>
+            </button>
           </div>
         </div>
       </div>

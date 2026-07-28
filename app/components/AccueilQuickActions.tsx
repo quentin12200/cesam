@@ -6,6 +6,7 @@ import AnimalPickerModal from "@/app/sanitaire/nouvel-evenement/AnimalPickerModa
 import type { AnimalOption } from "@/app/sanitaire/nouvel-evenement/AnimalPicker";
 import AccueilShortcuts from "@/app/components/AccueilShortcuts";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
+import { useReproductionModal } from "@/app/components/ReproductionModalProvider";
 
 type ActionRapide = "chaleur" | "saillie" | "evenement";
 
@@ -17,6 +18,7 @@ interface Groupe {
 export default function AccueilQuickActions() {
   const router = useRouter();
   const { hrefWithOrigin } = useOriginNavigation();
+  const { openReproductionModal } = useReproductionModal();
   const [action, setAction] = useState<ActionRapide | null>(null);
   const [selection, setSelection] = useState<AnimalOption[]>([]);
   const [groupes, setGroupes] = useState<Groupe[]>([]);
@@ -44,8 +46,15 @@ export default function AccueilQuickActions() {
       return;
     }
 
-    const ids = animaux.map((animal) => animal.id).join(",");
-    router.push(hrefWithOrigin(`/reproduction?action=${action}&animaux=${encodeURIComponent(ids)}`));
+    setAction(null);
+    openReproductionModal({
+      action,
+      animals: animaux.map((animal) => ({
+        id: animal.id,
+        nutrav: animal.nutrav,
+        nom: animal.nom,
+      })),
+    });
   }
 
   return (

@@ -13,13 +13,12 @@ import {
 import {
   VOICE_ACTIONS,
   VOICE_PARAGE_STORAGE_KEY,
-  VOICE_REPRODUCTION_STORAGE_KEY,
   getVoiceAction,
   type VoiceActionId,
   type VoiceParageDraft,
-  type VoiceReproductionDraft,
 } from "@/lib/voice-actions";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
+import { useReproductionModal } from "@/app/components/ReproductionModalProvider";
 
 declare global {
   interface Window {
@@ -92,6 +91,7 @@ interface TaureauOption {
 export default function VoiceButton() {
   const router = useRouter();
   const { hrefWithOrigin } = useOriginNavigation();
+  const { openReproductionModal } = useReproductionModal();
   const [supported, setSupported] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [transcript, setTranscript] = useState<string | null>(null);
@@ -370,11 +370,32 @@ export default function VoiceButton() {
       } catch {}
     }
     if (chosenAction === "chaleur") {
-      const ids = analysis.draft.target.nutravs
-        .map((nutrav) => animaux.find((animal) => animal.nutrav === nutrav)?.id)
-        .filter((id): id is string => Boolean(id));
+      const selectedAnimals = analysis.draft.target.nutravs
+        .map((nutrav) => animaux.find((animal) => animal.nutrav === nutrav))
+        .filter((animal): animal is AnimalOption => Boolean(animal))
+        .map((animal) => ({ id: animal.id, nutrav: animal.nutrav, nom: animal.nobovi }));
       setAnalysis(null);
-      router.push(hrefWithOrigin(`/reproduction?action=chaleur&animaux=${encodeURIComponent(ids.join(","))}`));
+      openReproductionModal({ action: "chaleur", animals: selectedAnimals });
+      return;
+    }
+    if (chosenAction === "saillie") {
+      const selectedAnimals = analysis.draft.target.nutravs
+        .map((nutrav) => animaux.find((animal) => animal.nutrav === nutrav))
+        .filter((animal): animal is AnimalOption => Boolean(animal))
+        .map((animal) => ({ id: animal.id, nutrav: animal.nutrav, nom: animal.nobovi }));
+      const recognizedBull = analysis.draft.taureau;
+      setAnalysis(null);
+      openReproductionModal({
+        action: "saillie",
+        animals: selectedAnimals,
+        date: analysis.draft.date || undefined,
+        type: analysis.draft.reproductionType ?? "NATURELLE",
+        initialBull: recognizedBull ? {
+          id: recognizedBull.id,
+          reference: recognizedBull.nom,
+          nom: recognizedBull.nom,
+        } : null,
+      });
       return;
     }
     if (chosenAction === "pesee") {
@@ -403,16 +424,6 @@ export default function VoiceButton() {
         note: analysis.draft.description,
       };
       sessionStorage.setItem(VOICE_PARAGE_STORAGE_KEY, JSON.stringify(draftParage));
-    } else if (chosenAction === "saillie") {
-      const draftReproduction: VoiceReproductionDraft = {
-        transcript: analysis.draft.transcript,
-        target: analysis.draft.target,
-        date: analysis.draft.date ?? "",
-        moment: analysis.draft.moment,
-        type: analysis.draft.reproductionType ?? "NATURELLE",
-        taureau: analysis.draft.taureau,
-      };
-      sessionStorage.setItem(VOICE_REPRODUCTION_STORAGE_KEY, JSON.stringify(draftReproduction));
     } else {
       sessionStorage.setItem(VOICE_SANITARY_STORAGE_KEY, JSON.stringify(analysis.draft));
     }

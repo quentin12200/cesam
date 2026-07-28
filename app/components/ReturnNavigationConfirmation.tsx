@@ -2,13 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ORIGIN_CONFIRMATION_KEY } from "@/lib/origin-navigation";
+import {
+  ORIGIN_CONFIRMATION_EVENT,
+  ORIGIN_CONFIRMATION_KEY,
+} from "@/lib/origin-navigation";
 
 export default function ReturnNavigationConfirmation() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const search = searchParams.toString();
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let timer: number | null = null;
+    const show = (nextMessage: string) => {
+      setMessage(nextMessage);
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => setMessage(""), 3500);
+    };
+    const handleConfirmation = (event: Event) => {
+      show((event as CustomEvent<string>).detail);
+    };
+    window.addEventListener(ORIGIN_CONFIRMATION_EVENT, handleConfirmation);
+    return () => {
+      window.removeEventListener(ORIGIN_CONFIRMATION_EVENT, handleConfirmation);
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const stored = window.sessionStorage.getItem(ORIGIN_CONFIRMATION_KEY);

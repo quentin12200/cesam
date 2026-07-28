@@ -15,6 +15,7 @@ import { UserPreferencesProvider } from "@/components/UserPreferencesProvider";
 import GlobalSettingsButton from "@/components/GlobalSettingsButton";
 import LayoutPersonalizer from "@/components/LayoutPersonalizer";
 import ReturnNavigationConfirmation from "@/app/components/ReturnNavigationConfirmation";
+import { ReproductionModalProvider } from "@/app/components/ReproductionModalProvider";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -46,6 +47,7 @@ export default function RootLayout({
     <html lang="fr" className={`${geist.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-gray-100">
         <UserPreferencesProvider>
+        <ReproductionModalProvider>
         <header className="print:hidden bg-green-700 text-white shadow-md sticky top-0 z-30">
           <div className="flex items-center justify-between px-3 py-1.5 sm:px-4">
             <div className="flex items-center gap-2.5">
@@ -79,6 +81,7 @@ export default function RootLayout({
           <LayoutPersonalizer />
           <InstallPrompt />
         </UndoProvider>
+        </ReproductionModalProvider>
         </UserPreferencesProvider>
       </body>
     </html>

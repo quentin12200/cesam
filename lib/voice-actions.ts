@@ -13,8 +13,8 @@ export interface VoiceActionDefinition {
 export const VOICE_ACTIONS: VoiceActionDefinition[] = [
   { id: "sanitaire", label: "Nouvel événement sanitaire", continueLabel: "Continuer vers Sanitaire", href: "/sanitaire/nouvel-evenement?brouillonVocal=1" },
   { id: "parage", label: "Parage", continueLabel: "Continuer vers Parage", href: "/parage?brouillonVocal=1" },
-  { id: "saillie", label: "Saillie / IA", continueLabel: "Continuer vers Reproduction", href: "/reproduction?brouillonVocal=1" },
-  { id: "chaleur", label: "Chaleur", continueLabel: "Continuer vers Chaleur", href: "/reproduction?action=chaleur" },
+  { id: "saillie", label: "Saillie / IA", continueLabel: "Ouvrir Saillie / IA", href: "/reproduction?brouillonVocal=1" },
+  { id: "chaleur", label: "Chaleur", continueLabel: "Ouvrir Chaleur", href: "/reproduction?action=chaleur" },
   { id: "pesee", label: "Pesée", continueLabel: "Continuer vers Pesée", href: "/troupeau" },
   { id: "velage", label: "Nouveau vêlage", continueLabel: "Continuer vers Nouveau vêlage", href: "/velage" },
 ];
