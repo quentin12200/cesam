@@ -1,16 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../app/config/page.tsx", import.meta.url), "utf8");
 
-test("la page présente les six rubriques dans l’ordre demandé", () => {
+test("la page présente les cinq rubriques générales dans l’ordre demandé", () => {
   const titles = [
     "Profil et personnalisation",
     "Exploitation",
     "Troupeau et identification",
     "Reproduction",
-    "Santé et traitements",
     "Notifications",
   ];
 
@@ -22,20 +21,26 @@ test("la page présente les six rubriques dans l’ordre demandé", () => {
   }
 });
 
-test("les six destinations disponibles sont liées", () => {
+test("les cinq destinations générales sont liées", () => {
   for (const href of [
     "/config/profil",
     "/config/exploitation",
     "/config/troupeau",
     "/config/reproduction",
-    "/config/protocoles",
     "/config/notifications",
   ]) {
     assert.match(source, new RegExp(`href: "${href.replaceAll("/", "\\/")}"`));
   }
 
-  assert.equal((source.match(/href: "\/config\//g) ?? []).length, 6);
-  assert.doesNotMatch(source, /pending: true|Encore disponible dans le menu actuel/);
+  assert.equal((source.match(/href: "\/config\//g) ?? []).length, 5);
+  assert.doesNotMatch(
+    source,
+    /Santé et traitements|\/config\/protocoles|pending: true|Encore disponible dans le menu actuel/
+  );
+});
+
+test("la route autonome des protocoles reste présente", async () => {
+  await access(new URL("../app/config/protocoles/page.tsx", import.meta.url));
 });
 
 test("le bouton retour, la grille mobile et la légende des portées sont présents", () => {

@@ -4,7 +4,6 @@ import {
   Building2,
   ChevronRight,
   HeartPulse,
-  Stethoscope,
   Tags,
   UserRound,
 } from "lucide-react";
@@ -34,12 +33,6 @@ const sections = [
     description: "Cycle reproductif, échographies, alertes et retour en chaleur.",
     icon: HeartPulse,
     href: "/config/reproduction",
-  },
-  {
-    title: "Santé et traitements",
-    description: "Protocoles de vaccination et réglages sanitaires.",
-    icon: Stethoscope,
-    href: "/config/protocoles",
   },
   {
     title: "Notifications",
