@@ -7,6 +7,11 @@ import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getVaccinsManquants } from "@/lib/utils";
 import { getHeatReturnReminder } from "@/lib/heat-return-monitoring";
 import { parseReproductionRules } from "@/lib/reproduction-rules";
+import {
+  createWebPushPayload,
+  heatReturnNotificationTag,
+  morningDigestNotificationTag,
+} from "@/lib/web-push-payload";
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get("authorization");
@@ -211,15 +216,17 @@ export async function GET(request: NextRequest) {
       ? `🚨 URGENT — ${vellesUrgentes.length} velle${vellesUrgentes.length > 1 ? "s" : ""} à vendre`
       : "Bonjour 🌅 — GAEC CESAM";
 
-    const digestPayload = JSON.stringify({
+    const digestPayload = createWebPushPayload({
       title,
       body,
       url: vellesUrgentes.length > 0 ? "/troupeau" : "/",
+      tag: morningDigestNotificationTag(now),
     });
-    const heatReturnPayloads = heatReturnNotifications.map(({ animal }) => JSON.stringify({
+    const heatReturnPayloads = heatReturnNotifications.map(({ animal, reminder }) => createWebPushPayload({
       title: "Retour en chaleur à surveiller",
       body: `Vérifier ${animal.nutrav}${animal.nobovi ? ` — ${animal.nobovi}` : ""}.`,
       url: `/troupeau/${encodeURIComponent(animal.nutrav)}`,
+      tag: heatReturnNotificationTag(animal.id, reminder.heat.id),
     }));
     const payloads = [...heatReturnPayloads, digestPayload];
 

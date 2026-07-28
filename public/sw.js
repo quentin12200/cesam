@@ -33,13 +33,14 @@ self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener("push", (e) => {
   const data = e.data?.json() ?? {};
   const title = data.title ?? "GAEC CESAM";
+  const tag = typeof data.tag === "string" && data.tag.trim() ? data.tag : "cesam-push";
   e.waitUntil(
     self.registration.showNotification(title, {
       body: data.body ?? "",
       icon: "/logo-cesam.jpg",
       badge: "/logo-cesam.jpg",
       data: { url: data.url ?? "/" },
-      tag: "cesam-push",
+      tag,
       renotify: true,
     })
   );
