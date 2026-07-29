@@ -16,6 +16,7 @@ export default function SevrageButton({
   dateSevrage?: string | null;
 }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const router = useRouter();
 
   if (sevreFait) {
@@ -30,24 +31,36 @@ export default function SevrageButton({
   }
 
   async function handleSevrer() {
+    if (!window.confirm("Marquer ce veau sevré ? Sa mère sera également marquée tarie à la date d’aujourd’hui.")) return;
     setLoading(true);
-    await fetch(`/api/animaux/${nutrav}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sevreFait: true }),
-    });
-    router.refresh();
-    setLoading(false);
+    setError("");
+    try {
+      const response = await fetch(`/api/animaux/${nutrav}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sevreFait: true }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "Enregistrement impossible.");
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Enregistrement impossible.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <button
-      onClick={handleSevrer}
-      disabled={loading}
-      className="inline-flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium hover:bg-orange-200 transition-colors disabled:opacity-50"
-    >
-      <Scissors size={11} />
-      {loading ? "..." : "Marquer sevré"}
-    </button>
+    <span className="inline-flex flex-col items-start gap-1">
+      <button
+        onClick={handleSevrer}
+        disabled={loading}
+        className="inline-flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium hover:bg-orange-200 transition-colors disabled:opacity-50"
+      >
+        <Scissors size={11} />
+        {loading ? "..." : "Marquer sevré"}
+      </button>
+      {error && <span className="text-[11px] font-semibold text-red-700">{error}</span>}
+    </span>
   );
 }

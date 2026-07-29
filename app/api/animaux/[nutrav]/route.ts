@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { resolveCalfMother } from "@/lib/weaning-dry-off";
 
 export async function GET(
   _request: NextRequest,
@@ -56,6 +57,13 @@ export async function PATCH(
     where: { nutrav },
     include: {
       velageVeau: { select: { vache: { select: { nutrav: true } } } },
+      veauxVelage: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          velage: { select: { vache: { select: { nutrav: true } } } },
+        },
+      },
       mere: { select: { nutrav: true } },
     },
   });
@@ -63,7 +71,7 @@ export async function PATCH(
 
   // La mère "officielle" est celle du vêlage enregistré ; à défaut (données
   // historiques/importées sans vêlage), on retombe sur le lien de généalogie direct.
-  const mereNutrav = animal.velageVeau?.vache?.nutrav ?? animal.mere?.nutrav;
+  const mereNutrav = resolveCalfMother(animal)?.nutrav;
 
   // Capture previous values for undo
   const prevFields: Record<string, unknown> = {};

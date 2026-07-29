@@ -5,6 +5,9 @@ import { formatAge, formatDate } from "@/lib/utils";
 import { differenceInDays, subDays } from "date-fns";
 
 import BackButton from "@/app/components/BackButton";
+import WeaningDryOffPanel from "@/app/components/WeaningDryOffPanel";
+import { getWeaningDryOffCandidates } from "@/lib/weaning-dry-off-data";
+import { resolveCalfMother } from "@/lib/weaning-dry-off";
 // Page sans segment dynamique ni searchParams : sans cette directive, Next.js
 // la fige en HTML statique au moment du build et ne reflète plus les
 // évolutions de la base tant qu'un nouveau déploiement n'a pas lieu.
@@ -19,6 +22,13 @@ interface VeauSevre {
   ageSevrageJours: number;
   mereNutrav: string | null;
   mereNobovi: string | null;
+}
+
+interface MereTarieRecente {
+  id: string;
+  nutrav: string;
+  nobovi: string | null;
+  dateTarie: Date;
 }
 
 async function getVeauxSevres(): Promise<VeauSevre[]> {
@@ -41,13 +51,24 @@ async function getVeauxSevres(): Promise<VeauSevre[]> {
           vache: { select: { nutrav: true, nobovi: true } },
         },
       },
+      veauxVelage: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          velage: {
+            select: {
+              vache: { select: { nutrav: true, nobovi: true } },
+            },
+          },
+        },
+      },
       mere: { select: { nutrav: true, nobovi: true } },
     },
     orderBy: { dateSevrage: "desc" },
   });
 
   return animaux.map((a) => {
-    const mere = a.velageVeau?.vache ?? a.mere ?? null;
+    const mere = resolveCalfMother(a);
     const dateSevrage = a.dateSevrage as Date;
     return {
       id: a.id,
@@ -62,8 +83,34 @@ async function getVeauxSevres(): Promise<VeauSevre[]> {
   });
 }
 
+async function getMeresTariesRecemment(): Promise<MereTarieRecente[]> {
+  const animaux = await prisma.animal.findMany({
+    where: {
+      statut: "ACTIF",
+      tarieFaite: true,
+      dateTarie: { gte: subDays(new Date(), 14) },
+    },
+    select: {
+      id: true,
+      nutrav: true,
+      nobovi: true,
+      dateTarie: true,
+    },
+    orderBy: { dateTarie: "desc" },
+  });
+  return animaux.flatMap((animal) =>
+    animal.dateTarie
+      ? [{ ...animal, dateTarie: animal.dateTarie }]
+      : []
+  );
+}
+
 export default async function SevragePage() {
-  const veaux = await getVeauxSevres();
+  const [veaux, meresTariesRecemment, weaningDryOff] = await Promise.all([
+    getVeauxSevres(),
+    getMeresTariesRecemment(),
+    getWeaningDryOffCandidates(),
+  ]);
 
   const ageMoyenJours =
     veaux.length > 0
@@ -80,11 +127,18 @@ export default async function SevragePage() {
         <div className="flex-1">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <Scissors size={20} className="text-orange-600" />
-            Sevrages
+            Sevrage et tarissement
           </h2>
-          <p className="text-xs text-gray-500 mt-0.5">Veaux sevrés de moins d&apos;un an, avec leur mère</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            À faire, bientôt à prévoir et récemment effectués
+          </p>
         </div>
       </div>
+
+      <WeaningDryOffPanel
+        initialCandidates={weaningDryOff.candidates}
+        thresholdMonths={weaningDryOff.thresholdMonths}
+      />
 
       {/* Résumé global */}
       <div className="grid grid-cols-2 gap-3">
@@ -102,15 +156,15 @@ export default async function SevragePage() {
 
       {veaux.length === 0 && (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">
-          Aucun veau sevré pour l&apos;instant.
+          Aucun sevrage récent enregistré pour l&apos;instant.
         </div>
       )}
 
-      {/* Sevrés récemment — pour re-vérifier la séparation avec la mère */}
-      {recents.length > 0 && (
+      {/* Événements récents, issus des dates déjà stockées sur les animaux. */}
+      {(recents.length > 0 || meresTariesRecemment.length > 0) && (
         <section>
           <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-            <span className="text-base">🕐</span> Sevrés récemment (14 derniers jours)
+            <span className="text-base">🕐</span> Récemment effectués (14 derniers jours)
           </h3>
           <div className="space-y-2">
             {recents.map((v) => (
@@ -140,6 +194,24 @@ export default async function SevragePage() {
                 </div>
               </div>
             ))}
+            {meresTariesRecemment.map((mere) => (
+              <div key={`dry-off-${mere.id}`} className="bg-white rounded-xl shadow p-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Link href={`/troupeau/${mere.nutrav}`} className="hover:underline">
+                    <span className="font-mono font-bold text-xs bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded">
+                      {mere.nutrav}
+                    </span>
+                    {mere.nobovi && <span className="ml-2 text-gray-800 text-sm font-medium">{mere.nobovi}</span>}
+                  </Link>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Tarissement enregistré le {formatDate(mere.dateTarie)}
+                  </div>
+                </div>
+                <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800">
+                  Mère tarie
+                </span>
+              </div>
+            ))}
           </div>
         </section>
       )}
@@ -147,7 +219,7 @@ export default async function SevragePage() {
       {/* Historique complet */}
       {veaux.length > 0 && (
         <section>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Historique complet</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Historique des sevrages</h3>
           <div className="bg-white rounded-xl shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

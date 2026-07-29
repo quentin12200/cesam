@@ -3,13 +3,12 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, addDays } from "date-fns";
-import { getEtatGestation, getVaccinsManquants, formatAge, VELAGE_IMMINENT_COLORS } from "@/lib/utils";
+import { getEtatGestation, getVaccinsManquants, VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 import Link from "next/link";
 import CowIcon from "@/components/CowIcon";
 import Collapsible from "@/app/components/Collapsible";
 import ChecklistSection, {
   type ChecklistItem,
-  type SubItem,
 } from "@/app/components/ChecklistSection";
 import AccueilQuickActions from "@/app/components/AccueilQuickActions";
 import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
@@ -24,6 +23,8 @@ import { getActiveHeat } from "@/lib/active-heat-action";
 import HeatReturnReminder from "@/app/components/HeatReturnReminder";
 import { getHeatReturnReminder } from "@/lib/heat-return-monitoring";
 import { parseReproductionRules } from "@/lib/reproduction-rules";
+import { getWeaningDryOffCandidates } from "@/lib/weaning-dry-off-data";
+import WeaningDryOffPanel from "@/app/components/WeaningDryOffPanel";
 import {
   Baby,
   Wifi,
@@ -31,7 +32,6 @@ import {
   Syringe,
   RefreshCw,
   Tag,
-  Scissors,
   Activity,
   HeartHandshake,
   } from "lucide-react";
@@ -43,9 +43,6 @@ async function getDashboardData() {
   const thirtyDaysLater = addDays(now, 30);
   const ninetyDaysLater = addDays(now, 90);
   const twentyOneDaysLater = addDays(now, 21);
-  const sixMonthsAgo = addDays(now, -180);
-  const fiveMonthsAgo = addDays(now, -150);
-
   const [
     vachesActives,
     capteurs,
@@ -57,8 +54,6 @@ async function getDashboardData() {
     vaccinationPreVelage,
     bolusPreVelage,
     veauxABouclerList,
-    veauxASevrerList,
-    veauxPresqueSevrables,
     genissesArapatrier,
     vachesACapteur,
     nbVaches,
@@ -68,6 +63,7 @@ async function getDashboardData() {
     nbMales,
     activeHeatCandidates,
     reproductionConfig,
+    weaningDryOff,
   ] = await Promise.all([
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: false } }),
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
@@ -116,40 +112,6 @@ async function getDashboardData() {
         statut: "ACTIF",
         boucleFaite: false,
         velageVeau: { isNot: null },
-      },
-      select: {
-        nutrav: true,
-        nobovi: true,
-        danais: true,
-        velageVeau: {
-          select: { vache: { select: { nutrav: true, nobovi: true } } },
-        },
-      },
-      orderBy: { danais: "asc" },
-    }),
-    prisma.animal.findMany({
-      where: {
-        statut: "ACTIF",
-        sevreFait: false,
-        velageVeau: { isNot: null },
-        danais: { lte: sixMonthsAgo },
-      },
-      select: {
-        nutrav: true,
-        nobovi: true,
-        danais: true,
-        velageVeau: {
-          select: { vache: { select: { nutrav: true, nobovi: true } } },
-        },
-      },
-      orderBy: { danais: "asc" },
-    }),
-    prisma.animal.findMany({
-      where: {
-        statut: "ACTIF",
-        sevreFait: false,
-        velageVeau: { isNot: null },
-        danais: { gte: sixMonthsAgo, lte: fiveMonthsAgo },
       },
       select: {
         nutrav: true,
@@ -225,6 +187,7 @@ async function getDashboardData() {
       where: { id: "singleton" },
       select: { reproductionRulesJson: true, reproReposObjectifJours: true },
     }).catch(() => null),
+    getWeaningDryOffCandidates(now),
   ]);
 
   const reproductionRules = parseReproductionRules(reproductionConfig?.reproductionRulesJson);
@@ -334,32 +297,6 @@ async function getDashboardData() {
     };
   });
 
-  const sevrageItems: ChecklistItem[] = veauxASevrerList.map((a) => {
-    const mere = a.velageVeau?.vache;
-    return {
-      nutrav: a.nutrav,
-      nom: a.nobovi ?? null,
-      ageLabel: formatAge(a.danais),
-      extra: mere
-        ? `Mère: ${mere.nutrav}${mere.nobovi ? " " + mere.nobovi : ""}`
-        : undefined,
-      apiField: "sevreFait",
-    };
-  });
-
-  const presqueSevrables: SubItem[] = veauxPresqueSevrables.map((a) => {
-    const mere = a.velageVeau?.vache;
-    return {
-      nutrav: a.nutrav,
-      nom: a.nobovi ?? null,
-      ageLabel: formatAge(a.danais),
-      extra: mere
-        ? `Mère: ${mere.nutrav}${mere.nobovi ? " " + mere.nobovi : ""}`
-        : undefined,
-      apiField: "sevreFait",
-    };
-  });
-
   return {
     vachesActives,
     capteurs,
@@ -374,8 +311,7 @@ async function getDashboardData() {
     vaccinationPreVelage,
     bolusPreVelage,
     bouclageItems,
-    sevrageItems,
-    presqueSevrables,
+    weaningDryOff,
     genissesArapatrier,
     vachesACapteur,
     nbVaches,
@@ -417,6 +353,13 @@ export default async function Dashboard({ searchParams }: PageProps) {
   ]);
   const capteursActifs = data.capteurs.filter((c) => c.actif);
   const capteursActifsNutravs = new Set(capteursActifs.map((c) => c.animalNutrav).filter(Boolean));
+  const weaningThresholdNews = data.weaningDryOff.candidates.filter(
+    (candidate) =>
+      candidate.reachedThresholdToday && candidate.needsWeaning
+  );
+  const weaningDryOffNowCount = data.weaningDryOff.candidates.filter(
+    (candidate) => candidate.window === "NOW"
+  ).length;
 
   const vachesACapteurSansCapteur = data.vachesACapteur.filter(
     (g) => !capteursActifsNutravs.has(g.saillie.animal.nutrav)
@@ -633,23 +576,6 @@ export default async function Dashboard({ searchParams }: PageProps) {
       actionLabel="Bouclé"
       color="orange"
       printKey={printMode ? undefined : "veaux-boucler"}
-      printMode={printMode}
-    />
-  );
-
-  const sectionVeauxSevrer = (
-    <ChecklistSection
-      title="Veaux à sevrer"
-      icon={<Scissors size={18} />}
-      items={data.sevrageItems}
-      actionLabel="Sevré"
-      color="green"
-      subSection={
-        data.presqueSevrables.length > 0
-          ? { title: "Presque sevrables (5–6 mois)", items: data.presqueSevrables, actionLabel: "Sevrer quand même" }
-          : undefined
-      }
-      printKey={printMode ? undefined : "veaux-sevrer"}
       printMode={printMode}
     />
   );
@@ -901,7 +827,6 @@ export default async function Dashboard({ searchParams }: PageProps) {
       "repro-velage": sectionReproVelage,
       "sante-vaccins": sectionSanteVaccins,
       "veaux-boucler": sectionVeauxBoucler,
-      "veaux-sevrer": sectionVeauxSevrer,
       "stats-rapides": sectionStatsRapides,
       mortalite: sectionMortalite,
       "composition-troupeau": sectionComposition,
@@ -946,10 +871,12 @@ export default async function Dashboard({ searchParams }: PageProps) {
         <NotesTerrain initialNotes={notesTerrain.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() }))} />
       )}
 
-      {(data.activeHeats.length > 0 || data.heatReturnReminders.length > 0) && (
+      {(data.activeHeats.length > 0 ||
+        data.heatReturnReminders.length > 0 ||
+        weaningThresholdNews.length > 0) && (
         <section
           data-layout-section="accueil-actualites-chaleurs"
-          data-layout-label="Actualités chaleurs"
+          data-layout-label="Actualités"
           className="rounded-xl bg-white p-3 shadow"
         >
           <h2 className="mb-2 text-base font-bold text-gray-900">Actualités</h2>
@@ -975,11 +902,39 @@ export default async function Dashboard({ searchParams }: PageProps) {
                 variant="home"
               />
             ))}
+            {weaningThresholdNews.map((candidate) => (
+              <Link
+                key={`weaning-threshold-${candidate.calf.id}`}
+                href="/troupeau/sevrage"
+                className="block rounded-lg border-l-4 border-l-cyan-500 bg-cyan-50 px-3 py-2"
+              >
+                <p className="text-sm font-bold text-cyan-950">
+                  Sevrage à prévoir — {candidate.calf.nutrav}
+                  {candidate.calf.nobovi ? ` ${candidate.calf.nobovi}` : ""} a
+                  atteint l’âge prévu.
+                </p>
+                <p className="mt-0.5 text-xs text-cyan-800">
+                  Voir le suivi sevrage et tarissement
+                </p>
+              </Link>
+            ))}
           </div>
         </section>
       )}
 
-      <AccueilTodoSection groups={todoGroups} />
+      <AccueilTodoSection
+        groups={todoGroups}
+        weaningDryOffCount={weaningDryOffNowCount}
+        weaningDryOff={
+          data.weaningDryOff.candidates.length > 0 ? (
+            <WeaningDryOffPanel
+              initialCandidates={data.weaningDryOff.candidates}
+              thresholdMonths={data.weaningDryOff.thresholdMonths}
+              compact
+            />
+          ) : undefined
+        }
+      />
 
       <details
         data-layout-section="accueil-apercu-elevage"

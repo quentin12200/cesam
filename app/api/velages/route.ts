@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     const vache = await prisma.animal.findUnique({ where: { nutrav: vacheNutrav } });
     if (!vache) return NextResponse.json({ error: `Vache ${vacheNutrav} non trouvée` }, { status: 404 });
     const prevTarieFaite = vache.tarieFaite;
+    const prevDateTarie = vache.dateTarie;
     const identificationConfig = await prisma.exploitationConfig.findUnique({ where: { id: "singleton" } });
     const lotActif = await obtenirLotBouclesActif();
 
@@ -72,7 +73,10 @@ export async function POST(request: NextRequest) {
         veauxDetails: { create: resolus.map((v) => ({ animalId: v.animalId, nutrav: v.saisi.nutrav ?? null, nunati: v.saisi.nunati ?? null, nom: v.saisi.nom ?? null, sexe: v.saisi.sexe ?? null, statut: v.saisi.statut ?? "VIVANT" })) },
       } });
       if (gestation) await tx.gestation.update({ where: { id: gestation.id }, data: { etat: "VELAGE" } });
-      await tx.animal.update({ where: { id: vache.id }, data: { tarieFaite: false } });
+      await tx.animal.update({
+        where: { id: vache.id },
+        data: { tarieFaite: false, dateTarie: null },
+      });
       return cree;
     });
 
@@ -87,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
     let undoId = "";
     try {
-      const ops: import("@/lib/action-log").RevertStep[] = [{ op: "delete", model: "velage", id: velage.id }, { op: "update", model: "animal", where: { nutrav: vacheNutrav }, data: { tarieFaite: prevTarieFaite } }];
+      const ops: import("@/lib/action-log").RevertStep[] = [{ op: "delete", model: "velage", id: velage.id }, { op: "update", model: "animal", where: { nutrav: vacheNutrav }, data: { tarieFaite: prevTarieFaite, dateTarie: prevDateTarie?.toISOString() ?? null } }];
       for (const v of resolus) {
         if (v.cree && v.animalId) ops.push({ op: "delete", model: "animal", id: v.animalId });
         else if (v.precedent && v.saisi.nutrav) ops.push({ op: "update", model: "animal", where: { nutrav: v.saisi.nutrav }, data: { ...v.precedent, danais: v.precedent.danais?.toISOString() ?? null } });
