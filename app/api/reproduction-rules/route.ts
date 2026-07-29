@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import {
   CESAM_REPRODUCTION_RULES,
+  applyPostCalvingRestDays,
+  getPostCalvingRestDays,
   parseReproductionRules,
   validateReproductionRules,
   type ReproductionRulesConfig,
@@ -11,9 +13,14 @@ import {
 export async function GET() {
   const config = await prisma.exploitationConfig.findUnique({
     where: { id: "singleton" },
-    select: { reproductionRulesJson: true },
+    select: { reproductionRulesJson: true, reproReposObjectifJours: true },
   }).catch(() => null);
-  return NextResponse.json(parseReproductionRules(config?.reproductionRulesJson));
+  return NextResponse.json(
+    applyPostCalvingRestDays(
+      parseReproductionRules(config?.reproductionRulesJson),
+      config?.reproReposObjectifJours
+    )
+  );
 }
 
 export async function PUT(request: NextRequest) {
@@ -30,11 +37,13 @@ export async function PUT(request: NextRequest) {
     where: { id: "singleton" },
     select: { reproductionRulesJson: true },
   }).catch(() => null);
-  const reproductionRulesJson = JSON.stringify(nextConfig);
+  const postCalvingRestDays = getPostCalvingRestDays(nextConfig);
+  const synchronizedConfig = applyPostCalvingRestDays(nextConfig, postCalvingRestDays);
+  const reproductionRulesJson = JSON.stringify(synchronizedConfig);
   await prisma.exploitationConfig.upsert({
     where: { id: "singleton" },
-    create: { id: "singleton", reproductionRulesJson },
-    update: { reproductionRulesJson },
+    create: { id: "singleton", reproductionRulesJson, reproReposObjectifJours: postCalvingRestDays },
+    update: { reproductionRulesJson, reproReposObjectifJours: postCalvingRestDays },
   });
 
   try {
@@ -45,5 +54,5 @@ export async function PUT(request: NextRequest) {
     );
   } catch {}
 
-  return NextResponse.json({ config: nextConfig, warnings: validation.warnings });
+  return NextResponse.json({ config: synchronizedConfig, warnings: validation.warnings });
 }

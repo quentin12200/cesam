@@ -223,7 +223,7 @@ async function getDashboardData() {
     }),
     prisma.exploitationConfig.findUnique({
       where: { id: "singleton" },
-      select: { reproductionRulesJson: true },
+      select: { reproductionRulesJson: true, reproReposObjectifJours: true },
     }).catch(() => null),
   ]);
 
@@ -268,7 +268,8 @@ async function getDashboardData() {
       etatGestation,
       dateVelagePrevue,
       dernierVelage,
-      false
+      false,
+      reproductionConfig?.reproReposObjectifJours ?? 60
     );
 
     if (etat === "VERT" || etat === "ROSE") vachesPleine++;

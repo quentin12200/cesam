@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
         }),
         prisma.exploitationConfig.findUnique({
           where: { id: "singleton" },
-          select: { reproductionRulesJson: true },
+          select: { reproductionRulesJson: true, reproReposObjectifJours: true },
         }).catch(() => null),
       ]);
 
@@ -147,7 +147,8 @@ export async function GET(request: NextRequest) {
         v.saillies[0]?.gestation?.etat ?? null,
         v.saillies[0]?.gestation?.dateVelagePrevue ?? null,
         v.velagesVache[0]?.date ?? null,
-        v.aEchographier
+        v.aEchographier,
+        reproductionConfig?.reproReposObjectifJours ?? 60
       );
       if (etat === "JAUNE") aEchographier++;
       if (etat === "ROUGE") videsEnRetard++;

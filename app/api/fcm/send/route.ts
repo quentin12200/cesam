@@ -21,7 +21,7 @@ export async function POST() {
 
     const alerts: string[] = [];
 
-    const [vachesAvecSaillies, animaux, velagesSemaine, veauxABoucler, genissesArapatrier, surveillanceActive, cryptoRotavecCount, bolusCount] =
+    const [vachesAvecSaillies, animaux, velagesSemaine, veauxABoucler, genissesArapatrier, surveillanceActive, cryptoRotavecCount, bolusCount, reproductionConfig] =
       await Promise.all([
         prisma.animal.findMany({
           where: { statut: "ACTIF", sexbov: "F", estGenisse: false, OR: [{ categorie: null }, { categorie: { not: "ENGRAISSEMENT" } }] },
@@ -56,6 +56,10 @@ export async function POST() {
         prisma.gestation.count({
           where: { etat: { in: ["VERT", "ROSE"] }, dateVelagePrevue: { gte: addDays(now, 21), lte: addDays(now, 45) } },
         }),
+        prisma.exploitationConfig.findUnique({
+          where: { id: "singleton" },
+          select: { reproReposObjectifJours: true },
+        }).catch(() => null),
       ]);
 
     let aEchographier = 0, videsEnRetard = 0;
@@ -65,7 +69,8 @@ export async function POST() {
         v.saillies[0]?.gestation?.etat ?? null,
         v.saillies[0]?.gestation?.dateVelagePrevue ?? null,
         v.velagesVache[0]?.date ?? null,
-        v.aEchographier
+        v.aEchographier,
+        reproductionConfig?.reproReposObjectifJours ?? 60
       );
       if (etat === "JAUNE") aEchographier++;
       if (etat === "ROUGE") videsEnRetard++;

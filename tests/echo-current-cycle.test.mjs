@@ -21,3 +21,11 @@ test("une saillie antérieure au dernier vêlage ne déclenche pas une demande d
   assert.equal(currentBreeding, null);
   assert.equal(phase, "REPOS");
 });
+
+test("le calcul du statut utilise la durée canonique de repos transmise", () => {
+  const lastCalving = new Date();
+  lastCalving.setDate(lastCalving.getDate() - 50);
+
+  assert.equal(getEtatGestation(null, null, null, lastCalving, false, 60), "REPOS");
+  assert.equal(getEtatGestation(null, null, null, lastCalving, false, 45), "ROUGE");
+});

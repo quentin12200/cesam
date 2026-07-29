@@ -18,7 +18,8 @@ export async function getGestationCalendar(): Promise<GestationCalendarRow[]> {
   const now = new Date();
   const dateMin24Mois = subMonths(now, 24);
 
-  const vaches = await prisma.animal.findMany({
+  const [vaches, reproductionConfig] = await Promise.all([
+    prisma.animal.findMany({
     where: {
       statut: "ACTIF",
       sexbov: "F",
@@ -55,7 +56,12 @@ export async function getGestationCalendar(): Promise<GestationCalendarRow[]> {
         select: { date: true },
       },
     },
-  });
+    }),
+    prisma.exploitationConfig.findUnique({
+      where: { id: "singleton" },
+      select: { reproReposObjectifJours: true },
+    }).catch(() => null),
+  ]);
 
   return vaches
     .flatMap((v) => {
@@ -66,7 +72,8 @@ export async function getGestationCalendar(): Promise<GestationCalendarRow[]> {
         saillie.gestation.etat,
         new Date(saillie.gestation.dateVelagePrevue),
         v.velagesVache[0]?.date ? new Date(v.velagesVache[0].date) : null,
-        false
+        false,
+        reproductionConfig?.reproReposObjectifJours ?? 60
       ) as EtatGestation;
       if (etat !== "VERT" && etat !== "ROSE") return [];
       return [{

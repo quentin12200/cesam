@@ -1,9 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
-import { parseReproductionRules } from "@/lib/reproduction-rules";
+import {
+  applyPostCalvingRestDays,
+  parseReproductionRules,
+} from "@/lib/reproduction-rules";
 import BackButton from "@/app/components/BackButton";
-import PostCalvingSettingsForm from "./PostCalvingSettingsForm";
+import DryOffSettingsForm from "./DryOffSettingsForm";
 import ReproductionRulesForm from "./ReproductionRulesForm";
 
 export default async function ReproductionRulesPage() {
@@ -15,6 +18,10 @@ export default async function ReproductionRulesPage() {
       tarissementVeauAgeMois: true,
     },
   }).catch(() => null);
+  const reproductionRules = applyPostCalvingRestDays(
+    parseReproductionRules(stored?.reproductionRulesJson),
+    stored?.reproReposObjectifJours
+  );
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl bg-slate-50 px-3 py-4 sm:px-5">
@@ -23,9 +30,8 @@ export default async function ReproductionRulesPage() {
         <div><p className="text-xs font-bold text-green-700">Paramètres · Reproduction</p><h1 className="text-xl font-black text-slate-900">Reproduction</h1></div>
       </header>
       <div className="space-y-5">
-        <PostCalvingSettingsForm
+        <DryOffSettingsForm
           initial={{
-            reproReposObjectifJours: stored?.reproReposObjectifJours ?? 60,
             tarissementVeauAgeMois: stored?.tarissementVeauAgeMois ?? 6,
           }}
         />
@@ -36,7 +42,7 @@ export default async function ReproductionRulesPage() {
               Phases, alertes et événements du suivi reproductif.
             </p>
           </div>
-          <ReproductionRulesForm initial={parseReproductionRules(stored?.reproductionRulesJson)} />
+          <ReproductionRulesForm initial={reproductionRules} />
         </section>
       </div>
     </main>

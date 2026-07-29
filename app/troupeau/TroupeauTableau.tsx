@@ -41,6 +41,7 @@ export interface AnimalRow {
 interface Props {
   animaux: AnimalRow[];
   groupes: { id: string; nom: string }[];
+  postCalvingRestDays: number;
 }
 
 interface FilterOption {
@@ -208,7 +209,7 @@ function SortHeader({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function TroupeauTableau({ animaux, groupes }: Props) {
+export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -331,7 +332,8 @@ export default function TroupeauTableau({ animaux, groupes }: Props) {
                         ? new Date(animal.gestationVelagePrevue)
                         : null,
                       animal.velageDate ? new Date(animal.velageDate) : null,
-                      false
+                      false,
+                      postCalvingRestDays
                     )
                   : null;
 

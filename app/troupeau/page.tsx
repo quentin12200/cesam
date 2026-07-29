@@ -149,7 +149,7 @@ async function getAnimaux(params: {
     : tri === "age_desc" ? { danais: "asc" }
     : { nutrav: "asc" };
 
-  const [total, animaux, groupes] = await Promise.all([
+  const [total, animaux, groupes, reproductionConfig] = await Promise.all([
     prisma.animal.count({ where }),
     prisma.animal.findMany({
       where,
@@ -211,9 +211,18 @@ async function getAnimaux(params: {
       },
     }),
     prisma.groupe.findMany({ orderBy: { nom: "asc" } }),
+    prisma.exploitationConfig.findUnique({
+      where: { id: "singleton" },
+      select: { reproReposObjectifJours: true },
+    }).catch(() => null),
   ]);
 
-  return { animaux, total, groupes };
+  return {
+    animaux,
+    total,
+    groupes,
+    postCalvingRestDays: reproductionConfig?.reproReposObjectifJours ?? 60,
+  };
 }
 
 export default async function TroupeauPage({ searchParams }: PageProps) {
@@ -230,7 +239,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const showForm = params.nouveau === "1";
   const showFiltres = params.filtres === "1";
 
-  const { animaux, total, groupes } = await getAnimaux({
+  const { animaux, total, groupes, postCalvingRestDays } = await getAnimaux({
     sexe, q, categorie, tarie, repro, sanitaire, groupe, tri,
   });
 
@@ -641,6 +650,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       <div className="hidden md:block">
         <Suspense fallback={<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Chargement…</div>}>
           <TroupeauTableau
+            postCalvingRestDays={postCalvingRestDays}
             animaux={animaux.map<AnimalRow>((a) => ({
               id: a.id,
               nutrav: a.nutrav,
@@ -683,7 +693,8 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                     animal.saillies[0]?.gestation?.etat ?? null,
                     animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
                     animal.velagesVache[0]?.date ?? null,
-                    false
+                    false,
+                    postCalvingRestDays
                   ))
                 : null;
             const veau = animal.velagesVache[0]?.veau;

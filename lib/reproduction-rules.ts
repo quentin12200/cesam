@@ -103,6 +103,44 @@ export const CESAM_REPRODUCTION_RULES: ReproductionRulesConfig = {
 };
 
 function cloneDefaults(): ReproductionRulesConfig { return JSON.parse(JSON.stringify(CESAM_REPRODUCTION_RULES)) as ReproductionRulesConfig; }
+
+export function applyPostCalvingRestDays(
+  config: ReproductionRulesConfig,
+  value: number | null | undefined
+): ReproductionRulesConfig {
+  const days = Number.isFinite(value)
+    ? Math.max(1, Math.round(value as number))
+    : POST_CALVING_REST_DAYS;
+  return {
+    ...config,
+    phases: config.phases.map((phase) =>
+      phase.id === "post_calving_rest"
+        ? {
+            ...phase,
+            endRule: {
+              ...phase.endRule,
+              type: "AFTER_DURATION",
+              duration: days,
+              unit: "DAYS",
+            },
+          }
+        : phase
+    ),
+  };
+}
+
+export function getPostCalvingRestDays(config: ReproductionRulesConfig): number {
+  const phase = config.phases.find((item) => item.id === "post_calving_rest");
+  const duration = phase?.endRule.duration;
+  const unit = phase?.endRule.unit ?? "DAYS";
+  if (!Number.isFinite(duration)) return POST_CALVING_REST_DAYS;
+  const days = unit === "WEEKS"
+    ? (duration as number) * 7
+    : unit === "MONTHS"
+      ? (duration as number) * 30
+      : duration as number;
+  return Math.max(1, Math.round(days));
+}
 const legacyFieldMap: Record<string, EventFieldKey> = { date: "DATE", observation: "OBSERVATION", résultat: "RESULT", resultat: "RESULT", taureau: "BULL", référence: "IA_REFERENCE", reference: "IA_REFERENCE", "numéro du veau": "CALF_NUMBER", sexe: "CALF_SEX" };
 
 function migrateLegacyPhase(saved: Record<string, unknown>, fallback: ReproductionPhaseRule): Partial<ReproductionPhaseRule> {

@@ -14,7 +14,7 @@ export async function GET() {
   const dateMin24Mois = subMonths(now, 24);
   const storedRules = await prisma.exploitationConfig.findUnique({
     where: { id: "singleton" },
-    select: { reproductionRulesJson: true },
+    select: { reproductionRulesJson: true, reproReposObjectifJours: true },
   }).catch(() => null);
   const rules = parseReproductionRules(storedRules?.reproductionRulesJson);
   const echoListEnabled = rules.phases.find((phase) => phase.id === "echo_due")?.enabledAlert ?? true;
@@ -141,5 +141,8 @@ export async function GET() {
     categorie: v.categorie ?? null,
   }});
 
-  return NextResponse.json({ vaches: result });
+  return NextResponse.json({
+    vaches: result,
+    postCalvingRestDays: storedRules?.reproReposObjectifJours ?? 60,
+  });
 }

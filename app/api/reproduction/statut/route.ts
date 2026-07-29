@@ -10,14 +10,15 @@ function statutAutomatique(animal: {
   aEchographier: boolean;
   saillies: { date: Date; gestation: { etat: string; dateVelagePrevue: Date | null } | null }[];
   velagesVache: { date: Date }[];
-}): EtatGestation {
+}, postCalvingRestDays: number): EtatGestation {
   const saillie = animal.saillies[0];
   return getEtatGestation(
     saillie?.date ?? null,
     saillie?.gestation?.etat ?? null,
     saillie?.gestation?.dateVelagePrevue ?? null,
     animal.velagesVache[0]?.date ?? null,
-    false
+    false,
+    postCalvingRestDays
   );
 }
 
@@ -39,7 +40,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Données invalides" }, { status: 400 });
   }
 
-  const animaux = await prisma.animal.findMany({
+  const [animaux, reproductionConfig] = await Promise.all([
+    prisma.animal.findMany({
     where: { id: { in: animalIds }, sexbov: "F" },
     select: {
       id: true,
@@ -62,7 +64,12 @@ export async function POST(request: Request) {
         select: { date: true },
       },
     },
-  });
+    }),
+    prisma.exploitationConfig.findUnique({
+      where: { id: "singleton" },
+      select: { reproReposObjectifJours: true },
+    }).catch(() => null),
+  ]);
 
   if (animaux.length !== animalIds.length) {
     return NextResponse.json({ error: "Un ou plusieurs animaux sont introuvables" }, { status: 404 });
@@ -82,7 +89,8 @@ export async function POST(request: Request) {
 
   const now = new Date();
   const changements = animaux.map((animal) => {
-    const courant = (animal.reproductionEtatManuel as EtatGestation | null) ?? statutAutomatique(animal);
+    const courant = (animal.reproductionEtatManuel as EtatGestation | null)
+      ?? statutAutomatique(animal, reproductionConfig?.reproReposObjectifJours ?? 60);
     const cible = restaurer ? animal.reproductionEtatPrecedent as EtatGestation : statut!;
     return { animal, courant, cible };
   });

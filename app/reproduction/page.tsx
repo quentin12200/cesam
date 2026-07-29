@@ -319,6 +319,7 @@ function localDateValue(date = new Date()) {
 function ReproductionContent() {
   const { closeToOrigin, completeToOrigin } = useOriginNavigation();
   const [vaches, setVaches] = useState<VacheRepro[]>([]);
+  const [postCalvingRestDays, setPostCalvingRestDays] = useState(60);
   const [taureaux, setTaureaux] = useState<Taureau[]>([]);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
@@ -463,6 +464,7 @@ function ReproductionContent() {
         fetch("/api/taureaux", { cache: "no-store" }).then((r) => r.json()),
       ]);
       setVaches(repro.vaches ?? []);
+      setPostCalvingRestDays(repro.postCalvingRestDays ?? 60);
       setTaureaux(taureauData.taureaux ?? []);
     } catch {
       setMessage("Erreur de chargement");
@@ -534,7 +536,8 @@ function ReproductionContent() {
       v.gestationEtat,
       v.dateVelagePrevue ? new Date(v.dateVelagePrevue) : null,
       v.dernierVelage ? new Date(v.dernierVelage) : null,
-      false
+      false,
+      postCalvingRestDays
     ) as EtatGestation,
   }));
 

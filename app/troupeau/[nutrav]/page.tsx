@@ -194,7 +194,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
           currentBreeding?.gestation?.etat ?? null,
           currentBreeding?.gestation?.dateVelagePrevue ?? null,
           animal.velagesVache[0]?.date ?? null,
-          false
+        false,
+        configAffichage.reproReposObjectifJours
         )
       : null;
 

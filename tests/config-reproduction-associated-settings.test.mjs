@@ -2,77 +2,40 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const reproductionPage = await readFile(
-  new URL("../app/config/reproduction/page.tsx", import.meta.url),
-  "utf8"
-);
-const settingsForm = await readFile(
-  new URL(
-    "../app/config/reproduction/PostCalvingSettingsForm.tsx",
-    import.meta.url
-  ),
-  "utf8"
-);
-const apiRoute = await readFile(
-  new URL("../app/api/exploitation-config/route.ts", import.meta.url),
-  "utf8"
-);
-const animalPage = await readFile(
-  new URL("../app/troupeau/[nutrav]/page.tsx", import.meta.url),
-  "utf8"
-);
+const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
+const reproductionPage = await read("../app/config/reproduction/page.tsx");
+const dryOffForm = await read("../app/config/reproduction/DryOffSettingsForm.tsx");
+const rulesForm = await read("../app/config/reproduction/ReproductionRulesForm.tsx");
+const exploitationApi = await read("../app/api/exploitation-config/route.ts");
+const rulesApi = await read("../app/api/reproduction-rules/route.ts");
+const animalPage = await read("../app/troupeau/[nutrav]/page.tsx");
 
-test("la page Reproduction charge les deux valeurs depuis ExploitationConfig", () => {
+test("la page Reproduction présente une seule règle visible de repos post-vêlage", () => {
   assert.match(reproductionPage, /reproReposObjectifJours: true/);
-  assert.match(reproductionPage, /tarissementVeauAgeMois: true/);
-  assert.match(reproductionPage, /reproReposObjectifJours: stored\?\.reproReposObjectifJours \?\? 60/);
-  assert.match(reproductionPage, /tarissementVeauAgeMois: stored\?\.tarissementVeauAgeMois \?\? 6/);
-  assert.match(reproductionPage, /PostCalvingSettingsForm/);
+  assert.match(reproductionPage, /applyPostCalvingRestDays/);
+  assert.match(reproductionPage, /ReproductionRulesForm initial=\{reproductionRules\}/);
+  assert.doesNotMatch(dryOffForm, /repos post-vêlage|reproReposObjectifJours/i);
+  assert.match(rulesForm, /config\.phases\.map/);
 });
 
-test("les réglages déplacés sont distincts du formulaire des règles du cycle", () => {
-  assert.match(settingsForm, /Après le vêlage/);
-  assert.match(settingsForm, /Objectif de repos post-vêlage/);
-  assert.match(settingsForm, /Durée de repos visée avant la remise à la reproduction/);
-  assert.match(settingsForm, /Tarissement/);
-  assert.match(settingsForm, /Proposer le tarissement lorsque le veau atteint/);
-  assert.match(settingsForm, /CESAM utilise cet âge pour afficher la proposition de tarissement/);
-  assert.doesNotMatch(settingsForm, /reproductionRulesJson/);
+test("le réglage de tarissement reste séparé et inchangé", () => {
+  assert.match(dryOffForm, /Tarissement/);
+  assert.match(dryOffForm, /tarissementVeauAgeMois/);
+  assert.match(dryOffForm, /fetch\("\/api\/exploitation-config"/);
+  assert.doesNotMatch(dryOffForm, /reproductionRulesJson/);
+  assert.match(animalPage, /dryOffCalfAgeMonths: configAffichage\.tarissementVeauAgeMois/);
 });
 
-test("l’enregistrement partiel envoie uniquement les deux champs existants", () => {
-  assert.match(settingsForm, /fetch\("\/api\/exploitation-config"/);
-  assert.match(settingsForm, /method: "PATCH"/);
-  assert.match(settingsForm, /body: JSON\.stringify\(form\)/);
-  assert.match(settingsForm, /reproReposObjectifJours: initial\.reproReposObjectifJours \?\? 60/);
-  assert.match(settingsForm, /tarissementVeauAgeMois: initial\.tarissementVeauAgeMois \?\? 6/);
-  assert.doesNotMatch(settingsForm, /\bipg\b|raisonSociale|veterinaireNom|affichageDelaiAttente/);
+test("la règle du cycle synchronise la valeur canonique utilisée par le cercle", () => {
+  assert.match(rulesApi, /getPostCalvingRestDays\(nextConfig\)/);
+  assert.match(rulesApi, /reproReposObjectifJours: postCalvingRestDays/);
+  assert.match(rulesApi, /applyPostCalvingRestDays/);
+  assert.match(animalPage, /restObjectiveDays: configAffichage\.reproReposObjectifJours/);
+  assert.match(animalPage, /configAffichage\.reproReposObjectifJours\s*\)/);
 });
 
-test("la route existante ne met à jour que les champs fournis", () => {
-  for (const field of [
-    "reproReposObjectifJours",
-    "tarissementVeauAgeMois",
-  ]) {
-    assert.match(
-      apiRoute,
-      new RegExp(
-        `safe${field === "reproReposObjectifJours" ? "ReposJours" : "TarissementMois"} !== undefined && \\{ ${field}:`
-      )
-    );
-  }
-  assert.match(apiRoute, /ipg !== undefined && \{ ipg:/);
-  assert.match(apiRoute, /veterinaireNom !== undefined && \{ veterinaireNom:/);
-  assert.match(apiRoute, /affichageDelaiAttente !== undefined && \{ affichageDelaiAttente \}/);
-});
-
-test("le cercle et la proposition de tarissement conservent les mêmes sources", () => {
-  assert.match(
-    animalPage,
-    /restObjectiveDays: configAffichage\.reproReposObjectifJours/
-  );
-  assert.match(
-    animalPage,
-    /dryOffCalfAgeMonths: configAffichage\.tarissementVeauAgeMois/
-  );
+test("la route Exploitation ne peut plus créer une seconde valeur concurrente", () => {
+  const patchBody = exploitationApi.slice(exploitationApi.indexOf("export async function PATCH"));
+  assert.doesNotMatch(patchBody, /reproReposObjectifJours/);
+  assert.match(patchBody, /tarissementVeauAgeMois/);
 });

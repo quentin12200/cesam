@@ -173,9 +173,13 @@ export function getEtatGestation(
   gestationEtat: string | null,
   dateVelagePrevue: Date | null,
   dernierVelage: Date | null,
-  aEchographier: boolean = false
+  aEchographier: boolean = false,
+  postCalvingRestDays: number = POST_CALVING_REST_DAYS
 ): EtatGestation {
   const now = new Date();
+  const safePostCalvingRestDays = Number.isFinite(postCalvingRestDays)
+    ? Math.max(1, Math.round(postCalvingRestDays))
+    : POST_CALVING_REST_DAYS;
 
   // Vêlage plus récent que la saillie : la vache a déjà vêlé pour cette
   // gestation — priorité absolue sur tout le reste (y compris un état VERT
@@ -183,7 +187,7 @@ export function getEtatGestation(
   // ou imminente après son terme.
   if (derniereSaillie && dernierVelage && dernierVelage > derniereSaillie) {
     const joursDepuisVelage = differenceInDays(now, dernierVelage);
-    return joursDepuisVelage <= POST_CALVING_REST_DAYS ? "REPOS" : "ROUGE";
+    return joursDepuisVelage <= safePostCalvingRestDays ? "REPOS" : "ROUGE";
   }
 
   // Compatibilité des consommateurs historiques : les vues de gestion de
@@ -207,7 +211,7 @@ export function getEtatGestation(
   if (!derniereSaillie) {
     if (dernierVelage) {
       const joursDepuisVelage = differenceInDays(now, dernierVelage);
-      if (joursDepuisVelage <= POST_CALVING_REST_DAYS) return "REPOS"; // < 2 mois post-vêlage
+      if (joursDepuisVelage <= safePostCalvingRestDays) return "REPOS";
       return "ROUGE";
     }
     return "ROUGE";
