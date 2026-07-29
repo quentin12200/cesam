@@ -358,7 +358,8 @@ export default async function Dashboard({ searchParams }: PageProps) {
       candidate.reachedThresholdToday && candidate.needsWeaning
   );
   const weaningDryOffNowCount = data.weaningDryOff.candidates.filter(
-    (candidate) => candidate.window === "NOW"
+    (candidate) =>
+      candidate.window === "NOW" && !candidate.recentlyWeaned
   ).length;
 
   const vachesACapteurSansCapteur = data.vachesACapteur.filter(

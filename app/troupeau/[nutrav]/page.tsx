@@ -452,6 +452,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     )}
                     {(animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150 && (
                       <SevrageButton
+                        animalId={animal.id}
                         nutrav={animal.nutrav}
                         sevreFait={animal.sevreFait}
                         danais={animal.danais.toISOString()}

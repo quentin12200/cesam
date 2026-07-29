@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
-import { resolveCalfMother } from "@/lib/weaning-dry-off";
 
 export async function GET(
   _request: NextRequest,
@@ -53,25 +52,20 @@ export async function PATCH(
   const { nutrav } = await params;
   const body = await request.json();
 
+  if ("sevreFait" in body) {
+    return NextResponse.json(
+      {
+        error:
+          "Le sevrage doit utiliser le parcours dédié afin de vérifier le cycle mère–veau actuel.",
+      },
+      { status: 409 }
+    );
+  }
+
   const animal = await prisma.animal.findUnique({
     where: { nutrav },
-    include: {
-      velageVeau: { select: { vache: { select: { nutrav: true } } } },
-      veauxVelage: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: {
-          velage: { select: { vache: { select: { nutrav: true } } } },
-        },
-      },
-      mere: { select: { nutrav: true } },
-    },
   });
   if (!animal) return NextResponse.json({ error: "Animal non trouvé" }, { status: 404 });
-
-  // La mère "officielle" est celle du vêlage enregistré ; à défaut (données
-  // historiques/importées sans vêlage), on retombe sur le lien de généalogie direct.
-  const mereNutrav = resolveCalfMother(animal)?.nutrav;
 
   // Capture previous values for undo
   const prevFields: Record<string, unknown> = {};
@@ -81,23 +75,11 @@ export async function PATCH(
   if ("notes"         in body) prevFields.notes         = animal.notes;
   if ("danais"        in body) prevFields.danais        = animal.danais;
   if ("boucleFaite"   in body) { prevFields.boucleFaite = animal.boucleFaite; prevFields.dateBouclage = animal.dateBouclage; }
-  if ("sevreFait"     in body) { prevFields.sevreFait = animal.sevreFait; prevFields.dateSevrage = animal.dateSevrage; }
   if ("tarieFaite"    in body) { prevFields.tarieFaite = animal.tarieFaite; prevFields.dateTarie = animal.dateTarie; }
   if ("categorie"     in body) prevFields.categorie     = animal.categorie;
   if ("groupeId"      in body) prevFields.groupeId      = animal.groupeId;
   if ("aEchographier" in body) prevFields.aEchographier = animal.aEchographier;
   if ("numeroNational" in body) prevFields.numeroNational = animal.numeroNational;
-
-  // Read mère's tarie BEFORE cascade update
-  let merePrevTarieFaite: boolean | undefined;
-  let merePrevDateTarie: Date | null | undefined;
-  if (body.sevreFait === true) {
-    if (mereNutrav) {
-      const mere = await prisma.animal.findUnique({ where: { nutrav: mereNutrav }, select: { tarieFaite: true, dateTarie: true } });
-      merePrevTarieFaite = mere?.tarieFaite;
-      merePrevDateTarie = mere?.dateTarie;
-    }
-  }
 
   const data: Record<string, unknown> = { updatedAt: new Date() };
   if ("nobovi"       in body) data.nobovi       = body.nobovi?.trim() || null;
@@ -108,10 +90,6 @@ export async function PATCH(
   if ("boucleFaite"  in body) {
     data.boucleFaite = body.boucleFaite;
     data.dateBouclage = body.boucleFaite ? new Date() : null;
-  }
-  if ("sevreFait"    in body) {
-    data.sevreFait = body.sevreFait;
-    data.dateSevrage = body.sevreFait ? (body.dateSevrage ? new Date(body.dateSevrage) : new Date()) : null;
   }
   if ("tarieFaite"   in body) {
     data.tarieFaite = body.tarieFaite;
@@ -124,27 +102,12 @@ export async function PATCH(
 
   const updated = await prisma.animal.update({ where: { nutrav }, data });
 
-  // Cascade sevrage → mère devient tarie automatiquement (même date que le sevrage du veau)
-  if (body.sevreFait === true) {
-    if (mereNutrav) {
-      await prisma.animal.update({
-        where: { nutrav: mereNutrav },
-        data: { tarieFaite: true, dateTarie: data.dateSevrage as Date },
-      });
-    }
-  }
-
   const desc = `Animal ${nutrav}${animal.nobovi ? ` (${animal.nobovi})` : ''} modifié`;
   let undoId = "";
   try {
     const revertSteps: Array<{ op: string; model: string; where?: Record<string, unknown>; data?: Record<string, unknown> }> = [
       { op: "update", model: "animal", where: { nutrav }, data: prevFields },
     ];
-    if (body.sevreFait === true) {
-      if (mereNutrav && merePrevTarieFaite !== undefined) {
-        revertSteps.push({ op: "update", model: "animal", where: { nutrav: mereNutrav }, data: { tarieFaite: merePrevTarieFaite, dateTarie: merePrevDateTarie ?? null } });
-      }
-    }
     undoId = await logAction("PATCH_ANIMAL", desc, revertSteps as Parameters<typeof logAction>[2]);
   } catch {}
 

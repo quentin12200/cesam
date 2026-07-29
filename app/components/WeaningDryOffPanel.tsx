@@ -1,15 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, MilkOff, Scissors, X } from "lucide-react";
-import { formatAge } from "@/lib/utils";
 import {
-  applySuccessfulWeaningDryOffAction,
-  type WeaningDryOffAction,
-  type WeaningDryOffCandidate,
+  ChevronDown,
+  MilkOff,
+  RotateCcw,
+  Scissors,
+  X,
+} from "lucide-react";
+import { formatAge } from "@/lib/utils";
+import type {
+  WeaningDryOffAction,
+  WeaningDryOffCandidate,
 } from "@/lib/weaning-dry-off";
+
+const SWIPE_THRESHOLD = 72;
+const MAX_SWIPE = 112;
+const REVERSIBLE_DURATION_MS = 12 * 60 * 60 * 1000;
 
 function localDateValue() {
   const now = new Date();
@@ -25,39 +34,134 @@ function CandidateLine({
   candidate,
   thresholdMonths,
   soon,
-  onAction,
+  busy,
+  error,
+  onQuickAction,
+  onManualDryOff,
 }: {
   candidate: WeaningDryOffCandidate;
   thresholdMonths: number;
   soon: boolean;
-  onAction: (
+  busy: boolean;
+  error: string;
+  onQuickAction: (
     candidate: WeaningDryOffCandidate,
     action: WeaningDryOffAction
   ) => void;
+  onManualDryOff: (candidate: WeaningDryOffCandidate) => void;
 }) {
-  const [separate, setSeparate] = useState(false);
-  const primaryLabel =
-    candidate.needsWeaning && candidate.needsDryOff
-      ? soon
-        ? "Enregistrer maintenant"
-        : "Sevrer / tarir"
-      : candidate.needsWeaning
-        ? "Sevrer le veau"
-        : "Tarir la mère";
-  const primaryAction: WeaningDryOffAction =
-    candidate.needsWeaning && candidate.needsDryOff
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const currentOffset = useRef(0);
+  const horizontalSwipe = useRef(false);
+  const quickAction: WeaningDryOffAction = candidate.recentlyWeaned
+    ? "UNDO_WEANING"
+    : candidate.willAutoDryOff
       ? "COMBINED"
-      : candidate.needsWeaning
-        ? "WEAN_ONLY"
-        : "DRY_OFF_ONLY";
+      : "WEAN_ONLY";
+
+  function updateOffset(value: number) {
+    currentOffset.current = value;
+    setSwipeOffset(value);
+  }
+
+  function onTouchStart(event: React.TouchEvent) {
+    if (busy) return;
+    touchStartX.current = event.touches[0].clientX;
+    touchStartY.current = event.touches[0].clientY;
+    horizontalSwipe.current = false;
+    setSwiping(true);
+  }
+
+  function onTouchMove(event: React.TouchEvent) {
+    if (busy) return;
+    const dx = event.touches[0].clientX - touchStartX.current;
+    const dy = event.touches[0].clientY - touchStartY.current;
+    if (!horizontalSwipe.current && Math.abs(dx) > Math.abs(dy) + 6) {
+      horizontalSwipe.current = true;
+    }
+    if (!horizontalSwipe.current) return;
+
+    const directionalOffset = candidate.recentlyWeaned
+      ? Math.max(0, Math.min(MAX_SWIPE, dx))
+      : Math.min(0, Math.max(-MAX_SWIPE, dx));
+    updateOffset(directionalOffset);
+  }
+
+  function onTouchEnd() {
+    setSwiping(false);
+    if (!horizontalSwipe.current || busy) {
+      updateOffset(0);
+      return;
+    }
+    const completed = candidate.recentlyWeaned
+      ? currentOffset.current >= SWIPE_THRESHOLD
+      : currentOffset.current <= -SWIPE_THRESHOLD;
+    updateOffset(0);
+    if (completed) onQuickAction(candidate, quickAction);
+  }
+
+  const statusText = candidate.recentlyWeaned
+    ? candidate.automaticDryOffAtWeaning
+      ? "Sevré — mère également tarie"
+      : "Sevré aujourd’hui"
+    : candidate.willAutoDryOff
+      ? "Dernier veau à sevrer : la mère sera automatiquement tarie."
+      : soon
+        ? "Sevrage anticipé possible"
+        : `Seuil de ${thresholdMonths} mois atteint`;
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+    <article
+      className={`relative overflow-hidden rounded-lg border ${
+        candidate.recentlyWeaned
+          ? "border-slate-200 bg-slate-100"
+          : "border-slate-200 bg-white"
+      }`}
+      data-swipe-direction={candidate.recentlyWeaned ? "right" : "left"}
+    >
+      <div
+        className={`absolute inset-0 flex items-center px-4 text-xs font-bold text-white md:hidden ${
+          candidate.recentlyWeaned
+            ? "justify-start bg-amber-600"
+            : "justify-end bg-green-700"
+        }`}
+      >
+        {candidate.recentlyWeaned ? (
+          <span className="flex items-center gap-1.5">
+            <RotateCcw size={16} /> Annuler
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5">
+            <Scissors size={16} /> Sevrer
+          </span>
+        )}
+      </div>
+
+      <div
+        className={`relative flex touch-pan-y select-none flex-col gap-2 p-3 sm:flex-row sm:items-start ${
+          candidate.recentlyWeaned ? "bg-slate-100" : "bg-white"
+        }`}
+        style={{
+          transform: `translateX(${swipeOffset}px)`,
+          transition: swiping ? "none" : "transform 0.2s ease",
+        }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={() => {
+          setSwiping(false);
+          updateOffset(0);
+        }}
+      >
         <div className="min-w-0 flex-1">
           <Link
             href={`/troupeau/${candidate.calf.nutrav}`}
-            className="text-sm font-extrabold text-green-800 hover:underline"
+            className={`text-sm font-extrabold hover:underline ${
+              candidate.recentlyWeaned ? "text-slate-700" : "text-green-800"
+            }`}
           >
             {animalLabel(candidate.calf)}
           </Link>
@@ -65,76 +169,80 @@ function CandidateLine({
             {formatAge(new Date(candidate.calf.birthDate))}
             <span className="mx-1 text-slate-300">·</span>
             Mère :{" "}
-            {candidate.mother ? (
-              <Link
-                href={`/troupeau/${candidate.mother.nutrav}`}
-                className="font-semibold text-amber-800 hover:underline"
-              >
-                {animalLabel(candidate.mother)}
-              </Link>
-            ) : (
-              <span className="font-semibold text-red-700">non reliée</span>
-            )}
+            <Link
+              href={`/troupeau/${candidate.mother.nutrav}`}
+              className="font-semibold text-amber-800 hover:underline"
+            >
+              {animalLabel(candidate.mother)}
+            </Link>
           </p>
-          <p
-            className={`mt-1 text-[11px] font-semibold ${
-              soon ? "text-slate-500" : "text-orange-700"
-            }`}
-          >
-            {soon
-              ? "Sevrage anticipé possible"
-              : `Seuil de ${thresholdMonths} mois atteint`}
-          </p>
-          {(!candidate.needsWeaning || !candidate.needsDryOff) && (
-            <p className="mt-1 text-[11px] font-semibold text-blue-700">
-              {candidate.needsWeaning
-                ? "La mère est déjà tarie : seul le sevrage reste à enregistrer."
-                : "Le veau est déjà sevré : seul le tarissement reste à enregistrer."}
+          {candidate.cycleCalfCount > 1 && (
+            <p className="mt-1 text-[11px] font-semibold text-slate-600">
+              {candidate.cycleWeanedCount} veau
+              {candidate.cycleWeanedCount > 1 ? "x" : ""} sur{" "}
+              {candidate.cycleCalfCount} sevré
+              {candidate.cycleWeanedCount > 1 ? "s" : ""}
             </p>
           )}
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => onAction(candidate, primaryAction)}
-            disabled={!candidate.needsWeaning && !candidate.needsDryOff}
-            className="min-h-9 rounded-lg bg-green-700 px-3 text-xs font-bold text-white hover:bg-green-800 disabled:opacity-50"
+          <p
+            className={`mt-1 text-[11px] font-semibold ${
+              candidate.recentlyWeaned
+                ? "text-slate-700"
+                : candidate.willAutoDryOff
+                  ? "text-blue-700"
+                  : soon
+                    ? "text-slate-500"
+                    : "text-orange-700"
+            }`}
           >
-            {primaryLabel}
-          </button>
-          {candidate.mother && candidate.needsWeaning && candidate.needsDryOff && (
+            {statusText}
+          </p>
+          {error && (
+            <p role="alert" className="mt-1 text-[11px] font-semibold text-red-700">
+              {error}
+            </p>
+          )}
+          {!candidate.recentlyWeaned && candidate.needsDryOff && (
             <button
               type="button"
-              onClick={() => setSeparate((value) => !value)}
-              className="min-h-9 rounded-lg border border-slate-300 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              onClick={() => onManualDryOff(candidate)}
+              disabled={busy}
+              className="mt-2 text-[11px] font-semibold text-blue-800 underline underline-offset-2 md:hidden"
             >
-              Gérer séparément
+              Tarir la mère séparément
+            </button>
+          )}
+        </div>
+
+        <div className="hidden shrink-0 flex-wrap gap-1.5 md:flex">
+          <button
+            type="button"
+            onClick={() => onQuickAction(candidate, quickAction)}
+            disabled={busy}
+            className={`min-h-9 rounded-lg px-3 text-xs font-bold text-white disabled:opacity-50 ${
+              candidate.recentlyWeaned
+                ? "bg-amber-600 hover:bg-amber-700"
+                : "bg-green-700 hover:bg-green-800"
+            }`}
+          >
+            {busy
+              ? "…"
+              : candidate.recentlyWeaned
+                ? "Annuler"
+                : "Sevrer"}
+          </button>
+          {!candidate.recentlyWeaned && candidate.needsDryOff && (
+            <button
+              type="button"
+              onClick={() => onManualDryOff(candidate)}
+              disabled={busy}
+              className="min-h-9 rounded-lg border border-slate-300 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Tarir la mère
             </button>
           )}
         </div>
       </div>
-      {separate && (
-        <div className="mt-2 flex flex-wrap gap-2 border-t border-slate-100 pt-2">
-          {candidate.needsWeaning && (
-            <button
-              type="button"
-              onClick={() => onAction(candidate, "WEAN_ONLY")}
-              className="rounded-lg bg-orange-50 px-2.5 py-2 text-xs font-bold text-orange-800 ring-1 ring-orange-200"
-            >
-              Sevrer uniquement le veau
-            </button>
-          )}
-          {candidate.needsDryOff && (
-            <button
-              type="button"
-              onClick={() => onAction(candidate, "DRY_OFF_ONLY")}
-              className="rounded-lg bg-blue-50 px-2.5 py-2 text-xs font-bold text-blue-800 ring-1 ring-blue-200"
-            >
-              Tarir uniquement la mère
-            </button>
-          )}
-        </div>
-      )}
     </article>
   );
 }
@@ -150,15 +258,32 @@ export default function WeaningDryOffPanel({
 }) {
   const router = useRouter();
   const [candidates, setCandidates] = useState(initialCandidates);
-  const [selection, setSelection] = useState<{
-    candidate: WeaningDryOffCandidate;
-    action: WeaningDryOffAction;
-  } | null>(null);
-  const [date, setDate] = useState(localDateValue);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [manualSelection, setManualSelection] =
+    useState<WeaningDryOffCandidate | null>(null);
+  const [manualDate, setManualDate] = useState(localDateValue);
+  const [busyCalfId, setBusyCalfId] = useState("");
+  const [error, setError] = useState<{ calfId: string; message: string } | null>(
+    null
+  );
 
   useEffect(() => setCandidates(initialCandidates), [initialCandidates]);
+
+  useEffect(() => {
+    const removeExpired = () => {
+      const now = Date.now();
+      setCandidates((current) =>
+        current.filter(
+          (candidate) =>
+            !candidate.recentlyWeaned ||
+            (candidate.reversibleUntil
+              ? new Date(candidate.reversibleUntil).getTime() > now
+              : false)
+        )
+      );
+    };
+    const timer = window.setInterval(removeExpired, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const nowCandidates = useMemo(
     () => candidates.filter((candidate) => candidate.window === "NOW"),
@@ -168,28 +293,28 @@ export default function WeaningDryOffPanel({
     () => candidates.filter((candidate) => candidate.window === "SOON"),
     [candidates]
   );
+  const activeNowCount = nowCandidates.filter(
+    (candidate) => !candidate.recentlyWeaned
+  ).length;
 
-  function openAction(
+  async function performAction(
     candidate: WeaningDryOffCandidate,
-    action: WeaningDryOffAction
+    action: WeaningDryOffAction,
+    date?: string
   ) {
-    setDate(localDateValue());
-    setError("");
-    setSelection({ candidate, action });
-  }
-
-  async function submit() {
-    if (!selection) return;
-    setSaving(true);
-    setError("");
+    if (busyCalfId) return false;
+    setBusyCalfId(candidate.calf.id);
+    setError(null);
     try {
       const response = await fetch("/api/sevrage-tarissement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          calfId: selection.candidate.calf.id,
-          action: selection.action,
-          date,
+          calfId: candidate.calf.id,
+          action,
+          ...(action === "UNDO_WEANING"
+            ? {}
+            : { date: date ?? new Date().toISOString() }),
         }),
       });
       const result = await response.json().catch(() => ({}));
@@ -197,34 +322,126 @@ export default function WeaningDryOffPanel({
         throw new Error(result.error ?? "Enregistrement impossible.");
       }
 
+      const motherDriedOff = Boolean(result.mother?.tarieFaite);
+      const progress = result.cycleProgress ?? {};
       setCandidates((current) =>
-        current.flatMap((candidate) => {
-          if (candidate.calf.id !== selection.candidate.calf.id) {
-            return [candidate];
+        current.map((currentCandidate) => {
+          if (currentCandidate.cycleId !== candidate.cycleId) {
+            return currentCandidate;
           }
-          const updated = applySuccessfulWeaningDryOffAction(
-            candidate,
-            selection.action,
-            date
+
+          const isTarget = currentCandidate.calf.id === candidate.calf.id;
+          const undone = Boolean(result.undone && isTarget);
+          const newlyWeaned = Boolean(
+            !result.undone && isTarget && result.calf?.sevreFait
           );
-          return updated ? [updated] : [];
+          const pending = Number(
+            progress.pending ?? currentCandidate.cyclePendingCount
+          );
+          const weaningDate = newlyWeaned
+            ? String(result.calf.dateSevrage)
+            : undone
+              ? null
+              : currentCandidate.calf.weaningDate;
+
+          return {
+            ...currentCandidate,
+            calf: {
+              ...currentCandidate.calf,
+              weaned: newlyWeaned
+                ? true
+                : undone
+                  ? false
+                  : currentCandidate.calf.weaned,
+              weaningDate,
+            },
+            cycleCalfCount: Number(
+              progress.total ?? currentCandidate.cycleCalfCount
+            ),
+            cycleWeanedCount: Number(
+              progress.weaned ?? currentCandidate.cycleWeanedCount
+            ),
+            cyclePendingCount: pending,
+            recentlyWeaned: newlyWeaned
+              ? true
+              : undone
+                ? false
+                : currentCandidate.recentlyWeaned,
+            reversibleUntil: newlyWeaned
+              ? new Date(
+                  new Date(String(result.calf.dateSevrage)).getTime() +
+                    REVERSIBLE_DURATION_MS
+                ).toISOString()
+              : undone
+                ? null
+                : currentCandidate.reversibleUntil,
+            automaticDryOffAtWeaning: newlyWeaned
+              ? Boolean(result.automaticDryOff)
+              : undone
+                ? false
+                : currentCandidate.automaticDryOffAtWeaning,
+            needsWeaning: newlyWeaned
+              ? false
+              : undone
+                ? true
+                : currentCandidate.needsWeaning,
+            willAutoDryOff:
+              !motherDriedOff &&
+              pending === 1 &&
+              !(newlyWeaned && isTarget),
+            needsDryOff: !motherDriedOff,
+            mother: {
+              ...currentCandidate.mother,
+              driedOff: motherDriedOff,
+              dryOffDate:
+                result.mother?.dateTarie ??
+                currentCandidate.mother.dryOffDate,
+            },
+          };
         })
       );
-      setSelection(null);
       router.refresh();
+      return true;
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Enregistrement impossible."
-      );
+      setError({
+        calfId: candidate.calf.id,
+        message:
+          caught instanceof Error
+            ? caught.message
+            : "Enregistrement impossible.",
+      });
+      return false;
     } finally {
-      setSaving(false);
+      setBusyCalfId("");
     }
+  }
+
+  function openManualDryOff(candidate: WeaningDryOffCandidate) {
+    setManualDate(localDateValue());
+    setError(null);
+    setManualSelection(candidate);
+  }
+
+  async function submitManualDryOff() {
+    if (!manualSelection) return;
+    const saved = await performAction(
+      manualSelection,
+      "DRY_OFF_ONLY",
+      manualDate
+    );
+    if (saved) setManualSelection(null);
   }
 
   if (candidates.length === 0) return null;
 
   return (
-    <div className={compact ? "rounded-lg border-l-[3px] border-l-cyan-500 bg-cyan-50/50 p-2.5" : "space-y-4"}>
+    <div
+      className={
+        compact
+          ? "rounded-lg border-l-[3px] border-l-cyan-500 bg-cyan-50/50 p-2.5"
+          : "space-y-4"
+      }
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="rounded-lg bg-cyan-100 p-1.5 text-cyan-800">
@@ -238,7 +455,7 @@ export default function WeaningDryOffPanel({
               Sevrage et tarissement
             </Link>
             <p className="text-[11px] text-slate-500">
-              {nowCandidates.length} à faire maintenant
+              {activeNowCount} à faire maintenant
             </p>
           </div>
         </div>
@@ -253,8 +470,7 @@ export default function WeaningDryOffPanel({
       {nowCandidates.length > 0 && (
         <div className="mt-2 space-y-2">
           <h2 className="flex items-center gap-2 text-xs font-extrabold text-slate-800">
-            <MilkOff size={15} className="text-blue-700" />
-            À faire maintenant
+            <MilkOff size={15} className="text-blue-700" />À faire maintenant
           </h2>
           {nowCandidates.map((candidate) => (
             <CandidateLine
@@ -262,7 +478,14 @@ export default function WeaningDryOffPanel({
               candidate={candidate}
               thresholdMonths={thresholdMonths}
               soon={false}
-              onAction={openAction}
+              busy={busyCalfId === candidate.calf.id}
+              error={
+                error?.calfId === candidate.calf.id ? error.message : ""
+              }
+              onQuickAction={(selected, action) =>
+                void performAction(selected, action)
+              }
+              onManualDryOff={openManualDryOff}
             />
           ))}
         </div>
@@ -285,91 +508,82 @@ export default function WeaningDryOffPanel({
                 candidate={candidate}
                 thresholdMonths={thresholdMonths}
                 soon
-                onAction={openAction}
+                busy={busyCalfId === candidate.calf.id}
+                error={
+                  error?.calfId === candidate.calf.id ? error.message : ""
+                }
+                onQuickAction={(selected, action) =>
+                  void performAction(selected, action)
+                }
+                onManualDryOff={openManualDryOff}
               />
             ))}
           </div>
         </details>
       )}
 
-      {selection && (
+      {manualSelection && (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="weaning-action-title"
+            aria-labelledby="manual-dry-off-title"
             className="w-full max-w-md rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 id="weaning-action-title" className="font-extrabold text-slate-900">
-                  {selection.action === "WEAN_ONLY"
-                    ? "Sevrer uniquement le veau"
-                    : selection.action === "DRY_OFF_ONLY"
-                      ? "Tarir uniquement la mère"
-                      : "Sevrer le veau et tarir la mère"}
+                <h2
+                  id="manual-dry-off-title"
+                  className="font-extrabold text-slate-900"
+                >
+                  Tarir uniquement la mère
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  Veau : {animalLabel(selection.candidate.calf)}
+                  Veau : {animalLabel(manualSelection.calf)}
                 </p>
                 <p className="text-xs text-slate-500">
-                  Mère :{" "}
-                  {selection.candidate.mother
-                    ? animalLabel(selection.candidate.mother)
-                    : "non reliée"}
+                  Mère : {animalLabel(manualSelection.mother)}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setSelection(null)}
+                onClick={() => setManualSelection(null)}
                 className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
                 aria-label="Fermer"
               >
                 <X size={18} />
               </button>
             </div>
-
-            <p className="mt-3 rounded-lg bg-cyan-50 p-3 text-xs leading-5 text-cyan-900">
-              {selection.action === "COMBINED"
-                ? "Le sevrage du veau et le tarissement de la mère seront enregistrés à cette date."
-                : selection.action === "WEAN_ONLY"
-                  ? "Seul le sevrage du veau sera enregistré à cette date."
-                  : "Seul le tarissement de la mère sera enregistré à cette date."}
+            <p className="mt-3 rounded-lg bg-blue-50 p-3 text-xs leading-5 text-blue-900">
+              Seul le tarissement de la mère sera enregistré. Les veaux
+              conserveront leur état de sevrage actuel.
             </p>
-
             <label className="mt-3 block text-xs font-bold text-slate-700">
               Date réalisée
               <input
                 type="date"
-                value={date}
+                value={manualDate}
                 max={localDateValue()}
-                onChange={(event) => setDate(event.target.value)}
+                onChange={(event) => setManualDate(event.target.value)}
                 className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
               />
             </label>
-
-            {error && (
-              <p role="alert" className="mt-2 rounded-lg bg-red-50 p-2.5 text-xs font-semibold text-red-700">
-                {error}
-              </p>
-            )}
-
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
-                onClick={() => setSelection(null)}
-                disabled={saving}
+                onClick={() => setManualSelection(null)}
+                disabled={Boolean(busyCalfId)}
                 className="min-h-11 flex-1 rounded-lg border border-slate-300 text-sm font-semibold text-slate-600"
               >
                 Annuler
               </button>
               <button
                 type="button"
-                onClick={() => void submit()}
-                disabled={saving || !date}
-                className="min-h-11 flex-1 rounded-lg bg-green-700 text-sm font-bold text-white disabled:opacity-50"
+                onClick={() => void submitManualDryOff()}
+                disabled={Boolean(busyCalfId) || !manualDate}
+                className="min-h-11 flex-1 rounded-lg bg-blue-700 text-sm font-bold text-white disabled:opacity-50"
               >
-                {saving ? "Enregistrement…" : "Confirmer"}
+                {busyCalfId ? "Enregistrement…" : "Confirmer"}
               </button>
             </div>
           </div>

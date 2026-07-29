@@ -1,7 +1,11 @@
 import { addMonths, isAfter, isSameDay, startOfDay } from "date-fns";
 
 export type WeaningWindow = "NOW" | "SOON";
-export type WeaningDryOffAction = "COMBINED" | "WEAN_ONLY" | "DRY_OFF_ONLY";
+export type WeaningDryOffAction =
+  | "COMBINED"
+  | "WEAN_ONLY"
+  | "DRY_OFF_ONLY"
+  | "UNDO_WEANING";
 
 export interface WeaningDryOffAnimal {
   id: string;
@@ -15,10 +19,19 @@ export interface WeaningDryOffCandidate {
     weaned: boolean;
     weaningDate: string | null;
   };
-  mother: (WeaningDryOffAnimal & {
+  mother: WeaningDryOffAnimal & {
     driedOff: boolean;
     dryOffDate: string | null;
-  }) | null;
+  };
+  cycleId: string;
+  cycleDate: string;
+  cycleCalfCount: number;
+  cycleWeanedCount: number;
+  cyclePendingCount: number;
+  willAutoDryOff: boolean;
+  recentlyWeaned: boolean;
+  reversibleUntil: string | null;
+  automaticDryOffAtWeaning: boolean;
   window: WeaningWindow;
   thresholdDate: string;
   anticipationDate: string;
@@ -33,14 +46,33 @@ export interface CalfMotherLinks<TMother> {
   mere?: TMother | null;
 }
 
+export interface LinkedCycleCalf {
+  id: string;
+  statut: string;
+  sevreFait: boolean;
+}
+
 export interface CandidateMotherRecord extends WeaningDryOffAnimal {
   statut: string;
   tarieFaite: boolean;
   dateTarie: Date | null;
+  velagesVache: Array<{ id: string; date: Date }>;
 }
 
-export interface CandidateCalfRecord
-  extends CalfMotherLinks<CandidateMotherRecord> {
+export interface CalvingCycleRecord {
+  id: string;
+  date: Date;
+  vache: CandidateMotherRecord;
+  veau: LinkedCycleCalf | null;
+  veauxDetails: Array<{ animal: LinkedCycleCalf | null }>;
+}
+
+export interface CalfCycleLinks {
+  velageVeau?: CalvingCycleRecord | null;
+  veauxVelage?: Array<{ velage: CalvingCycleRecord }>;
+}
+
+export interface CandidateCalfRecord extends CalfCycleLinks {
   id: string;
   nutrav: string;
   nobovi: string | null;
@@ -48,6 +80,14 @@ export interface CandidateCalfRecord
   statut: string;
   sevreFait: boolean;
   dateSevrage: Date | null;
+  automaticDryOffAtWeaning?: boolean;
+}
+
+export interface CurrentCalvingCycle {
+  cycle: CalvingCycleRecord;
+  mother: CandidateMotherRecord;
+  linkedCalves: LinkedCycleCalf[];
+  pendingCalves: LinkedCycleCalf[];
 }
 
 export function resolveCalfMother<TMother>(
@@ -59,6 +99,50 @@ export function resolveCalfMother<TMother>(
     calf.mere ??
     null
   );
+}
+
+export function resolveCalfCycle(
+  calf: CalfCycleLinks
+): CalvingCycleRecord | null {
+  return calf.velageVeau ?? calf.veauxVelage?.[0]?.velage ?? null;
+}
+
+export function collectLinkedCycleCalves(
+  cycle: CalvingCycleRecord
+): LinkedCycleCalf[] {
+  const calves = new Map<string, LinkedCycleCalf>();
+  if (cycle.veau) calves.set(cycle.veau.id, cycle.veau);
+  for (const detail of cycle.veauxDetails) {
+    if (detail.animal) calves.set(detail.animal.id, detail.animal);
+  }
+  return [...calves.values()];
+}
+
+export function getCurrentCalvingCycle(
+  calf: CandidateCalfRecord
+): CurrentCalvingCycle | null {
+  const cycle = resolveCalfCycle(calf);
+  if (!cycle || cycle.vache.statut !== "ACTIF") return null;
+
+  const latestCalving = cycle.vache.velagesVache[0];
+  if (!latestCalving || latestCalving.id !== cycle.id) return null;
+
+  const linkedCalves = collectLinkedCycleCalves(cycle);
+  if (!linkedCalves.some((linkedCalf) => linkedCalf.id === calf.id)) {
+    return null;
+  }
+
+  return {
+    cycle,
+    mother: cycle.vache,
+    linkedCalves,
+    // ACTIF est le seul statut opérationnel. SORTI, MORT et VENDU ne
+    // nécessitent plus de sevrage et ne doivent pas bloquer le tarissement.
+    pendingCalves: linkedCalves.filter(
+      (linkedCalf) =>
+        linkedCalf.statut === "ACTIF" && !linkedCalf.sevreFait
+    ),
+  };
 }
 
 export function classifyWeaningWindow(
@@ -100,13 +184,32 @@ export function buildWeaningDryOffCandidates(
   const candidates = new Map<string, WeaningDryOffCandidate>();
   for (const calf of calves) {
     if (calf.statut !== "ACTIF") continue;
+
+    const reversibleUntil = calf.dateSevrage
+      ? new Date(calf.dateSevrage.getTime() + 12 * 60 * 60 * 1000)
+      : null;
+    const recentlyWeaned = Boolean(
+      calf.sevreFait &&
+        calf.dateSevrage &&
+        reversibleUntil &&
+        reversibleUntil > now &&
+        calf.dateSevrage <= now
+    );
+    if (calf.sevreFait && !recentlyWeaned) continue;
+
     const timing = classifyWeaningWindow(calf.danais, thresholdMonths, now);
     if (!timing.window) continue;
-    const linkedMother = resolveCalfMother(calf);
-    const mother = linkedMother?.statut === "ACTIF" ? linkedMother : null;
-    const needsWeaning = !calf.sevreFait;
-    const needsDryOff = Boolean(mother && !mother.tarieFaite);
-    if (!needsWeaning && !needsDryOff) continue;
+
+    const currentCycle = getCurrentCalvingCycle(calf);
+    if (!currentCycle) continue;
+
+    const cycleWeanedCount = currentCycle.linkedCalves.filter(
+      (linkedCalf) => linkedCalf.sevreFait
+    ).length;
+    const willAutoDryOff =
+      !currentCycle.mother.tarieFaite &&
+      currentCycle.pendingCalves.length === 1 &&
+      currentCycle.pendingCalves[0]?.id === calf.id;
 
     candidates.set(calf.id, {
       calf: {
@@ -114,47 +217,36 @@ export function buildWeaningDryOffCandidates(
         nutrav: calf.nutrav,
         nobovi: calf.nobovi,
         birthDate: calf.danais.toISOString(),
-        weaned: calf.sevreFait,
-        weaningDate: calf.dateSevrage?.toISOString() ?? null,
+        weaned: false,
+        weaningDate: null,
       },
-      mother: mother
-        ? {
-            id: mother.id,
-            nutrav: mother.nutrav,
-            nobovi: mother.nobovi,
-            driedOff: mother.tarieFaite,
-            dryOffDate: mother.dateTarie?.toISOString() ?? null,
-          }
+      mother: {
+        id: currentCycle.mother.id,
+        nutrav: currentCycle.mother.nutrav,
+        nobovi: currentCycle.mother.nobovi,
+        driedOff: currentCycle.mother.tarieFaite,
+        dryOffDate: currentCycle.mother.dateTarie?.toISOString() ?? null,
+      },
+      cycleId: currentCycle.cycle.id,
+      cycleDate: currentCycle.cycle.date.toISOString(),
+      cycleCalfCount: currentCycle.linkedCalves.length,
+      cycleWeanedCount,
+      cyclePendingCount: currentCycle.pendingCalves.length,
+      willAutoDryOff,
+      recentlyWeaned,
+      reversibleUntil: recentlyWeaned
+        ? reversibleUntil?.toISOString() ?? null
         : null,
+      automaticDryOffAtWeaning: Boolean(
+        recentlyWeaned && calf.automaticDryOffAtWeaning
+      ),
       window: timing.window,
       thresholdDate: timing.thresholdDate.toISOString(),
       anticipationDate: timing.anticipationDate.toISOString(),
       reachedThresholdToday: timing.reachedThresholdToday,
-      needsWeaning,
-      needsDryOff,
+      needsWeaning: !recentlyWeaned,
+      needsDryOff: !currentCycle.mother.tarieFaite,
     });
   }
   return [...candidates.values()];
-}
-
-export function applySuccessfulWeaningDryOffAction(
-  candidate: WeaningDryOffCandidate,
-  action: WeaningDryOffAction,
-  date: string
-): WeaningDryOffCandidate | null {
-  const wean = action === "COMBINED" || action === "WEAN_ONLY";
-  const dryOff = action === "COMBINED" || action === "DRY_OFF_ONLY";
-  const next = {
-    ...candidate,
-    calf: wean
-      ? { ...candidate.calf, weaned: true, weaningDate: date }
-      : candidate.calf,
-    mother:
-      dryOff && candidate.mother
-        ? { ...candidate.mother, driedOff: true, dryOffDate: date }
-        : candidate.mother,
-    needsWeaning: wean ? false : candidate.needsWeaning,
-    needsDryOff: dryOff ? false : candidate.needsDryOff,
-  };
-  return next.needsWeaning || next.needsDryOff ? next : null;
 }

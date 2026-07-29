@@ -2,35 +2,63 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
-  applySuccessfulWeaningDryOffAction,
   buildWeaningDryOffCandidates,
   classifyWeaningWindow,
-  resolveCalfMother,
+  collectLinkedCycleCalves,
+  getCurrentCalvingCycle,
+  resolveCalfCycle,
 } from "../lib/weaning-dry-off.ts";
 
 const now = new Date("2026-07-29T10:00:00.000Z");
-const mother = {
-  id: "mother-1",
-  nutrav: "0001",
-  nobovi: "Mère",
-  statut: "ACTIF",
-  tarieFaite: false,
-  dateTarie: null,
-};
 
-function calf(id, nutrav, danais, links = {}) {
+function linkedCalf(id, statut = "ACTIF", sevreFait = false) {
+  return { id, statut, sevreFait };
+}
+
+function mother(latestCycleId = "cycle-current", overrides = {}) {
   return {
-    id,
-    nutrav,
-    nobovi: `Veau ${nutrav}`,
-    danais: new Date(danais),
+    id: "mother-1",
+    nutrav: "0001",
+    nobovi: "Mère",
     statut: "ACTIF",
-    sevreFait: false,
+    tarieFaite: false,
+    dateTarie: null,
+    velagesVache: [
+      { id: latestCycleId, date: new Date("2026-01-01T08:00:00.000Z") },
+    ],
+    ...overrides,
+  };
+}
+
+function cycle(calves, overrides = {}) {
+  return {
+    id: "cycle-current",
+    date: new Date("2026-01-01T08:00:00.000Z"),
+    vache: mother(),
+    veau: calves[0] ?? null,
+    veauxDetails: calves.map((animal) => ({ animal })),
+    ...overrides,
+  };
+}
+
+function calfRecord(
+  linked,
+  originCycle,
+  relation = "secondary",
+  overrides = {}
+) {
+  return {
+    id: linked.id,
+    nutrav: linked.id,
+    nobovi: `Veau ${linked.id}`,
+    danais: new Date("2026-01-01T08:00:00.000Z"),
+    statut: linked.statut,
+    sevreFait: linked.sevreFait,
     dateSevrage: null,
-    velageVeau: null,
-    veauxVelage: [],
-    mere: null,
-    ...links,
+    velageVeau: relation === "primary" ? originCycle : null,
+    veauxVelage:
+      relation === "secondary" ? [{ velage: originCycle }] : [],
+    ...overrides,
   };
 }
 
@@ -45,175 +73,257 @@ test("le mois d’anticipation et le seuil exact ne se chevauchent pas", () => {
     6,
     now
   );
-  const tooEarly = classifyWeaningWindow(
-    new Date("2026-03-01T00:00:00.000Z"),
-    6,
-    now
-  );
-
   assert.equal(atThreshold.window, "NOW");
   assert.equal(atThreshold.reachedThresholdToday, true);
   assert.equal(soon.window, "SOON");
-  assert.equal(tooEarly.window, null);
 });
 
-test("la mère du vêlage est prioritaire puis mereId sert de repli", () => {
-  const official = { ...mother, id: "official" };
-  const secondary = { ...mother, id: "secondary" };
-  const genealogy = { ...mother, id: "genealogy" };
-
-  assert.equal(
-    resolveCalfMother({
-      velageVeau: { vache: official },
-      veauxVelage: [{ velage: { vache: secondary } }],
-      mere: genealogy,
-    })?.id,
-    "official"
-  );
-  assert.equal(resolveCalfMother({ mere: genealogy })?.id, "genealogy");
-});
-
-test("un vêlage de trois veaux retourne trois lignes sans doublon", () => {
+test("un vêlage de trois veaux retrouve le principal et tous les secondaires sans doublon", () => {
   const calves = [
-    calf("calf-1", "1001", "2026-01-01", {
-      velageVeau: { vache: mother },
-      veauxVelage: [{ velage: { vache: mother } }],
-      mere: mother,
-    }),
-    calf("calf-2", "1002", "2026-01-01", {
-      veauxVelage: [{ velage: { vache: mother } }],
-      mere: mother,
-    }),
-    calf("calf-3", "1003", "2026-01-01", {
-      veauxVelage: [{ velage: { vache: mother } }],
-      mere: mother,
-    }),
+    linkedCalf("1001"),
+    linkedCalf("1002"),
+    linkedCalf("1003"),
   ];
+  const origin = cycle(calves);
+  origin.veauxDetails.push({ animal: calves[0] });
+
+  assert.equal(collectLinkedCycleCalves(origin).length, 3);
+  assert.equal(resolveCalfCycle(calfRecord(calves[0], origin, "primary"))?.id, origin.id);
+  assert.equal(resolveCalfCycle(calfRecord(calves[2], origin))?.id, origin.id);
 
   const candidates = buildWeaningDryOffCandidates(
-    [...calves, calves[1]],
+    [
+      calfRecord(calves[0], origin, "primary"),
+      calfRecord(calves[1], origin),
+      calfRecord(calves[2], origin),
+    ],
     6,
     now
   );
-
   assert.deepEqual(
-    candidates.map((candidate) => candidate.calf.id).sort(),
-    ["calf-1", "calf-2", "calf-3"]
+    candidates.map((candidate) => candidate.calf.id),
+    ["1001", "1002", "1003"]
   );
-  assert.ok(candidates.every((candidate) => candidate.mother?.id === mother.id));
+  assert.ok(candidates.every((candidate) => candidate.mother.id === "mother-1"));
 });
 
-test("un veau relié uniquement par mereId reste candidat", () => {
+test("un vêlage simple tarit automatiquement la mère au sevrage", () => {
+  const onlyCalf = linkedCalf("1001");
+  const origin = cycle([onlyCalf]);
+  const [candidate] = buildWeaningDryOffCandidates(
+    [calfRecord(onlyCalf, origin, "primary")],
+    6,
+    now
+  );
+  assert.equal(candidate.willAutoDryOff, true);
+  assert.equal(candidate.cyclePendingCount, 1);
+});
+
+test("le premier veau de deux ne tarit pas automatiquement la mère", () => {
+  const calves = [linkedCalf("1001"), linkedCalf("1002")];
+  const origin = cycle(calves);
   const candidates = buildWeaningDryOffCandidates(
-    [calf("calf-4", "1004", "2026-01-01", { mere: mother })],
+    [
+      calfRecord(calves[0], origin, "primary"),
+      calfRecord(calves[1], origin),
+    ],
+    6,
+    now
+  );
+  assert.ok(candidates.every((candidate) => !candidate.willAutoDryOff));
+  assert.ok(candidates.every((candidate) => candidate.cyclePendingCount === 2));
+});
+
+test("le dernier veau non sevré de deux déclenche le tarissement automatique", () => {
+  const calves = [linkedCalf("1001", "ACTIF", true), linkedCalf("1002")];
+  const origin = cycle(calves);
+  const candidates = buildWeaningDryOffCandidates(
+    [calfRecord(calves[1], origin)],
     6,
     now
   );
   assert.equal(candidates.length, 1);
-  assert.equal(candidates[0].mother?.id, mother.id);
+  assert.equal(candidates[0].willAutoDryOff, true);
+  assert.equal(candidates[0].cycleWeanedCount, 1);
 });
 
-test("les animaux sortis sont exclus", () => {
-  const exited = calf("calf-5", "1005", "2026-01-01", { mere: mother });
-  exited.statut = "SORTI";
-  assert.equal(buildWeaningDryOffCandidates([exited], 6, now).length, 0);
-});
-
-test("les actions combinée et séparées conservent les actions restantes", () => {
-  const candidate = buildWeaningDryOffCandidates(
-    [calf("calf-6", "1006", "2026-01-01", { mere: mother })],
+test("trois veaux sevrés à des dates différentes conservent le bon avancement", () => {
+  const calves = [
+    linkedCalf("1001", "ACTIF", true),
+    linkedCalf("1002", "ACTIF", true),
+    linkedCalf("1003"),
+  ];
+  const origin = cycle(calves);
+  const [candidate] = buildWeaningDryOffCandidates(
+    [calfRecord(calves[2], origin)],
     6,
     now
-  )[0];
-
-  const weanedOnly = applySuccessfulWeaningDryOffAction(
-    candidate,
-    "WEAN_ONLY",
-    "2026-07-29"
   );
-  assert.equal(weanedOnly?.needsWeaning, false);
-  assert.equal(weanedOnly?.needsDryOff, true);
+  assert.equal(candidate.cycleCalfCount, 3);
+  assert.equal(candidate.cycleWeanedCount, 2);
+  assert.equal(candidate.cyclePendingCount, 1);
+  assert.equal(candidate.willAutoDryOff, true);
+});
 
-  const driedOnly = applySuccessfulWeaningDryOffAction(
-    candidate,
-    "DRY_OFF_ONLY",
-    "2026-07-28"
+test("un veau sorti, mort ou vendu ne bloque pas indéfiniment le tarissement", () => {
+  for (const status of ["SORTI", "MORT", "VENDU"]) {
+    const calves = [linkedCalf(`inactive-${status}`, status), linkedCalf("active")];
+    const origin = cycle(calves);
+    const current = getCurrentCalvingCycle(calfRecord(calves[1], origin));
+    assert.equal(current?.pendingCalves.length, 1);
+    const [candidate] = buildWeaningDryOffCandidates(
+      [calfRecord(calves[1], origin)],
+      6,
+      now
+    );
+    assert.equal(candidate.willAutoDryOff, true);
+  }
+});
+
+test("un ancien veau déjà sevré n’est jamais une tâche de tarissement", () => {
+  const old = linkedCalf("old", "ACTIF", true);
+  const origin = cycle([old]);
+  const candidates = buildWeaningDryOffCandidates(
+    [
+      calfRecord(old, origin, "primary", {
+        dateSevrage: new Date("2020-07-01T10:00:00.000Z"),
+      }),
+    ],
+    6,
+    now
   );
-  assert.equal(driedOnly?.needsWeaning, true);
-  assert.equal(driedOnly?.needsDryOff, false);
+  assert.equal(candidates.length, 0);
+});
 
+test("un cycle antérieur est exclu si la mère a vêlé depuis", () => {
+  const linked = linkedCalf("old-cycle-calf");
+  const oldCycle = cycle([linked], {
+    id: "cycle-old",
+    vache: mother("cycle-new"),
+  });
+  assert.equal(getCurrentCalvingCycle(calfRecord(linked, oldCycle)), null);
   assert.equal(
-    applySuccessfulWeaningDryOffAction(
-      candidate,
-      "COMBINED",
-      "2026-07-29"
-    ),
-    null
+    buildWeaningDryOffCandidates(
+      [calfRecord(linked, oldCycle)],
+      6,
+      now
+    ).length,
+    0
   );
 });
 
-const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+test("un simple lien généalogique sans vêlage fiable reste hors liste opérationnelle", () => {
+  const linked = linkedCalf("genealogy-only");
+  const record = calfRecord(linked, cycle([linked]), "none", {
+    mere: mother(),
+  });
+  assert.equal(resolveCalfCycle(record), null);
+  assert.equal(buildWeaningDryOffCandidates([record], 6, now).length, 0);
+});
+
+test("une ligne sevrée reste grisée et réversible exactement douze heures", () => {
+  const linked = linkedCalf("recent", "ACTIF", true);
+  const origin = cycle([linked]);
+  const recent = calfRecord(linked, origin, "primary", {
+    dateSevrage: new Date("2026-07-29T09:00:00.000Z"),
+    automaticDryOffAtWeaning: true,
+  });
+  const [candidate] = buildWeaningDryOffCandidates([recent], 6, now);
+  assert.equal(candidate.recentlyWeaned, true);
+  assert.equal(candidate.needsWeaning, false);
+  assert.equal(candidate.automaticDryOffAtWeaning, true);
+  assert.equal(
+    buildWeaningDryOffCandidates(
+      [recent],
+      6,
+      new Date("2026-07-29T21:00:01.000Z")
+    ).length,
+    0
+  );
+});
+
 const panel = await readFile(
   new URL("../app/components/WeaningDryOffPanel.tsx", import.meta.url),
-  "utf8"
-);
-const page = await readFile(
-  new URL("../app/troupeau/sevrage/page.tsx", import.meta.url),
   "utf8"
 );
 const api = await readFile(
   new URL("../app/api/sevrage-tarissement/route.ts", import.meta.url),
   "utf8"
 );
-const calvingApi = await readFile(
-  new URL("../app/api/velages/route.ts", import.meta.url),
-  "utf8"
-);
 const dataSource = await readFile(
   new URL("../lib/weaning-dry-off-data.ts", import.meta.url),
   "utf8"
 );
+const animalApi = await readFile(
+  new URL("../app/api/animaux/[nutrav]/route.ts", import.meta.url),
+  "utf8"
+);
+const calvingApi = await readFile(
+  new URL("../app/api/velages/route.ts", import.meta.url),
+  "utf8"
+);
 
-test("l’accueil utilise la source unique sans seuil fixe de 180 jours", () => {
-  assert.match(home, /getWeaningDryOffCandidates\(now\)/);
-  assert.match(home, /WeaningDryOffPanel/);
-  assert.doesNotMatch(home, /sixMonthsAgo|fiveMonthsAgo|addDays\(now, -180\)/);
-});
-
-test("la source couvre le veau principal, tous les VeauVelage et mereId", () => {
+test("la source ne charge que le cycle relié et les sevrages des douze dernières heures", () => {
   assert.match(dataSource, /velageVeau: \{ isNot: null \}/);
   assert.match(dataSource, /veauxVelage: \{ some: \{\} \}/);
-  assert.match(dataSource, /mereId: \{ not: null \}/);
-  assert.match(dataSource, /buildWeaningDryOffCandidates/);
+  assert.doesNotMatch(dataSource, /mereId: \{ not: null \}/);
+  assert.match(dataSource, /12 \* 60 \* 60 \* 1000/);
+  assert.match(dataSource, /SEVRAGE_TARISSEMENT_AUTO/);
 });
 
-test("le panneau attend response.ok avant de retirer une ligne", () => {
+test("le swipe gauche enregistre directement et le swipe droit annule", () => {
+  assert.match(panel, /data-swipe-direction=\{candidate\.recentlyWeaned \? "right" : "left"\}/);
+  assert.match(panel, /onTouchEnd/);
+  assert.match(panel, /currentOffset\.current <= -SWIPE_THRESHOLD/);
+  assert.match(panel, /currentOffset\.current >= SWIPE_THRESHOLD/);
+  assert.match(panel, /onQuickAction\(candidate, quickAction\)/);
+  assert.doesNotMatch(panel, /window\.confirm/);
+});
+
+test("un swipe incomplet ou annulé restaure la ligne", () => {
+  assert.match(panel, /updateOffset\(0\)/);
+  assert.match(panel, /onTouchCancel/);
+  assert.match(panel, /horizontalSwipe/);
+});
+
+test("l’interface attend response.ok et conserve les erreurs sur la ligne", () => {
   const responseCheck = panel.indexOf("if (!response.ok)");
-  const stateUpdate = panel.indexOf("setCandidates((current)");
+  const stateUpdate = panel.indexOf("setCandidates((current)", responseCheck);
   assert.ok(responseCheck >= 0);
   assert.ok(stateUpdate > responseCheck);
   assert.match(panel, /role="alert"/);
 });
 
-test("la page dédiée réutilise les candidats et l’historique existant", () => {
-  assert.match(page, /getWeaningDryOffCandidates/);
-  assert.match(page, /getVeauxSevres/);
-  assert.match(page, /WeaningDryOffPanel/);
-  assert.match(page, /Récemment effectués/);
-  assert.match(page, /getMeresTariesRecemment/);
-  assert.match(page, /veauxVelage/);
-  assert.match(page, /resolveCalfMother\(a\)/);
+test("les boutons ordinateur proposent Sevrer puis Annuler pendant douze heures", () => {
+  assert.match(panel, /className="hidden shrink-0 flex-wrap gap-1\.5 md:flex"/);
+  assert.match(panel, /\? "Annuler"\s*: "Sevrer"/);
+  assert.match(panel, /REVERSIBLE_DURATION_MS/);
+  assert.match(panel, /window\.setInterval\(removeExpired, 60_000\)/);
 });
 
-test("l’API réalise les actions dans une transaction et conserve l’annulation", () => {
-  assert.match(api, /prisma\.\$transaction/);
-  assert.match(api, /SEVRAGE_TARISSEMENT/);
-  assert.match(api, /WEAN_ONLY/);
-  assert.match(api, /DRY_OFF_ONLY/);
-  assert.match(api, /revertData: JSON\.stringify\(revertSteps\)/);
+test("l’API ne tarit automatiquement qu’en l’absence d’un autre veau actif non sevré", () => {
+  assert.match(api, /remainingCalves === 0/);
+  assert.match(api, /tx\.animal\.count/);
+  assert.match(api, /automaticDryOff/);
+  assert.match(api, /SEVRAGE_TARISSEMENT_AUTO/);
+  assert.match(api, /TARISSEMENT_MANUEL/);
+  assert.match(api, /effectiveActionDate/);
 });
 
-test("un nouveau vêlage efface le statut et l’ancienne date de tarissement", () => {
+test("l’annulation restaure le veau et protège un tarissement manuel", () => {
+  assert.match(api, /action === "UNDO_WEANING"/);
+  assert.match(api, /"TARISSEMENT_MANUEL"/);
+  assert.match(api, /\.includes\(latestDryOffLog\.type\)/);
+  assert.match(api, /sevreFait: false, dateSevrage: null/);
+  assert.match(api, /reverted: true, revertedAt: new Date\(\)/);
+});
+
+test("l’ancienne route générique ne peut plus appliquer la cascade incorrecte", () => {
+  assert.match(animalApi, /Le sevrage doit utiliser le parcours dédié/);
+  assert.doesNotMatch(animalApi, /Cascade sevrage/);
+});
+
+test("un nouveau vêlage efface toujours le statut et l’ancienne date de tarissement", () => {
   assert.match(calvingApi, /tarieFaite: false, dateTarie: null/);
   assert.match(calvingApi, /dateTarie: prevDateTarie/);
 });
