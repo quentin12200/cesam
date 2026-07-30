@@ -301,6 +301,32 @@ test("les boutons ordinateur proposent Sevrer puis Annuler pendant douze heures"
   assert.match(panel, /window\.setInterval\(removeExpired, 60_000\)/);
 });
 
+test("l’ordinateur n’affiche qu’un bouton principal et garde le tarissement en action secondaire", () => {
+  const desktopStart = panel.indexOf(
+    'className="hidden shrink-0 flex-wrap gap-1.5 md:flex"'
+  );
+  const desktopEnd = panel.indexOf("</div>", desktopStart);
+  const desktopActions = panel.slice(desktopStart, desktopEnd);
+  assert.equal(desktopActions.match(/<button/g)?.length, 1);
+  assert.match(desktopActions, /"Sevrer"/);
+  assert.doesNotMatch(desktopActions, /Tarir la mère/);
+  assert.match(panel, /aria-label="Autres actions"/);
+  assert.match(panel, /Tarir la mère séparément/);
+});
+
+test("le message du dernier veau est réservé à un vrai vêlage multiple déjà partiellement sevré", () => {
+  assert.match(panel, /candidate\.cycleCalfCount > 1/);
+  assert.match(panel, /candidate\.cycleWeanedCount > 0/);
+  assert.match(panel, /candidate\.cyclePendingCount === 1/);
+  assert.match(panel, /showLastCalfMessage/);
+});
+
+test("les deux aides de swipe restent discrètes et limitées au mobile", () => {
+  assert.match(panel, /Glisser à gauche pour sevrer/);
+  assert.match(panel, /Glisser à droite pour annuler/);
+  assert.match(panel, /text-slate-400 md:hidden/);
+});
+
 test("l’API ne tarit automatiquement qu’en l’absence d’un autre veau actif non sevré", () => {
   assert.match(api, /remainingCalves === 0/);
   assert.match(api, /tx\.animal\.count/);

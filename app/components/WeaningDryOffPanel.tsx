@@ -61,6 +61,11 @@ function CandidateLine({
     : candidate.willAutoDryOff
       ? "COMBINED"
       : "WEAN_ONLY";
+  const showLastCalfMessage =
+    candidate.willAutoDryOff &&
+    candidate.cycleCalfCount > 1 &&
+    candidate.cycleWeanedCount > 0 &&
+    candidate.cyclePendingCount === 1;
 
   function updateOffset(value: number) {
     currentOffset.current = value;
@@ -107,7 +112,7 @@ function CandidateLine({
     ? candidate.automaticDryOffAtWeaning
       ? "Sevré — mère également tarie"
       : "Sevré aujourd’hui"
-    : candidate.willAutoDryOff
+    : showLastCalfMessage
       ? "Dernier veau à sevrer : la mère sera automatiquement tarie."
       : soon
         ? "Sevrage anticipé possible"
@@ -188,7 +193,7 @@ function CandidateLine({
             className={`mt-1 text-[11px] font-semibold ${
               candidate.recentlyWeaned
                 ? "text-slate-700"
-                : candidate.willAutoDryOff
+                : showLastCalfMessage
                   ? "text-blue-700"
                   : soon
                     ? "text-slate-500"
@@ -197,20 +202,34 @@ function CandidateLine({
           >
             {statusText}
           </p>
+          <p className="mt-1 text-[10px] font-medium text-slate-400 md:hidden">
+            {candidate.recentlyWeaned
+              ? "Glisser à droite pour annuler"
+              : "Glisser à gauche pour sevrer"}
+          </p>
           {error && (
             <p role="alert" className="mt-1 text-[11px] font-semibold text-red-700">
               {error}
             </p>
           )}
           {!candidate.recentlyWeaned && candidate.needsDryOff && (
-            <button
-              type="button"
-              onClick={() => onManualDryOff(candidate)}
-              disabled={busy}
-              className="mt-2 text-[11px] font-semibold text-blue-800 underline underline-offset-2 md:hidden"
-            >
-              Tarir la mère séparément
-            </button>
+            <details className="mt-1 w-fit text-[11px] text-slate-500">
+              <summary
+                className="cursor-pointer list-none rounded px-1 font-bold tracking-widest hover:bg-slate-100"
+                aria-label="Autres actions"
+                title="Autres actions"
+              >
+                ···
+              </summary>
+              <button
+                type="button"
+                onClick={() => onManualDryOff(candidate)}
+                disabled={busy}
+                className="mt-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 font-semibold tracking-normal text-blue-800 disabled:opacity-50"
+              >
+                Tarir la mère séparément
+              </button>
+            </details>
           )}
         </div>
 
@@ -231,16 +250,6 @@ function CandidateLine({
                 ? "Annuler"
                 : "Sevrer"}
           </button>
-          {!candidate.recentlyWeaned && candidate.needsDryOff && (
-            <button
-              type="button"
-              onClick={() => onManualDryOff(candidate)}
-              disabled={busy}
-              className="min-h-9 rounded-lg border border-slate-300 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-            >
-              Tarir la mère
-            </button>
-          )}
         </div>
       </div>
     </article>
