@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { FieldSessionEntry } from "./field-weighing.ts";
+import { removeSessionEntry, replaceSessionEntry } from "./field-weighing.ts";
 import {
   assignPriceGroup,
   generalEstimate,
@@ -33,6 +34,46 @@ const femaleHead: PriceGroup = {
 
 test("trie les poids décroissants et reste stable à poids égal", () => {
   assert.deepEqual(sortEntriesByWeight(entries).map((entry) => entry.id), ["m2", "m1", "m3", "f2", "f1"]);
+});
+
+test("trie la série constatée du plus lourd au plus léger", () => {
+  const weights = [463, 429, 447, 457, 375, 395].map((poids, index) => ({
+    ...entries[0],
+    id: `p${index}`,
+    poids,
+  }));
+
+  assert.deepEqual(sortEntriesByWeight(weights).map((entry) => entry.poids), [463, 457, 447, 429, 395, 375]);
+  assert.deepEqual(weights.map((entry) => entry.poids), [463, 429, 447, 457, 375, 395]);
+});
+
+test("trie séparément les mâles et les femelles", () => {
+  const males = sortEntriesByWeight(entries.filter((entry) => entry.sexe === "M"));
+  const females = sortEntriesByWeight(entries.filter((entry) => entry.sexe === "F"));
+
+  assert.deepEqual(males.map((entry) => entry.id), ["m2", "m1", "m3"]);
+  assert.deepEqual(females.map((entry) => entry.id), ["f2", "f1"]);
+});
+
+test("conserve l'ordre de saisie lorsque les poids sont identiques", () => {
+  const equalWeights = entries.slice(0, 3).map((entry) => ({ ...entry, poids: 450 }));
+
+  assert.deepEqual(sortEntriesByWeight(equalWeights).map((entry) => entry.id), ["m1", "m2", "m3"]);
+});
+
+test("repositionne la bonne ligne après modification du poids", () => {
+  const updated = replaceSessionEntry(entries, { ...entries[2], poids: 500 });
+
+  assert.deepEqual(sortEntriesByWeight(updated).map((entry) => entry.id), ["m3", "m2", "m1", "f2", "f1"]);
+  assert.equal(updated.filter((entry) => entry.id === "m3").length, 1);
+});
+
+test("supprime toujours la pesée ciblée par son id après le tri", () => {
+  const sorted = sortEntriesByWeight(entries);
+  const removed = removeSessionEntry(sorted, "m1");
+
+  assert.deepEqual(removed.map((entry) => entry.id), ["m2", "m3", "f2", "f1"]);
+  assert.equal(removed.some((entry) => entry.id === "m1"), false);
 });
 
 test("calcule les estimations individuelles selon les deux modes", () => {

@@ -30,7 +30,7 @@ import {
   SWIPE_ACTION_WIDTH,
 } from "@/lib/field-weighing";
 import type { FieldSessionEntry } from "@/lib/field-weighing";
-import { parsePriceGroups, type PriceGroup } from "@/lib/price-simulation";
+import { parsePriceGroups, sortEntriesByWeight, type PriceGroup } from "@/lib/price-simulation";
 import PriceSimulation from "./PriceSimulation";
 
 type StoredSession = {
@@ -361,8 +361,9 @@ export default function FieldWeighingSession() {
     setError("");
   }
 
-  const males = session.entries.filter((entry) => entry.sexe === "M");
-  const females = session.entries.filter((entry) => entry.sexe === "F");
+  const sortedEntries = sortEntriesByWeight(session.entries);
+  const males = sortEntriesByWeight(session.entries.filter((entry) => entry.sexe === "M"));
+  const females = sortEntriesByWeight(session.entries.filter((entry) => entry.sexe === "F"));
   const maleAverage = averageWeight(males);
   const femaleAverage = averageWeight(females);
   const ageAlerts = fieldAgeAlertSummary(session.entries);
@@ -463,7 +464,7 @@ export default function FieldWeighingSession() {
                 AUCUNE PESÉE ENREGISTRÉE DANS CETTE SÉANCE
               </p>
             ) : (
-              session.entries.map((entry, index) => {
+              sortedEntries.map((entry, index) => {
                 const isEditing = editingInSummary && editingId === entry.id;
                 return (
                   <SummaryRow
