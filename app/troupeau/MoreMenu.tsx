@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { MoreVertical, Printer, Network, Scissors, Tags } from "lucide-react";
+import { MoreVertical, Printer, Network, Scale, Scissors, Tags } from "lucide-react";
 
 export default function MoreMenu({ printHref }: { printHref: string }) {
   const [open, setOpen] = useState(false);
@@ -17,6 +17,7 @@ export default function MoreMenu({ printHref }: { printHref: string }) {
   }, []);
 
   const items = [
+    { href: "/troupeau/pesee", icon: Scale, label: "Pesée rapide", color: "text-black" },
     { href: "/troupeau/identification", icon: Tags, label: "Identification", color: "text-violet-600" },
     { href: "/troupeau/sevrage", icon: Scissors, label: "Sevrage", color: "text-orange-600" },
     { href: "/troupeau/genealogie", icon: Network, label: "Généalogie", color: "text-emerald-700" },
