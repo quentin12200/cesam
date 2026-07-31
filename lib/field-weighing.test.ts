@@ -4,6 +4,8 @@ import {
   averageWeight,
   calculateGmqKgPerDay,
   clampSwipeOffset,
+  fieldAgeInfo,
+  motherNumberLabel,
   nextOpenSwipeId,
   prependSessionEntry,
   removeSessionEntry,
@@ -17,10 +19,58 @@ import {
 import type { FieldSessionEntry } from "./field-weighing.ts";
 
 const entries: FieldSessionEntry[] = [
-  { id: "p3", nutrav: "3003", sexe: "M", poids: 310, gmq: 1.2, selected: true },
+  { id: "p3", nutrav: "3003", mereNutrav: "6393", birthDate: "2025-09-13T12:00:00.000Z", sexe: "M", poids: 310, gmq: 1.2, selected: true },
   { id: "p2", nutrav: "2002", sexe: "F", poids: 280, gmq: 0.9, selected: true },
   { id: "p1", nutrav: "1001", sexe: "M", poids: 250, gmq: 0.7, selected: false },
 ];
+
+test("affiche le numéro de la mère sans le confondre avec celui du veau", () => {
+  assert.equal(entries[0].nutrav, "3003");
+  assert.equal(motherNumberLabel(entries[0]), "Mère 6393");
+  assert.notEqual(entries[0].nutrav, entries[0].mereNutrav);
+});
+
+test("affiche une mère inconnue lorsque la relation est absente", () => {
+  assert.equal(motherNumberLabel(entries[1]), "Mère inconnue");
+});
+
+test("conserve le numéro de mère après rechargement de la séance locale", () => {
+  const restored = JSON.parse(JSON.stringify({ entries })) as { entries: FieldSessionEntry[] };
+
+  assert.equal(restored.entries[0].mereNutrav, "6393");
+  assert.equal(motherNumberLabel(restored.entries[0]), "Mère 6393");
+  assert.equal(restored.entries[0].birthDate, "2025-09-13T12:00:00.000Z");
+});
+
+const ageReference = new Date("2026-07-31T12:00:00.000Z");
+
+test("affiche l'âge en mois et jours avant 12 mois", () => {
+  assert.deepEqual(fieldAgeInfo("2025-09-13T12:00:00.000Z", ageReference), {
+    label: "10 mois 18 j",
+    overTwelveMonths: false,
+  });
+});
+
+test("affiche exactement 12 mois en années et mois", () => {
+  assert.deepEqual(fieldAgeInfo("2025-07-31T12:00:00.000Z", ageReference), {
+    label: "1 an 0 mois",
+    overTwelveMonths: true,
+  });
+});
+
+test("affiche plus de 12 mois en années et mois", () => {
+  assert.deepEqual(fieldAgeInfo("2024-05-31T12:00:00.000Z", ageReference), {
+    label: "2 ans 2 mois",
+    overTwelveMonths: true,
+  });
+});
+
+test("affiche un âge inconnu sans date de naissance", () => {
+  assert.deepEqual(fieldAgeInfo(null, ageReference), {
+    label: "Âge inconnu",
+    overTwelveMonths: false,
+  });
+});
 
 function clickSwipeAction(action: () => void) {
   let pointerDownReachedSwipeRow = true;

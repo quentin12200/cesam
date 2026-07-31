@@ -1,3 +1,5 @@
+import { addMonths, differenceInDays, differenceInMonths } from "date-fns";
+
 export type PreviousWeight = {
   poids: number;
   date: Date;
@@ -6,11 +8,45 @@ export type PreviousWeight = {
 export type FieldSessionEntry = {
   id: string;
   nutrav: string;
+  mereNutrav?: string | null;
+  birthDate?: string | null;
   sexe: "M" | "F";
   poids: number;
   gmq: number | null;
   selected: boolean;
 };
+
+export function motherNumberLabel(entry: Pick<FieldSessionEntry, "mereNutrav">): string {
+  return entry.mereNutrav ? `Mère ${entry.mereNutrav}` : "Mère inconnue";
+}
+
+export function fieldAgeInfo(
+  birthDate: string | null | undefined,
+  referenceDate: Date = new Date(),
+): { label: string; overTwelveMonths: boolean } {
+  if (!birthDate) return { label: "Âge inconnu", overTwelveMonths: false };
+
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime()) || birth > referenceDate) {
+    return { label: "Âge inconnu", overTwelveMonths: false };
+  }
+
+  const totalMonths = differenceInMonths(referenceDate, birth);
+  if (totalMonths >= 12) {
+    const years = Math.floor(totalMonths / 12);
+    const months = totalMonths % 12;
+    return {
+      label: `${years} an${years > 1 ? "s" : ""} ${months} mois`,
+      overTwelveMonths: true,
+    };
+  }
+
+  const days = differenceInDays(referenceDate, addMonths(birth, totalMonths));
+  return {
+    label: `${totalMonths} mois ${days} j`,
+    overTwelveMonths: false,
+  };
+}
 
 export const SWIPE_ACTION_WIDTH = 192;
 export const SWIPE_OPEN_THRESHOLD = 72;

@@ -15,6 +15,8 @@ import { ArrowLeft, Check, ChevronLeft, Lock, Pencil, Scale, Sun, Trash2 } from 
 import {
   averageWeight,
   clampSwipeOffset,
+  fieldAgeInfo,
+  motherNumberLabel,
   nextOpenSwipeId,
   prependSessionEntry,
   removeSessionEntry,
@@ -242,6 +244,8 @@ export default function FieldWeighingSession() {
               entries: prependSessionEntry(current.entries, {
                 id: result.pesee.id,
                 nutrav: result.animal.nutrav,
+                mereNutrav: result.animal.mereNutrav,
+                birthDate: result.animal.birthDate,
                 sexe: result.animal.sexe === "M" ? "M" : "F",
                 poids: result.pesee.poids,
                 gmq: result.gmq,
@@ -698,6 +702,7 @@ function SummaryRow({
   const offsetRef = useRef(open ? -SWIPE_ACTION_WIDTH : 0);
   const [offset, setOffset] = useState(offsetRef.current);
   const [dragging, setDragging] = useState(false);
+  const age = fieldAgeInfo(entry.birthDate);
 
   const updateOffset = useCallback((value: number) => {
     offsetRef.current = value;
@@ -770,26 +775,18 @@ function SummaryRow({
               aria-label={`Sélectionner ${entry.nutrav}`}
             />
           )}
-          {showDetails ? (
-            <div className="min-w-0 flex-1 py-2">
-              <p className="text-xl font-black">
-                {entry.nutrav} · {entry.sexe === "M" ? "Mâle" : "Femelle"}
-              </p>
-              <p className="mt-1 text-base font-extrabold">
-                {entry.poids} kg · {entry.gmq === null
-                  ? "Première pesée"
-                  : `GMQ ${entry.gmq.toFixed(1).replace(".", ",")} kg/j`}
-              </p>
-              {showHint && (
-                <p className="mt-1 text-sm font-bold">Glisser pour modifier ou annuler</p>
-              )}
-            </div>
-          ) : (
-            <>
-              <span className="min-w-0 flex-1 text-2xl font-black">{entry.nutrav}</span>
-              <span className="whitespace-nowrap text-2xl font-black">{entry.poids} kg</span>
-            </>
-          )}
+          <div className="min-w-0 flex-1 py-2">
+            <p className="text-xl font-black">{entry.nutrav} — {entry.poids} kg</p>
+            <p className="text-sm font-bold">
+              {motherNumberLabel(entry)} · {age.label}
+              {age.overTwelveMonths ? " · + de 12 mois" : ""} · {entry.gmq === null
+                ? "Première pesée"
+                : `GMQ ${entry.gmq.toFixed(1).replace(".", ",")} kg/j`}
+            </p>
+            {showHint && (
+              <p className="mt-1 text-sm font-bold">Glisser pour modifier ou annuler</p>
+            )}
+          </div>
           <button
             type="button"
             onPointerDown={(event) => event.stopPropagation()}

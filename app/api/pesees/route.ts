@@ -24,7 +24,13 @@ export async function POST(request: NextRequest) {
 
     const animal = await prisma.animal.findUnique({
       where: { nutrav },
-      select: { id: true, nutrav: true, sexbov: true },
+      select: {
+        id: true,
+        nutrav: true,
+        sexbov: true,
+        danais: true,
+        mere: { select: { nutrav: true } },
+      },
     });
     if (!animal) {
       return NextResponse.json({ error: "Animal non trouvé" }, { status: 404 });
@@ -61,7 +67,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       pesee,
-      animal: { nutrav: animal.nutrav, sexe: animal.sexbov },
+      animal: {
+        nutrav: animal.nutrav,
+        sexe: animal.sexbov,
+        mereNutrav: animal.mere?.nutrav ?? null,
+        birthDate: animal.danais.toISOString(),
+      },
       previous,
       gmq: calculateGmqKgPerDay(poids, currentDate, previous),
       _undoId: undoId,
