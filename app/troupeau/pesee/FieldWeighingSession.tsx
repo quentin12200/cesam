@@ -20,6 +20,7 @@ import {
   fieldAgeInfo,
   fieldAgeAlertSummary,
   hydrateFieldSessionEntries,
+  isSwipeInteractiveTarget,
   motherNumberLabel,
   needsFieldAnimalDetails,
   nextOpenSwipeId,
@@ -789,7 +790,11 @@ function SummaryRow({
   }, [open, onOpenChange, updateOffset]);
 
   function startSwipe(event: ReactPointerEvent<HTMLDivElement>) {
-    if (disabled || isEditing) return;
+    if (
+      disabled ||
+      isEditing ||
+      isSwipeInteractiveTarget(event.target as HTMLElement)
+    ) return;
     updateOffset(stableSwipeOffset(open));
     pointerStartRef.current = {
       x: event.clientX,
@@ -857,21 +862,24 @@ function SummaryRow({
   }
 
   return (
-    <div ref={wrapperRef} className="border-x-4 border-b-4 border-black">
+    <div
+      ref={wrapperRef}
+      onPointerDown={startSwipe}
+      onPointerMove={moveSwipe}
+      onPointerUp={endSwipe}
+      onPointerCancel={cancelSwipe}
+      onLostPointerCapture={lostPointerCapture}
+      style={{ touchAction: "pan-y" }}
+      className="border-x-4 border-b-4 border-black"
+    >
       <div className="relative overflow-hidden">
         <div className="absolute inset-y-0 right-0 flex w-48 md:hidden">
           <ActionButton type="edit" onClick={onEdit} disabled={disabled} />
           <ActionButton type="delete" onClick={onDelete} disabled={disabled} />
         </div>
         <div
-          onPointerDown={startSwipe}
-          onPointerMove={moveSwipe}
-          onPointerUp={endSwipe}
-          onPointerCancel={cancelSwipe}
-          onLostPointerCapture={lostPointerCapture}
           style={{
             transform: `translateX(${offset}px)`,
-            touchAction: "pan-y",
             transition: dragging ? "none" : "transform 180ms ease-out",
           }}
           className="relative z-10 flex min-h-20 items-center gap-3 bg-white px-3 md:!translate-x-0"

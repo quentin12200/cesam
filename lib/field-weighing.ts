@@ -109,6 +109,8 @@ export const SWIPE_ACTION_WIDTH = 192;
 export const SWIPE_OPEN_THRESHOLD = 72;
 export const SWIPE_CLOSE_THRESHOLD = 12;
 export const SWIPE_AXIS_THRESHOLD = 8;
+export const SWIPE_INTERACTIVE_SELECTOR =
+  "button, input, select, textarea, a, [role='button'], [contenteditable='true'], [data-no-swipe]";
 
 export type SwipeAxis = "pending" | "horizontal" | "vertical";
 
@@ -183,6 +185,12 @@ export function detectSwipeAxis(deltaX: number, deltaY: number): SwipeAxis {
 
 export function swipeToggleLabel(open: boolean): string {
   return open ? "Fermer les actions" : "Ouvrir les actions";
+}
+
+export function isSwipeInteractiveTarget(
+  target: { closest?: (selector: string) => unknown } | null,
+): boolean {
+  return Boolean(target?.closest?.(SWIPE_INTERACTIVE_SELECTOR));
 }
 
 export function replaceSessionEntry(

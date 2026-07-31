@@ -9,6 +9,7 @@ import {
   fieldAgeInfo,
   fieldAgeAlertSummary,
   hydrateFieldSessionEntries,
+  isSwipeInteractiveTarget,
   motherNumberLabel,
   needsFieldAnimalDetails,
   nextOpenSwipeId,
@@ -358,6 +359,20 @@ test("un swipe horizontal volontaire est détecté sur les lignes partagées", (
   assert.equal(settledSwipeOffset(-SWIPE_ACTION_WIDTH), -SWIPE_ACTION_WIDTH);
   assert.equal(detectSwipeAxis(13, 2), "horizontal");
   assert.equal(settledSwipeOffset(-SWIPE_ACTION_WIDTH + 13, -SWIPE_ACTION_WIDTH), 0);
+});
+
+test("toute zone libre de la fiche peut démarrer un swipe", () => {
+  assert.equal(isSwipeInteractiveTarget({ closest: () => null }), false);
+});
+
+test("les contrôles interactifs de la fiche ne démarrent jamais le swipe", () => {
+  for (const control of ["checkbox", "action", "field", "chevron"]) {
+    assert.equal(
+      isSwipeInteractiveTarget({ closest: () => ({ control }) }),
+      true,
+      control,
+    );
+  }
 });
 
 test("le chevron reflète toujours l'état ouvert réel", () => {
