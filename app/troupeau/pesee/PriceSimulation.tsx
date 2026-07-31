@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, ListEnd, MoveRight, Pencil, Trash2, X } from "lucide-react";
-import { fieldAgeInfo, motherNumberLabel, type FieldSessionEntry } from "@/lib/field-weighing";
+import { ageAlertLabel, fieldAgeInfo, motherNumberLabel, type FieldSessionEntry } from "@/lib/field-weighing";
 import {
   assignPriceGroup,
   generalEstimate,
@@ -292,6 +292,7 @@ function SimulationSexSection({
             ? individualEstimate(entry.poids, assigned.mode, assigned.tarif)
             : null;
           const age = fieldAgeInfo(entry.birthDate);
+          const ageAlert = ageAlertLabel(age.alert);
           return (
             <div key={entry.id} className="border-x-2 border-b-2 border-black px-3 py-2.5">
               <div className="flex items-start gap-3">
@@ -306,7 +307,9 @@ function SimulationSexSection({
                 <p className="text-xl font-black">{entry.nutrav} — {entry.poids} kg</p>
                 <p className="text-sm font-bold">
                   {motherNumberLabel(entry)} · {age.label}
-                  {age.overTwelveMonths ? " · + de 12 mois" : ""} · {entry.gmq === null
+                  {ageAlert && (
+                    <> · <span className={age.alert === "approaching" ? "text-orange-700" : "bg-orange-200 px-1 text-black"}>{ageAlert}</span></>
+                  )} · {entry.gmq === null
                     ? "Première pesée"
                     : `GMQ ${entry.gmq.toFixed(1).replace(".", ",")} kg/j`}
                 </p>
@@ -436,6 +439,7 @@ function GroupEditor({
       <div className="mt-1 max-h-64 overflow-y-auto border-t-2 border-black">
         {animals.map((entry) => {
           const age = fieldAgeInfo(entry.birthDate);
+          const ageAlert = ageAlertLabel(age.alert);
           return (
           <label key={entry.id} className="flex min-h-14 items-center gap-3 border-x-2 border-b-2 border-black bg-white px-3">
             <input
@@ -452,7 +456,8 @@ function GroupEditor({
             <span className="min-w-0 flex-1">
               <strong className="block">{entry.nutrav}</strong>
               <span className="block text-sm font-bold">
-                {motherNumberLabel(entry)} · {age.label}{age.overTwelveMonths ? " · + de 12 mois" : ""}
+                {motherNumberLabel(entry)} · {age.label}
+                {ageAlert && <> · <span className={age.alert === "approaching" ? "text-orange-700" : "bg-orange-200 px-1 text-black"}>{ageAlert}</span></>}
               </span>
             </span>
             <strong>{entry.poids} kg</strong>

@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ageAlertLabel,
   averageWeight,
   calculateGmqKgPerDay,
   clampSwipeOffset,
   fieldAgeInfo,
+  fieldAgeAlertSummary,
   motherNumberLabel,
   nextOpenSwipeId,
   prependSessionEntry,
@@ -47,29 +49,65 @@ const ageReference = new Date("2026-07-31T12:00:00.000Z");
 test("affiche l'âge en mois et jours avant 12 mois", () => {
   assert.deepEqual(fieldAgeInfo("2025-09-13T12:00:00.000Z", ageReference), {
     label: "10 mois 18 j",
-    overTwelveMonths: false,
+    alert: null,
   });
 });
 
 test("affiche exactement 12 mois en années et mois", () => {
   assert.deepEqual(fieldAgeInfo("2025-07-31T12:00:00.000Z", ageReference), {
     label: "1 an 0 mois",
-    overTwelveMonths: true,
+    alert: "exceeded",
   });
 });
 
 test("affiche plus de 12 mois en années et mois", () => {
   assert.deepEqual(fieldAgeInfo("2024-05-31T12:00:00.000Z", ageReference), {
     label: "2 ans 2 mois",
-    overTwelveMonths: true,
+    alert: "exceeded",
   });
 });
 
 test("affiche un âge inconnu sans date de naissance", () => {
   assert.deepEqual(fieldAgeInfo(null, ageReference), {
     label: "Âge inconnu",
-    overTwelveMonths: false,
+    alert: null,
   });
+});
+
+test("ne déclenche aucune alerte à 10 mois 29 jours", () => {
+  const info = fieldAgeInfo("2025-09-02T12:00:00.000Z", ageReference);
+  assert.equal(info.label, "10 mois 29 j");
+  assert.equal(ageAlertLabel(info.alert), null);
+});
+
+test("signale l'approche à exactement 11 mois", () => {
+  const info = fieldAgeInfo("2025-08-31T12:00:00.000Z", ageReference);
+  assert.equal(info.label, "11 mois 0 j");
+  assert.equal(ageAlertLabel(info.alert), "⚠ Approche 12 mois");
+});
+
+test("signale encore l'approche à 11 mois 29 jours", () => {
+  const info = fieldAgeInfo("2025-08-02T12:00:00.000Z", ageReference);
+  assert.equal(info.label, "11 mois 29 j");
+  assert.equal(ageAlertLabel(info.alert), "⚠ Approche 12 mois");
+});
+
+test("signale le dépassement à exactement 12 mois", () => {
+  const info = fieldAgeInfo("2025-07-31T12:00:00.000Z", ageReference);
+  assert.equal(ageAlertLabel(info.alert), "⚠ 12 mois dépassés");
+});
+
+test("l'âge inconnu ne produit aucune fausse alerte", () => {
+  assert.equal(ageAlertLabel(fieldAgeInfo(null, ageReference).alert), null);
+});
+
+test("résume les alertes d'âge du récapitulatif", () => {
+  assert.deepEqual(fieldAgeAlertSummary([
+    { birthDate: "2025-09-02T12:00:00.000Z" },
+    { birthDate: "2025-08-31T12:00:00.000Z" },
+    { birthDate: "2025-07-31T12:00:00.000Z" },
+    { birthDate: null },
+  ], ageReference), { approaching: 1, exceeded: 1 });
 });
 
 function clickSwipeAction(action: () => void) {

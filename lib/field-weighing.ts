@@ -23,12 +23,12 @@ export function motherNumberLabel(entry: Pick<FieldSessionEntry, "mereNutrav">):
 export function fieldAgeInfo(
   birthDate: string | null | undefined,
   referenceDate: Date = new Date(),
-): { label: string; overTwelveMonths: boolean } {
-  if (!birthDate) return { label: "Âge inconnu", overTwelveMonths: false };
+): { label: string; alert: "approaching" | "exceeded" | null } {
+  if (!birthDate) return { label: "Âge inconnu", alert: null };
 
   const birth = new Date(birthDate);
   if (Number.isNaN(birth.getTime()) || birth > referenceDate) {
-    return { label: "Âge inconnu", overTwelveMonths: false };
+    return { label: "Âge inconnu", alert: null };
   }
 
   const totalMonths = differenceInMonths(referenceDate, birth);
@@ -37,15 +37,35 @@ export function fieldAgeInfo(
     const months = totalMonths % 12;
     return {
       label: `${years} an${years > 1 ? "s" : ""} ${months} mois`,
-      overTwelveMonths: true,
+      alert: "exceeded",
     };
   }
 
   const days = differenceInDays(referenceDate, addMonths(birth, totalMonths));
   return {
     label: `${totalMonths} mois ${days} j`,
-    overTwelveMonths: false,
+    alert: totalMonths >= 11 ? "approaching" : null,
   };
+}
+
+export function ageAlertLabel(alert: ReturnType<typeof fieldAgeInfo>["alert"]): string | null {
+  if (alert === "approaching") return "⚠ Approche 12 mois";
+  if (alert === "exceeded") return "⚠ 12 mois dépassés";
+  return null;
+}
+
+export function fieldAgeAlertSummary(
+  entries: Array<Pick<FieldSessionEntry, "birthDate">>,
+  referenceDate: Date = new Date(),
+): { approaching: number; exceeded: number } {
+  return entries.reduce(
+    (summary, entry) => {
+      const alert = fieldAgeInfo(entry.birthDate, referenceDate).alert;
+      if (alert) summary[alert] += 1;
+      return summary;
+    },
+    { approaching: 0, exceeded: 0 },
+  );
 }
 
 export const SWIPE_ACTION_WIDTH = 192;

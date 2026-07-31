@@ -13,9 +13,11 @@ import {
 } from "react";
 import { ArrowLeft, Check, ChevronLeft, Lock, Pencil, Scale, Sun, Trash2 } from "lucide-react";
 import {
+  ageAlertLabel,
   averageWeight,
   clampSwipeOffset,
   fieldAgeInfo,
+  fieldAgeAlertSummary,
   motherNumberLabel,
   nextOpenSwipeId,
   prependSessionEntry,
@@ -363,6 +365,7 @@ export default function FieldWeighingSession() {
   const females = session.entries.filter((entry) => entry.sexe === "F");
   const maleAverage = averageWeight(males);
   const femaleAverage = averageWeight(females);
+  const ageAlerts = fieldAgeAlertSummary(session.entries);
 
   return (
     <div className="min-h-full bg-white text-black">
@@ -504,6 +507,10 @@ export default function FieldWeighingSession() {
             <p className="mt-1 text-3xl font-black">
               Moyenne : {average === null ? "—" : `${average} kg`}
             </p>
+            <div className="mt-3 border-t-2 border-black pt-2 text-sm font-black">
+              <p>{ageAlerts.approaching} animaux approchent 12 mois</p>
+              <p>{ageAlerts.exceeded} animaux ont dépassé 12 mois</p>
+            </div>
           </section>
 
           <button
@@ -703,6 +710,7 @@ function SummaryRow({
   const [offset, setOffset] = useState(offsetRef.current);
   const [dragging, setDragging] = useState(false);
   const age = fieldAgeInfo(entry.birthDate);
+  const ageAlert = ageAlertLabel(age.alert);
 
   const updateOffset = useCallback((value: number) => {
     offsetRef.current = value;
@@ -779,7 +787,9 @@ function SummaryRow({
             <p className="text-xl font-black">{entry.nutrav} — {entry.poids} kg</p>
             <p className="text-sm font-bold">
               {motherNumberLabel(entry)} · {age.label}
-              {age.overTwelveMonths ? " · + de 12 mois" : ""} · {entry.gmq === null
+              {ageAlert && (
+                <> · <span className={age.alert === "approaching" ? "text-orange-700" : "bg-orange-200 px-1 text-black"}>{ageAlert}</span></>
+              )} · {entry.gmq === null
                 ? "Première pesée"
                 : `GMQ ${entry.gmq.toFixed(1).replace(".", ",")} kg/j`}
             </p>
