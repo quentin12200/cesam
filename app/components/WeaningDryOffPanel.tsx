@@ -10,7 +10,12 @@ import {
   Scissors,
   X,
 } from "lucide-react";
-import { formatAge } from "@/lib/utils";
+import {
+  formatAge,
+  getBadgeClass,
+  getEtatLabel,
+  type EtatGestation,
+} from "@/lib/utils";
 import type {
   WeaningDryOffAction,
   WeaningDryOffCandidate,
@@ -36,6 +41,8 @@ function CandidateLine({
   soon,
   busy,
   error,
+  compact,
+  motherReproductionStatus,
   onQuickAction,
   onManualDryOff,
 }: {
@@ -44,6 +51,8 @@ function CandidateLine({
   soon: boolean;
   busy: boolean;
   error: string;
+  compact: boolean;
+  motherReproductionStatus?: EtatGestation;
   onQuickAction: (
     candidate: WeaningDryOffCandidate,
     action: WeaningDryOffAction
@@ -162,25 +171,86 @@ function CandidateLine({
         }}
       >
         <div className="min-w-0 flex-1">
-          <Link
-            href={`/troupeau/${candidate.calf.nutrav}`}
-            className={`text-sm font-extrabold hover:underline ${
-              candidate.recentlyWeaned ? "text-slate-700" : "text-green-800"
-            }`}
-          >
-            {animalLabel(candidate.calf)}
-          </Link>
-          <p className="text-xs text-slate-600">
-            {formatAge(new Date(candidate.calf.birthDate))}
-            <span className="mx-1 text-slate-300">·</span>
-            Mère :{" "}
-            <Link
-              href={`/troupeau/${candidate.mother.nutrav}`}
-              className="font-semibold text-amber-800 hover:underline"
-            >
-              {animalLabel(candidate.mother)}
-            </Link>
-          </p>
+          {compact ? (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  href={`/troupeau/${candidate.calf.nutrav}`}
+                  className="min-w-0 rounded-lg border border-green-200 bg-green-50 px-2.5 py-2 hover:border-green-300"
+                >
+                  <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-green-700">
+                    Veau
+                  </span>
+                  <span
+                    className={`block truncate font-mono text-base font-black leading-tight ${
+                      candidate.recentlyWeaned
+                        ? "text-slate-700"
+                        : "text-green-950"
+                    }`}
+                  >
+                    {candidate.calf.nutrav}
+                  </span>
+                  {candidate.calf.nobovi && (
+                    <span className="block truncate text-[11px] font-semibold text-slate-600">
+                      {candidate.calf.nobovi}
+                    </span>
+                  )}
+                </Link>
+                <Link
+                  href={`/troupeau/${candidate.mother.nutrav}`}
+                  className="min-w-0 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 hover:border-amber-300"
+                >
+                  <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-amber-700">
+                    Mère
+                  </span>
+                  <span className="block truncate font-mono text-base font-black leading-tight text-amber-950">
+                    {candidate.mother.nutrav}
+                  </span>
+                  {candidate.mother.nobovi && (
+                    <span className="block truncate text-[11px] font-semibold text-slate-600">
+                      {candidate.mother.nobovi}
+                    </span>
+                  )}
+                </Link>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700">
+                  Âge du veau · {formatAge(new Date(candidate.calf.birthDate))}
+                </span>
+                {motherReproductionStatus && (
+                  <span
+                    className={`rounded-full px-2 py-1 text-[11px] font-bold ${getBadgeClass(
+                      motherReproductionStatus
+                    )}`}
+                  >
+                    Mère · {getEtatLabel(motherReproductionStatus)}
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <Link
+                href={`/troupeau/${candidate.calf.nutrav}`}
+                className={`text-sm font-extrabold hover:underline ${
+                  candidate.recentlyWeaned ? "text-slate-700" : "text-green-800"
+                }`}
+              >
+                {animalLabel(candidate.calf)}
+              </Link>
+              <p className="text-xs text-slate-600">
+                {formatAge(new Date(candidate.calf.birthDate))}
+                <span className="mx-1 text-slate-300">·</span>
+                Mère :{" "}
+                <Link
+                  href={`/troupeau/${candidate.mother.nutrav}`}
+                  className="font-semibold text-amber-800 hover:underline"
+                >
+                  {animalLabel(candidate.mother)}
+                </Link>
+              </p>
+            </>
+          )}
           {candidate.cycleCalfCount > 1 && (
             <p className="mt-1 text-[11px] font-semibold text-slate-600">
               {candidate.cycleWeanedCount} veau
@@ -212,7 +282,7 @@ function CandidateLine({
               {error}
             </p>
           )}
-          {!candidate.recentlyWeaned && candidate.needsDryOff && (
+          {!compact && !candidate.recentlyWeaned && candidate.needsDryOff && (
             <details className="mt-1 w-fit text-[11px] text-slate-500">
               <summary
                 className="cursor-pointer list-none rounded px-1 font-bold tracking-widest hover:bg-slate-100"
@@ -259,10 +329,12 @@ function CandidateLine({
 export default function WeaningDryOffPanel({
   initialCandidates,
   thresholdMonths,
+  motherReproductionStatuses = {},
   compact = false,
 }: {
   initialCandidates: WeaningDryOffCandidate[];
   thresholdMonths: number;
+  motherReproductionStatuses?: Record<string, EtatGestation>;
   compact?: boolean;
 }) {
   const router = useRouter();
@@ -488,6 +560,10 @@ export default function WeaningDryOffPanel({
               thresholdMonths={thresholdMonths}
               soon={false}
               busy={busyCalfId === candidate.calf.id}
+              compact={compact}
+              motherReproductionStatus={
+                motherReproductionStatuses[candidate.mother.id]
+              }
               error={
                 error?.calfId === candidate.calf.id ? error.message : ""
               }
@@ -518,6 +594,10 @@ export default function WeaningDryOffPanel({
                 thresholdMonths={thresholdMonths}
                 soon
                 busy={busyCalfId === candidate.calf.id}
+                compact={compact}
+                motherReproductionStatus={
+                  motherReproductionStatuses[candidate.mother.id]
+                }
                 error={
                   error?.calfId === candidate.calf.id ? error.message : ""
                 }

@@ -3,7 +3,12 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, addDays } from "date-fns";
-import { getEtatGestation, getVaccinsManquants, VELAGE_IMMINENT_COLORS } from "@/lib/utils";
+import {
+  getEtatGestation,
+  getVaccinsManquants,
+  VELAGE_IMMINENT_COLORS,
+  type EtatGestation,
+} from "@/lib/utils";
 import Link from "next/link";
 import CowIcon from "@/components/CowIcon";
 import Collapsible from "@/app/components/Collapsible";
@@ -218,6 +223,7 @@ async function getDashboardData() {
   let vachesPleine = 0;
   let aEchographier = 0;
   let vachesVidesEnRetard = 0;
+  const motherReproductionStatuses: Record<string, EtatGestation> = {};
 
   for (const vache of vachesAvecSaillies) {
     const derniereSaillie = vache.saillies[0]?.date ?? null;
@@ -234,6 +240,8 @@ async function getDashboardData() {
       false,
       reproductionConfig?.reproReposObjectifJours ?? 60
     );
+    motherReproductionStatuses[vache.id] =
+      (vache.reproductionEtatManuel as EtatGestation | null) ?? etat;
 
     if (etat === "VERT" || etat === "ROSE") vachesPleine++;
     if (vache.aEchographier) aEchographier++;
@@ -312,6 +320,7 @@ async function getDashboardData() {
     bolusPreVelage,
     bouclageItems,
     weaningDryOff,
+    motherReproductionStatuses,
     genissesArapatrier,
     vachesACapteur,
     nbVaches,
@@ -931,6 +940,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
             <WeaningDryOffPanel
               initialCandidates={data.weaningDryOff.candidates}
               thresholdMonths={data.weaningDryOff.thresholdMonths}
+              motherReproductionStatuses={data.motherReproductionStatuses}
               compact
             />
           ) : undefined

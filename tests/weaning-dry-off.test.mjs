@@ -246,6 +246,10 @@ const panel = await readFile(
   new URL("../app/components/WeaningDryOffPanel.tsx", import.meta.url),
   "utf8"
 );
+const dashboard = await readFile(
+  new URL("../app/page.tsx", import.meta.url),
+  "utf8"
+);
 const api = await readFile(
   new URL("../app/api/sevrage-tarissement/route.ts", import.meta.url),
   "utf8"
@@ -312,6 +316,40 @@ test("l’ordinateur n’affiche qu’un bouton principal et garde le tarissemen
   assert.doesNotMatch(desktopActions, /Tarir la mère/);
   assert.match(panel, /aria-label="Autres actions"/);
   assert.match(panel, /Tarir la mère séparément/);
+});
+
+test("l’accueil distingue visuellement le veau et la mère avec le même poids", () => {
+  assert.match(panel, /compact \? \(/);
+  assert.match(panel, /className="grid grid-cols-2 gap-2"/);
+  assert.match(panel, />\s*Veau\s*</);
+  assert.match(panel, />\s*Mère\s*</);
+  assert.equal(
+    panel.match(/font-mono text-base font-black leading-tight/g)?.length,
+    2
+  );
+});
+
+test("l’accueil affiche clairement l’âge du veau et l’état reproductif existant de la mère", () => {
+  assert.match(panel, /Âge du veau · \{formatAge/);
+  assert.match(panel, /Mère · \{getEtatLabel\(motherReproductionStatus\)\}/);
+  assert.match(panel, /getBadgeClass\(\s*motherReproductionStatus\s*\)/);
+  assert.match(
+    dashboard,
+    /motherReproductionStatuses\[vache\.id\] =\s*\(vache\.reproductionEtatManuel[\s\S]*\?\? etat/
+  );
+  assert.match(
+    dashboard,
+    /motherReproductionStatuses=\{data\.motherReproductionStatuses\}/
+  );
+});
+
+test("le tarissement manuel est retiré de l’accueil mais reste sur la page dédiée", () => {
+  assert.match(
+    panel,
+    /!compact && !candidate\.recentlyWeaned && candidate\.needsDryOff/
+  );
+  assert.match(panel, /Tarir la mère séparément/);
+  assert.match(panel, /onManualDryOff=\{openManualDryOff\}/);
 });
 
 test("le message du dernier veau est réservé à un vrai vêlage multiple déjà partiellement sevré", () => {
