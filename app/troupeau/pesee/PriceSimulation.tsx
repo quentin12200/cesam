@@ -1,12 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowLeft, Check, ChevronDown, Pencil, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ListEnd, MoveRight, Pencil, Trash2, X } from "lucide-react";
 import type { FieldSessionEntry } from "@/lib/field-weighing";
 import {
   assignPriceGroup,
   generalEstimate,
-  groupEntries,
   groupForEntry,
   groupStats,
   individualEstimate,
@@ -17,6 +16,11 @@ import {
   type PriceGroup,
   type PriceMode,
 } from "@/lib/price-simulation";
+import {
+  emptySectionLabel,
+  sectionUiState,
+  selectHeaviestThrough,
+} from "@/lib/price-simulation-ui";
 
 type DraftGroup = {
   id: string | null;
@@ -24,6 +28,7 @@ type DraftGroup = {
   peseeIds: string[];
   mode: PriceMode;
   tarifInput: string;
+  focus: "tarif" | "animals";
 };
 
 const euros = new Intl.NumberFormat("fr-FR", {
@@ -35,13 +40,11 @@ const euros = new Intl.NumberFormat("fr-FR", {
 function formatEuros(value: number) {
   return euros.format(Math.round(value));
 }
-
 function formatTarif(group: Pick<PriceGroup, "mode" | "tarif">) {
   return group.mode === "PER_KG"
     ? `${group.tarif.toFixed(2).replace(".", ",")} €/kg`
     : `${group.tarif.toFixed(2).replace(".", ",")} €/tête`;
 }
-
 export default function PriceSimulation({
   entries,
   groups,
@@ -58,26 +61,25 @@ export default function PriceSimulation({
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  const maleTotals = useMemo(() => sexTotals(groups, entries, "M"), [groups, entries]);
-  const femaleTotals = useMemo(() => sexTotals(groups, entries, "F"), [groups, entries]);
   const total = useMemo(() => generalEstimate(groups, entries), [groups, entries]);
 
   function toggleSelection(sexe: "M" | "F", id: string) {
     setSelected((current) => ({
-      ...current,
+      M: sexe === "M" ? current.M : [],
+      F: sexe === "F" ? current.F : [],
       [sexe]: current[sexe].includes(id)
         ? current[sexe].filter((entryId) => entryId !== id)
         : [...current[sexe], id],
     }));
   }
 
-  function openCreate(sexe: "M" | "F") {
-    if (selected[sexe].length === 0) return;
-    setDraft({ id: null, sexe, peseeIds: selected[sexe], mode: "PER_KG", tarifInput: "" });
+  function openCreate(sexe: "M" | "F", ids = selected[sexe]) {
+    if (ids.length === 0) return;
+    setDraft({ id: null, sexe, peseeIds: ids, mode: "PER_KG", tarifInput: "", focus: "tarif" });
     setError("");
   }
 
-  function openEdit(group: PriceGroup) {
+  function openEdit(group: PriceGroup, focus: "tarif" | "animals") {
     setOpenActionsId(null);
     setDraft({
       id: group.id,
@@ -85,9 +87,13 @@ export default function PriceSimulation({
       peseeIds: group.peseeIds,
       mode: group.mode,
       tarifInput: String(group.tarif).replace(".", ","),
+      focus,
     });
     setError("");
   }
+
+  const activeSex = selected.M.length > 0 ? "M" : selected.F.length > 0 ? "F" : null;
+  const selectedCount = activeSex ? selected[activeSex].length : 0;
 
   function saveDraft() {
     if (!draft || draft.peseeIds.length === 0) {
@@ -113,7 +119,7 @@ export default function PriceSimulation({
   }
 
   return (
-    <main className="mx-auto max-w-4xl bg-white px-3 py-5 pb-24 text-black">
+    <main className={`mx-auto max-w-4xl bg-white px-3 py-5 text-black ${selectedCount > 0 && !draft ? "pb-44" : "pb-24"}`}>
       <div className="mb-5 flex items-center gap-3 border-b-4 border-black pb-3">
         <button
           type="button"
@@ -134,12 +140,14 @@ export default function PriceSimulation({
         entries={entries}
         groups={groups}
         selectedIds={selected.M}
-        draft={draft}
         openActionsId={openActionsId}
         onToggle={(id) => toggleSelection("M", id)}
-        onSelect={(ids) => setSelected((current) => ({ ...current, M: ids }))}
-        onCreate={() => openCreate("M")}
+        onSelect={(ids) => setSelected({ M: ids, F: [] })}
         onEdit={openEdit}
+        onChangeGroup={(entry) => {
+          setSelected({ M: [entry.id], F: [] });
+          openCreate("M", [entry.id]);
+        }}
         onDelete={(id) => {
           onGroupsChange(removePriceGroup(groups, id));
           setOpenActionsId(null);
@@ -167,12 +175,14 @@ export default function PriceSimulation({
         entries={entries}
         groups={groups}
         selectedIds={selected.F}
-        draft={draft}
         openActionsId={openActionsId}
         onToggle={(id) => toggleSelection("F", id)}
-        onSelect={(ids) => setSelected((current) => ({ ...current, F: ids }))}
-        onCreate={() => openCreate("F")}
+        onSelect={(ids) => setSelected({ M: [], F: ids })}
         onEdit={openEdit}
+        onChangeGroup={(entry) => {
+          setSelected({ M: [], F: [entry.id] });
+          openCreate("F", [entry.id]);
+        }}
         onDelete={(id) => {
           onGroupsChange(removePriceGroup(groups, id));
           setOpenActionsId(null);
@@ -195,11 +205,20 @@ export default function PriceSimulation({
         />
       )}
 
+      {activeSex && selectedCount > 0 && !draft && (
+        <div className="fixed bottom-20 left-3 right-3 z-30 mx-auto max-w-3xl border-4 border-black bg-yellow-300 p-2 shadow-lg">
+          <button
+            type="button"
+            onClick={() => openCreate(activeSex)}
+            className="min-h-14 w-full bg-black px-4 text-lg font-black text-white"
+          >
+            {selectedCount} {selectedCount > 1 ? "ANIMAUX SÉLECTIONNÉS" : "ANIMAL SÉLECTIONNÉ"} · DÉFINIR UN PRIX
+          </button>
+        </div>
+      )}
+
       <section className="mt-8 border-4 border-black">
-        <h2 className="bg-black px-4 py-3 text-xl font-black text-white">TOTAUX DE LA SIMULATION</h2>
-        <TotalsLine label="MÂLES" stats={maleTotals} />
-        <TotalsLine label="FEMELLES" stats={femaleTotals} />
-        <div className="border-t-4 border-black bg-yellow-300 p-5 text-center">
+        <div className="bg-yellow-300 p-5 text-center">
           <p className="text-lg font-black">TOTAL GÉNÉRAL ESTIMÉ</p>
           <p className="mt-1 text-4xl font-black">{formatEuros(total)}</p>
         </div>
@@ -213,12 +232,11 @@ function SimulationSexSection({
   entries,
   groups,
   selectedIds,
-  draft,
   openActionsId,
   onToggle,
   onSelect,
-  onCreate,
   onEdit,
+  onChangeGroup,
   onDelete,
   onOpenActions,
 }: {
@@ -226,72 +244,91 @@ function SimulationSexSection({
   entries: FieldSessionEntry[];
   groups: PriceGroup[];
   selectedIds: string[];
-  draft: DraftGroup | null;
   openActionsId: string | null;
   onToggle: (id: string) => void;
   onSelect: (ids: string[]) => void;
-  onCreate: () => void;
-  onEdit: (group: PriceGroup) => void;
+  onEdit: (group: PriceGroup, focus: "tarif" | "animals") => void;
+  onChangeGroup: (entry: FieldSessionEntry) => void;
   onDelete: (id: string) => void;
   onOpenActions: (id: string | null) => void;
 }) {
   const animals = sortEntriesByWeight(entries.filter((entry) => entry.sexe === sexe));
   const sexGroups = groups.filter((group) => group.sexe === sexe);
   const label = sexe === "M" ? "MÂLES" : "FEMELLES";
+  const ui = sectionUiState(animals.length, selectedIds.length);
+  const totals = sexTotals(groups, entries, sexe);
+
+  if (ui.empty) {
+    return (
+      <section className="mt-6 border-b-4 border-black pb-3">
+        <h2 className="text-2xl font-black">{label}</h2>
+        <p className="mt-2 font-bold">{emptySectionLabel(sexe)}</p>
+      </section>
+    );
+  }
 
   return (
     <section className="mt-7">
-      <div className="flex items-center justify-between border-b-4 border-black pb-2">
-        <h2 className="text-2xl font-black">{label}</h2>
-        <span className="font-black">{animals.length} {animals.length > 1 ? "animaux" : "animal"}</span>
-      </div>
-      <div className="flex flex-wrap gap-2 py-3">
-        <button type="button" onClick={() => onSelect(animals.map((entry) => entry.id))} className="min-h-11 border-2 border-black px-3 font-black">
-          Tout sélectionner
-        </button>
-        <button type="button" onClick={() => onSelect([])} className="min-h-11 border-2 border-black px-3 font-black">
-          Tout désélectionner
-        </button>
+      <div className="border-b-4 border-black pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-3">
+          <h2 className="text-2xl font-black">{label} · {animals.length}</h2>
+          <div className="flex items-center gap-2 text-sm font-black">
+            <button type="button" onClick={() => onSelect(animals.map((entry) => entry.id))} className="min-h-11 underline">
+              Tout sélectionner
+            </button>
+            <span aria-hidden="true">·</span>
+            <button type="button" onClick={() => onSelect([])} className="min-h-11 underline">
+              Effacer
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="border-t-2 border-black">
+      <div>
         {animals.map((entry, index) => {
           const assigned = groupForEntry(groups, entry.id);
+          const estimate = assigned
+            ? individualEstimate(entry.poids, assigned.mode, assigned.tarif)
+            : null;
           return (
-            <div key={entry.id} className="flex min-h-16 items-center gap-3 border-x-2 border-b-2 border-black px-3">
+            <div key={entry.id} className="border-x-2 border-b-2 border-black px-3 py-2.5">
+              <div className="flex items-start gap-3">
               <input
                 type="checkbox"
                 checked={selectedIds.includes(entry.id)}
                 onChange={() => onToggle(entry.id)}
-                className="h-8 w-8 shrink-0 accent-black"
+                className="mt-1 h-8 w-8 shrink-0 accent-black"
                 aria-label={`Sélectionner ${entry.nutrav}`}
               />
               <div className="min-w-0 flex-1">
-                <p className="text-lg font-black">{entry.nutrav} · {entry.poids} kg</p>
-                <p className="text-sm font-bold">
-                  {assigned ? `Groupe ${sexGroups.findIndex((group) => group.id === assigned.id) + 1} · ${formatTarif(assigned)}` : "Aucun tarif appliqué"}
-                </p>
+                <p className="text-xl font-black">{entry.nutrav} — {entry.poids} kg</p>
+                {assigned ? (
+                  <>
+                    <p className="text-sm font-bold">{formatTarif(assigned)} · Groupe {sexGroups.findIndex((group) => group.id === assigned.id) + 1}</p>
+                    <p className="mt-0.5 text-xl font-black">ESTIMATION : {formatEuros(estimate ?? 0)}</p>
+                    <button type="button" onClick={() => onChangeGroup(entry)} className="mt-1 flex min-h-10 items-center gap-1 text-sm font-black underline">
+                      <MoveRight size={17} /> Changer de groupe
+                    </button>
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm font-bold">Aucun tarif appliqué</p>
+                )}
               </div>
               <button
                 type="button"
-                onClick={() => onSelect(animals.slice(0, index + 1).map((animal) => animal.id))}
-                className="min-h-11 shrink-0 border-2 border-black px-2 text-xs font-black"
+                onClick={() => onSelect(selectHeaviestThrough(animals, index))}
+                className="flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-black underline"
+                title="Sélectionner du plus lourd jusqu’ici"
+                aria-label={`Sélectionner du plus lourd jusqu’à ${entry.nutrav}`}
               >
-                Jusqu’ici
+                <ListEnd size={18} />
+                <span className="max-w-20 leading-tight sm:max-w-none">Plus lourds jusqu’ici</span>
               </button>
+              </div>
             </div>
           );
         })}
       </div>
-
-      <button
-        type="button"
-        disabled={selectedIds.length === 0 || draft !== null}
-        onClick={onCreate}
-        className="mt-3 min-h-14 w-full border-3 border-black bg-green-600 px-4 text-lg font-black disabled:bg-neutral-300"
-      >
-        CRÉER UN GROUPE DE PRIX · {selectedIds.length}
-      </button>
 
       {sexGroups.map((group, index) => (
         <PriceGroupSection
@@ -301,14 +338,16 @@ function SimulationSexSection({
           entries={entries}
           actionsOpen={openActionsId === group.id}
           onOpenActions={() => onOpenActions(openActionsId === group.id ? null : group.id)}
-          onEdit={() => onEdit(group)}
+          onEditTarif={() => onEdit(group, "tarif")}
+          onEditAnimals={() => onEdit(group, "animals")}
           onDelete={() => onDelete(group.id)}
         />
       ))}
+
+      <SexTotalSummary label={label} stats={totals} />
     </section>
   );
 }
-
 function GroupEditor({
   draft,
   entries,
@@ -336,10 +375,14 @@ function GroupEditor({
     tarif: tarif ?? 0,
   };
   const preview = groupStats(previewGroup, entries);
-  const movedCount = draft.peseeIds.filter((id) => {
+  const movedAnimals = draft.peseeIds.flatMap((id) => {
     const assigned = groupForEntry(groups, id);
-    return assigned && assigned.id !== draft.id;
-  }).length;
+    if (!assigned || assigned.id === draft.id) return [];
+    const entry = entries.find((animal) => animal.id === id);
+    const groupNumber = groups.filter((group) => group.sexe === draft.sexe).findIndex((group) => group.id === assigned.id) + 1;
+    return entry ? [{ entry, groupNumber }] : [];
+  });
+  const movedCount = movedAnimals.length;
 
   return (
     <section className="mt-7 border-4 border-black bg-yellow-100 p-4">
@@ -376,12 +419,13 @@ function GroupEditor({
             if (/^\d*(?:[,.]\d{0,2})?$/.test(value)) onChange({ ...draft, tarifInput: value });
           }}
           inputMode="decimal"
-          autoFocus
+          autoFocus={draft.focus === "tarif"}
           className="h-16 w-full border-3 border-black bg-white px-3 text-center text-3xl font-black"
         />
       </label>
 
-      <div className="mt-4 max-h-64 overflow-y-auto border-t-2 border-black">
+      <p className="mt-4 font-black">ANIMAUX DU GROUPE</p>
+      <div className="mt-1 max-h-64 overflow-y-auto border-t-2 border-black">
         {animals.map((entry) => (
           <label key={entry.id} className="flex min-h-14 items-center gap-3 border-x-2 border-b-2 border-black bg-white px-3">
             <input
@@ -403,7 +447,9 @@ function GroupEditor({
 
       {movedCount > 0 && (
         <p className="mt-3 border-2 border-black bg-white p-3 font-black">
-          {movedCount} {movedCount > 1 ? "animaux sont déjà tarifés" : "animal est déjà tarifé"}. Valider {movedCount > 1 ? "les déplacera" : "le déplacera"} vers ce groupe.
+          {movedCount === 1
+            ? `${movedAnimals[0].entry.nutrav} appartient déjà au Groupe ${movedAnimals[0].groupNumber}. Il sera déplacé vers le nouveau groupe.`
+            : `${movedCount} animaux appartiennent déjà à un groupe. Ils seront déplacés vers le nouveau groupe.`}
         </p>
       )}
       {error && <p className="mt-3 font-black text-red-800">{error}</p>}
@@ -426,7 +472,8 @@ function PriceGroupSection({
   entries,
   actionsOpen,
   onOpenActions,
-  onEdit,
+  onEditTarif,
+  onEditAnimals,
   onDelete,
 }: {
   group: PriceGroup;
@@ -434,10 +481,10 @@ function PriceGroupSection({
   entries: FieldSessionEntry[];
   actionsOpen: boolean;
   onOpenActions: () => void;
-  onEdit: () => void;
+  onEditTarif: () => void;
+  onEditAnimals: () => void;
   onDelete: () => void;
 }) {
-  const animals = groupEntries(group, entries);
   const stats = groupStats(group, entries);
   return (
     <section className="mt-5 border-4 border-black">
@@ -448,48 +495,45 @@ function PriceGroupSection({
         </button>
       </div>
       {actionsOpen && (
-        <div className="grid grid-cols-2 border-b-2 border-black">
-          <button type="button" onClick={onEdit} className="min-h-12 border-r-2 border-black bg-white font-black"><Pencil className="mr-2 inline" size={18} />Modifier</button>
-          <button type="button" onClick={onDelete} className="min-h-12 bg-red-700 font-black text-white"><Trash2 className="mr-2 inline" size={18} />Supprimer</button>
+        <div className="grid grid-cols-1 border-b-2 border-black sm:grid-cols-3">
+          <button type="button" onClick={onEditTarif} className="min-h-12 border-b-2 border-black bg-white font-black sm:border-b-0 sm:border-r-2"><Pencil className="mr-2 inline" size={18} />Modifier le tarif</button>
+          <button type="button" onClick={onEditAnimals} className="min-h-12 border-b-2 border-black bg-white font-black sm:border-b-0 sm:border-r-2"><Pencil className="mr-2 inline" size={18} />Modifier les animaux</button>
+          <button type="button" onClick={onDelete} className="min-h-12 bg-red-700 font-black text-white"><Trash2 className="mr-2 inline" size={18} />Dissoudre le groupe</button>
         </div>
       )}
-      {animals.map((entry) => {
-        const estimate = individualEstimate(entry.poids, group.mode, group.tarif);
-        return (
-          <div key={entry.id} className="border-b-2 border-black px-3 py-3 last:border-b-0">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-lg font-black">{entry.nutrav}</p>
-                <p className="text-sm font-bold">{entry.poids} kg · {formatTarif(group)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-black">ESTIMATION</p>
-                <strong className="text-2xl font-black">{formatEuros(estimate)}</strong>
-              </div>
-            </div>
+      <div className="bg-yellow-100 p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="text-sm font-bold">
+            <p>{stats.animalCount} {stats.animalCount > 1 ? "animaux" : "animal"} · Tarif : {formatTarif(group)}</p>
+            <p>Poids moyen : {stats.averageWeight} kg · Total : {stats.totalWeight} kg</p>
           </div>
-        );
-      })}
-      <div className="border-t-4 border-black bg-yellow-200 p-4">
-        <div className="grid grid-cols-2 gap-2 text-sm font-bold">
-          <span>{stats.animalCount} animaux</span><span className="text-right">Poids moyen : {stats.averageWeight} kg</span>
-          <span>Poids total : {stats.totalWeight} kg</span><span className="text-right">{formatTarif(group)}</span>
+          <div className="shrink-0 text-right">
+            <p className="text-xs font-black">TOTAL ESTIMÉ</p>
+            <p className="text-2xl font-black">{formatEuros(stats.totalEstimate)}</p>
+          </div>
         </div>
-        <p className="mt-3 text-center text-3xl font-black">TOTAL : {formatEuros(stats.totalEstimate)}</p>
-        <p className="text-center font-black">Moyenne/tête : {formatEuros(stats.averageEstimate)}</p>
       </div>
     </section>
   );
 }
 
-function TotalsLine({ label, stats }: { label: string; stats: ReturnType<typeof sexTotals> }) {
+function SexTotalSummary({
+  label,
+  stats,
+}: {
+  label: string;
+  stats: ReturnType<typeof sexTotals>;
+}) {
   return (
-    <div className="grid grid-cols-[1fr_auto] gap-2 border-b-2 border-black p-4">
-      <div>
-        <p className="text-lg font-black">{label}</p>
-        <p className="font-bold">{stats.animalCount} tarifé{stats.animalCount > 1 ? "s" : ""} · {stats.totalWeight} kg</p>
+    <div className="mt-4 flex items-center justify-between gap-4 border-y-4 border-black bg-neutral-100 px-3 py-3">
+      <div className="font-bold">
+        <p>{stats.animalCount} tarifé{stats.animalCount > 1 ? "s" : ""}</p>
+        <p>{stats.totalWeight} kg</p>
       </div>
-      <strong className="self-center text-2xl font-black">{formatEuros(stats.totalEstimate)}</strong>
+      <div className="text-right">
+        <p className="text-xs font-black">TOTAL {label}</p>
+        <p className="text-2xl font-black">{formatEuros(stats.totalEstimate)}</p>
+      </div>
     </div>
   );
 }
