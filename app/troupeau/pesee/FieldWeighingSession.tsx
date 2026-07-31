@@ -16,6 +16,7 @@ import {
   ageAlertLabel,
   averageWeight,
   clampSwipeOffset,
+  detectSwipeAxis,
   fieldAgeInfo,
   fieldAgeAlertSummary,
   hydrateFieldSessionEntries,
@@ -32,6 +33,7 @@ import {
   stableSwipeOffset,
   stopSwipeActionPointerDown,
   SWIPE_ACTION_WIDTH,
+  swipeToggleLabel,
   weightProgressLabel,
 } from "@/lib/field-weighing";
 import type { FieldAnimalDetails, FieldSessionEntry } from "@/lib/field-weighing";
@@ -796,6 +798,7 @@ function SummaryRow({
     };
     activePointerRef.current = event.pointerId;
     gestureAxisRef.current = "pending";
+    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function moveSwipe(event: ReactPointerEvent<HTMLDivElement>) {
@@ -804,16 +807,18 @@ function SummaryRow({
     const deltaY = event.clientY - pointerStartRef.current.y;
 
     if (gestureAxisRef.current === "pending") {
-      if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 8) return;
-      if (Math.abs(deltaY) >= Math.abs(deltaX)) {
-        gestureAxisRef.current = "vertical";
+      const axis = detectSwipeAxis(deltaX, deltaY);
+      if (axis === "pending") return;
+      gestureAxisRef.current = axis;
+      if (axis === "vertical") {
         activePointerRef.current = null;
         updateOffset(stableSwipeOffset(open));
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
         return;
       }
-      gestureAxisRef.current = "horizontal";
       setDragging(true);
-      event.currentTarget.setPointerCapture(event.pointerId);
     }
 
     if (gestureAxisRef.current !== "horizontal") return;
@@ -901,9 +906,13 @@ function SummaryRow({
             onClick={() => onOpenChange(!open)}
             disabled={disabled}
             className="flex min-h-11 min-w-11 items-center justify-center md:hidden"
-            aria-label={`Actions pour ${entry.nutrav}`}
+            aria-label={swipeToggleLabel(open)}
           >
-            <ChevronLeft size={24} strokeWidth={3} />
+            <ChevronLeft
+              size={24}
+              strokeWidth={3}
+              className={`transition-transform duration-150 ${open ? "rotate-180" : "rotate-0"}`}
+            />
           </button>
           <div className="hidden shrink-0 gap-1.5 md:flex">
             <ActionButton type="edit" onClick={onEdit} disabled={disabled} compact />

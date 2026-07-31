@@ -5,6 +5,7 @@ import {
   averageWeight,
   calculateGmqKgPerDay,
   clampSwipeOffset,
+  detectSwipeAxis,
   fieldAgeInfo,
   fieldAgeAlertSummary,
   hydrateFieldSessionEntries,
@@ -22,6 +23,7 @@ import {
   stableSwipeOffset,
   stopSwipeActionPointerDown,
   SWIPE_ACTION_WIDTH,
+  swipeToggleLabel,
   weightProgressLabel,
 } from "./field-weighing.ts";
 import type { FieldSessionEntry } from "./field-weighing.ts";
@@ -345,8 +347,26 @@ test("clic extérieur, modification et annulation ferment la ligne à zéro", ()
 });
 
 test("un scroll vertical ne laisse aucun décalage horizontal", () => {
+  assert.equal(detectSwipeAxis(3, 5), "pending");
+  assert.equal(detectSwipeAxis(4, 14), "vertical");
   assert.equal(stableSwipeOffset(false), 0);
   assert.equal(stableSwipeOffset(true), -SWIPE_ACTION_WIDTH);
+});
+
+test("un swipe horizontal volontaire est détecté sur les lignes partagées", () => {
+  assert.equal(detectSwipeAxis(-9, 2), "horizontal");
+  assert.equal(settledSwipeOffset(-SWIPE_ACTION_WIDTH), -SWIPE_ACTION_WIDTH);
+  assert.equal(detectSwipeAxis(13, 2), "horizontal");
+  assert.equal(settledSwipeOffset(-SWIPE_ACTION_WIDTH + 13, -SWIPE_ACTION_WIDTH), 0);
+});
+
+test("le chevron reflète toujours l'état ouvert réel", () => {
+  let openId = nextOpenSwipeId(null, "p2", true);
+  assert.equal(swipeToggleLabel(openId === "p2"), "Fermer les actions");
+
+  openId = nextOpenSwipeId(openId, "p2", false);
+  assert.equal(openId, null);
+  assert.equal(swipeToggleLabel(false), "Ouvrir les actions");
 });
 
 test("modifier remplace la pesée existante sans doublon et actualise son GMQ", () => {

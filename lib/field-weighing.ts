@@ -108,6 +108,9 @@ export function fieldAgeAlertSummary(
 export const SWIPE_ACTION_WIDTH = 192;
 export const SWIPE_OPEN_THRESHOLD = 72;
 export const SWIPE_CLOSE_THRESHOLD = 12;
+export const SWIPE_AXIS_THRESHOLD = 8;
+
+export type SwipeAxis = "pending" | "horizontal" | "vertical";
 
 export function calculateGmqKgPerDay(
   currentWeight: number,
@@ -169,6 +172,17 @@ export function stableSwipeOffset(open: boolean): number {
 
 export function settledSwipeOffset(offset: number, startOffset = 0): number {
   return stableSwipeOffset(settleSwipe(offset, startOffset));
+}
+
+export function detectSwipeAxis(deltaX: number, deltaY: number): SwipeAxis {
+  if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < SWIPE_AXIS_THRESHOLD) {
+    return "pending";
+  }
+  return Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
+}
+
+export function swipeToggleLabel(open: boolean): string {
+  return open ? "Fermer les actions" : "Ouvrir les actions";
 }
 
 export function replaceSessionEntry(
