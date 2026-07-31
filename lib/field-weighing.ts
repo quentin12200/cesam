@@ -51,6 +51,12 @@ export function motherNumberLabel(entry: Pick<FieldSessionEntry, "mereNutrav">):
   return entry.mereNutrav ? `Mère ${entry.mereNutrav}` : "Mère inconnue";
 }
 
+export function weightProgressLabel(entry: Pick<FieldSessionEntry, "gmq">): string {
+  return entry.gmq === null
+    ? "Première pesée"
+    : `GMQ ${entry.gmq.toFixed(1).replace(".", ",")} kg/j`;
+}
+
 export function fieldAgeInfo(
   birthDate: string | null | undefined,
   referenceDate: Date = new Date(),

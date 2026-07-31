@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, ListEnd, MoveRight, Pencil, Trash2, X } from "lucide-react";
-import { ageAlertLabel, fieldAgeInfo, motherNumberLabel, type FieldSessionEntry } from "@/lib/field-weighing";
+import { ageAlertLabel, fieldAgeInfo, motherNumberLabel, weightProgressLabel, type FieldSessionEntry } from "@/lib/field-weighing";
 import {
   assignPriceGroup,
   generalEstimate,
@@ -309,10 +309,9 @@ function SimulationSexSection({
                   {motherNumberLabel(entry)} · {age.label}
                   {ageAlert && (
                     <> · <span className={age.alert === "approaching" ? "text-orange-700" : "bg-orange-200 px-1 text-black"}>{ageAlert}</span></>
-                  )} · {entry.gmq === null
-                    ? "Première pesée"
-                    : `GMQ ${entry.gmq.toFixed(1).replace(".", ",")} kg/j`}
+                  )}
                 </p>
+                <p className="text-sm font-extrabold">{weightProgressLabel(entry)}</p>
                 {assigned ? (
                   <>
                     <p className="text-sm font-bold">{formatTarif(assigned)} · Groupe {sexGroups.findIndex((group) => group.id === assigned.id) + 1}</p>

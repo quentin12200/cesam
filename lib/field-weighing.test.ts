@@ -20,6 +20,7 @@ import {
   shouldShowSwipeHint,
   stopSwipeActionPointerDown,
   SWIPE_ACTION_WIDTH,
+  weightProgressLabel,
 } from "./field-weighing.ts";
 import type { FieldSessionEntry } from "./field-weighing.ts";
 
@@ -37,6 +38,14 @@ test("affiche le numéro de la mère sans le confondre avec celui du veau", () =
 
 test("affiche une mère inconnue lorsque la relation est absente", () => {
   assert.equal(motherNumberLabel(entries[1]), "Mère inconnue");
+});
+
+test("affiche Première pesée sur sa ligne dédiée sans GMQ", () => {
+  assert.equal(weightProgressLabel({ gmq: null }), "Première pesée");
+});
+
+test("affiche le GMQ formaté sur sa ligne dédiée", () => {
+  assert.equal(weightProgressLabel({ gmq: 2.3 }), "GMQ 2,3 kg/j");
 });
 
 test("conserve le numéro de mère après rechargement de la séance locale", () => {

@@ -31,6 +31,7 @@ import {
   shouldShowSwipeHint,
   stopSwipeActionPointerDown,
   SWIPE_ACTION_WIDTH,
+  weightProgressLabel,
 } from "@/lib/field-weighing";
 import type { FieldAnimalDetails, FieldSessionEntry } from "@/lib/field-weighing";
 import { parsePriceGroups, sortEntriesByWeight, type PriceGroup } from "@/lib/price-simulation";
@@ -829,10 +830,9 @@ function SummaryRow({
               {motherNumberLabel(entry)} · {age.label}
               {ageAlert && (
                 <> · <span className={age.alert === "approaching" ? "text-orange-700" : "bg-orange-200 px-1 text-black"}>{ageAlert}</span></>
-              )} · {entry.gmq === null
-                ? "Première pesée"
-                : `GMQ ${entry.gmq.toFixed(1).replace(".", ",")} kg/j`}
+              )}
             </p>
+            <p className="text-sm font-extrabold">{weightProgressLabel(entry)}</p>
             {showHint && (
               <p className="mt-1 text-sm font-bold">Glisser pour modifier ou annuler</p>
             )}
