@@ -24,11 +24,15 @@ import {
   SWIPE_ACTION_WIDTH,
 } from "@/lib/field-weighing";
 import type { FieldSessionEntry } from "@/lib/field-weighing";
+import { parsePriceGroups, type PriceGroup } from "@/lib/price-simulation";
+import PriceSimulation from "./PriceSimulation";
 
 type StoredSession = {
   startedAt: string;
   entries: FieldSessionEntry[];
   summaryOpen: boolean;
+  simulationOpen: boolean;
+  priceGroups: PriceGroup[];
 };
 
 type WakeLockSentinel = {
@@ -41,7 +45,13 @@ const STORAGE_KEY = "cesam:field-weighing-session";
 const SWIPE_HINT_KEY = "cesam:field-weighing-swipe-hint-used";
 
 function createSession(): StoredSession {
-  return { startedAt: new Date().toISOString(), entries: [], summaryOpen: false };
+  return {
+    startedAt: new Date().toISOString(),
+    entries: [],
+    summaryOpen: false,
+    simulationOpen: false,
+    priceGroups: [],
+  };
 }
 
 function todayLocal() {
@@ -69,7 +79,18 @@ export default function FieldWeighingSession() {
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     try {
-      setSession(saved ? (JSON.parse(saved) as StoredSession) : createSession());
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<StoredSession>;
+        setSession({
+          startedAt: parsed.startedAt ?? new Date().toISOString(),
+          entries: parsed.entries ?? [],
+          summaryOpen: parsed.summaryOpen ?? false,
+          simulationOpen: parsed.simulationOpen ?? false,
+          priceGroups: parsePriceGroups(JSON.stringify(parsed.priceGroups ?? [])),
+        });
+      } else {
+        setSession(createSession());
+      }
       setSwipeHintUsed(localStorage.getItem(SWIPE_HINT_KEY) === "true");
     } catch {
       setSession(createSession());
@@ -258,7 +279,16 @@ export default function FieldWeighingSession() {
       if (!response.ok) throw new Error(result.error || "La pesée n’a pas pu être annulée.");
       setSession((current) =>
         current
-          ? { ...current, entries: removeSessionEntry(current.entries, entry.id) }
+          ? {
+              ...current,
+              entries: removeSessionEntry(current.entries, entry.id),
+              priceGroups: current.priceGroups
+                .map((group) => ({
+                  ...group,
+                  peseeIds: group.peseeIds.filter((id) => id !== entry.id),
+                }))
+                .filter((group) => group.peseeIds.length > 0),
+            }
           : current,
       );
       if (editingId === entry.id) resetEdit();
@@ -348,7 +378,18 @@ export default function FieldWeighingSession() {
         </div>
       </header>
 
-      {!session.summaryOpen ? (
+      {session.simulationOpen ? (
+        <PriceSimulation
+          entries={session.entries}
+          groups={session.priceGroups}
+          onGroupsChange={(priceGroups) =>
+            setSession((current) => (current ? { ...current, priceGroups } : current))
+          }
+          onBack={() =>
+            setSession((current) => (current ? { ...current, simulationOpen: false } : current))
+          }
+        />
+      ) : !session.summaryOpen ? (
         <main className="mx-auto max-w-3xl px-3 py-5 pb-24">
           <form onSubmit={submit} className="space-y-5">
             <label className="block">
@@ -400,7 +441,7 @@ export default function FieldWeighingSession() {
 
           <section className="mt-6">
             <h2 className="border-b-4 border-black pb-2 text-xl font-black">
-              PESÉES DE LA SÉANCE — {session.entries.length} ANIMAUX
+              PESÉES DE LA SÉANCE — {session.entries.length} {session.entries.length > 1 ? "ANIMAUX" : "ANIMAL"}
             </h2>
             {session.entries.length === 0 ? (
               <p className="border-x-4 border-b-4 border-black bg-white p-5 text-center text-lg font-black">
@@ -452,6 +493,14 @@ export default function FieldWeighingSession() {
               Moyenne : {average === null ? "—" : `${average} kg`}
             </p>
           </section>
+
+          <button
+            type="button"
+            onClick={() => setSession({ ...session, simulationOpen: true })}
+            className="mt-4 min-h-16 w-full border-4 border-black bg-green-600 px-4 text-xl font-black"
+          >
+            SIMULER UN PRIX DE VENTE
+          </button>
 
           {error && !editingInSummary && (
             <div role="alert" className="mt-4 border-4 border-red-700 bg-red-100 p-4 text-lg font-black text-red-900">
