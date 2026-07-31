@@ -5,6 +5,32 @@ import { logAction } from "@/lib/action-log";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+  const requestedNutravs = [...new Set(
+    (searchParams.get("nutravs") ?? "")
+      .split(",")
+      .map((nutrav) => nutrav.trim())
+      .filter(Boolean),
+  )].slice(0, 200);
+
+  if (requestedNutravs.length > 0) {
+    const animaux = await prisma.animal.findMany({
+      where: { nutrav: { in: requestedNutravs } },
+      select: {
+        nutrav: true,
+        danais: true,
+        mere: { select: { nutrav: true } },
+      },
+    });
+
+    return NextResponse.json({
+      animaux: animaux.map((animal) => ({
+        nutrav: animal.nutrav,
+        birthDate: animal.danais?.toISOString() ?? null,
+        mereNutrav: animal.mere?.nutrav ?? null,
+      })),
+    });
+  }
+
   const statut = searchParams.get("statut") ?? "ACTIF";
   const sexe = searchParams.get("sexe");
   const q = searchParams.get("q");

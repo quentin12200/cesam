@@ -7,7 +7,9 @@ import {
   clampSwipeOffset,
   fieldAgeInfo,
   fieldAgeAlertSummary,
+  hydrateFieldSessionEntries,
   motherNumberLabel,
+  needsFieldAnimalDetails,
   nextOpenSwipeId,
   prependSessionEntry,
   removeSessionEntry,
@@ -42,6 +44,60 @@ test("conserve le numéro de mère après rechargement de la séance locale", ()
   assert.equal(restored.entries[0].mereNutrav, "6393");
   assert.equal(motherNumberLabel(restored.entries[0]), "Mère 6393");
   assert.equal(restored.entries[0].birthDate, "2025-09-13T12:00:00.000Z");
+});
+
+test("réhydrate un animal avec mère et date de naissance", () => {
+  const incomplete = [{ ...entries[0], mereNutrav: undefined, birthDate: undefined }];
+  const hydrated = hydrateFieldSessionEntries(incomplete, [{
+    nutrav: "3003", mereNutrav: "6393", birthDate: "2025-09-13T12:00:00.000Z",
+  }]);
+
+  assert.equal(motherNumberLabel(hydrated[0]), "Mère 6393");
+  assert.notEqual(fieldAgeInfo(hydrated[0].birthDate).label, "Âge inconnu");
+  assert.equal(hydrated[0].id, incomplete[0].id);
+});
+
+test("réhydrate une date connue sans inventer de mère", () => {
+  const hydrated = hydrateFieldSessionEntries([entries[1]], [{
+    nutrav: "2002", mereNutrav: null, birthDate: "2025-10-01T12:00:00.000Z",
+  }]);
+
+  assert.equal(motherNumberLabel(hydrated[0]), "Mère inconnue");
+  assert.equal(hydrated[0].birthDate, "2025-10-01T12:00:00.000Z");
+});
+
+test("réhydrate une mère connue même si la date est absente", () => {
+  const hydrated = hydrateFieldSessionEntries([entries[1]], [{
+    nutrav: "2002", mereNutrav: "7007", birthDate: null,
+  }]);
+
+  assert.equal(motherNumberLabel(hydrated[0]), "Mère 7007");
+  assert.equal(fieldAgeInfo(hydrated[0].birthDate).label, "Âge inconnu");
+});
+
+test("réhydrate une ancienne séance sans doublon et conserve les données au rechargement", () => {
+  const oldEntries = entries.map((entry) => ({ ...entry, mereNutrav: undefined, birthDate: undefined }));
+  const hydrated = hydrateFieldSessionEntries(oldEntries, [{
+    nutrav: "3003", mereNutrav: "6393", birthDate: "2025-09-13T12:00:00.000Z",
+  }]);
+  const restored = JSON.parse(JSON.stringify(hydrated)) as FieldSessionEntry[];
+
+  assert.equal(restored.length, oldEntries.length);
+  assert.deepEqual(restored.map((entry) => entry.id), oldEntries.map((entry) => entry.id));
+  assert.equal(restored[0].mereNutrav, "6393");
+  assert.equal(restored[0].birthDate, "2025-09-13T12:00:00.000Z");
+  assert.equal(needsFieldAnimalDetails(restored[0]), false);
+});
+
+test("ne remplace pas une information locale déjà connue", () => {
+  const current = [entries[0]];
+  const result = hydrateFieldSessionEntries(current, [{
+    nutrav: "3003", mereNutrav: "9999", birthDate: "2020-01-01T12:00:00.000Z",
+  }]);
+
+  assert.equal(result, current);
+  assert.equal(result[0].mereNutrav, "6393");
+  assert.equal(result[0].birthDate, "2025-09-13T12:00:00.000Z");
 });
 
 const ageReference = new Date("2026-07-31T12:00:00.000Z");

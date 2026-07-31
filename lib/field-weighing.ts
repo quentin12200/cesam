@@ -16,6 +16,37 @@ export type FieldSessionEntry = {
   selected: boolean;
 };
 
+export type FieldAnimalDetails = {
+  nutrav: string;
+  mereNutrav: string | null;
+  birthDate: string | null;
+};
+
+export function needsFieldAnimalDetails(entry: FieldSessionEntry): boolean {
+  return entry.mereNutrav === undefined || entry.birthDate === undefined;
+}
+
+export function hydrateFieldSessionEntries(
+  entries: FieldSessionEntry[],
+  details: FieldAnimalDetails[],
+): FieldSessionEntry[] {
+  const detailsByNutrav = new Map(details.map((animal) => [animal.nutrav, animal]));
+  let changed = false;
+  const hydrated = entries.map((entry) => {
+    const animal = detailsByNutrav.get(entry.nutrav);
+    if (!animal || !needsFieldAnimalDetails(entry)) return entry;
+
+    changed = true;
+    return {
+      ...entry,
+      mereNutrav: entry.mereNutrav === undefined ? animal.mereNutrav : entry.mereNutrav,
+      birthDate: entry.birthDate === undefined ? animal.birthDate : entry.birthDate,
+    };
+  });
+
+  return changed ? hydrated : entries;
+}
+
 export function motherNumberLabel(entry: Pick<FieldSessionEntry, "mereNutrav">): string {
   return entry.mereNutrav ? `Mère ${entry.mereNutrav}` : "Mère inconnue";
 }

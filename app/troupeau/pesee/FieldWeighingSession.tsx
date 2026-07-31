@@ -18,7 +18,9 @@ import {
   clampSwipeOffset,
   fieldAgeInfo,
   fieldAgeAlertSummary,
+  hydrateFieldSessionEntries,
   motherNumberLabel,
+  needsFieldAnimalDetails,
   nextOpenSwipeId,
   prependSessionEntry,
   removeSessionEntry,
@@ -29,7 +31,7 @@ import {
   stopSwipeActionPointerDown,
   SWIPE_ACTION_WIDTH,
 } from "@/lib/field-weighing";
-import type { FieldSessionEntry } from "@/lib/field-weighing";
+import type { FieldAnimalDetails, FieldSessionEntry } from "@/lib/field-weighing";
 import { parsePriceGroups, sortEntriesByWeight, type PriceGroup } from "@/lib/price-simulation";
 import PriceSimulation from "./PriceSimulation";
 
@@ -106,6 +108,38 @@ export default function FieldWeighingSession() {
   useEffect(() => {
     if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   }, [session]);
+
+  useEffect(() => {
+    const entriesToHydrate = session?.entries.filter(needsFieldAnimalDetails) ?? [];
+    if (entriesToHydrate.length === 0) return;
+
+    const controller = new AbortController();
+    const nutravs = [...new Set(entriesToHydrate.map((entry) => entry.nutrav))];
+
+    async function hydrateAnimalDetails() {
+      try {
+        const response = await fetch(`/api/animaux?nutravs=${encodeURIComponent(nutravs.join(","))}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const result = await response.json() as { animaux?: FieldAnimalDetails[] };
+        if (!Array.isArray(result.animaux)) return;
+
+        setSession((current) => {
+          if (!current) return current;
+          const entries = hydrateFieldSessionEntries(current.entries, result.animaux ?? []);
+          return entries === current.entries ? current : { ...current, entries };
+        });
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("Réhydratation de la séance impossible", error);
+        }
+      }
+    }
+
+    void hydrateAnimalDetails();
+    return () => controller.abort();
+  }, [session?.entries]);
 
   useEffect(() => {
     let mounted = true;
