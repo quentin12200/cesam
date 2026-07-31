@@ -11,14 +11,16 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Check, Lock, Pencil, Scale, Sun, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, Lock, Pencil, Scale, Sun, Trash2 } from "lucide-react";
 import {
   clampSwipeOffset,
   nextOpenSwipeId,
+  prependSessionEntry,
   removeSessionEntry,
   replaceSessionEntry,
   selectedAverage,
   settleSwipe,
+  shouldShowSwipeHint,
   SWIPE_ACTION_WIDTH,
 } from "@/lib/field-weighing";
 import type { FieldSessionEntry } from "@/lib/field-weighing";
@@ -36,6 +38,7 @@ type WakeLockSentinel = {
 };
 
 const STORAGE_KEY = "cesam:field-weighing-session";
+const SWIPE_HINT_KEY = "cesam:field-weighing-swipe-hint-used";
 
 function createSession(): StoredSession {
   return { startedAt: new Date().toISOString(), entries: [], summaryOpen: false };
@@ -51,31 +54,23 @@ export default function FieldWeighingSession() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [nutrav, setNutrav] = useState("");
   const [poids, setPoids] = useState("");
+  const [editWeight, setEditWeight] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingInSummary, setEditingInSummary] = useState(false);
   const [openSummaryRowId, setOpenSummaryRowId] = useState<string | null>(null);
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
+  const [swipeHintUsed, setSwipeHintUsed] = useState(false);
   const [error, setError] = useState("");
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const numberRef = useRef<HTMLInputElement>(null);
   const weightRef = useRef<HTMLInputElement>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
-  const actionCardRef = useRef<HTMLDivElement>(null);
-  const pointerStartRef = useRef({ x: 0, offset: 0 });
-  const dragOffsetRef = useRef(0);
-
-  const updateDragOffset = useCallback((offset: number) => {
-    dragOffsetRef.current = offset;
-    setDragOffset(offset);
-  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     try {
       setSession(saved ? (JSON.parse(saved) as StoredSession) : createSession());
+      setSwipeHintUsed(localStorage.getItem(SWIPE_HINT_KEY) === "true");
     } catch {
       setSession(createSession());
     }
@@ -84,18 +79,6 @@ export default function FieldWeighingSession() {
   useEffect(() => {
     if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   }, [session]);
-
-  useEffect(() => {
-    if (!actionsOpen) return;
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!actionCardRef.current?.contains(event.target as Node)) {
-        setActionsOpen(false);
-        updateDragOffset(0);
-      }
-    };
-    document.addEventListener("pointerdown", closeOnOutsidePress);
-    return () => document.removeEventListener("pointerdown", closeOnOutsidePress);
-  }, [actionsOpen, updateDragOffset]);
 
   useEffect(() => {
     let mounted = true;
@@ -149,12 +132,17 @@ export default function FieldWeighingSession() {
     return <div className="min-h-[70vh] bg-white" aria-label="Chargement de la séance" />;
   }
 
-  function resetForm() {
+  function resetEdit() {
     setEditingId(null);
     setEditingInSummary(false);
+    setEditWeight("");
+    setError("");
+  }
+
+  function resetForm() {
+    resetEdit();
     setNutrav("");
     setPoids("");
-    setError("");
     requestAnimationFrame(() => numberRef.current?.focus());
   }
 
@@ -200,7 +188,7 @@ export default function FieldWeighingSession() {
       weightRef.current?.focus();
       return;
     }
-    if (!editingId && activeSession.entries.some((entry) => entry.nutrav === cleanNumber)) {
+    if (activeSession.entries.some((entry) => entry.nutrav === cleanNumber)) {
       setError(`L’animal ${cleanNumber} est déjà pesé dans cette séance.`);
       setNutrav("");
       setPoids("");
@@ -211,12 +199,6 @@ export default function FieldWeighingSession() {
     setSaving(true);
     setError("");
     try {
-      if (editingId) {
-        await saveModification(activeSession, editingId, numericWeight);
-        resetForm();
-        return;
-      }
-
       const response = await fetch("/api/pesees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -234,17 +216,14 @@ export default function FieldWeighingSession() {
         current
           ? {
               ...current,
-              entries: [
-                {
-                  id: result.pesee.id,
-                  nutrav: result.animal.nutrav,
-                  sexe: result.animal.sexe === "M" ? "M" : "F",
-                  poids: result.pesee.poids,
-                  gmq: result.gmq,
-                  selected: true,
-                },
-                ...current.entries,
-              ],
+              entries: prependSessionEntry(current.entries, {
+                id: result.pesee.id,
+                nutrav: result.animal.nutrav,
+                sexe: result.animal.sexe === "M" ? "M" : "F",
+                poids: result.pesee.poids,
+                gmq: result.gmq,
+                selected: true,
+              }),
             }
           : current,
       );
@@ -256,15 +235,12 @@ export default function FieldWeighingSession() {
     }
   }
 
-  function beginEdit(entry: FieldSessionEntry, inSummary = false) {
+  function beginEdit(entry: FieldSessionEntry) {
     if (editingId && editingId !== entry.id) return;
-    setActionsOpen(false);
     setOpenSummaryRowId(null);
-    updateDragOffset(0);
     setEditingId(entry.id);
-    setEditingInSummary(inSummary);
-    setNutrav(entry.nutrav);
-    setPoids(String(entry.poids));
+    setEditingInSummary(true);
+    setEditWeight(String(entry.poids));
     setError("");
     requestAnimationFrame(() => {
       weightRef.current?.focus();
@@ -273,9 +249,7 @@ export default function FieldWeighingSession() {
   }
 
   async function cancelWeight(entry: FieldSessionEntry) {
-    setActionsOpen(false);
     setOpenSummaryRowId(null);
-    updateDragOffset(0);
     setSaving(true);
     setError("");
     try {
@@ -287,7 +261,7 @@ export default function FieldWeighingSession() {
           ? { ...current, entries: removeSessionEntry(current.entries, entry.id) }
           : current,
       );
-      if (editingId === entry.id) resetForm();
+      if (editingId === entry.id) resetEdit();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "La pesée n’a pas pu être annulée.");
     } finally {
@@ -298,7 +272,7 @@ export default function FieldWeighingSession() {
   async function saveSummaryEdit() {
     const activeSession = session;
     if (!activeSession || !editingId) return;
-    const numericWeight = Number(poids);
+    const numericWeight = Number(editWeight);
     if (!Number.isInteger(numericWeight) || numericWeight <= 0 || numericWeight > 2000) {
       setError("Saisissez un poids entier valide.");
       weightRef.current?.focus();
@@ -309,37 +283,12 @@ export default function FieldWeighingSession() {
     setError("");
     try {
       await saveModification(activeSession, editingId, numericWeight);
-      resetForm();
+      resetEdit();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "La pesée n’a pas pu être modifiée.");
     } finally {
       setSaving(false);
     }
-  }
-
-  function onSwipeStart(event: ReactPointerEvent<HTMLDivElement>) {
-    pointerStartRef.current = {
-      x: event.clientX,
-      offset: actionsOpen ? -SWIPE_ACTION_WIDTH : 0,
-    };
-    setIsDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function onSwipeMove(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    updateDragOffset(
-      clampSwipeOffset(pointerStartRef.current.offset + event.clientX - pointerStartRef.current.x),
-    );
-  }
-
-  function onSwipeEnd(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-    const open = settleSwipe(dragOffsetRef.current);
-    setIsDragging(false);
-    setActionsOpen(open);
-    updateDragOffset(open ? -SWIPE_ACTION_WIDTH : 0);
   }
 
   function toggle(id: string) {
@@ -355,13 +304,20 @@ export default function FieldWeighingSession() {
     );
   }
 
+  function handleRowOpen(id: string, open: boolean) {
+    setOpenSummaryRowId((current) => nextOpenSwipeId(current, id, open));
+    if (open && !swipeHintUsed) {
+      setSwipeHintUsed(true);
+      localStorage.setItem(SWIPE_HINT_KEY, "true");
+    }
+  }
+
   function startNewSession() {
     setSession(createSession());
     setEditingId(null);
     setEditingInSummary(false);
     setOpenSummaryRowId(null);
-    setActionsOpen(false);
-    updateDragOffset(0);
+    setEditWeight("");
     setNutrav("");
     setPoids("");
     setError("");
@@ -393,7 +349,7 @@ export default function FieldWeighingSession() {
       </header>
 
       {!session.summaryOpen ? (
-        <main className="mx-auto max-w-3xl px-3 py-5">
+        <main className="mx-auto max-w-3xl px-3 py-5 pb-24">
           <form onSubmit={submit} className="space-y-5">
             <label className="block">
               <span className="mb-2 block text-xl font-black">NUMÉRO ANIMAL</span>
@@ -426,20 +382,10 @@ export default function FieldWeighingSession() {
               />
             </label>
 
-            {error && (
+            {error && !editingInSummary && (
               <div role="alert" className="border-4 border-red-700 bg-red-100 p-4 text-lg font-black text-red-900">
                 {error}
               </div>
-            )}
-
-            {editingId && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="min-h-12 w-full border-2 border-black bg-white px-4 text-base font-black"
-              >
-                ABANDONNER LA MODIFICATION
-              </button>
             )}
 
             <button
@@ -448,86 +394,45 @@ export default function FieldWeighingSession() {
               className="flex min-h-20 w-full items-center justify-center gap-3 border-4 border-black bg-green-600 px-4 text-2xl font-black text-black active:bg-green-400 disabled:bg-yellow-300"
             >
               <Check size={36} strokeWidth={4} />
-              {saving
-                ? "ENREGISTREMENT…"
-                : editingId
-                  ? "ENREGISTRER LA MODIFICATION"
-                  : "VALIDER LA PESÉE"}
+              {saving ? "ENREGISTREMENT…" : "VALIDER LA PESÉE"}
             </button>
           </form>
 
-          {session.entries[0] ? (
-            <>
-              <div
-                ref={actionCardRef}
-                className="relative mt-6 overflow-hidden border-4 border-black md:hidden"
-              >
-                <div className="absolute inset-y-0 right-0 flex w-48">
-                  <button
-                    type="button"
-                    onClick={() => beginEdit(session.entries[0])}
-                    disabled={saving}
-                    className="flex w-24 flex-col items-center justify-center gap-1 bg-neutral-200 text-base font-black text-black"
-                  >
-                    <Pencil size={26} strokeWidth={3} />
-                    Modifier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void cancelWeight(session.entries[0])}
-                    disabled={saving}
-                    className="flex w-24 flex-col items-center justify-center gap-1 bg-red-700 text-base font-black text-white"
-                  >
-                    <Trash2 size={26} strokeWidth={3} />
-                    Annuler
-                  </button>
-                </div>
-                <div
-                  onPointerDown={onSwipeStart}
-                  onPointerMove={onSwipeMove}
-                  onPointerUp={onSwipeEnd}
-                  onPointerCancel={onSwipeEnd}
-                  style={{
-                    transform: `translateX(${dragOffset}px)`,
-                    touchAction: "pan-y",
-                    transition: isDragging ? "none" : "transform 180ms ease-out",
-                  }}
-                  aria-expanded={actionsOpen}
-                  className="relative z-10 bg-yellow-200 p-4"
-                >
-                  <LatestWeightContent entry={session.entries[0]} />
-                </div>
-              </div>
-
-              <section className="mt-6 hidden border-4 border-black bg-yellow-200 p-4 md:block">
-                <LatestWeightContent entry={session.entries[0]} />
-                <div className="mt-4 flex gap-3 border-t-2 border-black pt-3">
-                  <button
-                    type="button"
-                    onClick={() => beginEdit(session.entries[0])}
-                    disabled={saving}
-                    className="flex min-h-11 flex-1 items-center justify-center gap-2 border-2 border-black bg-white px-3 font-black"
-                  >
-                    <Pencil size={20} strokeWidth={3} />
-                    Modifier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void cancelWeight(session.entries[0])}
-                    disabled={saving}
-                    className="flex min-h-11 flex-1 items-center justify-center gap-2 border-2 border-black bg-red-700 px-3 font-black text-white"
-                  >
-                    <Trash2 size={20} strokeWidth={3} />
-                    Annuler
-                  </button>
-                </div>
-              </section>
-            </>
-          ) : (
-            <p className="mt-6 border-4 border-black bg-white p-5 text-center text-lg font-black">
-              AUCUNE PESÉE ENREGISTRÉE DANS CETTE SÉANCE
-            </p>
-          )}
+          <section className="mt-6">
+            <h2 className="border-b-4 border-black pb-2 text-xl font-black">
+              PESÉES DE LA SÉANCE — {session.entries.length} ANIMAUX
+            </h2>
+            {session.entries.length === 0 ? (
+              <p className="border-x-4 border-b-4 border-black bg-white p-5 text-center text-lg font-black">
+                AUCUNE PESÉE ENREGISTRÉE DANS CETTE SÉANCE
+              </p>
+            ) : (
+              session.entries.map((entry, index) => {
+                const isEditing = editingInSummary && editingId === entry.id;
+                return (
+                  <SummaryRow
+                    key={entry.id}
+                    entry={entry}
+                    open={openSummaryRowId === entry.id}
+                    disabled={saving || (editingId !== null && !isEditing)}
+                    isEditing={isEditing}
+                    editWeight={editWeight}
+                    error={isEditing ? error : ""}
+                    weightRef={isEditing ? weightRef : undefined}
+                    showDetails
+                    showHint={shouldShowSwipeHint(swipeHintUsed, index)}
+                    onOpenChange={(open) => handleRowOpen(entry.id, open)}
+                    onToggle={() => {}}
+                    onEdit={() => beginEdit(entry)}
+                    onEditWeight={setEditWeight}
+                    onSave={() => void saveSummaryEdit()}
+                    onAbandon={resetEdit}
+                    onDelete={() => void cancelWeight(entry)}
+                  />
+                );
+              })
+            )}
+          </section>
 
           <button
             type="button"
@@ -539,7 +444,7 @@ export default function FieldWeighingSession() {
           </button>
         </main>
       ) : (
-        <main className="mx-auto max-w-3xl px-3 py-5">
+        <main className="mx-auto max-w-3xl px-3 py-5 pb-24">
           <section className="border-4 border-black bg-yellow-300 p-4 text-center">
             <p className="text-lg font-black">LOT SIMULÉ</p>
             <p className="mt-1 text-4xl font-black">{selected.length} sélectionné{selected.length > 1 ? "s" : ""}</p>
@@ -559,17 +464,17 @@ export default function FieldWeighingSession() {
             entries={males}
             onToggle={toggle}
             openRowId={openSummaryRowId}
-            onOpenRow={(id, open) => setOpenSummaryRowId((current) => nextOpenSwipeId(current, id, open))}
+            onOpenRow={handleRowOpen}
             editingId={editingId}
             editingInSummary={editingInSummary}
-            editWeight={poids}
+            editWeight={editWeight}
             saving={saving}
             error={error}
             weightRef={weightRef}
-            onEdit={(entry) => beginEdit(entry, true)}
-            onEditWeight={setPoids}
+            onEdit={beginEdit}
+            onEditWeight={setEditWeight}
             onSave={() => void saveSummaryEdit()}
-            onAbandon={resetForm}
+            onAbandon={resetEdit}
             onDelete={(entry) => void cancelWeight(entry)}
           />
           <SummaryGroup
@@ -577,17 +482,17 @@ export default function FieldWeighingSession() {
             entries={females}
             onToggle={toggle}
             openRowId={openSummaryRowId}
-            onOpenRow={(id, open) => setOpenSummaryRowId((current) => nextOpenSwipeId(current, id, open))}
+            onOpenRow={handleRowOpen}
             editingId={editingId}
             editingInSummary={editingInSummary}
-            editWeight={poids}
+            editWeight={editWeight}
             saving={saving}
             error={error}
             weightRef={weightRef}
-            onEdit={(entry) => beginEdit(entry, true)}
-            onEditWeight={setPoids}
+            onEdit={beginEdit}
+            onEditWeight={setEditWeight}
             onSave={() => void saveSummaryEdit()}
-            onAbandon={resetForm}
+            onAbandon={resetEdit}
             onDelete={(entry) => void cancelWeight(entry)}
           />
 
@@ -617,23 +522,6 @@ export default function FieldWeighingSession() {
         </main>
       )}
     </div>
-  );
-}
-
-function LatestWeightContent({ entry }: { entry: FieldSessionEntry }) {
-  return (
-    <>
-      <p className="text-sm font-black">DERNIÈRE PESÉE VALIDÉE</p>
-      <div className="mt-1 flex items-end justify-between gap-3">
-        <strong className="text-4xl font-black">{entry.nutrav}</strong>
-        <strong className="text-4xl font-black">{entry.poids} kg</strong>
-      </div>
-      <p className="mt-2 text-lg font-black">
-        {entry.gmq === null
-          ? "GMQ non calculable"
-          : `GMQ : ${entry.gmq.toFixed(1).replace(".", ",")} kg/j`}
-      </p>
-    </>
   );
 }
 
@@ -721,6 +609,8 @@ function SummaryRow({
   editWeight,
   error,
   weightRef,
+  showDetails = false,
+  showHint = false,
   onOpenChange,
   onToggle,
   onEdit,
@@ -736,6 +626,8 @@ function SummaryRow({
   editWeight: string;
   error: string;
   weightRef?: RefObject<HTMLInputElement | null>;
+  showDetails?: boolean;
+  showHint?: boolean;
   onOpenChange: (open: boolean) => void;
   onToggle: () => void;
   onEdit: () => void;
@@ -809,16 +701,46 @@ function SummaryRow({
           className="relative z-10 flex min-h-20 items-center gap-3 bg-white px-3 md:!translate-x-0"
           aria-expanded={open}
         >
-          <input
-            type="checkbox"
-            checked={entry.selected}
-            onChange={onToggle}
+          {!showDetails && (
+            <input
+              type="checkbox"
+              checked={entry.selected}
+              onChange={onToggle}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="h-9 w-9 shrink-0 accent-black"
+              aria-label={`Sélectionner ${entry.nutrav}`}
+            />
+          )}
+          {showDetails ? (
+            <div className="min-w-0 flex-1 py-2">
+              <p className="text-xl font-black">
+                {entry.nutrav} · {entry.sexe === "M" ? "Mâle" : "Femelle"}
+              </p>
+              <p className="mt-1 text-base font-extrabold">
+                {entry.poids} kg · {entry.gmq === null
+                  ? "Première pesée"
+                  : `GMQ ${entry.gmq.toFixed(1).replace(".", ",")} kg/j`}
+              </p>
+              {showHint && (
+                <p className="mt-1 text-sm font-bold">Glisser pour modifier ou annuler</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <span className="min-w-0 flex-1 text-2xl font-black">{entry.nutrav}</span>
+              <span className="whitespace-nowrap text-2xl font-black">{entry.poids} kg</span>
+            </>
+          )}
+          <button
+            type="button"
             onPointerDown={(event) => event.stopPropagation()}
-            className="h-9 w-9 shrink-0 accent-black"
-            aria-label={`Sélectionner ${entry.nutrav}`}
-          />
-          <span className="min-w-0 flex-1 text-2xl font-black">{entry.nutrav}</span>
-          <span className="whitespace-nowrap text-2xl font-black">{entry.poids} kg</span>
+            onClick={() => onOpenChange(!open)}
+            disabled={disabled}
+            className="flex min-h-11 min-w-11 items-center justify-center md:hidden"
+            aria-label={`Actions pour ${entry.nutrav}`}
+          >
+            <ChevronLeft size={24} strokeWidth={3} />
+          </button>
           <div className="hidden shrink-0 gap-1.5 md:flex">
             <ActionButton type="edit" onClick={onEdit} disabled={disabled} compact />
             <ActionButton type="delete" onClick={onDelete} disabled={disabled} compact />

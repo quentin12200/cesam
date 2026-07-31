@@ -4,10 +4,12 @@ import {
   calculateGmqKgPerDay,
   clampSwipeOffset,
   nextOpenSwipeId,
+  prependSessionEntry,
   removeSessionEntry,
   replaceSessionEntry,
   selectedAverage,
   settleSwipe,
+  shouldShowSwipeHint,
   SWIPE_ACTION_WIDTH,
 } from "./field-weighing.ts";
 import type { FieldSessionEntry } from "./field-weighing.ts";
@@ -145,4 +147,21 @@ test("modifier un animal décoché ne change pas la moyenne sélectionnée", () 
 
   assert.equal(selectedAverage(malesBefore), 310);
   assert.equal(selectedAverage(malesAfter), 310);
+});
+
+test("une nouvelle pesée est ajoutée en tête sans altérer les précédentes", () => {
+  const newEntry: FieldSessionEntry = {
+    id: "p4", nutrav: "4004", sexe: "F", poids: 290, gmq: 1.1, selected: true,
+  };
+  const result = prependSessionEntry(entries, newEntry);
+
+  assert.deepEqual(result.map((entry) => entry.id), ["p4", "p3", "p2", "p1"]);
+  assert.equal(entries.length, 3);
+});
+
+test("le chevron ouvre une seule ligne et masque ensuite l'aide locale", () => {
+  assert.equal(shouldShowSwipeHint(false, 0), true);
+  assert.equal(nextOpenSwipeId(null, "p2", true), "p2");
+  assert.equal(shouldShowSwipeHint(true, 0), false);
+  assert.equal(shouldShowSwipeHint(false, 1), false);
 });

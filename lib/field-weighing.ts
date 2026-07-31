@@ -55,6 +55,13 @@ export function replaceSessionEntry(
   return entries.map((entry) => (entry.id === updated.id ? updated : entry));
 }
 
+export function prependSessionEntry(
+  entries: FieldSessionEntry[],
+  entry: FieldSessionEntry,
+): FieldSessionEntry[] {
+  return [entry, ...entries];
+}
+
 export function removeSessionEntry(
   entries: FieldSessionEntry[],
   id: string,
@@ -69,4 +76,8 @@ export function nextOpenSwipeId(
 ): string | null {
   if (!open) return currentId === requestedId ? null : currentId;
   return requestedId;
+}
+
+export function shouldShowSwipeHint(hasUsedSwipeActions: boolean, index: number): boolean {
+  return !hasUsedSwipeActions && index === 0;
 }
