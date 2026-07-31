@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   FormEvent,
   PointerEvent as ReactPointerEvent,
+  type RefObject,
   useCallback,
   useEffect,
   useMemo,
@@ -13,7 +14,8 @@ import {
 import { ArrowLeft, Check, Lock, Pencil, Scale, Sun, Trash2, X } from "lucide-react";
 import {
   clampSwipeOffset,
-  removeLatestSessionEntry,
+  nextOpenSwipeId,
+  removeSessionEntry,
   replaceSessionEntry,
   selectedAverage,
   settleSwipe,
@@ -51,6 +53,8 @@ export default function FieldWeighingSession() {
   const [poids, setPoids] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingInSummary, setEditingInSummary] = useState(false);
+  const [openSummaryRowId, setOpenSummaryRowId] = useState<string | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -147,10 +151,35 @@ export default function FieldWeighingSession() {
 
   function resetForm() {
     setEditingId(null);
+    setEditingInSummary(false);
     setNutrav("");
     setPoids("");
     setError("");
     requestAnimationFrame(() => numberRef.current?.focus());
+  }
+
+  async function saveModification(activeSession: StoredSession, id: string, numericWeight: number) {
+    const currentEntry = activeSession.entries.find((entry) => entry.id === id);
+    if (!currentEntry) throw new Error("Cette pesée n’est plus dans la séance.");
+
+    const response = await fetch(`/api/pesees/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ poids: numericWeight, sessionStartedAt: activeSession.startedAt }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "La pesée n’a pas pu être modifiée.");
+
+    const updatedEntry = {
+      ...currentEntry,
+      poids: result.pesee.poids,
+      gmq: result.gmq,
+    };
+    setSession((current) =>
+      current
+        ? { ...current, entries: replaceSessionEntry(current.entries, updatedEntry) }
+        : current,
+    );
   }
 
   async function submit(event: FormEvent) {
@@ -182,52 +211,43 @@ export default function FieldWeighingSession() {
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(editingId ? `/api/pesees/${editingId}` : "/api/pesees", {
-        method: editingId ? "PATCH" : "POST",
+      if (editingId) {
+        await saveModification(activeSession, editingId, numericWeight);
+        resetForm();
+        return;
+      }
+
+      const response = await fetch("/api/pesees", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nutrav: cleanNumber,
           poids: numericWeight,
-          ...(!editingId && { date: todayLocal() }),
+          date: todayLocal(),
           sessionStartedAt: activeSession.startedAt,
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "La pesée n’a pas pu être enregistrée.");
 
-      if (editingId) {
-        const currentEntry = activeSession.entries.find((entry) => entry.id === editingId);
-        if (!currentEntry) throw new Error("Cette pesée n’est plus dans la séance.");
-        const updatedEntry = {
-          ...currentEntry,
-          poids: result.pesee.poids,
-          gmq: result.gmq,
-        };
-        setSession((current) =>
-          current
-            ? { ...current, entries: replaceSessionEntry(current.entries, updatedEntry) }
-            : current,
-        );
-      } else {
-        setSession((current) =>
-          current
-            ? {
-                ...current,
-                entries: [
-                  {
-                    id: result.pesee.id,
-                    nutrav: result.animal.nutrav,
-                    sexe: result.animal.sexe === "M" ? "M" : "F",
-                    poids: result.pesee.poids,
-                    gmq: result.gmq,
-                    selected: true,
-                  },
-                  ...current.entries,
-                ],
-              }
-            : current,
-        );
-      }
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              entries: [
+                {
+                  id: result.pesee.id,
+                  nutrav: result.animal.nutrav,
+                  sexe: result.animal.sexe === "M" ? "M" : "F",
+                  poids: result.pesee.poids,
+                  gmq: result.gmq,
+                  selected: true,
+                },
+                ...current.entries,
+              ],
+            }
+          : current,
+      );
       resetForm();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "La pesée n’a pas pu être enregistrée.");
@@ -236,14 +256,15 @@ export default function FieldWeighingSession() {
     }
   }
 
-  function beginEdit() {
-    const latest = session?.entries[0];
-    if (!latest) return;
+  function beginEdit(entry: FieldSessionEntry, inSummary = false) {
+    if (editingId && editingId !== entry.id) return;
     setActionsOpen(false);
+    setOpenSummaryRowId(null);
     updateDragOffset(0);
-    setEditingId(latest.id);
-    setNutrav(latest.nutrav);
-    setPoids(String(latest.poids));
+    setEditingId(entry.id);
+    setEditingInSummary(inSummary);
+    setNutrav(entry.nutrav);
+    setPoids(String(entry.poids));
     setError("");
     requestAnimationFrame(() => {
       weightRef.current?.focus();
@@ -251,25 +272,46 @@ export default function FieldWeighingSession() {
     });
   }
 
-  async function cancelLatestWeight() {
-    const latest = session?.entries[0];
-    if (!latest) return;
+  async function cancelWeight(entry: FieldSessionEntry) {
     setActionsOpen(false);
+    setOpenSummaryRowId(null);
     updateDragOffset(0);
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/pesees/${latest.id}`, { method: "DELETE" });
+      const response = await fetch(`/api/pesees/${entry.id}`, { method: "DELETE" });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "La pesée n’a pas pu être annulée.");
       setSession((current) =>
         current
-          ? { ...current, entries: removeLatestSessionEntry(current.entries, latest.id) }
+          ? { ...current, entries: removeSessionEntry(current.entries, entry.id) }
           : current,
       );
-      if (editingId === latest.id) resetForm();
+      if (editingId === entry.id) resetForm();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "La pesée n’a pas pu être annulée.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveSummaryEdit() {
+    const activeSession = session;
+    if (!activeSession || !editingId) return;
+    const numericWeight = Number(poids);
+    if (!Number.isInteger(numericWeight) || numericWeight <= 0 || numericWeight > 2000) {
+      setError("Saisissez un poids entier valide.");
+      weightRef.current?.focus();
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      await saveModification(activeSession, editingId, numericWeight);
+      resetForm();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "La pesée n’a pas pu être modifiée.");
     } finally {
       setSaving(false);
     }
@@ -315,6 +357,11 @@ export default function FieldWeighingSession() {
 
   function startNewSession() {
     setSession(createSession());
+    setEditingId(null);
+    setEditingInSummary(false);
+    setOpenSummaryRowId(null);
+    setActionsOpen(false);
+    updateDragOffset(0);
     setNutrav("");
     setPoids("");
     setError("");
@@ -418,7 +465,7 @@ export default function FieldWeighingSession() {
                 <div className="absolute inset-y-0 right-0 flex w-48">
                   <button
                     type="button"
-                    onClick={beginEdit}
+                    onClick={() => beginEdit(session.entries[0])}
                     disabled={saving}
                     className="flex w-24 flex-col items-center justify-center gap-1 bg-neutral-200 text-base font-black text-black"
                   >
@@ -427,7 +474,7 @@ export default function FieldWeighingSession() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void cancelLatestWeight()}
+                    onClick={() => void cancelWeight(session.entries[0])}
                     disabled={saving}
                     className="flex w-24 flex-col items-center justify-center gap-1 bg-red-700 text-base font-black text-white"
                   >
@@ -457,7 +504,7 @@ export default function FieldWeighingSession() {
                 <div className="mt-4 flex gap-3 border-t-2 border-black pt-3">
                   <button
                     type="button"
-                    onClick={beginEdit}
+                    onClick={() => beginEdit(session.entries[0])}
                     disabled={saving}
                     className="flex min-h-11 flex-1 items-center justify-center gap-2 border-2 border-black bg-white px-3 font-black"
                   >
@@ -466,7 +513,7 @@ export default function FieldWeighingSession() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void cancelLatestWeight()}
+                    onClick={() => void cancelWeight(session.entries[0])}
                     disabled={saving}
                     className="flex min-h-11 flex-1 items-center justify-center gap-2 border-2 border-black bg-red-700 px-3 font-black text-white"
                   >
@@ -501,13 +548,57 @@ export default function FieldWeighingSession() {
             </p>
           </section>
 
-          <SummaryGroup title="MÂLES" entries={males} onToggle={toggle} />
-          <SummaryGroup title="FEMELLES" entries={females} onToggle={toggle} />
+          {error && !editingInSummary && (
+            <div role="alert" className="mt-4 border-4 border-red-700 bg-red-100 p-4 text-lg font-black text-red-900">
+              {error}
+            </div>
+          )}
+
+          <SummaryGroup
+            title="MÂLES"
+            entries={males}
+            onToggle={toggle}
+            openRowId={openSummaryRowId}
+            onOpenRow={(id, open) => setOpenSummaryRowId((current) => nextOpenSwipeId(current, id, open))}
+            editingId={editingId}
+            editingInSummary={editingInSummary}
+            editWeight={poids}
+            saving={saving}
+            error={error}
+            weightRef={weightRef}
+            onEdit={(entry) => beginEdit(entry, true)}
+            onEditWeight={setPoids}
+            onSave={() => void saveSummaryEdit()}
+            onAbandon={resetForm}
+            onDelete={(entry) => void cancelWeight(entry)}
+          />
+          <SummaryGroup
+            title="FEMELLES"
+            entries={females}
+            onToggle={toggle}
+            openRowId={openSummaryRowId}
+            onOpenRow={(id, open) => setOpenSummaryRowId((current) => nextOpenSwipeId(current, id, open))}
+            editingId={editingId}
+            editingInSummary={editingInSummary}
+            editWeight={poids}
+            saving={saving}
+            error={error}
+            weightRef={weightRef}
+            onEdit={(entry) => beginEdit(entry, true)}
+            onEditWeight={setPoids}
+            onSave={() => void saveSummaryEdit()}
+            onAbandon={resetForm}
+            onDelete={(entry) => void cancelWeight(entry)}
+          />
 
           <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
-              onClick={() => setSession({ ...session, summaryOpen: false })}
+              onClick={() => {
+                resetForm();
+                setOpenSummaryRowId(null);
+                setSession({ ...session, summaryOpen: false });
+              }}
               className="min-h-16 border-4 border-black bg-white px-4 text-xl font-black"
             >
               REPRENDRE LA SÉANCE
@@ -550,10 +641,36 @@ function SummaryGroup({
   title,
   entries,
   onToggle,
+  openRowId,
+  onOpenRow,
+  editingId,
+  editingInSummary,
+  editWeight,
+  saving,
+  error,
+  weightRef,
+  onEdit,
+  onEditWeight,
+  onSave,
+  onAbandon,
+  onDelete,
 }: {
   title: string;
   entries: FieldSessionEntry[];
   onToggle: (id: string) => void;
+  openRowId: string | null;
+  onOpenRow: (id: string, open: boolean) => void;
+  editingId: string | null;
+  editingInSummary: boolean;
+  editWeight: string;
+  saving: boolean;
+  error: string;
+  weightRef: RefObject<HTMLInputElement | null>;
+  onEdit: (entry: FieldSessionEntry) => void;
+  onEditWeight: (value: string) => void;
+  onSave: () => void;
+  onAbandon: () => void;
+  onDelete: (entry: FieldSessionEntry) => void;
 }) {
   const selectedEntries = entries.filter((entry) => entry.selected);
   const average = selectedAverage(selectedEntries);
@@ -569,27 +686,204 @@ function SummaryGroup({
       {entries.length === 0 ? (
         <p className="border-x-4 border-b-4 border-black p-4 text-lg font-black">AUCUN</p>
       ) : (
-        entries.map((entry) => (
-          <label
+        entries.map((entry) => {
+          const isEditing = editingInSummary && editingId === entry.id;
+          return (
+          <SummaryRow
             key={entry.id}
-            className="flex min-h-20 cursor-pointer items-center gap-4 border-x-4 border-b-4 border-black px-4"
-          >
-            <input
-              type="checkbox"
-              checked={entry.selected}
-              onChange={() => onToggle(entry.id)}
-              className="h-9 w-9 shrink-0 accent-black"
-            />
-            <span className="min-w-0 flex-1 text-2xl font-black">{entry.nutrav}</span>
-            <span className="text-2xl font-black">{entry.poids} kg</span>
-            {entry.selected ? (
-              <Check size={30} strokeWidth={4} aria-hidden="true" />
-            ) : (
-              <X size={30} strokeWidth={4} aria-hidden="true" />
-            )}
-          </label>
-        ))
+            entry={entry}
+            open={openRowId === entry.id}
+            disabled={saving || (editingId !== null && !isEditing)}
+            isEditing={isEditing}
+            editWeight={editWeight}
+            error={isEditing ? error : ""}
+            weightRef={isEditing ? weightRef : undefined}
+            onOpenChange={(open) => onOpenRow(entry.id, open)}
+            onToggle={() => onToggle(entry.id)}
+            onEdit={() => onEdit(entry)}
+            onEditWeight={onEditWeight}
+            onSave={onSave}
+            onAbandon={onAbandon}
+            onDelete={() => onDelete(entry)}
+          />
+          );
+        })
       )}
     </section>
+  );
+}
+
+function SummaryRow({
+  entry,
+  open,
+  disabled,
+  isEditing,
+  editWeight,
+  error,
+  weightRef,
+  onOpenChange,
+  onToggle,
+  onEdit,
+  onEditWeight,
+  onSave,
+  onAbandon,
+  onDelete,
+}: {
+  entry: FieldSessionEntry;
+  open: boolean;
+  disabled: boolean;
+  isEditing: boolean;
+  editWeight: string;
+  error: string;
+  weightRef?: RefObject<HTMLInputElement | null>;
+  onOpenChange: (open: boolean) => void;
+  onToggle: () => void;
+  onEdit: () => void;
+  onEditWeight: (value: string) => void;
+  onSave: () => void;
+  onAbandon: () => void;
+  onDelete: () => void;
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const pointerStartRef = useRef({ x: 0, offset: 0 });
+  const offsetRef = useRef(open ? -SWIPE_ACTION_WIDTH : 0);
+  const [offset, setOffset] = useState(offsetRef.current);
+  const [dragging, setDragging] = useState(false);
+
+  const updateOffset = useCallback((value: number) => {
+    offsetRef.current = value;
+    setOffset(value);
+  }, []);
+
+  useEffect(() => {
+    updateOffset(open ? -SWIPE_ACTION_WIDTH : 0);
+  }, [open, updateOffset]);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) onOpenChange(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePress);
+  }, [open, onOpenChange]);
+
+  function startSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+    if (disabled || isEditing) return;
+    pointerStartRef.current = { x: event.clientX, offset: open ? -SWIPE_ACTION_WIDTH : 0 };
+    setDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    updateOffset(
+      clampSwipeOffset(pointerStartRef.current.offset + event.clientX - pointerStartRef.current.x),
+    );
+  }
+
+  function endSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    setDragging(false);
+    onOpenChange(settleSwipe(offsetRef.current));
+  }
+
+  return (
+    <div ref={wrapperRef} className="border-x-4 border-b-4 border-black">
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-y-0 right-0 flex w-48 md:hidden">
+          <ActionButton type="edit" onClick={onEdit} disabled={disabled} />
+          <ActionButton type="delete" onClick={onDelete} disabled={disabled} />
+        </div>
+        <div
+          onPointerDown={startSwipe}
+          onPointerMove={moveSwipe}
+          onPointerUp={endSwipe}
+          onPointerCancel={endSwipe}
+          style={{
+            transform: `translateX(${offset}px)`,
+            touchAction: "pan-y",
+            transition: dragging ? "none" : "transform 180ms ease-out",
+          }}
+          className="relative z-10 flex min-h-20 items-center gap-3 bg-white px-3 md:!translate-x-0"
+          aria-expanded={open}
+        >
+          <input
+            type="checkbox"
+            checked={entry.selected}
+            onChange={onToggle}
+            onPointerDown={(event) => event.stopPropagation()}
+            className="h-9 w-9 shrink-0 accent-black"
+            aria-label={`Sélectionner ${entry.nutrav}`}
+          />
+          <span className="min-w-0 flex-1 text-2xl font-black">{entry.nutrav}</span>
+          <span className="whitespace-nowrap text-2xl font-black">{entry.poids} kg</span>
+          <div className="hidden shrink-0 gap-1.5 md:flex">
+            <ActionButton type="edit" onClick={onEdit} disabled={disabled} compact />
+            <ActionButton type="delete" onClick={onDelete} disabled={disabled} compact />
+          </div>
+        </div>
+      </div>
+
+      {isEditing && (
+        <div className="border-t-4 border-black bg-yellow-100 p-3">
+          <p className="mb-2 text-base font-black">Modifier {entry.nutrav}</p>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <input
+              ref={weightRef}
+              value={editWeight}
+              onChange={(event) => onEditWeight(event.target.value.replace(/\D/g, ""))}
+              inputMode="numeric"
+              className="h-14 min-w-0 border-2 border-black bg-white px-3 text-center text-2xl font-black outline-none focus:ring-4 focus:ring-yellow-400"
+              aria-label={`Nouveau poids de ${entry.nutrav}`}
+            />
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={disabled}
+              className="min-h-14 border-2 border-black bg-green-600 px-4 text-base font-black"
+            >
+              ENREGISTRER
+            </button>
+          </div>
+          {error && <p className="mt-2 font-black text-red-800">{error}</p>}
+          <button type="button" onClick={onAbandon} className="mt-2 min-h-11 font-black underline">
+            Abandonner la modification
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionButton({
+  type,
+  onClick,
+  disabled,
+  compact = false,
+}: {
+  type: "edit" | "delete";
+  onClick: () => void;
+  disabled: boolean;
+  compact?: boolean;
+}) {
+  const edit = type === "edit";
+  const Icon = edit ? Pencil : Trash2;
+  const label = edit ? "Modifier" : "Annuler";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={
+        compact
+          ? `flex min-h-11 items-center gap-1 border-2 border-black px-2 text-sm font-black ${edit ? "bg-white text-black" : "bg-red-700 text-white"}`
+          : `flex w-24 flex-col items-center justify-center gap-1 text-base font-black ${edit ? "bg-neutral-200 text-black" : "bg-red-700 text-white"}`
+      }
+    >
+      <Icon size={compact ? 18 : 26} strokeWidth={3} />
+      {label}
+    </button>
   );
 }

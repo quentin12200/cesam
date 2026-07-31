@@ -55,10 +55,18 @@ export function replaceSessionEntry(
   return entries.map((entry) => (entry.id === updated.id ? updated : entry));
 }
 
-export function removeLatestSessionEntry(
+export function removeSessionEntry(
   entries: FieldSessionEntry[],
   id: string,
 ): FieldSessionEntry[] {
-  if (entries[0]?.id !== id) return entries;
-  return entries.slice(1);
+  return entries.filter((entry) => entry.id !== id);
+}
+
+export function nextOpenSwipeId(
+  currentId: string | null,
+  requestedId: string,
+  open: boolean,
+): string | null {
+  if (!open) return currentId === requestedId ? null : currentId;
+  return requestedId;
 }
