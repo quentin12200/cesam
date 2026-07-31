@@ -125,6 +125,19 @@ export function selectedAverage(
   return averageWeight(selected);
 }
 
+export function selectedWeightSummary(
+  count: number,
+  average: number | null,
+  sexe: "M" | "F",
+): string {
+  const selectedLabel = sexe === "F"
+    ? count > 1 ? "sélectionnées" : "sélectionnée"
+    : count > 1 ? "sélectionnés" : "sélectionné";
+  if (count === 0 || average === null) return `0 ${selectedLabel} · —`;
+  if (count === 1) return `1 ${selectedLabel} · ${average} kg`;
+  return `${count} ${selectedLabel} · moyenne ${average} kg`;
+}
+
 export function averageWeight(entries: Array<{ poids: number }>): number | null {
   if (entries.length === 0) return null;
 

@@ -26,6 +26,7 @@ import {
   removeSessionEntry,
   replaceSessionEntry,
   selectedAverage,
+  selectedWeightSummary,
   settleSwipe,
   shouldShowSwipeHint,
   stopSwipeActionPointerDown,
@@ -564,6 +565,7 @@ export default function FieldWeighingSession() {
 
           <SummaryGroup
             title="MÂLES"
+            sexe="M"
             entries={males}
             onToggle={toggle}
             openRowId={openSummaryRowId}
@@ -582,6 +584,7 @@ export default function FieldWeighingSession() {
           />
           <SummaryGroup
             title="FEMELLES"
+            sexe="F"
             entries={females}
             onToggle={toggle}
             openRowId={openSummaryRowId}
@@ -630,6 +633,7 @@ export default function FieldWeighingSession() {
 
 function SummaryGroup({
   title,
+  sexe,
   entries,
   onToggle,
   openRowId,
@@ -647,6 +651,7 @@ function SummaryGroup({
   onDelete,
 }: {
   title: string;
+  sexe: "M" | "F";
   entries: FieldSessionEntry[];
   onToggle: (id: string) => void;
   openRowId: string | null;
@@ -668,11 +673,11 @@ function SummaryGroup({
 
   return (
     <section className="mt-6">
-      <div className="flex items-center justify-between border-b-4 border-black pb-2">
-        <h2 className="text-2xl font-black">{title}</h2>
-        <strong className="text-lg font-black">
-          {selectedEntries.length} · {average === null ? "—" : `${average} kg`}
-        </strong>
+      <div className="border-b-4 border-black pb-2">
+        <h2 className="text-3xl font-black leading-none">{title}</h2>
+        <p className="mt-1 text-xl font-black leading-tight">
+          {selectedWeightSummary(selectedEntries.length, average, sexe)}
+        </p>
       </div>
       {entries.length === 0 ? (
         <p className="border-x-4 border-b-4 border-black p-4 text-lg font-black">AUCUN</p>

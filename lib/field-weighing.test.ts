@@ -15,6 +15,7 @@ import {
   removeSessionEntry,
   replaceSessionEntry,
   selectedAverage,
+  selectedWeightSummary,
   settleSwipe,
   shouldShowSwipeHint,
   stopSwipeActionPointerDown,
@@ -240,6 +241,21 @@ test("calcule la moyenne entière des seuls animaux sélectionnés", () => {
     204,
   );
   assert.equal(selectedAverage([{ poids: 201, selected: false }]), null);
+});
+
+test("affiche la moyenne de plusieurs animaux sélectionnés", () => {
+  assert.equal(selectedWeightSummary(2, 444, "F"), "2 sélectionnées · moyenne 444 kg");
+  assert.equal(selectedWeightSummary(3, 463, "M"), "3 sélectionnés · moyenne 463 kg");
+});
+
+test("affiche le poids d'un seul animal sélectionné", () => {
+  assert.equal(selectedWeightSummary(1, 424, "F"), "1 sélectionnée · 424 kg");
+  assert.equal(selectedWeightSummary(1, 424, "M"), "1 sélectionné · 424 kg");
+});
+
+test("affiche un état vide lorsque rien n'est sélectionné", () => {
+  assert.equal(selectedWeightSummary(0, null, "F"), "0 sélectionnée · —");
+  assert.equal(selectedWeightSummary(0, null, "M"), "0 sélectionné · —");
 });
 
 test("calcule les moyennes mâles et femelles sur toute la séance après ajout", () => {
