@@ -14,6 +14,7 @@ export type FieldSessionEntry = {
 
 export const SWIPE_ACTION_WIDTH = 192;
 export const SWIPE_OPEN_THRESHOLD = 72;
+export const SWIPE_CLOSE_THRESHOLD = 12;
 
 export function calculateGmqKgPerDay(
   currentWeight: number,
@@ -33,10 +34,15 @@ export function selectedAverage(
   entries: Array<{ poids: number; selected: boolean }>,
 ): number | null {
   const selected = entries.filter((entry) => entry.selected);
-  if (selected.length === 0) return null;
+
+  return averageWeight(selected);
+}
+
+export function averageWeight(entries: Array<{ poids: number }>): number | null {
+  if (entries.length === 0) return null;
 
   return Math.round(
-    selected.reduce((total, entry) => total + entry.poids, 0) / selected.length,
+    entries.reduce((total, entry) => total + entry.poids, 0) / entries.length,
   );
 }
 
@@ -44,7 +50,10 @@ export function clampSwipeOffset(offset: number): number {
   return Math.max(-SWIPE_ACTION_WIDTH, Math.min(0, offset));
 }
 
-export function settleSwipe(offset: number): boolean {
+export function settleSwipe(offset: number, startOffset = 0): boolean {
+  if (startOffset === -SWIPE_ACTION_WIDTH) {
+    return offset - startOffset < SWIPE_CLOSE_THRESHOLD;
+  }
   return offset <= -SWIPE_OPEN_THRESHOLD;
 }
 

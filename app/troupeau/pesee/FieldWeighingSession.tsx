@@ -13,6 +13,7 @@ import {
 } from "react";
 import { ArrowLeft, Check, ChevronLeft, Lock, Pencil, Scale, Sun, Trash2 } from "lucide-react";
 import {
+  averageWeight,
   clampSwipeOffset,
   nextOpenSwipeId,
   prependSessionEntry,
@@ -356,6 +357,8 @@ export default function FieldWeighingSession() {
 
   const males = session.entries.filter((entry) => entry.sexe === "M");
   const females = session.entries.filter((entry) => entry.sexe === "F");
+  const maleAverage = averageWeight(males);
+  const femaleAverage = averageWeight(females);
 
   return (
     <div className="min-h-full bg-white text-black">
@@ -444,6 +447,10 @@ export default function FieldWeighingSession() {
             <h2 className="border-b-4 border-black pb-2 text-xl font-black">
               PESÉES DE LA SÉANCE — {session.entries.length} {session.entries.length > 1 ? "ANIMAUX" : "ANIMAL"}
             </h2>
+            <div className="grid border-x-4 border-b-4 border-black bg-white px-3 py-2 text-base font-black sm:grid-cols-2 sm:gap-4">
+              <p>MÂLES : {males.length === 0 ? "aucun" : `${males.length} · moyenne ${maleAverage} kg`}</p>
+              <p>FEMELLES : {females.length === 0 ? "aucune" : `${females.length} · moyenne ${femaleAverage} kg`}</p>
+            </div>
             {session.entries.length === 0 ? (
               <p className="border-x-4 border-b-4 border-black bg-white p-5 text-center text-lg font-black">
                 AUCUNE PESÉE ENREGISTRÉE DANS CETTE SÉANCE
@@ -728,7 +735,9 @@ function SummaryRow({
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
     event.currentTarget.releasePointerCapture(event.pointerId);
     setDragging(false);
-    onOpenChange(settleSwipe(offsetRef.current));
+    const shouldOpen = settleSwipe(offsetRef.current, pointerStartRef.current.offset);
+    updateOffset(shouldOpen ? -SWIPE_ACTION_WIDTH : 0);
+    onOpenChange(shouldOpen);
   }
 
   return (

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  averageWeight,
   calculateGmqKgPerDay,
   clampSwipeOffset,
   nextOpenSwipeId,
@@ -97,12 +98,46 @@ test("calcule la moyenne entière des seuls animaux sélectionnés", () => {
   assert.equal(selectedAverage([{ poids: 201, selected: false }]), null);
 });
 
+test("calcule les moyennes mâles et femelles sur toute la séance après ajout", () => {
+  const added = prependSessionEntry(entries, {
+    id: "p4", nutrav: "4004", sexe: "F", poids: 300, gmq: 1, selected: true,
+  });
+
+  assert.equal(averageWeight(added.filter((entry) => entry.sexe === "M")), 280);
+  assert.equal(averageWeight(added.filter((entry) => entry.sexe === "F")), 290);
+});
+
+test("recalcule les moyennes de séance après modification et annulation", () => {
+  const modified = replaceSessionEntry(entries, { ...entries[0], poids: 350 });
+  const removed = removeSessionEntry(modified, "p1");
+
+  assert.equal(averageWeight(modified.filter((entry) => entry.sexe === "M")), 300);
+  assert.equal(averageWeight(removed.filter((entry) => entry.sexe === "M")), 350);
+  assert.equal(averageWeight(removed.filter((entry) => entry.sexe === "F")), 280);
+});
+
+test("renvoie un état de moyenne vide pour un sexe absent", () => {
+  assert.equal(averageWeight([]), null);
+});
+
 test("le swipe suit le doigt et ne fait qu'ouvrir les actions après le seuil", () => {
   assert.equal(clampSwipeOffset(-40), -40);
   assert.equal(clampSwipeOffset(-400), -SWIPE_ACTION_WIDTH);
   assert.equal(settleSwipe(-40), false);
   assert.equal(settleSwipe(-72), true);
+  assert.equal(settleSwipe(-SWIPE_ACTION_WIDTH + 8, -SWIPE_ACTION_WIDTH), true);
+  assert.equal(settleSwipe(-SWIPE_ACTION_WIDTH + 16, -SWIPE_ACTION_WIDTH), false);
   assert.deepEqual(entries.map((entry) => entry.id), ["p3", "p2", "p1"]);
+});
+
+test("le relâchement du swipe ne produit qu'une position complètement ouverte ou fermée", () => {
+  const settledOffsets = [
+    settleSwipe(-71) ? -SWIPE_ACTION_WIDTH : 0,
+    settleSwipe(-72) ? -SWIPE_ACTION_WIDTH : 0,
+    settleSwipe(-176, -SWIPE_ACTION_WIDTH) ? -SWIPE_ACTION_WIDTH : 0,
+  ];
+
+  assert.deepEqual(settledOffsets, [0, -SWIPE_ACTION_WIDTH, 0]);
 });
 
 test("modifier remplace la pesée existante sans doublon et actualise son GMQ", () => {
