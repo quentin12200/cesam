@@ -163,6 +163,14 @@ export function settleSwipe(offset: number, startOffset = 0): boolean {
   return offset <= -SWIPE_OPEN_THRESHOLD;
 }
 
+export function stableSwipeOffset(open: boolean): number {
+  return open ? -SWIPE_ACTION_WIDTH : 0;
+}
+
+export function settledSwipeOffset(offset: number, startOffset = 0): number {
+  return stableSwipeOffset(settleSwipe(offset, startOffset));
+}
+
 export function replaceSessionEntry(
   entries: FieldSessionEntry[],
   updated: FieldSessionEntry,

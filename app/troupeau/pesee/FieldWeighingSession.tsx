@@ -27,8 +27,9 @@ import {
   replaceSessionEntry,
   selectedAverage,
   selectedWeightSummary,
-  settleSwipe,
+  settledSwipeOffset,
   shouldShowSwipeHint,
+  stableSwipeOffset,
   stopSwipeActionPointerDown,
   SWIPE_ACTION_WIDTH,
   weightProgressLabel,
@@ -434,7 +435,10 @@ export default function FieldWeighingSession() {
             setSession((current) => (current ? { ...current, priceGroups } : current))
           }
           onBack={() =>
-            setSession((current) => (current ? { ...current, simulationOpen: false } : current))
+            {
+              setOpenSummaryRowId(null);
+              setSession((current) => (current ? { ...current, simulationOpen: false } : current));
+            }
           }
         />
       ) : !session.summaryOpen ? (
@@ -530,7 +534,10 @@ export default function FieldWeighingSession() {
           <button
             type="button"
             disabled={session.entries.length === 0}
-            onClick={() => setSession({ ...session, summaryOpen: true })}
+            onClick={() => {
+              setOpenSummaryRowId(null);
+              setSession({ ...session, summaryOpen: true });
+            }}
             className="mt-6 min-h-16 w-full border-4 border-black bg-black px-4 text-xl font-black text-white disabled:border-neutral-500 disabled:bg-neutral-500"
           >
             FIN DE SÉANCE · {session.entries.length} PESÉ{session.entries.length > 1 ? "ES" : "E"}
@@ -552,7 +559,10 @@ export default function FieldWeighingSession() {
 
           <button
             type="button"
-            onClick={() => setSession({ ...session, simulationOpen: true })}
+            onClick={() => {
+              setOpenSummaryRowId(null);
+              setSession({ ...session, simulationOpen: true });
+            }}
             className="mt-4 min-h-16 w-full border-4 border-black bg-green-600 px-4 text-xl font-black"
           >
             SIMULER UN PRIX DE VENTE
@@ -746,8 +756,10 @@ function SummaryRow({
   onDelete: () => void;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const pointerStartRef = useRef({ x: 0, offset: 0 });
-  const offsetRef = useRef(open ? -SWIPE_ACTION_WIDTH : 0);
+  const pointerStartRef = useRef({ x: 0, y: 0, offset: 0 });
+  const activePointerRef = useRef<number | null>(null);
+  const gestureAxisRef = useRef<"pending" | "horizontal" | "vertical">("pending");
+  const offsetRef = useRef(stableSwipeOffset(open));
   const [offset, setOffset] = useState(offsetRef.current);
   const [dragging, setDragging] = useState(false);
   const age = fieldAgeInfo(entry.birthDate);
@@ -759,39 +771,84 @@ function SummaryRow({
   }, []);
 
   useEffect(() => {
-    updateOffset(open ? -SWIPE_ACTION_WIDTH : 0);
+    updateOffset(stableSwipeOffset(open));
   }, [open, updateOffset]);
 
   useEffect(() => {
     if (!open) return;
     const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!wrapperRef.current?.contains(event.target as Node)) onOpenChange(false);
+      if (!wrapperRef.current?.contains(event.target as Node)) {
+        updateOffset(0);
+        onOpenChange(false);
+      }
     };
     document.addEventListener("pointerdown", closeOnOutsidePress);
     return () => document.removeEventListener("pointerdown", closeOnOutsidePress);
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, updateOffset]);
 
   function startSwipe(event: ReactPointerEvent<HTMLDivElement>) {
     if (disabled || isEditing) return;
-    pointerStartRef.current = { x: event.clientX, offset: open ? -SWIPE_ACTION_WIDTH : 0 };
-    setDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    updateOffset(stableSwipeOffset(open));
+    pointerStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      offset: stableSwipeOffset(open),
+    };
+    activePointerRef.current = event.pointerId;
+    gestureAxisRef.current = "pending";
   }
 
   function moveSwipe(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    if (activePointerRef.current !== event.pointerId) return;
+    const deltaX = event.clientX - pointerStartRef.current.x;
+    const deltaY = event.clientY - pointerStartRef.current.y;
+
+    if (gestureAxisRef.current === "pending") {
+      if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 8) return;
+      if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+        gestureAxisRef.current = "vertical";
+        activePointerRef.current = null;
+        updateOffset(stableSwipeOffset(open));
+        return;
+      }
+      gestureAxisRef.current = "horizontal";
+      setDragging(true);
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    if (gestureAxisRef.current !== "horizontal") return;
     updateOffset(
-      clampSwipeOffset(pointerStartRef.current.offset + event.clientX - pointerStartRef.current.x),
+      clampSwipeOffset(pointerStartRef.current.offset + deltaX),
     );
   }
 
-  function endSwipe(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+  function finishSwipe(event: ReactPointerEvent<HTMLDivElement>, settle: boolean) {
+    if (activePointerRef.current !== event.pointerId) return;
+    const finalOffset = settle && gestureAxisRef.current === "horizontal"
+      ? settledSwipeOffset(offsetRef.current, pointerStartRef.current.offset)
+      : stableSwipeOffset(open);
+    const shouldOpen = finalOffset === -SWIPE_ACTION_WIDTH;
+
+    activePointerRef.current = null;
+    gestureAxisRef.current = "pending";
     setDragging(false);
-    const shouldOpen = settleSwipe(offsetRef.current, pointerStartRef.current.offset);
-    updateOffset(shouldOpen ? -SWIPE_ACTION_WIDTH : 0);
+    updateOffset(finalOffset);
     onOpenChange(shouldOpen);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function endSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+    finishSwipe(event, true);
+  }
+
+  function cancelSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+    finishSwipe(event, false);
+  }
+
+  function lostPointerCapture(event: ReactPointerEvent<HTMLDivElement>) {
+    finishSwipe(event, false);
   }
 
   return (
@@ -805,7 +862,8 @@ function SummaryRow({
           onPointerDown={startSwipe}
           onPointerMove={moveSwipe}
           onPointerUp={endSwipe}
-          onPointerCancel={endSwipe}
+          onPointerCancel={cancelSwipe}
+          onLostPointerCapture={lostPointerCapture}
           style={{
             transform: `translateX(${offset}px)`,
             touchAction: "pan-y",

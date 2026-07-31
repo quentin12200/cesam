@@ -17,7 +17,9 @@ import {
   selectedAverage,
   selectedWeightSummary,
   settleSwipe,
+  settledSwipeOffset,
   shouldShowSwipeHint,
+  stableSwipeOffset,
   stopSwipeActionPointerDown,
   SWIPE_ACTION_WIDTH,
   weightProgressLabel,
@@ -307,6 +309,44 @@ test("le relâchement du swipe ne produit qu'une position complètement ouverte 
   ];
 
   assert.deepEqual(settledOffsets, [0, -SWIPE_ACTION_WIDTH, 0]);
+});
+
+test("un swipe gauche suffisant finit exactement ouvert", () => {
+  assert.equal(settledSwipeOffset(-72), -SWIPE_ACTION_WIDTH);
+});
+
+test("un swipe gauche insuffisant finit exactement fermé", () => {
+  assert.equal(settledSwipeOffset(-71), 0);
+});
+
+test("un petit swipe droit depuis une ligne ouverte finit exactement fermé", () => {
+  assert.equal(settledSwipeOffset(-SWIPE_ACTION_WIDTH + 12, -SWIPE_ACTION_WIDTH), 0);
+});
+
+test("pointercancel et lostpointercapture restaurent toujours un offset stable", () => {
+  assert.equal(stableSwipeOffset(false), 0);
+  assert.equal(stableSwipeOffset(true), -SWIPE_ACTION_WIDTH);
+});
+
+test("ouvrir une nouvelle ligne ferme l'ancienne à zéro", () => {
+  const openId = nextOpenSwipeId("p3", "p2", true);
+
+  assert.equal(openId, "p2");
+  assert.equal(stableSwipeOffset(false), 0);
+  assert.equal(stableSwipeOffset(openId === "p2"), -SWIPE_ACTION_WIDTH);
+});
+
+test("clic extérieur, modification et annulation ferment la ligne à zéro", () => {
+  for (const reason of ["outside", "edit", "delete"]) {
+    const openId = nextOpenSwipeId("p2", "p2", false);
+    assert.equal(openId, null, reason);
+    assert.equal(stableSwipeOffset(openId === "p2"), 0, reason);
+  }
+});
+
+test("un scroll vertical ne laisse aucun décalage horizontal", () => {
+  assert.equal(stableSwipeOffset(false), 0);
+  assert.equal(stableSwipeOffset(true), -SWIPE_ACTION_WIDTH);
 });
 
 test("modifier remplace la pesée existante sans doublon et actualise son GMQ", () => {
