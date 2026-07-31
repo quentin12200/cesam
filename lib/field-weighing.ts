@@ -3,6 +3,18 @@ export type PreviousWeight = {
   date: Date;
 };
 
+export type FieldSessionEntry = {
+  id: string;
+  nutrav: string;
+  sexe: "M" | "F";
+  poids: number;
+  gmq: number | null;
+  selected: boolean;
+};
+
+export const SWIPE_ACTION_WIDTH = 192;
+export const SWIPE_OPEN_THRESHOLD = 72;
+
 export function calculateGmqKgPerDay(
   currentWeight: number,
   currentDate: Date,
@@ -26,4 +38,27 @@ export function selectedAverage(
   return Math.round(
     selected.reduce((total, entry) => total + entry.poids, 0) / selected.length,
   );
+}
+
+export function clampSwipeOffset(offset: number): number {
+  return Math.max(-SWIPE_ACTION_WIDTH, Math.min(0, offset));
+}
+
+export function settleSwipe(offset: number): boolean {
+  return offset <= -SWIPE_OPEN_THRESHOLD;
+}
+
+export function replaceSessionEntry(
+  entries: FieldSessionEntry[],
+  updated: FieldSessionEntry,
+): FieldSessionEntry[] {
+  return entries.map((entry) => (entry.id === updated.id ? updated : entry));
+}
+
+export function removeLatestSessionEntry(
+  entries: FieldSessionEntry[],
+  id: string,
+): FieldSessionEntry[] {
+  if (entries[0]?.id !== id) return entries;
+  return entries.slice(1);
 }
