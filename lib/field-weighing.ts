@@ -81,3 +81,7 @@ export function nextOpenSwipeId(
 export function shouldShowSwipeHint(hasUsedSwipeActions: boolean, index: number): boolean {
   return !hasUsedSwipeActions && index === 0;
 }
+
+export function stopSwipeActionPointerDown(event: { stopPropagation: () => void }): void {
+  event.stopPropagation();
+}

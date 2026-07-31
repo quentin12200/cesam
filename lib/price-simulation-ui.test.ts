@@ -2,10 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { FieldSessionEntry } from "./field-weighing.ts";
 import {
+  SELECT_THROUGH_LABEL,
   emptySectionLabel,
   sectionUiState,
   selectHeaviestThrough,
 } from "./price-simulation-ui.ts";
+
+test("affiche le libellé de sélection jusqu'à la ligne choisie", () => {
+  assert.equal(SELECT_THROUGH_LABEL, "Sélectionner jusqu’ici");
+});
 
 const entries: FieldSessionEntry[] = [
   { id: "a", nutrav: "1", sexe: "M", poids: 500, gmq: 1, selected: true },

@@ -17,6 +17,7 @@ import {
   type PriceMode,
 } from "@/lib/price-simulation";
 import {
+  SELECT_THROUGH_LABEL,
   emptySectionLabel,
   sectionUiState,
   selectHeaviestThrough,
@@ -318,11 +319,11 @@ function SimulationSexSection({
                 type="button"
                 onClick={() => onSelect(selectHeaviestThrough(animals, index))}
                 className="flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-black underline"
-                title="Sélectionner du plus lourd jusqu’ici"
-                aria-label={`Sélectionner du plus lourd jusqu’à ${entry.nutrav}`}
+                title={SELECT_THROUGH_LABEL}
+                aria-label={`${SELECT_THROUGH_LABEL}, jusqu’à ${entry.nutrav}`}
               >
                 <ListEnd size={18} />
-                <span className="max-w-20 leading-tight sm:max-w-none">Plus lourds jusqu’ici</span>
+                <span className="max-w-20 leading-tight sm:max-w-none">{SELECT_THROUGH_LABEL}</span>
               </button>
               </div>
             </div>

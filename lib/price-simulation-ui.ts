@@ -1,5 +1,7 @@
 import type { FieldSessionEntry } from "./field-weighing";
 
+export const SELECT_THROUGH_LABEL = "Sélectionner jusqu’ici";
+
 export function sectionUiState(animalCount: number, selectedCount: number) {
   return {
     empty: animalCount === 0,

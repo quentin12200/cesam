@@ -10,6 +10,7 @@ import {
   selectedAverage,
   settleSwipe,
   shouldShowSwipeHint,
+  stopSwipeActionPointerDown,
   SWIPE_ACTION_WIDTH,
 } from "./field-weighing.ts";
 import type { FieldSessionEntry } from "./field-weighing.ts";
@@ -19,6 +20,49 @@ const entries: FieldSessionEntry[] = [
   { id: "p2", nutrav: "2002", sexe: "F", poids: 280, gmq: 0.9, selected: true },
   { id: "p1", nutrav: "1001", sexe: "M", poids: 250, gmq: 0.7, selected: false },
 ];
+
+function clickSwipeAction(action: () => void) {
+  let pointerDownReachedSwipeRow = true;
+  stopSwipeActionPointerDown({
+    stopPropagation: () => {
+      pointerDownReachedSwipeRow = false;
+    },
+  });
+  action();
+  return pointerDownReachedSwipeRow;
+}
+
+test("le clic Modifier ouvre l'édition de la bonne ligne sans déclencher le swipe", () => {
+  let editingId: string | null = null;
+  const pointerDownReachedSwipeRow = clickSwipeAction(() => {
+    editingId = entries[1].id;
+  });
+
+  assert.equal(pointerDownReachedSwipeRow, false);
+  assert.equal(editingId, "p2");
+  assert.equal(editingId === entries[1].id, true);
+});
+
+test("le clic Annuler reste actif derrière le swipe et retire la bonne ligne", () => {
+  let currentEntries = entries;
+  const pointerDownReachedSwipeRow = clickSwipeAction(() => {
+    currentEntries = removeSessionEntry(currentEntries, entries[1].id);
+  });
+
+  assert.equal(pointerDownReachedSwipeRow, false);
+  assert.deepEqual(currentEntries.map((entry) => entry.id), ["p3", "p1"]);
+});
+
+test("une erreur serveur conserve les données locales", async () => {
+  let currentEntries = entries;
+
+  await assert.rejects(async () => {
+    await Promise.reject(new Error("Erreur serveur"));
+    currentEntries = removeSessionEntry(currentEntries, "p2");
+  }, /Erreur serveur/);
+
+  assert.equal(currentEntries, entries);
+});
 
 test("calcule le GMQ en kg/j avec une décimale", () => {
   assert.equal(

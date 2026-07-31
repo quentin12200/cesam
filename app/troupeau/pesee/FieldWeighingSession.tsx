@@ -21,6 +21,7 @@ import {
   selectedAverage,
   settleSwipe,
   shouldShowSwipeHint,
+  stopSwipeActionPointerDown,
   SWIPE_ACTION_WIDTH,
 } from "@/lib/field-weighing";
 import type { FieldSessionEntry } from "@/lib/field-weighing";
@@ -845,7 +846,9 @@ function ActionButton({
   return (
     <button
       type="button"
+      onPointerDown={stopSwipeActionPointerDown}
       onClick={onClick}
+      aria-label={label}
       disabled={disabled}
       className={
         compact
