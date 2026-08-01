@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
-import { numeroNationalDuLot } from "@/lib/identification";
-import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
+import { genererNumerosLibresDuLot } from "@/lib/identification";
+import {
+  obtenirLotBouclesActif,
+  obtenirNumerosIdentificationUtilises,
+} from "@/lib/lot-boucles";
 
 type VeauSaisi = { nutrav?: string; nunati?: string; sexe?: "M" | "F"; nom?: string; statut?: "VIVANT" | "MORT_NE" };
 
@@ -27,10 +30,16 @@ export async function POST(request: NextRequest) {
     veaux = veaux.slice(0, 10).map((v) => ({ ...v, nutrav: v.nutrav?.trim().toUpperCase() || undefined, nunati: v.nunati?.trim().toUpperCase() || undefined, nom: v.nom?.trim() || undefined, statut: v.statut === "MORT_NE" ? "MORT_NE" : "VIVANT" }));
     if (veaux.some((v) => v.nutrav && !/^\d{4}$/.test(v.nutrav))) return NextResponse.json({ error: "Le numéro de travail doit contenir 4 chiffres" }, { status: 400 });
     if (veaux.some((v) => v.nunati && v.nutrav !== v.nunati.slice(-4))) return NextResponse.json({ error: "Le numéro de travail doit correspondre aux 4 derniers chiffres du numéro national" }, { status: 400 });
-    const numerosDuLot = lotActif ? Array.from({ length: lotActif.quantite }, (_, index) => {
-      const nunati = numeroNationalDuLot(lotActif.premierNunati, index);
-      return { index, nunati, nutrav: nunati.slice(-4) };
-    }) : [];
+    const restantesDuLot = lotActif
+      ? Math.max(0, lotActif.quantite - lotActif.prochainIndex)
+      : 0;
+    const numerosDuLot = lotActif && restantesDuLot > 0
+      ? genererNumerosLibresDuLot(
+          lotActif.premierNunati,
+          restantesDuLot,
+          await obtenirNumerosIdentificationUtilises()
+        ).numeros
+      : [];
     if (lotActif && veaux.some((v) => v.nutrav && (!v.nunati || !numerosDuLot.some((numero) => numero.nutrav === v.nutrav && numero.nunati === v.nunati)))) return NextResponse.json({ error: "Cette boucle n'appartient pas au lot actif. Ajoutez un nouveau lot dans les Paramètres." }, { status: 400 });
     if (new Set(veaux.flatMap((v) => v.nutrav ? [v.nutrav] : [])).size !== veaux.filter((v) => v.nutrav).length) return NextResponse.json({ error: "Un numéro de travail est utilisé plusieurs fois" }, { status: 409 });
     if (new Set(veaux.flatMap((v) => v.nunati ? [v.nunati] : [])).size !== veaux.filter((v) => v.nunati).length) return NextResponse.json({ error: "Un numéro national est utilisé plusieurs fois" }, { status: 409 });
@@ -82,9 +91,21 @@ export async function POST(request: NextRequest) {
 
     if (capteur) await prisma.capteurVelage.updateMany({ where: { numero: capteur }, data: { actif: false, animalNutrav: null, animalNom: null, dateAttribution: null } });
     if (lotActif) {
-      const indexes = veaux.flatMap((veau) => numerosDuLot.find((numero) => numero.nunati === veau.nunati && numero.nutrav === veau.nutrav)?.index ?? []).filter((index) => index >= lotActif.prochainIndex);
-      if (indexes.length) {
-        const prochainIndex = Math.max(...indexes) + 1;
+      const numerosConsommes = new Set(
+        veaux.flatMap((veau) =>
+          numerosDuLot.some(
+            (numero) =>
+              numero.nunati === veau.nunati && numero.nutrav === veau.nutrav
+          ) && veau.nunati
+            ? [veau.nunati]
+            : []
+        )
+      ).size;
+      if (numerosConsommes > 0) {
+        const prochainIndex = Math.min(
+          lotActif.quantite,
+          lotActif.prochainIndex + numerosConsommes
+        );
         await prisma.lotBoucles.update({ where: { id: lotActif.id }, data: { prochainIndex, actif: prochainIndex < lotActif.quantite } });
         if (prochainIndex >= lotActif.quantite) await obtenirLotBouclesActif();
       }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { getMomentActuel } from "@/lib/evenements-sanitaires";
-import { normaliserNutrav, numeroNationalDuLot } from "@/lib/identification";
+import { normaliserNutrav } from "@/lib/identification";
 import { useRouter } from "next/navigation";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
@@ -23,9 +23,9 @@ const PRECISIONS: Record<Qualificatif, { value: string; label: string }[]> = {
   DIFFICILE: [{ value: "MAUVAIS_POSITIONNEMENT", label: "Mauvais positionnement" }, { value: "GROS_VEAU", label: "Gros veau" }, { value: "VACHE_NON_PREPAREE", label: "Vache non préparée" }, { value: "CESARIENNE", label: "Césarienne" }],
   AVORTEMENT: [], MORT_NEE: [],
 };
-interface Props { initialOpen?: boolean; initialMere?: string; initialDate?: string; initialSexe?: "M" | "F" | ""; capteurs?: Capteur[]; numeroVeauPropose: string; numeroNationalPropose: string; numerosUtilises: string[]; numerosNationauxUtilises: string[]; lotBoucles: { quantite: number; restantes: number } | null }
+interface Props { initialOpen?: boolean; initialMere?: string; initialDate?: string; initialSexe?: "M" | "F" | ""; capteurs?: Capteur[]; numeroVeauPropose: string; numeroNationalPropose: string; identificationsProposees: Array<{ nutrav: string; nunati: string }>; numerosUtilises: string[]; numerosNationauxUtilises: string[]; lotBoucles: { quantite: number; restantes: number } | null }
 
-export default function VelageFormWrapper({ initialOpen = false, initialMere = "", initialDate, initialSexe = "", capteurs = [], numeroVeauPropose, numeroNationalPropose, numerosUtilises, numerosNationauxUtilises, lotBoucles }: Props) {
+export default function VelageFormWrapper({ initialOpen = false, initialMere = "", initialDate, initialSexe = "", capteurs = [], numeroVeauPropose, numeroNationalPropose, identificationsProposees, numerosUtilises, numerosNationauxUtilises, lotBoucles }: Props) {
   const router = useRouter();
   const { closeToOrigin, completeToOrigin } = useOriginNavigation();
   const today = new Date().toISOString().split("T")[0];
@@ -53,7 +53,7 @@ export default function VelageFormWrapper({ initialOpen = false, initialMere = "
   useEffect(() => { if (initialOpen && initialMere) void chargerMere(initialMere); }, [chargerMere, initialMere, initialOpen]);
 
   function changerMere(value: string) { const n = value.toUpperCase(); setMere(n); setMereNom(null); if (debounce.current) clearTimeout(debounce.current); debounce.current = setTimeout(() => void chargerMere(n), 500); }
-  function prochaineIdentification(existants: Veau[]) { if (!numeroNationalPropose) return { nutrav: "", nunati: "" }; let decalage = existants.length; let nunati = numeroNationalDuLot(numeroNationalPropose, decalage); let nutrav = nunati.slice(-4); while (numerosUtilises.includes(nutrav) || numerosNationauxUtilises.includes(nunati) || existants.some((v) => v.nutrav === nutrav)) { decalage += 1; nunati = numeroNationalDuLot(numeroNationalPropose, decalage); nutrav = nunati.slice(-4); } return { nutrav, nunati }; }
+  function prochaineIdentification(existants: Veau[]) { return identificationsProposees.find((numero) => !numerosUtilises.includes(numero.nutrav) && !numerosNationauxUtilises.includes(numero.nunati) && !existants.some((veau) => veau.nutrav === numero.nutrav || veau.nunati === numero.nunati)) ?? { nutrav: "", nunati: "" }; }
   function ajouterVeau() { setVeaux((v) => [...v, { ...vide(qualificatif === "MORT_NEE" ? "MORT_NE" : "VIVANT"), ...prochaineIdentification(v) }]); }
   function supprimerVeau(index: number) { setVeaux((v) => v.filter((_, i) => i !== index)); }
   function modifierVeau(index: number, data: Partial<Veau>) { setVeaux((v) => v.map((veau, i) => i === index ? { ...veau, ...data } : veau)); }

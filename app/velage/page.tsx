@@ -8,7 +8,7 @@ import CapteurManager from "./CapteurManager";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
 import GestationCalendarSection from "@/app/components/GestationCalendarSection";
 import TroupeauTabs from "@/components/TroupeauTabs";
-import { propositionLot } from "@/lib/identification";
+import { genererNumerosLibresDuLot } from "@/lib/identification";
 import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
 
 async function getVelageData() {
@@ -38,24 +38,27 @@ async function getVelageData() {
 
   const numerosUtilises = [...new Set([...numerosAnimaux.map((animal) => animal.nutrav), ...numerosVeaux.flatMap((veau) => veau.nutrav ? [veau.nutrav] : [])])];
   const numerosNationauxUtilises = [...new Set([...numerosAnimaux.flatMap((animal) => animal.numeroNational ? [animal.numeroNational] : []), ...numerosVeaux.flatMap((veau) => veau.nunati ? [veau.nunati] : [])])];
-  const dejaUtilises = new Set(numerosUtilises);
-  let proposition = { nutrav: "", nunati: "" };
-  if (lotActif && lotActif.prochainIndex < lotActif.quantite) {
-    let decalage = 0;
-    proposition = propositionLot(lotActif, 4, true, decalage);
-    while ((dejaUtilises.has(proposition.nutrav) || numerosNationauxUtilises.includes(proposition.nunati)) && lotActif.prochainIndex + decalage < lotActif.quantite) {
-      decalage += 1;
-      proposition = propositionLot(lotActif, 4, true, decalage);
-    }
-    if (lotActif.prochainIndex + decalage >= lotActif.quantite) proposition = { nutrav: "", nunati: "" };
-  }
+  const restantes = lotActif
+    ? Math.max(0, lotActif.quantite - lotActif.prochainIndex)
+    : 0;
+  const identificationsProposees = lotActif && restantes > 0
+    ? genererNumerosLibresDuLot(
+        lotActif.premierNunati,
+        Math.min(10, restantes),
+        [
+          ...numerosUtilises.map((nutrav) => ({ nutrav, nunati: null })),
+          ...numerosNationauxUtilises.map((nunati) => ({ nutrav: null, nunati })),
+        ]
+      ).numeros.map(({ nutrav, nunati }) => ({ nutrav, nunati }))
+    : [];
+  const proposition = identificationsProposees[0] ?? { nutrav: "", nunati: "" };
 
-  return { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numerosNationauxUtilises, proposition, lotActif };
+  return { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numerosNationauxUtilises, proposition, identificationsProposees, lotActif };
 }
 
 export default async function VelagePage({ searchParams }: { searchParams: Promise<{ nouveau?: string; mere?: string; date?: string; sexe?: string }> }) {
   const params = await searchParams;
-  const { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numerosNationauxUtilises, proposition, lotActif } = await getVelageData();
+  const { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numerosNationauxUtilises, proposition, identificationsProposees, lotActif } = await getVelageData();
   const now = new Date();
 
   return (
@@ -75,6 +78,7 @@ export default async function VelagePage({ searchParams }: { searchParams: Promi
         capteurs={capteurs.map((c) => ({ numero: c.numero, actif: c.actif, animalNutrav: c.animalNutrav }))}
         numeroVeauPropose={proposition.nutrav}
         numeroNationalPropose={proposition.nunati}
+        identificationsProposees={identificationsProposees}
         numerosUtilises={numerosUtilises}
         numerosNationauxUtilises={numerosNationauxUtilises}
         lotBoucles={lotActif ? { quantite: lotActif.quantite, restantes: Math.max(0, lotActif.quantite - lotActif.prochainIndex) } : null}
