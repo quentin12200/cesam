@@ -4,6 +4,7 @@ import {
   assertActiveWeighingSessionForAnimal,
   attachExistingWeightsToSession,
   getOrCreateActiveWeighingSession,
+  getWeighingSession,
   isWeighingSessionStatus,
   listWeighingSessions,
   transitionWeighingSession,
@@ -34,6 +35,14 @@ test("crée une première séance active", async () => {
 
   assert.equal((await getOrCreateActiveWeighingSession(db as never)).id, "s1");
   assert.equal(createCalls, 1);
+});
+
+test("retourne une erreur propre pour une séance inexistante", async () => {
+  const db = { weighingSession: { findUnique: async () => null } };
+  await assert.rejects(
+    getWeighingSession("absente", db as never),
+    (error) => error instanceof WeighingSessionError && error.code === "NOT_FOUND",
+  );
 });
 
 test("rattache une ancienne séance locale par ids exacts et reste idempotent", async () => {

@@ -16,6 +16,7 @@ import ChecklistSection, {
   type ChecklistItem,
 } from "@/app/components/ChecklistSection";
 import AccueilQuickActions from "@/app/components/AccueilQuickActions";
+import HomeWeighingPanel from "@/app/components/HomeWeighingPanel";
 import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import AccueilTodoSection, { type AccueilTodoGroup } from "@/app/components/AccueilTodoSection";
@@ -858,6 +859,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-4 md:max-w-3xl lg:max-w-4xl">
       <AccueilQuickActions />
+      <HomeWeighingPanel />
 
       <Link
         href="/soutien"

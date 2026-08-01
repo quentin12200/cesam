@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { calculateGmqKgPerDay } from "@/lib/field-weighing";
+import { getWeighingSessionHistoryDetail } from "@/lib/weighing-session-history";
 import { parsePriceGroups } from "@/lib/price-simulation";
 import {
-  getWeighingSession,
   updateWeighingSessionMetadata,
   WeighingSessionError,
   type WeighingSessionMetadata,
@@ -14,29 +12,16 @@ type RouteContext = { params: Promise<{ id: string }> };
 export async function GET(_request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
-    const session = await getWeighingSession(id);
-    const fieldEntries = await Promise.all(session.pesees.map(async (pesee) => {
-      const previous = await prisma.pesee.findFirst({
-        where: {
-          animalId: pesee.animalId,
-          createdAt: { lt: session.startedAt },
-          id: { not: pesee.id },
-        },
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-        select: { poids: true, date: true },
-      });
-      return {
-        id: pesee.id,
-        nutrav: pesee.animal.nutrav,
-        mereNutrav: pesee.animal.mere?.nutrav ?? null,
-        birthDate: pesee.animal.danais.toISOString(),
-        sexe: pesee.animal.sexbov === "M" ? "M" : "F",
-        poids: pesee.poids,
-        gmq: calculateGmqKgPerDay(pesee.poids, pesee.date, previous),
-        selected: true,
-      };
-    }));
-    return NextResponse.json({ ...session, fieldEntries });
+    const detail = await getWeighingSessionHistoryDetail(id);
+    return NextResponse.json({
+      id: detail.id,
+      startedAt: detail.startedAt,
+      endedAt: detail.endedAt,
+      status: detail.status,
+      selectionData: detail.selectionData,
+      simulationData: detail.simulationData,
+      fieldEntries: detail.entries,
+    });
   } catch (error) {
     if (error instanceof WeighingSessionError && error.code === "NOT_FOUND") {
       return NextResponse.json({ error: error.message }, { status: 404 });
