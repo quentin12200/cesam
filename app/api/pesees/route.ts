@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { calculateGmqKgPerDay } from "@/lib/field-weighing";
+import {
+  assertActiveWeighingSessionForAnimal,
+  isWeighingSessionWeightDuplicateError,
+  WeighingSessionError,
+} from "@/lib/weighing-sessions";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,6 +15,9 @@ export async function POST(request: NextRequest) {
     const date = String(body.date ?? "");
     const poids = Number(body.poids);
     const sessionStartedAt = new Date(String(body.sessionStartedAt ?? ""));
+    const weighingSessionId = typeof body.weighingSessionId === "string"
+      ? body.weighingSessionId.trim() || null
+      : null;
 
     if (
       !nutrav ||
@@ -36,6 +44,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Animal non trouvé" }, { status: 404 });
     }
 
+    if (weighingSessionId) {
+      try {
+        await assertActiveWeighingSessionForAnimal(weighingSessionId, animal.id);
+      } catch (error) {
+        if (error instanceof WeighingSessionError) {
+          return NextResponse.json(
+            { error: error.message },
+            { status: error.code === "NOT_FOUND" ? 404 : 409 },
+          );
+        }
+        throw error;
+      }
+    }
+
     const currentDate = new Date(`${date}T12:00:00`);
     if (Number.isNaN(currentDate.getTime())) {
       return NextResponse.json({ error: "Date de pesée invalide" }, { status: 400 });
@@ -50,13 +72,25 @@ export async function POST(request: NextRequest) {
       select: { poids: true, date: true },
     });
 
-    const pesee = await prisma.pesee.create({
-      data: {
-        animalId: animal.id,
-        date: currentDate,
-        poids,
-      },
-    });
+    let pesee;
+    try {
+      pesee = await prisma.pesee.create({
+        data: {
+          animalId: animal.id,
+          weighingSessionId,
+          date: currentDate,
+          poids,
+        },
+      });
+    } catch (error) {
+      if (weighingSessionId && isWeighingSessionWeightDuplicateError(error)) {
+        return NextResponse.json(
+          { error: "Cet animal possède déjà une pesée dans cette séance." },
+          { status: 409 },
+        );
+      }
+      throw error;
+    }
 
     const desc = `Pesée ${pesee.poids}kg enregistrée pour ${nutrav}`;
     let undoId = "";

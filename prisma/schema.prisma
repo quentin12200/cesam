@@ -274,14 +274,42 @@ model QuestionReponse {
 }
 
 model Pesee {
-  id         String   @id @default(cuid())
-  animalId   String
-  animal     Animal   @relation(fields: [animalId], references: [id])
-  date       DateTime
-  poids      Float
+  id                 String            @id @default(cuid())
+  animalId           String
+  animal             Animal            @relation(fields: [animalId], references: [id])
+  weighingSessionId  String?
+  weighingSession    WeighingSession?   @relation(fields: [weighingSessionId], references: [id], onDelete: SetNull)
+  date               DateTime
+  poids              Float
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([weighingSessionId, animalId])
+  @@index([weighingSessionId])
+}
+
+enum WeighingSessionStatus {
+  ACTIVE
+  FINISHED
+  ABANDONED
+}
+
+/// CESAM est actuellement mono-exploitation : une base correspond à une exploitation.
+/// Une évolution multi-exploitations devra rattacher transversalement tous les modèles métier.
+model WeighingSession {
+  id              String    @id @default(cuid())
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  status          WeighingSessionStatus @default(ACTIVE)
+  selectionData   Json?
+  simulationData  Json?
+  pesees          Pesee[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([startedAt])
+  @@index([status, startedAt])
 }
 
 model Parage {
