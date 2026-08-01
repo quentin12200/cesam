@@ -8,6 +8,7 @@ import {
   detectSwipeAxis,
   fieldAgeInfo,
   fieldAgeAlertSummary,
+  formatWeightKg,
   hydrateFieldSessionEntries,
   isSwipeInteractiveTarget,
   motherNumberLabel,
@@ -51,6 +52,10 @@ test("affiche Première pesée sur sa ligne dédiée sans GMQ", () => {
 
 test("affiche le GMQ formaté sur sa ligne dédiée", () => {
   assert.equal(weightProgressLabel({ gmq: 2.3 }), "GMQ 2,3 kg/j");
+});
+
+test("formate le poids en kilogrammes entiers", () => {
+  assert.equal(formatWeightKg(348), "348 kg");
 });
 
 test("conserve le numéro de mère après rechargement de la séance locale", () => {

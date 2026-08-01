@@ -3,9 +3,7 @@
 import Link from "next/link";
 import {
   FormEvent,
-  PointerEvent as ReactPointerEvent,
   type RefObject,
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -13,41 +11,33 @@ import {
 } from "react";
 import { ArrowLeft, Check, ChevronLeft, Lock, Pencil, Scale, Sun, Trash2 } from "lucide-react";
 import {
-  ageAlertLabel,
   averageWeight,
-  clampSwipeOffset,
-  detectSwipeAxis,
-  fieldAgeInfo,
+  formatWeightKg,
   fieldAgeAlertSummary,
   hydrateFieldSessionEntries,
-  isSwipeInteractiveTarget,
-  motherNumberLabel,
   needsFieldAnimalDetails,
   nextOpenSwipeId,
   prependSessionEntry,
-  removeSessionEntry,
   replaceSessionEntry,
   selectedAverage,
   selectedWeightSummary,
-  settledSwipeOffset,
   shouldShowSwipeHint,
-  stableSwipeOffset,
   stopSwipeActionPointerDown,
-  SWIPE_ACTION_WIDTH,
   swipeToggleLabel,
-  weightProgressLabel,
 } from "@/lib/field-weighing";
 import type { FieldAnimalDetails, FieldSessionEntry } from "@/lib/field-weighing";
-import { parsePriceGroups, sortEntriesByWeight, type PriceGroup } from "@/lib/price-simulation";
+import { createFieldWeight, deleteFieldWeight, updateFieldWeight } from "@/lib/field-weighing-api";
+import {
+  createFieldSession,
+  FIELD_SESSION_STORAGE_KEY,
+  parseStoredFieldSession,
+  removeFieldSessionEntry,
+  type StoredFieldSession,
+} from "@/lib/field-weighing-session";
+import { sortEntriesByWeight } from "@/lib/price-simulation";
 import PriceSimulation from "./PriceSimulation";
-
-type StoredSession = {
-  startedAt: string;
-  entries: FieldSessionEntry[];
-  summaryOpen: boolean;
-  simulationOpen: boolean;
-  priceGroups: PriceGroup[];
-};
+import WeighingAnimalDetails from "./WeighingAnimalDetails";
+import { useSwipeActions } from "./useSwipeActions";
 
 type WakeLockSentinel = {
   released: boolean;
@@ -55,18 +45,7 @@ type WakeLockSentinel = {
   addEventListener: (type: "release", listener: () => void) => void;
 };
 
-const STORAGE_KEY = "cesam:field-weighing-session";
 const SWIPE_HINT_KEY = "cesam:field-weighing-swipe-hint-used";
-
-function createSession(): StoredSession {
-  return {
-    startedAt: new Date().toISOString(),
-    entries: [],
-    summaryOpen: false,
-    simulationOpen: false,
-    priceGroups: [],
-  };
-}
 
 function todayLocal() {
   const now = new Date();
@@ -75,7 +54,7 @@ function todayLocal() {
 }
 
 export default function FieldWeighingSession() {
-  const [session, setSession] = useState<StoredSession | null>(null);
+  const [session, setSession] = useState<StoredFieldSession | null>(null);
   const [nutrav, setNutrav] = useState("");
   const [poids, setPoids] = useState("");
   const [editWeight, setEditWeight] = useState("");
@@ -91,28 +70,12 @@ export default function FieldWeighingSession() {
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    try {
-      if (saved) {
-        const parsed = JSON.parse(saved) as Partial<StoredSession>;
-        setSession({
-          startedAt: parsed.startedAt ?? new Date().toISOString(),
-          entries: parsed.entries ?? [],
-          summaryOpen: parsed.summaryOpen ?? false,
-          simulationOpen: parsed.simulationOpen ?? false,
-          priceGroups: parsePriceGroups(JSON.stringify(parsed.priceGroups ?? [])),
-        });
-      } else {
-        setSession(createSession());
-      }
-      setSwipeHintUsed(localStorage.getItem(SWIPE_HINT_KEY) === "true");
-    } catch {
-      setSession(createSession());
-    }
+    setSession(parseStoredFieldSession(localStorage.getItem(FIELD_SESSION_STORAGE_KEY)));
+    setSwipeHintUsed(localStorage.getItem(SWIPE_HINT_KEY) === "true");
   }, []);
 
   useEffect(() => {
-    if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    if (session) localStorage.setItem(FIELD_SESSION_STORAGE_KEY, JSON.stringify(session));
   }, [session]);
 
   useEffect(() => {
@@ -213,23 +176,14 @@ export default function FieldWeighingSession() {
     requestAnimationFrame(() => numberRef.current?.focus());
   }
 
-  async function saveModification(activeSession: StoredSession, id: string, numericWeight: number) {
+  async function saveModification(activeSession: StoredFieldSession, id: string, numericWeight: number) {
     const currentEntry = activeSession.entries.find((entry) => entry.id === id);
     if (!currentEntry) throw new Error("Cette pesée n’est plus dans la séance.");
-
-    const response = await fetch(`/api/pesees/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ poids: numericWeight, sessionStartedAt: activeSession.startedAt }),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "La pesée n’a pas pu être modifiée.");
-
-    const updatedEntry = {
-      ...currentEntry,
-      poids: result.pesee.poids,
-      gmq: result.gmq,
-    };
+    const updatedEntry = await updateFieldWeight(
+      currentEntry,
+      numericWeight,
+      activeSession.startedAt,
+    );
     setSession((current) =>
       current
         ? { ...current, entries: replaceSessionEntry(current.entries, updatedEntry) }
@@ -266,33 +220,18 @@ export default function FieldWeighingSession() {
     setSaving(true);
     setError("");
     try {
-      const response = await fetch("/api/pesees", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nutrav: cleanNumber,
-          poids: numericWeight,
-          date: todayLocal(),
-          sessionStartedAt: activeSession.startedAt,
-        }),
+      const entry = await createFieldWeight({
+        nutrav: cleanNumber,
+        poids: numericWeight,
+        date: todayLocal(),
+        sessionStartedAt: activeSession.startedAt,
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "La pesée n’a pas pu être enregistrée.");
 
       setSession((current) =>
         current
           ? {
               ...current,
-              entries: prependSessionEntry(current.entries, {
-                id: result.pesee.id,
-                nutrav: result.animal.nutrav,
-                mereNutrav: result.animal.mereNutrav,
-                birthDate: result.animal.birthDate,
-                sexe: result.animal.sexe === "M" ? "M" : "F",
-                poids: result.pesee.poids,
-                gmq: result.gmq,
-                selected: true,
-              }),
+              entries: prependSessionEntry(current.entries, entry),
             }
           : current,
       );
@@ -322,22 +261,9 @@ export default function FieldWeighingSession() {
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/pesees/${entry.id}`, { method: "DELETE" });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "La pesée n’a pas pu être annulée.");
+      await deleteFieldWeight(entry.id);
       setSession((current) =>
-        current
-          ? {
-              ...current,
-              entries: removeSessionEntry(current.entries, entry.id),
-              priceGroups: current.priceGroups
-                .map((group) => ({
-                  ...group,
-                  peseeIds: group.peseeIds.filter((id) => id !== entry.id),
-                }))
-                .filter((group) => group.peseeIds.length > 0),
-            }
-          : current,
+        current ? removeFieldSessionEntry(current, entry.id) : current,
       );
       if (editingId === entry.id) resetEdit();
     } catch (caught) {
@@ -391,7 +317,7 @@ export default function FieldWeighingSession() {
   }
 
   function startNewSession() {
-    setSession(createSession());
+    setSession(createFieldSession());
     setEditingId(null);
     setEditingInSummary(false);
     setOpenSummaryRowId(null);
@@ -758,117 +684,16 @@ function SummaryRow({
   onAbandon: () => void;
   onDelete: () => void;
 }) {
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const pointerStartRef = useRef({ x: 0, y: 0, offset: 0 });
-  const activePointerRef = useRef<number | null>(null);
-  const gestureAxisRef = useRef<"pending" | "horizontal" | "vertical">("pending");
-  const offsetRef = useRef(stableSwipeOffset(open));
-  const [offset, setOffset] = useState(offsetRef.current);
-  const [dragging, setDragging] = useState(false);
-  const age = fieldAgeInfo(entry.birthDate);
-  const ageAlert = ageAlertLabel(age.alert);
-
-  const updateOffset = useCallback((value: number) => {
-    offsetRef.current = value;
-    setOffset(value);
-  }, []);
-
-  useEffect(() => {
-    updateOffset(stableSwipeOffset(open));
-  }, [open, updateOffset]);
-
-  useEffect(() => {
-    if (!open) return;
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!wrapperRef.current?.contains(event.target as Node)) {
-        updateOffset(0);
-        onOpenChange(false);
-      }
-    };
-    document.addEventListener("pointerdown", closeOnOutsidePress);
-    return () => document.removeEventListener("pointerdown", closeOnOutsidePress);
-  }, [open, onOpenChange, updateOffset]);
-
-  function startSwipe(event: ReactPointerEvent<HTMLDivElement>) {
-    if (
-      disabled ||
-      isEditing ||
-      isSwipeInteractiveTarget(event.target as HTMLElement)
-    ) return;
-    updateOffset(stableSwipeOffset(open));
-    pointerStartRef.current = {
-      x: event.clientX,
-      y: event.clientY,
-      offset: stableSwipeOffset(open),
-    };
-    activePointerRef.current = event.pointerId;
-    gestureAxisRef.current = "pending";
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function moveSwipe(event: ReactPointerEvent<HTMLDivElement>) {
-    if (activePointerRef.current !== event.pointerId) return;
-    const deltaX = event.clientX - pointerStartRef.current.x;
-    const deltaY = event.clientY - pointerStartRef.current.y;
-
-    if (gestureAxisRef.current === "pending") {
-      const axis = detectSwipeAxis(deltaX, deltaY);
-      if (axis === "pending") return;
-      gestureAxisRef.current = axis;
-      if (axis === "vertical") {
-        activePointerRef.current = null;
-        updateOffset(stableSwipeOffset(open));
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-          event.currentTarget.releasePointerCapture(event.pointerId);
-        }
-        return;
-      }
-      setDragging(true);
-    }
-
-    if (gestureAxisRef.current !== "horizontal") return;
-    updateOffset(
-      clampSwipeOffset(pointerStartRef.current.offset + deltaX),
-    );
-  }
-
-  function finishSwipe(event: ReactPointerEvent<HTMLDivElement>, settle: boolean) {
-    if (activePointerRef.current !== event.pointerId) return;
-    const finalOffset = settle && gestureAxisRef.current === "horizontal"
-      ? settledSwipeOffset(offsetRef.current, pointerStartRef.current.offset)
-      : stableSwipeOffset(open);
-    const shouldOpen = finalOffset === -SWIPE_ACTION_WIDTH;
-
-    activePointerRef.current = null;
-    gestureAxisRef.current = "pending";
-    setDragging(false);
-    updateOffset(finalOffset);
-    onOpenChange(shouldOpen);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }
-
-  function endSwipe(event: ReactPointerEvent<HTMLDivElement>) {
-    finishSwipe(event, true);
-  }
-
-  function cancelSwipe(event: ReactPointerEvent<HTMLDivElement>) {
-    finishSwipe(event, false);
-  }
-
-  function lostPointerCapture(event: ReactPointerEvent<HTMLDivElement>) {
-    finishSwipe(event, false);
-  }
+  const { wrapperRef, offset, dragging, pointerHandlers } = useSwipeActions({
+    open,
+    disabled: disabled || isEditing,
+    onOpenChange,
+  });
 
   return (
     <div
       ref={wrapperRef}
-      onPointerDown={startSwipe}
-      onPointerMove={moveSwipe}
-      onPointerUp={endSwipe}
-      onPointerCancel={cancelSwipe}
-      onLostPointerCapture={lostPointerCapture}
+      {...pointerHandlers}
       style={{ touchAction: "pan-y" }}
       className="border-x-4 border-b-4 border-black"
     >
@@ -896,14 +721,8 @@ function SummaryRow({
             />
           )}
           <div className="min-w-0 flex-1 py-2">
-            <p className="text-xl font-black">{entry.nutrav} — {entry.poids} kg</p>
-            <p className="text-sm font-bold">
-              {motherNumberLabel(entry)} · {age.label}
-              {ageAlert && (
-                <> · <span className={age.alert === "approaching" ? "text-orange-700" : "bg-orange-200 px-1 text-black"}>{ageAlert}</span></>
-              )}
-            </p>
-            <p className="text-sm font-extrabold">{weightProgressLabel(entry)}</p>
+            <p className="text-xl font-black">{entry.nutrav} — {formatWeightKg(entry.poids)}</p>
+            <WeighingAnimalDetails entry={entry} />
             {showHint && (
               <p className="mt-1 text-sm font-bold">Glisser pour modifier ou annuler</p>
             )}
