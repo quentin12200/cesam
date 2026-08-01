@@ -13,6 +13,7 @@ import {
   GripVertical,
   Pill,
   Plus,
+  Scale,
   Stethoscope,
   Tags,
   Users,
@@ -159,8 +160,14 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
     );
   }
 
-  const mobileActions = raccourcis.slice(0, raccourcis.length > 6 ? 5 : 6);
-  const desktopActions = raccourcis.slice(0, raccourcis.length > 12 ? 11 : 12);
+  const mobileActions = raccourcis.slice(0, raccourcis.length > 5 ? 4 : 5);
+  const desktopActions = raccourcis.slice(0, raccourcis.length > 11 ? 10 : 11);
+  const weighingShortcut = (
+    <Link href="/troupeau/pesee" className="flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-green-300 bg-green-50 px-1 py-1 text-center text-xs font-semibold leading-tight text-green-900 shadow-sm transition active:scale-[0.97]">
+      <Scale size={16} className="shrink-0" />
+      <span className="w-full whitespace-normal">Pesée rapide</span>
+    </Link>
+  );
 
   return (
     <section data-layout-section="accueil-actions-rapides" data-layout-label="Actions rapides" className="space-y-1.5">
@@ -172,18 +179,23 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
       </div>
 
       {raccourcis.length === 0 ? (
-        <button type="button" onClick={ouvrir} className="min-h-14 w-full rounded-lg border border-dashed border-gray-300 bg-white text-sm font-medium text-gray-500">
-          + Ajouter une action
-        </button>
+        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+          {weighingShortcut}
+          <button type="button" onClick={ouvrir} className="min-h-14 rounded-lg border border-dashed border-gray-300 bg-white text-xs font-medium text-gray-500">
+            + Ajouter une action
+          </button>
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-3 gap-1.5 sm:hidden">
             {mobileActions.map((id) => afficherAction(id))}
-            {raccourcis.length > 6 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-gray-200 bg-white px-1 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={16} />Plus</button>}
+            {weighingShortcut}
+            {raccourcis.length > 5 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-gray-200 bg-white px-1 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={16} />Plus</button>}
           </div>
           <div className="hidden grid-cols-6 gap-1.5 sm:grid">
             {desktopActions.map((id) => afficherAction(id))}
-            {raccourcis.length > 12 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-gray-200 bg-white px-1 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={16} />Plus</button>}
+            {weighingShortcut}
+            {raccourcis.length > 11 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-gray-200 bg-white px-1 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={16} />Plus</button>}
           </div>
         </>
       )}

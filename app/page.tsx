@@ -16,7 +16,7 @@ import ChecklistSection, {
   type ChecklistItem,
 } from "@/app/components/ChecklistSection";
 import AccueilQuickActions from "@/app/components/AccueilQuickActions";
-import HomeWeighingPanel from "@/app/components/HomeWeighingPanel";
+import HomeActiveWeighingNews from "@/app/components/HomeActiveWeighingNews";
 import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import AccueilTodoSection, { type AccueilTodoGroup } from "@/app/components/AccueilTodoSection";
@@ -31,6 +31,7 @@ import { getHeatReturnReminder } from "@/lib/heat-return-monitoring";
 import { parseReproductionRules } from "@/lib/reproduction-rules";
 import { getWeaningDryOffCandidates } from "@/lib/weaning-dry-off-data";
 import WeaningDryOffPanel from "@/app/components/WeaningDryOffPanel";
+import { neverWeighedAnimalWhere, shouldShowActiveWeighingNews } from "@/lib/weighing-news";
 import {
   Baby,
   Wifi,
@@ -40,6 +41,7 @@ import {
   Tag,
   Activity,
   HeartHandshake,
+  Scale,
   } from "lucide-react";
 
 async function getDashboardData() {
@@ -70,6 +72,8 @@ async function getDashboardData() {
     activeHeatCandidates,
     reproductionConfig,
     weaningDryOff,
+    activeWeighingSession,
+    neverWeighedCount,
   ] = await Promise.all([
     prisma.animal.count({ where: { statut: "ACTIF", sexbov: "F", estGenisse: false } }),
     prisma.capteurVelage.findMany({ orderBy: { numero: "asc" } }),
@@ -194,6 +198,12 @@ async function getDashboardData() {
       select: { reproductionRulesJson: true, reproReposObjectifJours: true },
     }).catch(() => null),
     getWeaningDryOffCandidates(now),
+    prisma.weighingSession.findFirst({
+      where: { status: "ACTIVE" },
+      orderBy: { startedAt: "desc" },
+      select: { id: true, startedAt: true, status: true, _count: { select: { pesees: true } } },
+    }),
+    prisma.animal.count({ where: neverWeighedAnimalWhere(now) }),
   ]);
 
   const reproductionRules = parseReproductionRules(reproductionConfig?.reproductionRulesJson);
@@ -335,6 +345,8 @@ async function getDashboardData() {
     tauxMortaliteAnnee,
     activeHeats,
     heatReturnReminders,
+    activeWeighingSession,
+    neverWeighedCount,
   };
 }
 
@@ -371,6 +383,11 @@ export default async function Dashboard({ searchParams }: PageProps) {
     (candidate) =>
       candidate.window === "NOW" && !candidate.recentlyWeaned
   ).length;
+  const showActiveWeighingNews = shouldShowActiveWeighingNews(
+    data.activeWeighingSession
+      ? { status: data.activeWeighingSession.status, weightCount: data.activeWeighingSession._count.pesees }
+      : null,
+  );
 
   const vachesACapteurSansCapteur = data.vachesACapteur.filter(
     (g) => !capteursActifsNutravs.has(g.saillie.animal.nutrav)
@@ -859,7 +876,6 @@ export default async function Dashboard({ searchParams }: PageProps) {
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-4 md:max-w-3xl lg:max-w-4xl">
       <AccueilQuickActions />
-      <HomeWeighingPanel />
 
       <Link
         href="/soutien"
@@ -885,6 +901,8 @@ export default async function Dashboard({ searchParams }: PageProps) {
 
       {(data.activeHeats.length > 0 ||
         data.heatReturnReminders.length > 0 ||
+        showActiveWeighingNews ||
+        data.neverWeighedCount > 0 ||
         weaningThresholdNews.length > 0) && (
         <section
           data-layout-section="accueil-actualites-chaleurs"
@@ -914,6 +932,26 @@ export default async function Dashboard({ searchParams }: PageProps) {
                 variant="home"
               />
             ))}
+            {showActiveWeighingNews && data.activeWeighingSession && (
+              <HomeActiveWeighingNews session={{
+                id: data.activeWeighingSession.id,
+                startedAt: data.activeWeighingSession.startedAt.toISOString(),
+                weightCount: data.activeWeighingSession._count.pesees,
+              }} />
+            )}
+            {data.neverWeighedCount > 0 && (
+              <div className="flex min-h-14 items-center gap-3 rounded-lg border-l-4 border-l-amber-600 bg-amber-50 px-3 py-2">
+                <Scale size={20} className="shrink-0 text-amber-800" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-amber-950">Veaux jamais pesés</p>
+                  <p className="text-xs text-amber-800">{data.neverWeighedCount} animaux de 10 mois ou plus</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Link href="/troupeau/pesee/jamais-peses" className="flex min-h-11 items-center px-2 text-sm font-bold text-amber-950 underline">Voir</Link>
+                  <Link href="/troupeau/pesee" className="hidden min-h-11 items-center px-2 text-xs font-semibold text-amber-900 underline sm:flex">Démarrer une pesée</Link>
+                </div>
+              </div>
+            )}
             {weaningThresholdNews.map((candidate) => (
               <Link
                 key={`weaning-threshold-${candidate.calf.id}`}
