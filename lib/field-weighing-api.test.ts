@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createFieldWeight,
   deleteFieldWeight,
+  FieldWeightApiError,
   updateFieldWeight,
 } from "./field-weighing-api.ts";
 import type { FieldSessionEntry } from "./field-weighing.ts";
@@ -24,7 +25,7 @@ function jsonFetcher(body: unknown, status = 200): typeof fetch {
 
 test("crée une entrée de séance depuis la réponse canonique", async () => {
   const created = await createFieldWeight(
-    { nutrav: "9260", poids: 348, date: "2026-08-01", sessionStartedAt: "2026-08-01T07:00:00.000Z" },
+    { nutrav: "9260", poids: 348, date: "2026-08-01", sessionStartedAt: "2026-08-01T07:00:00.000Z", weighingSessionId: "ws1" },
     jsonFetcher({
       pesee: { id: "p1", poids: 348 },
       animal: { nutrav: "9260", sexe: "M", mereNutrav: "6393", birthDate: entry.birthDate },
@@ -33,6 +34,16 @@ test("crée une entrée de séance depuis la réponse canonique", async () => {
   );
 
   assert.deepEqual(created, entry);
+});
+
+test("expose le statut du conflit pour réconcilier une réponse réseau perdue", async () => {
+  await assert.rejects(
+    createFieldWeight(
+      { nutrav: "9260", poids: 348, date: "2026-08-01", sessionStartedAt: "2026-08-01T07:00:00.000Z", weighingSessionId: "ws1" },
+      jsonFetcher({ error: "Déjà pesé" }, 409),
+    ),
+    (error) => error instanceof FieldWeightApiError && error.status === 409,
+  );
 });
 
 test("PATCH remplace seulement la pesée existante", async () => {

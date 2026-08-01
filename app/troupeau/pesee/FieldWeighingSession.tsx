@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Check, ChevronLeft, Lock, Pencil, Scale, Sun, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, Lock, Pencil, RefreshCw, Scale, Sun, Trash2 } from "lucide-react";
 import {
   averageWeight,
   formatWeightKg,
@@ -26,14 +26,26 @@ import {
   swipeToggleLabel,
 } from "@/lib/field-weighing";
 import type { FieldAnimalDetails, FieldSessionEntry } from "@/lib/field-weighing";
-import { createFieldWeight, deleteFieldWeight, updateFieldWeight } from "@/lib/field-weighing-api";
+import { createFieldWeight, deleteFieldWeight, FieldWeightApiError, updateFieldWeight } from "@/lib/field-weighing-api";
 import {
-  createFieldSession,
+  addPendingWeight,
+  canStartNewFieldSession,
   FIELD_SESSION_STORAGE_KEY,
   parseStoredFieldSession,
   removeFieldSessionEntry,
+  resolvePendingWeight,
   type StoredFieldSession,
 } from "@/lib/field-weighing-session";
+import {
+  attachLegacyFieldSession,
+  FieldSessionApiError,
+  getFieldSession,
+  openActiveFieldSession,
+  pendingWeightInput,
+  saveFieldSessionMetadata,
+  sessionFromServer,
+  transitionFieldSession,
+} from "@/lib/field-weighing-session-api";
 import { sortEntriesByWeight } from "@/lib/price-simulation";
 import PriceSimulation from "./PriceSimulation";
 import WeighingAnimalDetails from "./WeighingAnimalDetails";
@@ -46,6 +58,10 @@ type WakeLockSentinel = {
 };
 
 const SWIPE_HINT_KEY = "cesam:field-weighing-swipe-hint-used";
+
+function isNetworkFailure(error: unknown): boolean {
+  return (typeof navigator !== "undefined" && navigator.onLine === false) || error instanceof TypeError;
+}
 
 function todayLocal() {
   const now = new Date();
@@ -65,17 +81,111 @@ export default function FieldWeighingSession() {
   const [swipeHintUsed, setSwipeHintUsed] = useState(false);
   const [error, setError] = useState("");
   const [wakeLockActive, setWakeLockActive] = useState(false);
+  const [sessionMessage, setSessionMessage] = useState("");
+  const [abandonOpen, setAbandonOpen] = useState(false);
   const numberRef = useRef<HTMLInputElement>(null);
   const weightRef = useRef<HTMLInputElement>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const syncingPendingRef = useRef(false);
 
   useEffect(() => {
-    setSession(parseStoredFieldSession(localStorage.getItem(FIELD_SESSION_STORAGE_KEY)));
+    const cached = parseStoredFieldSession(localStorage.getItem(FIELD_SESSION_STORAGE_KEY));
+    setSession(cached);
     setSwipeHintUsed(localStorage.getItem(SWIPE_HINT_KEY) === "true");
+
+    let cancelled = false;
+    async function reconcileServerSession() {
+      try {
+        if (cached.weighingSessionId) {
+          try {
+            const known = await getFieldSession(cached.weighingSessionId);
+            if (cancelled) return;
+            setSession(sessionFromServer(known, cached));
+            if (known.status !== "ACTIVE") {
+              setSessionMessage("Cette séance a été terminée depuis un autre appareil.");
+            }
+            return;
+          } catch (caught) {
+            if (cached.entries.length > 0 || cached.pendingWeights.length > 0) {
+              setSessionMessage("La référence serveur de cette séance est devenue invalide. Le cache local est conservé sans être écrasé.");
+              return;
+            }
+            if (!(caught instanceof FieldSessionApiError && caught.status === 404)) throw caught;
+          }
+        }
+
+        const active = await openActiveFieldSession();
+        if (cancelled) return;
+        if (!cached.weighingSessionId && cached.entries.length > 0) {
+          const attachment = await attachLegacyFieldSession(active.id, cached.entries.map((entry) => entry.id));
+          if (attachment.ignored.length > 0) {
+            setSessionMessage(`${attachment.ignored.length} référence locale invalide a été ignorée ; les autres pesées sont conservées.`);
+          }
+        }
+        const canonical = await getFieldSession(active.id);
+        if (!cancelled) setSession(sessionFromServer(canonical, {
+          ...cached,
+          weighingSessionId: active.id,
+          startedAt: active.startedAt,
+        }));
+      } catch {
+        if (!cancelled) {
+          setSessionMessage("Mode hors connexion : la séance reste conservée sur cet appareil.");
+        }
+      }
+    }
+    void reconcileServerSession();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
     if (session) localStorage.setItem(FIELD_SESSION_STORAGE_KEY, JSON.stringify(session));
+  }, [session]);
+
+  useEffect(() => {
+    if (!session?.weighingSessionId) return;
+    const timeout = window.setTimeout(() => {
+      void saveFieldSessionMetadata(session).catch(() => {
+        setSessionMessage("Les choix restent enregistrés sur cet appareil et seront resynchronisés.");
+      });
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session?.weighingSessionId || session.status !== "ACTIVE" || session.pendingWeights.length === 0) return;
+
+    async function synchronizePending() {
+      if (syncingPendingRef.current) return;
+      syncingPendingRef.current = true;
+      try {
+        for (const pending of session!.pendingWeights) {
+          let entry: FieldSessionEntry;
+          try {
+            entry = await createFieldWeight(pendingWeightInput(pending, session!));
+          } catch (caught) {
+            if (!(caught instanceof FieldWeightApiError && caught.status === 409)) throw caught;
+            const canonical = await getFieldSession(session!.weighingSessionId!);
+            const existing = canonical.fieldEntries.find((item) => item.nutrav === pending.nutrav);
+            if (!existing) throw caught;
+            entry = existing;
+          }
+          setSession((current) => current ? resolvePendingWeight(current, pending.localId, entry) : current);
+        }
+        setSessionMessage("Pesées hors connexion synchronisées.");
+      } catch (caught) {
+        if (!isNetworkFailure(caught)) {
+          setSessionMessage(caught instanceof Error ? caught.message : "Une pesée en attente ne peut pas être synchronisée.");
+        }
+      } finally {
+        syncingPendingRef.current = false;
+      }
+    }
+
+    const onOnline = () => void synchronizePending();
+    window.addEventListener("online", onOnline);
+    if (navigator.onLine) void synchronizePending();
+    return () => window.removeEventListener("online", onOnline);
   }, [session]);
 
   useEffect(() => {
@@ -195,6 +305,14 @@ export default function FieldWeighingSession() {
     event.preventDefault();
     const activeSession = session;
     if (!activeSession) return;
+    if (activeSession.status !== "ACTIVE") {
+      setError("Cette séance est terminée. Démarrez une nouvelle séance pour ajouter une pesée.");
+      return;
+    }
+    if (!activeSession.weighingSessionId) {
+      setError("Connexion au serveur nécessaire avant la première pesée de cette séance.");
+      return;
+    }
 
     const cleanNumber = nutrav.trim();
     const numericWeight = Number(poids);
@@ -209,7 +327,10 @@ export default function FieldWeighingSession() {
       weightRef.current?.focus();
       return;
     }
-    if (activeSession.entries.some((entry) => entry.nutrav === cleanNumber)) {
+    if (
+      activeSession.entries.some((entry) => entry.nutrav === cleanNumber) ||
+      activeSession.pendingWeights.some((entry) => entry.nutrav === cleanNumber)
+    ) {
       setError(`L’animal ${cleanNumber} est déjà pesé dans cette séance.`);
       setNutrav("");
       setPoids("");
@@ -225,6 +346,7 @@ export default function FieldWeighingSession() {
         poids: numericWeight,
         date: todayLocal(),
         sessionStartedAt: activeSession.startedAt,
+        weighingSessionId: activeSession.weighingSessionId,
       });
 
       setSession((current) =>
@@ -237,7 +359,19 @@ export default function FieldWeighingSession() {
       );
       resetForm();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "La pesée n’a pas pu être enregistrée.");
+      if (isNetworkFailure(caught)) {
+        const pending = {
+          localId: crypto.randomUUID(),
+          nutrav: cleanNumber,
+          poids: numericWeight,
+          date: todayLocal(),
+        };
+        setSession((current) => current ? addPendingWeight(current, pending) : current);
+        setSessionMessage("Pesée conservée hors connexion. Elle sera enregistrée automatiquement au retour du réseau.");
+        resetForm();
+      } else {
+        setError(caught instanceof Error ? caught.message : "La pesée n’a pas pu être enregistrée.");
+      }
     } finally {
       setSaving(false);
     }
@@ -316,15 +450,69 @@ export default function FieldWeighingSession() {
     }
   }
 
-  function startNewSession() {
-    setSession(createFieldSession());
-    setEditingId(null);
-    setEditingInSummary(false);
-    setOpenSummaryRowId(null);
-    setEditWeight("");
-    setNutrav("");
-    setPoids("");
+  async function finishSession() {
+    const activeSession = session;
+    if (!activeSession?.weighingSessionId || activeSession.status !== "ACTIVE") return;
+    setSaving(true);
     setError("");
+    try {
+      await saveFieldSessionMetadata(activeSession);
+      const finished = await transitionFieldSession(activeSession.weighingSessionId, "finish");
+      setSession((current) => current ? {
+        ...current,
+        status: finished.status,
+        summaryOpen: true,
+        simulationOpen: false,
+      } : current);
+      setSessionMessage("Séance terminée et enregistrée");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "La séance ne peut pas être terminée.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function startNewSession() {
+    if (!session || !canStartNewFieldSession(session.status)) {
+      setError("Terminez ou abandonnez la séance active avant d’en démarrer une nouvelle.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const opened = await openActiveFieldSession();
+      const canonical = await getFieldSession(opened.id);
+      setSession(sessionFromServer(canonical));
+      resetForm();
+      setSessionMessage("Nouvelle séance démarrée.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "La nouvelle séance ne peut pas être démarrée.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function abandonSession() {
+    const activeSession = session;
+    if (!activeSession?.weighingSessionId || activeSession.status !== "ACTIVE") return;
+    setSaving(true);
+    setError("");
+    try {
+      await saveFieldSessionMetadata(activeSession);
+      const abandoned = await transitionFieldSession(activeSession.weighingSessionId, "abandon");
+      setSession((current) => current ? {
+        ...current,
+        status: abandoned.status,
+        summaryOpen: true,
+        simulationOpen: false,
+      } : current);
+      setAbandonOpen(false);
+      setSessionMessage("Séance abandonnée. Toutes les pesées enregistrées sont conservées.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "La séance ne peut pas être abandonnée.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const sortedEntries = sortEntriesByWeight(session.entries);
@@ -355,6 +543,12 @@ export default function FieldWeighingSession() {
           <Scale size={42} strokeWidth={3} aria-hidden="true" />
         </div>
       </header>
+
+      {sessionMessage && (
+        <div role="status" className="mx-auto max-w-3xl border-x-4 border-b-4 border-black bg-yellow-200 px-3 py-2 text-center font-black">
+          {sessionMessage}
+        </div>
+      )}
 
       {session.simulationOpen ? (
         <PriceSimulation
@@ -458,6 +652,14 @@ export default function FieldWeighingSession() {
                 );
               })
             )}
+            {session.pendingWeights.length > 0 && (
+              <div className="border-x-4 border-b-4 border-black bg-yellow-200 p-3 font-black">
+                <p className="flex items-center gap-2"><RefreshCw size={20} /> EN ATTENTE DE SYNCHRONISATION</p>
+                {session.pendingWeights.map((pending) => (
+                  <p key={pending.localId} className="mt-1">{pending.nutrav} — {pending.poids} kg</p>
+                ))}
+              </div>
+            )}
           </section>
 
           <button
@@ -469,7 +671,7 @@ export default function FieldWeighingSession() {
             }}
             className="mt-6 min-h-16 w-full border-4 border-black bg-black px-4 text-xl font-black text-white disabled:border-neutral-500 disabled:bg-neutral-500"
           >
-            FIN DE SÉANCE · {session.entries.length} PESÉ{session.entries.length > 1 ? "ES" : "E"}
+            VOIR LE RÉCAPITULATIF · {session.entries.length} PESÉ{session.entries.length > 1 ? "ES" : "E"}
           </button>
         </main>
       ) : (
@@ -545,23 +747,46 @@ export default function FieldWeighingSession() {
           <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
+              disabled={session.status !== "ACTIVE"}
               onClick={() => {
                 resetForm();
                 setOpenSummaryRowId(null);
                 setSession({ ...session, summaryOpen: false });
               }}
-              className="min-h-16 border-4 border-black bg-white px-4 text-xl font-black"
+              className="min-h-16 border-4 border-black bg-white px-4 text-xl font-black disabled:bg-neutral-300"
             >
-              REPRENDRE LA SÉANCE
+              {session.status === "ACTIVE" ? "REPRENDRE LA SÉANCE" : "SÉANCE EN LECTURE SEULE"}
             </button>
             <button
               type="button"
-              onClick={startNewSession}
-              className="min-h-16 border-4 border-black bg-green-600 px-4 text-xl font-black"
+              onClick={() => void finishSession()}
+              disabled={saving || session.status !== "ACTIVE" || session.pendingWeights.length > 0}
+              className="min-h-16 border-4 border-black bg-green-600 px-4 text-xl font-black disabled:bg-neutral-400"
             >
-              NOUVELLE SÉANCE
+              {session.status === "ACTIVE" ? "TERMINER LA SÉANCE" : "SÉANCE TERMINÉE"}
             </button>
           </div>
+          {session.status === "ACTIVE" ? (
+            <div className="mt-3">
+              {!abandonOpen ? (
+                <button type="button" onClick={() => setAbandonOpen(true)} className="min-h-12 w-full px-3 font-black underline">
+                  Abandonner la séance
+                </button>
+              ) : (
+                <div className="border-4 border-red-700 bg-red-50 p-4">
+                  <p className="font-black">Les pesées déjà enregistrées seront conservées. Le récapitulatif de cette séance restera consultable comme séance abandonnée.</p>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => setAbandonOpen(false)} className="min-h-12 border-2 border-black bg-white font-black">REVENIR</button>
+                    <button type="button" onClick={() => void abandonSession()} disabled={saving || session.pendingWeights.length > 0} className="min-h-12 border-2 border-black bg-red-700 font-black text-white disabled:bg-neutral-400">CONFIRMER L’ABANDON</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button type="button" onClick={() => void startNewSession()} disabled={saving} className="mt-3 min-h-16 w-full border-4 border-black bg-green-600 px-4 text-xl font-black disabled:bg-neutral-400">
+              DÉMARRER UNE NOUVELLE SÉANCE
+            </button>
+          )}
           <p className="mt-4 text-center text-base font-extrabold">
             La sélection ne modifie et ne supprime aucun poids.
           </p>

@@ -18,14 +18,28 @@ type UpdatedWeight = {
   gmq: number | null;
 };
 
+export class FieldWeightApiError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function readResult<T>(response: Response, fallback: string): Promise<T> {
   const result = await response.json() as T & { error?: string };
-  if (!response.ok) throw new Error(result.error || fallback);
+  if (!response.ok) throw new FieldWeightApiError(result.error || fallback, response.status);
   return result;
 }
 
 export async function createFieldWeight(
-  input: { nutrav: string; poids: number; date: string; sessionStartedAt: string },
+  input: {
+    nutrav: string;
+    poids: number;
+    date: string;
+    sessionStartedAt: string;
+    weighingSessionId: string;
+  },
   fetcher: Fetcher = fetch,
 ): Promise<FieldSessionEntry> {
   const response = await fetcher("/api/pesees", {

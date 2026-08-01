@@ -7,6 +7,19 @@ export type WeighingSessionStatus = (typeof WEIGHING_SESSION_STATUSES)[number];
 type WeighingSessionDb = Pick<PrismaClient, "weighingSession">;
 type WeighingSessionWeightDb = Pick<PrismaClient, "weighingSession" | "pesee">;
 
+export type WeighingSessionMetadata = {
+  selectedPeseeIds: string[];
+  summaryOpen: boolean;
+  simulationOpen: boolean;
+  priceGroups: Array<{
+    id: string;
+    sexe: "M" | "F";
+    peseeIds: string[];
+    mode: "PER_KG" | "PER_HEAD";
+    tarif: number;
+  }>;
+};
+
 const sessionDetails = {
   pesees: {
     orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }],
@@ -111,6 +124,90 @@ export async function getWeighingSession(
   });
   if (!session) throw new WeighingSessionError("NOT_FOUND", "Séance de pesée introuvable.");
   return session;
+}
+
+export async function updateWeighingSessionMetadata(
+  id: string,
+  metadata: WeighingSessionMetadata,
+  db: WeighingSessionDb = prisma,
+) {
+  const existing = await db.weighingSession.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing) throw new WeighingSessionError("NOT_FOUND", "Séance de pesée introuvable.");
+  await db.weighingSession.update({
+    where: { id },
+    data: {
+      selectionData: {
+        selectedPeseeIds: metadata.selectedPeseeIds,
+        summaryOpen: metadata.summaryOpen,
+        simulationOpen: metadata.simulationOpen,
+      },
+      simulationData: { priceGroups: metadata.priceGroups },
+    },
+  });
+  return getWeighingSession(id, db);
+}
+
+export async function attachExistingWeightsToSession(
+  sessionId: string,
+  peseeIds: string[],
+  db: WeighingSessionWeightDb = prisma,
+) {
+  const session = await db.weighingSession.findUnique({
+    where: { id: sessionId },
+    select: { id: true, status: true },
+  });
+  if (!session) throw new WeighingSessionError("NOT_FOUND", "Séance de pesée introuvable.");
+  if (session.status !== "ACTIVE") {
+    throw new WeighingSessionError("NOT_ACTIVE", "Cette séance de pesée est terminée.");
+  }
+
+  const uniqueIds = [...new Set(peseeIds.filter(Boolean))];
+  const weights = await db.pesee.findMany({
+    where: { id: { in: uniqueIds } },
+    select: { id: true, animalId: true, weighingSessionId: true },
+  });
+  const attached: string[] = [];
+  const ignored: string[] = uniqueIds.filter((id) => !weights.some((weight) => weight.id === id));
+
+  for (const weight of weights) {
+    if (weight.weighingSessionId === sessionId) {
+      attached.push(weight.id);
+      continue;
+    }
+    if (weight.weighingSessionId !== null) {
+      ignored.push(weight.id);
+      continue;
+    }
+    const duplicateAnimal = await db.pesee.findFirst({
+      where: { weighingSessionId: sessionId, animalId: weight.animalId },
+      select: { id: true },
+    });
+    if (duplicateAnimal) {
+      ignored.push(weight.id);
+      continue;
+    }
+    try {
+      const updated = await db.pesee.updateMany({
+        where: { id: weight.id, weighingSessionId: null },
+        data: { weighingSessionId: sessionId },
+      });
+      if (updated.count === 1) attached.push(weight.id);
+      else ignored.push(weight.id);
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) throw error;
+      const concurrent = await db.pesee.findUnique({
+        where: { id: weight.id },
+        select: { weighingSessionId: true },
+      });
+      if (concurrent?.weighingSessionId === sessionId) attached.push(weight.id);
+      else ignored.push(weight.id);
+    }
+  }
+
+  return { attached, ignored, session: await getWeighingSession(sessionId, db) };
 }
 
 export async function transitionWeighingSession(

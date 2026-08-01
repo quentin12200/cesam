@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   assertActiveWeighingSessionForAnimal,
+  attachExistingWeightsToSession,
   getOrCreateActiveWeighingSession,
   isWeighingSessionStatus,
   listWeighingSessions,
   transitionWeighingSession,
+  updateWeighingSessionMetadata,
   WeighingSessionError,
 } from "./weighing-sessions.ts";
 
@@ -32,6 +34,57 @@ test("crée une première séance active", async () => {
 
   assert.equal((await getOrCreateActiveWeighingSession(db as never)).id, "s1");
   assert.equal(createCalls, 1);
+});
+
+test("rattache une ancienne séance locale par ids exacts et reste idempotent", async () => {
+  const state = new Map([
+    ["p1", { id: "p1", animalId: "a1", weighingSessionId: null as string | null }],
+    ["p2", { id: "p2", animalId: "a2", weighingSessionId: "other" as string | null }],
+  ]);
+  const db = {
+    weighingSession: {
+      findUnique: async (args: { select?: unknown }) => args.select
+        ? { id: "s1", status: "ACTIVE" }
+        : { ...activeSession, pesees: [] },
+    },
+    pesee: {
+      findMany: async () => [...state.values()],
+      findFirst: async ({ where }: { where: { weighingSessionId: string; animalId: string } }) =>
+        [...state.values()].find((weight) => weight.weighingSessionId === where.weighingSessionId && weight.animalId === where.animalId) ?? null,
+      updateMany: async ({ where, data }: { where: { id: string }; data: { weighingSessionId: string } }) => {
+        const weight = state.get(where.id);
+        if (!weight || weight.weighingSessionId !== null) return { count: 0 };
+        weight.weighingSessionId = data.weighingSessionId;
+        return { count: 1 };
+      },
+    },
+  };
+
+  const first = await attachExistingWeightsToSession("s1", ["p1", "p2", "missing"], db as never);
+  const second = await attachExistingWeightsToSession("s1", ["p1"], db as never);
+  assert.deepEqual(first.attached, ["p1"]);
+  assert.deepEqual(new Set(first.ignored), new Set(["p2", "missing"]));
+  assert.deepEqual(second.attached, ["p1"]);
+});
+
+test("conserve sélections et groupes dans les JSON de la séance", async () => {
+  let data: unknown;
+  const db = {
+    weighingSession: {
+      findUnique: async (args: { select?: unknown }) => args.select ? { id: "s1" } : activeSession,
+      update: async ({ data: next }: { data: unknown }) => { data = next; return activeSession; },
+    },
+  };
+  await updateWeighingSessionMetadata("s1", {
+    selectedPeseeIds: ["p1"],
+    summaryOpen: true,
+    simulationOpen: false,
+    priceGroups: [{ id: "g1", sexe: "M", peseeIds: ["p1"], mode: "PER_KG", tarif: 5 }],
+  }, db as never);
+  assert.deepEqual(data, {
+    selectionData: { selectedPeseeIds: ["p1"], summaryOpen: true, simulationOpen: false },
+    simulationData: { priceGroups: [{ id: "g1", sexe: "M", peseeIds: ["p1"], mode: "PER_KG", tarif: 5 }] },
+  });
 });
 
 test("retourne la séance active existante sans doublon", async () => {
