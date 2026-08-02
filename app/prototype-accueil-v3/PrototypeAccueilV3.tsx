@@ -4,15 +4,17 @@ import Image from "next/image";
 import {
   Baby, BellRing, ChevronDown, ChevronRight, ClipboardCheck, Dna, GripVertical,
   HeartHandshake, HeartPulse, LayoutGrid, LogOut, Menu, Pill, Plus, Scale,
-  ScanLine, Scissors, Search, Settings, Stethoscope, Tag, Thermometer, Users, X,
+  ScanLine, Scissors, Search, Settings, Stethoscope, Tag, Thermometer, Trash2, X,
 } from "lucide-react";
 import {
-  useMemo, useRef, useState, type ComponentType, type PointerEvent as ReactPointerEvent,
+  useLayoutEffect, useMemo, useRef, useState, type ComponentType,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import HoofPrintIcon from "@/components/HoofPrintIcon";
 import {
-  DEFAULT_FAVORITES, PROTOTYPE_CATEGORIES, PROTOTYPE_EXIT_REASONS,
-  filterPrototypeAnimals, reorderActions,
+  ALL_PROTOTYPE_ACTIONS, DEFAULT_FAVORITES, PROTOTYPE_CATEGORIES,
+  PROTOTYPE_EXIT_REASONS, addFavorite, filterPrototypeAnimals, removeFavorite,
+  reorderActions,
   type PrototypeAction, type PrototypeCategory,
 } from "./prototype-data";
 
@@ -20,11 +22,10 @@ type IconType = ComponentType<{ size?: number; strokeWidth?: number; className?:
 type CategoryActions = Record<PrototypeCategory["id"], PrototypeAction[]>;
 
 const ICONS: Record<string, IconType> = {
-  chaleur: Thermometer, saillie: HeartPulse, "nouvel-evenement": Stethoscope,
-  parage: HoofPrintIcon, "pesee-rapide": Scale, echographie: ClipboardCheck,
-  velage: Baby, pharmacie: Pill, "scanner-ordonnance": ScanLine,
-  identification: Tag, sevrage: Scissors, genealogie: Dna, "ajouter-animal": Plus,
-  "sortir-animal": LogOut, "seances-pesee": LayoutGrid,
+  thermometer: Thermometer, heart: HeartPulse, stethoscope: Stethoscope,
+  hoof: HoofPrintIcon, scale: Scale, echo: ClipboardCheck, baby: Baby, pill: Pill,
+  scan: ScanLine, tag: Tag, scissors: Scissors, dna: Dna, plus: Plus,
+  logout: LogOut, grid: LayoutGrid,
 };
 
 const NEWS = [
@@ -41,11 +42,17 @@ const NEWS_TONES = {
   blue: "border-l-blue-700 bg-blue-50 text-blue-950",
 };
 
-const FAVORITE_TONES = [
-  "bg-rose-50 text-rose-900 ring-rose-200", "bg-fuchsia-50 text-fuchsia-900 ring-fuchsia-200",
-  "bg-blue-50 text-blue-950 ring-blue-200", "bg-amber-50 text-amber-950 ring-amber-200",
-  "bg-green-50 text-green-950 ring-green-300",
-];
+const ACTION_TONES: Record<PrototypeAction["tone"], string> = {
+  rose: "bg-rose-50 text-rose-900 ring-rose-200",
+  fuchsia: "bg-fuchsia-50 text-fuchsia-900 ring-fuchsia-200",
+  blue: "bg-blue-50 text-blue-950 ring-blue-200",
+  amber: "bg-amber-50 text-amber-950 ring-amber-200",
+  green: "bg-green-50 text-green-950 ring-green-300",
+  cyan: "bg-cyan-50 text-cyan-950 ring-cyan-200",
+  violet: "bg-violet-50 text-violet-950 ring-violet-200",
+  slate: "bg-slate-50 text-slate-950 ring-slate-300",
+  red: "bg-red-50 text-red-950 ring-red-200",
+};
 
 const NAV_ITEMS = ["Accueil", "Troupeau", "Reproduction", "Sanitaire", "Finances"];
 function initialCategoryActions(): CategoryActions {
@@ -59,7 +66,8 @@ export default function PrototypeAccueilV3() {
   const [category, setCategory] = useState<PrototypeCategory["id"]>("reproduction");
   const [categoryActions, setCategoryActions] = useState(initialCategoryActions);
   const [overviewOpen, setOverviewOpen] = useState(false);
-  const [ordering, setOrdering] = useState(false);
+  const [categoryOrdering, setCategoryOrdering] = useState(false);
+  const [favoritesEditorOpen, setFavoritesEditorOpen] = useState(false);
   const [favorites, setFavorites] = useState(DEFAULT_FAVORITES);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -108,18 +116,18 @@ export default function PrototypeAccueilV3() {
         <section className="mt-7" aria-labelledby="daily-title">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div><h2 id="daily-title" className="text-lg font-black">Actions quotidiennes</h2><p className="text-xs text-slate-500">Toujours à portée de main</p></div>
-            <button type="button" onClick={() => setOrdering((active) => !active)} className={`min-h-10 rounded-md px-3 text-sm font-bold ${ordering ? "bg-slate-950 text-white" : "text-green-800 hover:bg-white"}`}>{ordering ? "Terminer" : "Modifier l’ordre"}</button>
+            <button type="button" onClick={() => setFavoritesEditorOpen(true)} className="min-h-11 rounded-md px-3 text-sm font-bold text-green-800 hover:bg-white">Modifier les actions rapides</button>
           </div>
-          <ReorderableGrid scope="favorites" items={favorites} editing={ordering} onEditing={() => setOrdering(true)} onReorder={setFavorites} onAction={activateAction} prominent />
+          <ReorderableGrid scope="favorites-home" items={favorites} editing={false} onEditing={() => setFavoritesEditorOpen(true)} onReorder={setFavorites} onAction={activateAction} prominent />
         </section>
 
         <section className="mt-7" aria-labelledby="other-title">
-          <div className="flex items-center justify-between gap-3"><h2 id="other-title" className="text-lg font-black">Autres actions</h2>{ordering && <span className="rounded bg-amber-100 px-2 py-1 text-xs font-black text-amber-950">Modifier l’ordre</span>}</div>
+          <div className="flex items-center justify-between gap-3"><h2 id="other-title" className="text-lg font-black">Autres actions</h2><button type="button" onClick={() => setCategoryOrdering((active) => !active)} className={`min-h-10 rounded-md px-3 text-sm font-bold ${categoryOrdering ? "bg-slate-950 text-white" : "text-green-800 hover:bg-white"}`}>{categoryOrdering ? "Terminer" : "Modifier l’ordre"}</button></div>
           <div className="mt-2 flex gap-1 overflow-x-auto rounded-md bg-slate-200 p-1" role="tablist" aria-label="Catégories d’actions">
             {PROTOTYPE_CATEGORIES.map((item) => <button key={item.id} type="button" role="tab" aria-selected={category === item.id} onClick={() => setCategory(item.id)} className={`min-h-10 shrink-0 flex-1 rounded px-3 text-sm font-bold ${category === item.id ? "bg-white text-slate-950 shadow-sm" : "text-slate-600"}`}>{item.label}</button>)}
           </div>
           <div aria-label={`Actions ${activeCategory.label}`}>
-            <ReorderableGrid scope={`category-${category}`} items={categoryActions[category]} editing={ordering} onEditing={() => setOrdering(true)} onReorder={(items) => setCategoryActions((current) => ({ ...current, [category]: items }))} onAction={activateAction} />
+            <ReorderableGrid scope={`category-${category}`} items={categoryActions[category]} editing={categoryOrdering} onEditing={() => setCategoryOrdering(true)} onReorder={(items) => setCategoryActions((current) => ({ ...current, [category]: items }))} onAction={activateAction} />
           </div>
         </section>
 
@@ -137,6 +145,7 @@ export default function PrototypeAccueilV3() {
       </main>
 
       {feedback && <div role="status" className="fixed bottom-4 left-1/2 z-50 w-max max-w-[calc(100%-24px)] -translate-x-1/2 rounded-md bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white shadow-xl">{feedback}</div>}
+      {favoritesEditorOpen && <FavoritesEditor favorites={favorites} onChange={setFavorites} onClose={() => setFavoritesEditorOpen(false)} onAction={activateAction} />}
       {exitOpen && <ExitDialog onClose={() => setExitOpen(false)} onSelect={(reason) => { setExitOpen(false); simulate(`${reason} · sortie simulée`); }} />}
     </div>
   );
@@ -168,32 +177,90 @@ function NewsSection({ openNews, onOpen, onSimulate }: { openNews: string | null
   return <section aria-labelledby="news-title"><div className="mb-2 flex items-center justify-between"><h2 id="news-title" className="text-lg font-black">Actualités</h2><span className="text-xs font-bold text-slate-500">4 à regarder</span></div><div className="grid gap-2 lg:grid-cols-2">{NEWS.map((item) => { const Icon = item.icon; const open = openNews === item.id; return <article key={item.id} className={`overflow-hidden rounded-md border-l-4 shadow-sm ${NEWS_TONES[item.tone]}`}><button type="button" onClick={() => onOpen(open ? null : item.id)} className="flex min-h-16 w-full items-center gap-3 px-3 text-left" aria-expanded={open}><Icon size={22} className="shrink-0" /><span className="min-w-0 flex-1"><strong className="block text-sm font-black">{item.title}</strong><span className="block truncate text-xs opacity-75">{item.info}</span></span><ChevronDown size={19} className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} /></button>{open && <div className="flex items-center justify-between gap-3 border-t border-black/10 bg-white/60 px-3 py-2"><p className="text-xs font-semibold">Situation fictive détectée.</p><button type="button" onClick={() => onSimulate(`${item.action} · interaction simulée`)} className="min-h-10 rounded-md bg-slate-950 px-4 text-sm font-black text-white">{item.action}</button></div>}</article>; })}</div></section>;
 }
 
-function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction, prominent = false }: {
+function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction, onRemove, prominent = false }: {
   scope: string; items: PrototypeAction[]; editing: boolean; onEditing: () => void;
-  onReorder: (items: PrototypeAction[]) => void; onAction: (action: PrototypeAction) => void; prominent?: boolean;
+  onReorder: (items: PrototypeAction[]) => void; onAction: (action: PrototypeAction) => void;
+  onRemove?: (action: PrototypeAction) => void; prominent?: boolean;
 }) {
   const draggedId = useRef<string | null>(null);
-  function startDrag(id: string, event: ReactPointerEvent<HTMLButtonElement>) { draggedId.current = id; event.currentTarget.setPointerCapture(event.pointerId); }
+  const cardNodes = useRef(new Map<string, HTMLDivElement>());
+  const previousRects = useRef(new Map<string, DOMRect>());
+  const [preview, setPreview] = useState<{
+    action: PrototypeAction; x: number; y: number; offsetX: number; offsetY: number;
+    width: number; height: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    for (const [id, node] of cardNodes.current) {
+      const previous = previousRects.current.get(id);
+      if (!previous) continue;
+      const current = node.getBoundingClientRect();
+      const x = previous.left - current.left;
+      const y = previous.top - current.top;
+      if (x || y) {
+        node.animate(
+          [{ transform: `translate(${x}px, ${y}px)` }, { transform: "translate(0, 0)" }],
+          { duration: 180, easing: "ease-out" }
+        );
+      }
+    }
+    previousRects.current.clear();
+  }, [items]);
+
+  function rememberPositions() {
+    previousRects.current = new Map(
+      [...cardNodes.current].map(([id, node]) => [id, node.getBoundingClientRect()])
+    );
+  }
+
+  function startDrag(action: PrototypeAction, event: ReactPointerEvent<HTMLButtonElement>) {
+    const card = cardNodes.current.get(action.id);
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    draggedId.current = action.id;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setPreview({
+      action, x: event.clientX, y: event.clientY,
+      offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top,
+      width: rect.width, height: rect.height,
+    });
+  }
+
   function moveDrag(event: ReactPointerEvent<HTMLButtonElement>) {
     if (!draggedId.current) return;
+    setPreview((current) => current ? { ...current, x: event.clientX, y: event.clientY } : current);
     const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-reorder-id]");
-    if (!target || target.dataset.reorderScope !== scope || !target.dataset.reorderId) return;
+    if (!target || target.dataset.reorderScope !== scope || !target.dataset.reorderId || target.dataset.reorderId === draggedId.current) return;
+    rememberPositions();
     onReorder(reorderActions(items, draggedId.current, target.dataset.reorderId));
   }
-  function stopDrag() { draggedId.current = null; }
+
+  function stopDrag() { draggedId.current = null; setPreview(null); }
+
+  function moveWithKeyboard(actionId: string, direction: -1 | 1) {
+    const index = items.findIndex((item) => item.id === actionId);
+    const target = items[index + direction];
+    if (!target) return;
+    rememberPositions();
+    onReorder(reorderActions(items, actionId, target.id));
+  }
 
   return <div className={`mt-2 grid grid-cols-2 gap-2 ${prominent ? "sm:grid-cols-5" : "rounded-md bg-white p-2 shadow-sm sm:grid-cols-3 lg:grid-cols-5"}`}>
-    {items.map((action, index) => <div key={action.id} data-reorder-id={action.id} data-reorder-scope={scope} className="relative min-w-0">
-      <ActionButton action={action} onClick={() => onAction(action)} onLongPress={onEditing} disabled={editing} tone={prominent ? FAVORITE_TONES[index] : undefined} prominent={prominent} />
-      {editing && <button type="button" onPointerDown={(event) => startDrag(action.id, event)} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} className="absolute inset-y-2 right-2 flex w-11 touch-none items-center justify-center rounded-md border-2 border-slate-400 bg-white text-slate-800 shadow" aria-label={`Déplacer ${action.label}`}><GripVertical size={23} /></button>}
+    {items.map((action) => <div key={action.id} ref={(node) => { if (node) cardNodes.current.set(action.id, node); else cardNodes.current.delete(action.id); }} data-reorder-id={action.id} data-reorder-scope={scope} className={`relative min-w-0 rounded-md ${preview?.action.id === action.id ? "outline-2 outline-dashed outline-slate-500" : ""}`}>
+      <div className={preview?.action.id === action.id ? "opacity-20" : "opacity-100"}>
+        <ActionButton action={action} onClick={() => onAction(action)} onLongPress={onEditing} disabled={editing} prominent={prominent} extraEditingSpace={Boolean(onRemove)} />
+      </div>
+      {editing && onRemove && <button type="button" disabled={items.length === 1} onClick={() => onRemove(action)} className="absolute bottom-2 right-14 z-10 flex h-11 w-11 items-center justify-center rounded-md border border-red-200 bg-white text-red-700 shadow disabled:opacity-30" aria-label={`Retirer ${action.label}`}><Trash2 size={18} /></button>}
+      {editing && <button type="button" onPointerDown={(event) => startDrag(action, event)} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); moveWithKeyboard(action.id, -1); } if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); moveWithKeyboard(action.id, 1); } }} className="absolute inset-y-2 right-2 flex w-11 touch-none items-center justify-center rounded-md border-2 border-slate-400 bg-white text-slate-800 shadow" aria-label={`Déplacer ${action.label}`}><GripVertical size={23} /></button>}
     </div>)}
+    {preview && <div aria-hidden="true" className="pointer-events-none fixed z-[90] scale-[1.03] rotate-[1deg] opacity-95 shadow-2xl" style={{ left: preview.x - preview.offsetX, top: preview.y - preview.offsetY, width: preview.width, height: preview.height }}><ActionSurface action={preview.action} prominent={prominent} floating /></div>}
   </div>;
 }
 
-function ActionButton({ action, onClick, onLongPress, disabled, tone = "bg-white text-slate-900 ring-slate-200", prominent = false }: {
-  action: PrototypeAction; onClick: () => void; onLongPress: () => void; disabled: boolean; tone?: string; prominent?: boolean;
+function ActionButton({ action, onClick, onLongPress, disabled, prominent = false, extraEditingSpace = false }: {
+  action: PrototypeAction; onClick: () => void; onLongPress: () => void; disabled: boolean;
+  prominent?: boolean; extraEditingSpace?: boolean;
 }) {
-  const Icon = ICONS[action.id] ?? ChevronRight;
   const timer = useRef<number | null>(null);
   const start = useRef({ x: 0, y: 0 });
   const suppressClick = useRef(false);
@@ -206,7 +273,34 @@ function ActionButton({ action, onClick, onLongPress, disabled, tone = "bg-white
   }
   function pointerMove(event: ReactPointerEvent<HTMLButtonElement>) { if (Math.abs(event.clientX - start.current.x) > 8 || Math.abs(event.clientY - start.current.y) > 8) clearTimer(); }
   function click() { clearTimer(); if (suppressClick.current || disabled) { suppressClick.current = false; return; } onClick(); }
-  return <button type="button" disabled={disabled} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={clearTimer} onPointerCancel={clearTimer} onClick={click} className={`flex min-h-20 w-full select-none items-center gap-3 rounded-md px-3 text-left font-black shadow-sm ring-1 ${tone} ${prominent ? "sm:min-h-24 sm:flex-col sm:justify-center sm:text-center" : "hover:bg-slate-50"} ${disabled ? "pr-14 ring-2 ring-amber-400" : ""}`}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/80"><Icon size={22} strokeWidth={2.5} /></span><span className="min-w-0 text-sm leading-5">{action.label}</span></button>;
+  return <button type="button" disabled={disabled} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={clearTimer} onPointerCancel={clearTimer} onClick={click} className="w-full"><ActionSurface action={action} prominent={prominent} editing={disabled} extraEditingSpace={extraEditingSpace} /></button>;
+}
+
+function ActionSurface({ action, prominent = false, editing = false, floating = false, extraEditingSpace = false }: { action: PrototypeAction; prominent?: boolean; editing?: boolean; floating?: boolean; extraEditingSpace?: boolean }) {
+  const Icon = ICONS[action.icon] ?? ChevronRight;
+  return <span className={`flex min-h-20 w-full select-none items-center gap-3 rounded-md px-3 text-left font-black ring-1 ${ACTION_TONES[action.tone]} ${prominent ? "sm:min-h-24 sm:flex-col sm:justify-center sm:text-center" : ""} ${editing ? `${extraEditingSpace ? "pr-28" : "pr-14"} ring-2 ring-amber-400` : ""} ${floating ? "h-full" : "shadow-sm"}`}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/80"><Icon size={22} strokeWidth={2.5} /></span><span className="min-w-0 text-sm leading-5">{action.label}</span></span>;
+}
+
+function FavoritesEditor({ favorites, onChange, onClose, onAction }: { favorites: PrototypeAction[]; onChange: (items: PrototypeAction[]) => void; onClose: () => void; onAction: (action: PrototypeAction) => void }) {
+  const [filter, setFilter] = useState<PrototypeCategory["id"]>("reproduction");
+  const selectedIds = new Set(favorites.map((item) => item.id));
+  const available = ALL_PROTOTYPE_ACTIONS.filter((action) => action.category === filter && !selectedIds.has(action.id));
+
+  return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 sm:items-center sm:p-4" onMouseDown={onClose}>
+    <section role="dialog" aria-modal="true" aria-labelledby="favorites-title" onMouseDown={(event) => event.stopPropagation()} className="flex max-h-[94vh] w-full max-w-2xl flex-col rounded-t-lg bg-white shadow-2xl sm:rounded-lg">
+      <div className="flex items-start justify-between border-b border-slate-200 p-4"><div><h2 id="favorites-title" className="text-lg font-black">Modifier les actions rapides</h2><p className="text-sm text-slate-500">{favorites.length}/5 sélectionnées · {5 - favorites.length} emplacement{5 - favorites.length > 1 ? "s" : ""} disponible{5 - favorites.length > 1 ? "s" : ""}</p></div><button type="button" onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-md" aria-label="Fermer"><X /></button></div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <h3 className="text-sm font-black">Actions sélectionnées</h3>
+        <ReorderableGrid scope="favorites-editor" items={favorites} editing onEditing={() => {}} onReorder={onChange} onAction={onAction} onRemove={(action) => onChange(removeFavorite(favorites, action.id))} />
+
+        <div className="mt-6 flex items-center justify-between gap-3"><h3 className="text-sm font-black">Actions disponibles</h3><span className="text-xs font-bold text-slate-500">Maximum 5</span></div>
+        <div className="mt-2 flex gap-1 overflow-x-auto rounded-md bg-slate-100 p-1" role="tablist" aria-label="Filtrer les actions disponibles">{PROTOTYPE_CATEGORIES.map((item) => <button key={item.id} type="button" role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)} className={`min-h-11 shrink-0 rounded px-3 text-sm font-bold ${filter === item.id ? "bg-white shadow" : "text-slate-600"}`}>{item.label}</button>)}</div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">{available.map((action) => <div key={action.id} className="flex min-h-14 items-center gap-2 rounded-md border border-slate-200 p-2"><div className="min-w-0 flex-1"><ActionSurface action={action} /></div><button type="button" disabled={favorites.length >= 5} onClick={() => onChange(addFavorite(favorites, action))} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-green-800 text-white disabled:bg-slate-300" aria-label={`Ajouter ${action.label}`}><Plus size={20} /></button></div>)}</div>
+        {available.length === 0 && <p className="mt-3 rounded-md bg-slate-50 p-3 text-center text-sm text-slate-500">Toutes les actions de cette rubrique sont déjà sélectionnées.</p>}
+      </div>
+      <div className="sticky bottom-0 border-t border-slate-200 bg-white p-3"><button type="button" onClick={onClose} className="min-h-12 w-full rounded-md bg-green-800 px-4 text-sm font-black text-white">Terminer</button></div>
+    </section>
+  </div>;
 }
 
 function ExitDialog({ onClose, onSelect }: { onClose: () => void; onSelect: (reason: string) => void }) {
