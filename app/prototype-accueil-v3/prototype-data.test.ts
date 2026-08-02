@@ -96,6 +96,9 @@ test("le prototype expose le sélecteur et le tri visuel partagé sans sortir de
   assert.match(source, /Modifier les actions rapides/);
   assert.match(source, /Actions sélectionnées/);
   assert.match(source, /Actions disponibles/);
+  assert.match(source, /layout="list"/);
+  assert.match(source, /data-reorder-layout/);
+  assert.match(source, /Retirez une action pour en ajouter une autre/);
   assert.match(source, /pointer-events-none fixed/);
   assert.match(source, /outline-dashed/);
   assert.match(source, /function ReorderableGrid/);

@@ -54,6 +54,14 @@ const ACTION_TONES: Record<PrototypeAction["tone"], string> = {
   red: "bg-red-50 text-red-950 ring-red-200",
 };
 
+const ACTION_LIST_ACCENTS: Record<PrototypeAction["tone"], string> = {
+  rose: "border-l-rose-500", fuchsia: "border-l-fuchsia-500",
+  blue: "border-l-blue-600", amber: "border-l-amber-500",
+  green: "border-l-green-700", cyan: "border-l-cyan-600",
+  violet: "border-l-violet-600", slate: "border-l-slate-600",
+  red: "border-l-red-600",
+};
+
 const NAV_ITEMS = ["Accueil", "Troupeau", "Reproduction", "Sanitaire", "Finances"];
 function initialCategoryActions(): CategoryActions {
   return Object.fromEntries(PROTOTYPE_CATEGORIES.map((item) => [item.id, item.actions])) as CategoryActions;
@@ -177,10 +185,10 @@ function NewsSection({ openNews, onOpen, onSimulate }: { openNews: string | null
   return <section aria-labelledby="news-title"><div className="mb-2 flex items-center justify-between"><h2 id="news-title" className="text-lg font-black">Actualités</h2><span className="text-xs font-bold text-slate-500">4 à regarder</span></div><div className="grid gap-2 lg:grid-cols-2">{NEWS.map((item) => { const Icon = item.icon; const open = openNews === item.id; return <article key={item.id} className={`overflow-hidden rounded-md border-l-4 shadow-sm ${NEWS_TONES[item.tone]}`}><button type="button" onClick={() => onOpen(open ? null : item.id)} className="flex min-h-16 w-full items-center gap-3 px-3 text-left" aria-expanded={open}><Icon size={22} className="shrink-0" /><span className="min-w-0 flex-1"><strong className="block text-sm font-black">{item.title}</strong><span className="block truncate text-xs opacity-75">{item.info}</span></span><ChevronDown size={19} className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} /></button>{open && <div className="flex items-center justify-between gap-3 border-t border-black/10 bg-white/60 px-3 py-2"><p className="text-xs font-semibold">Situation fictive détectée.</p><button type="button" onClick={() => onSimulate(`${item.action} · interaction simulée`)} className="min-h-10 rounded-md bg-slate-950 px-4 text-sm font-black text-white">{item.action}</button></div>}</article>; })}</div></section>;
 }
 
-function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction, onRemove, prominent = false }: {
+function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction, onRemove, prominent = false, layout = "grid" }: {
   scope: string; items: PrototypeAction[]; editing: boolean; onEditing: () => void;
   onReorder: (items: PrototypeAction[]) => void; onAction: (action: PrototypeAction) => void;
-  onRemove?: (action: PrototypeAction) => void; prominent?: boolean;
+  onRemove?: (action: PrototypeAction) => void; prominent?: boolean; layout?: "grid" | "list";
 }) {
   const draggedId = useRef<string | null>(null);
   const cardNodes = useRef(new Map<string, HTMLDivElement>());
@@ -245,21 +253,21 @@ function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction
     onReorder(reorderActions(items, actionId, target.id));
   }
 
-  return <div className={`mt-2 grid grid-cols-2 gap-2 ${prominent ? "sm:grid-cols-5" : "rounded-md bg-white p-2 shadow-sm sm:grid-cols-3 lg:grid-cols-5"}`}>
+  return <div data-reorder-layout={layout} className={`mt-2 gap-2 ${layout === "list" ? "flex flex-col" : `grid grid-cols-2 ${prominent ? "sm:grid-cols-5" : "rounded-md bg-white p-2 shadow-sm sm:grid-cols-3 lg:grid-cols-5"}`}`}>
     {items.map((action) => <div key={action.id} ref={(node) => { if (node) cardNodes.current.set(action.id, node); else cardNodes.current.delete(action.id); }} data-reorder-id={action.id} data-reorder-scope={scope} className={`relative min-w-0 rounded-md ${preview?.action.id === action.id ? "outline-2 outline-dashed outline-slate-500" : ""}`}>
       <div className={preview?.action.id === action.id ? "opacity-20" : "opacity-100"}>
-        <ActionButton action={action} onClick={() => onAction(action)} onLongPress={onEditing} disabled={editing} prominent={prominent} extraEditingSpace={Boolean(onRemove)} />
+        <ActionButton action={action} onClick={() => onAction(action)} onLongPress={onEditing} disabled={editing} prominent={prominent} extraEditingSpace={Boolean(onRemove)} layout={layout} />
       </div>
       {editing && onRemove && <button type="button" disabled={items.length === 1} onClick={() => onRemove(action)} className="absolute bottom-2 right-14 z-10 flex h-11 w-11 items-center justify-center rounded-md border border-red-200 bg-white text-red-700 shadow disabled:opacity-30" aria-label={`Retirer ${action.label}`}><Trash2 size={18} /></button>}
       {editing && <button type="button" onPointerDown={(event) => startDrag(action, event)} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); moveWithKeyboard(action.id, -1); } if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); moveWithKeyboard(action.id, 1); } }} className="absolute inset-y-2 right-2 flex w-11 touch-none items-center justify-center rounded-md border-2 border-slate-400 bg-white text-slate-800 shadow" aria-label={`Déplacer ${action.label}`}><GripVertical size={23} /></button>}
     </div>)}
-    {preview && <div aria-hidden="true" className="pointer-events-none fixed z-[90] scale-[1.03] rotate-[1deg] opacity-95 shadow-2xl" style={{ left: preview.x - preview.offsetX, top: preview.y - preview.offsetY, width: preview.width, height: preview.height }}><ActionSurface action={preview.action} prominent={prominent} floating /></div>}
+    {preview && <div aria-hidden="true" className="pointer-events-none fixed z-[90] scale-[1.02] opacity-95 shadow-2xl" style={{ left: preview.x - preview.offsetX, top: preview.y - preview.offsetY, width: preview.width, height: preview.height }}><ActionSurface action={preview.action} prominent={prominent} floating layout={layout} /></div>}
   </div>;
 }
 
-function ActionButton({ action, onClick, onLongPress, disabled, prominent = false, extraEditingSpace = false }: {
+function ActionButton({ action, onClick, onLongPress, disabled, prominent = false, extraEditingSpace = false, layout = "grid" }: {
   action: PrototypeAction; onClick: () => void; onLongPress: () => void; disabled: boolean;
-  prominent?: boolean; extraEditingSpace?: boolean;
+  prominent?: boolean; extraEditingSpace?: boolean; layout?: "grid" | "list";
 }) {
   const timer = useRef<number | null>(null);
   const start = useRef({ x: 0, y: 0 });
@@ -273,27 +281,30 @@ function ActionButton({ action, onClick, onLongPress, disabled, prominent = fals
   }
   function pointerMove(event: ReactPointerEvent<HTMLButtonElement>) { if (Math.abs(event.clientX - start.current.x) > 8 || Math.abs(event.clientY - start.current.y) > 8) clearTimer(); }
   function click() { clearTimer(); if (suppressClick.current || disabled) { suppressClick.current = false; return; } onClick(); }
-  return <button type="button" disabled={disabled} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={clearTimer} onPointerCancel={clearTimer} onClick={click} className="w-full"><ActionSurface action={action} prominent={prominent} editing={disabled} extraEditingSpace={extraEditingSpace} /></button>;
+  return <button type="button" disabled={disabled} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={clearTimer} onPointerCancel={clearTimer} onClick={click} className="w-full"><ActionSurface action={action} prominent={prominent} editing={disabled} extraEditingSpace={extraEditingSpace} layout={layout} /></button>;
 }
 
-function ActionSurface({ action, prominent = false, editing = false, floating = false, extraEditingSpace = false }: { action: PrototypeAction; prominent?: boolean; editing?: boolean; floating?: boolean; extraEditingSpace?: boolean }) {
+function ActionSurface({ action, prominent = false, editing = false, floating = false, extraEditingSpace = false, layout = "grid" }: { action: PrototypeAction; prominent?: boolean; editing?: boolean; floating?: boolean; extraEditingSpace?: boolean; layout?: "grid" | "list" }) {
   const Icon = ICONS[action.icon] ?? ChevronRight;
-  return <span className={`flex min-h-20 w-full select-none items-center gap-3 rounded-md px-3 text-left font-black ring-1 ${ACTION_TONES[action.tone]} ${prominent ? "sm:min-h-24 sm:flex-col sm:justify-center sm:text-center" : ""} ${editing ? `${extraEditingSpace ? "pr-28" : "pr-14"} ring-2 ring-amber-400` : ""} ${floating ? "h-full" : "shadow-sm"}`}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/80"><Icon size={22} strokeWidth={2.5} /></span><span className="min-w-0 text-sm leading-5">{action.label}</span></span>;
+  const list = layout === "list";
+  return <span className={`flex w-full select-none items-center gap-3 rounded-md px-3 text-left font-black ring-1 ${list ? `min-h-16 border-l-4 bg-white text-slate-950 ring-slate-200 ${ACTION_LIST_ACCENTS[action.tone]}` : `min-h-20 ${ACTION_TONES[action.tone]}`} ${prominent ? "sm:min-h-24 sm:flex-col sm:justify-center sm:text-center" : ""} ${editing ? `${extraEditingSpace ? "pr-28" : "pr-14"} ${list ? "" : "ring-2 ring-amber-400"}` : ""} ${floating ? "h-full" : "shadow-sm"}`}><span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${list ? ACTION_TONES[action.tone] : "bg-white/80"}`}><Icon size={22} strokeWidth={2.5} /></span><span className="min-w-0 text-sm leading-5">{action.label}</span></span>;
 }
 
 function FavoritesEditor({ favorites, onChange, onClose, onAction }: { favorites: PrototypeAction[]; onChange: (items: PrototypeAction[]) => void; onClose: () => void; onAction: (action: PrototypeAction) => void }) {
   const [filter, setFilter] = useState<PrototypeCategory["id"]>("reproduction");
   const selectedIds = new Set(favorites.map((item) => item.id));
   const available = ALL_PROTOTYPE_ACTIONS.filter((action) => action.category === filter && !selectedIds.has(action.id));
+  const remainingSlots = 5 - favorites.length;
 
   return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 sm:items-center sm:p-4" onMouseDown={onClose}>
     <section role="dialog" aria-modal="true" aria-labelledby="favorites-title" onMouseDown={(event) => event.stopPropagation()} className="flex max-h-[94vh] w-full max-w-2xl flex-col rounded-t-lg bg-white shadow-2xl sm:rounded-lg">
-      <div className="flex items-start justify-between border-b border-slate-200 p-4"><div><h2 id="favorites-title" className="text-lg font-black">Modifier les actions rapides</h2><p className="text-sm text-slate-500">{favorites.length}/5 sélectionnées · {5 - favorites.length} emplacement{5 - favorites.length > 1 ? "s" : ""} disponible{5 - favorites.length > 1 ? "s" : ""}</p></div><button type="button" onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-md" aria-label="Fermer"><X /></button></div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="flex items-start justify-between border-b border-slate-200 p-4"><div><h2 id="favorites-title" className="text-lg font-black">Modifier les actions rapides</h2><p className="text-sm text-slate-500">{favorites.length}/5 sélectionnées{remainingSlots > 0 ? ` · ${remainingSlots} place${remainingSlots > 1 ? "s" : ""} restante${remainingSlots > 1 ? "s" : ""}` : ""}</p></div><button type="button" onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-md" aria-label="Fermer"><X /></button></div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-6">
         <h3 className="text-sm font-black">Actions sélectionnées</h3>
-        <ReorderableGrid scope="favorites-editor" items={favorites} editing onEditing={() => {}} onReorder={onChange} onAction={onAction} onRemove={(action) => onChange(removeFavorite(favorites, action.id))} />
+        <ReorderableGrid scope="favorites-editor" items={favorites} editing onEditing={() => {}} onReorder={onChange} onAction={onAction} onRemove={(action) => onChange(removeFavorite(favorites, action.id))} layout="list" />
 
         <div className="mt-6 flex items-center justify-between gap-3"><h3 className="text-sm font-black">Actions disponibles</h3><span className="text-xs font-bold text-slate-500">Maximum 5</span></div>
+        {remainingSlots === 0 && <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm font-bold text-amber-950">Retirez une action pour en ajouter une autre</p>}
         <div className="mt-2 flex gap-1 overflow-x-auto rounded-md bg-slate-100 p-1" role="tablist" aria-label="Filtrer les actions disponibles">{PROTOTYPE_CATEGORIES.map((item) => <button key={item.id} type="button" role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)} className={`min-h-11 shrink-0 rounded px-3 text-sm font-bold ${filter === item.id ? "bg-white shadow" : "text-slate-600"}`}>{item.label}</button>)}</div>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">{available.map((action) => <div key={action.id} className="flex min-h-14 items-center gap-2 rounded-md border border-slate-200 p-2"><div className="min-w-0 flex-1"><ActionSurface action={action} /></div><button type="button" disabled={favorites.length >= 5} onClick={() => onChange(addFavorite(favorites, action))} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-green-800 text-white disabled:bg-slate-300" aria-label={`Ajouter ${action.label}`}><Plus size={20} /></button></div>)}</div>
         {available.length === 0 && <p className="mt-3 rounded-md bg-slate-50 p-3 text-center text-sm text-slate-500">Toutes les actions de cette rubrique sont déjà sélectionnées.</p>}
