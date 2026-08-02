@@ -36,12 +36,12 @@ export const ACTION_CATALOG = {
 
 export const ALL_PROTOTYPE_ACTIONS: PrototypeAction[] = Object.values(ACTION_CATALOG);
 
+export const MAX_FAVORITES = 3;
+
 export const DEFAULT_FAVORITES: PrototypeAction[] = [
   ACTION_CATALOG.chaleur,
   ACTION_CATALOG.saillie,
   ACTION_CATALOG.nouvelEvenement,
-  ACTION_CATALOG.parage,
-  ACTION_CATALOG.peseeRapide,
 ];
 
 export const PROTOTYPE_CATEGORIES: PrototypeCategory[] = [
@@ -63,7 +63,7 @@ export const PROTOTYPE_EXIT_REASONS = [
 ];
 
 export function addFavorite(items: PrototypeAction[], action: PrototypeAction): PrototypeAction[] {
-  if (items.length >= 5 || items.some((item) => item.id === action.id)) return items;
+  if (items.length >= MAX_FAVORITES || items.some((item) => item.id === action.id)) return items;
   return [...items, action];
 }
 

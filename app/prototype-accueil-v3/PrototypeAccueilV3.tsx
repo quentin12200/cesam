@@ -3,8 +3,9 @@
 import Image from "next/image";
 import {
   Baby, BellRing, ChevronDown, ChevronRight, ClipboardCheck, Dna, GripVertical,
-  HeartHandshake, HeartPulse, LayoutGrid, LogOut, Menu, Pill, Plus, Scale,
-  ScanLine, Scissors, Search, Settings, Stethoscope, Tag, Thermometer, Trash2, X,
+  HeartHandshake, HeartPulse, LayoutGrid, LogOut, Menu, Mic, NotebookPen, Pill,
+  Plus, Scale, ScanLine, Scissors, Search, Settings, Stethoscope, Tag,
+  Thermometer, Trash2, X,
 } from "lucide-react";
 import {
   useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType,
@@ -12,7 +13,7 @@ import {
 } from "react";
 import HoofPrintIcon from "@/components/HoofPrintIcon";
 import {
-  ALL_PROTOTYPE_ACTIONS, DEFAULT_FAVORITES, PROTOTYPE_CATEGORIES,
+  ALL_PROTOTYPE_ACTIONS, DEFAULT_FAVORITES, MAX_FAVORITES, PROTOTYPE_CATEGORIES,
   PROTOTYPE_EXIT_REASONS, addFavorite, filterPrototypeAnimals,
   getSortableAutoScrollDelta, removeFavorite, reorderActions,
   type PrototypeAction, type PrototypeCategory,
@@ -63,6 +64,11 @@ const ACTION_LIST_ACCENTS: Record<PrototypeAction["tone"], string> = {
 };
 
 const NAV_ITEMS = ["Accueil", "Troupeau", "Reproduction", "Sanitaire", "Finances"];
+const MENU_ITEMS = [
+  { label: "Paramètres", icon: Settings },
+  { label: "Soutien et ressources", icon: HeartHandshake },
+  { label: "Se déconnecter", icon: LogOut },
+];
 function initialCategoryActions(): CategoryActions {
   return Object.fromEntries(PROTOTYPE_CATEGORIES.map((item) => [item.id, item.actions])) as CategoryActions;
 }
@@ -70,7 +76,6 @@ function initialCategoryActions(): CategoryActions {
 export default function PrototypeAccueilV3() {
   const [activeNav, setActiveNav] = useState("Accueil");
   const [mobileMenu, setMobileMenu] = useState(false);
-  const [openNews, setOpenNews] = useState<string | null>("session");
   const [category, setCategory] = useState<PrototypeCategory["id"]>("reproduction");
   const [categoryActions, setCategoryActions] = useState(initialCategoryActions);
   const [overviewOpen, setOverviewOpen] = useState(false);
@@ -109,37 +114,28 @@ export default function PrototypeAccueilV3() {
         onQuery={setQuery} onSearchOpen={setSearchOpen} onSimulate={simulate}
       />
 
-      <main className="mx-auto w-full max-w-6xl px-3 py-5 sm:px-5 sm:py-7">
-        <div className="mb-5 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase text-green-800">Prototype accueil V3</p>
-            <h1 className="mt-1 text-2xl font-black sm:text-3xl">Bonjour Céline</h1>
-            <p className="mt-1 text-sm text-slate-600">Vendredi 1 août · l’essentiel de l’élevage</p>
-          </div>
-          <span className="hidden rounded-md bg-white px-3 py-2 text-xs font-bold text-slate-500 shadow-sm sm:block">Données de démonstration</span>
-        </div>
+      <main className="mx-auto w-full max-w-6xl px-3 py-3 sm:px-5 sm:py-5">
+        <NewsSection onSimulate={simulate} />
 
-        <NewsSection openNews={openNews} onOpen={setOpenNews} onSimulate={simulate} />
-
-        <section className="mt-7" aria-labelledby="daily-title">
+        <section className="mt-5" aria-labelledby="daily-title">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <div><h2 id="daily-title" className="text-lg font-black">Actions quotidiennes</h2><p className="text-xs text-slate-500">Toujours à portée de main</p></div>
+            <h2 id="daily-title" className="text-lg font-black">Actions rapides</h2>
             <button type="button" onClick={() => setFavoritesEditorOpen(true)} className="min-h-11 rounded-md px-3 text-sm font-bold text-green-800 hover:bg-white">Modifier les actions rapides</button>
           </div>
           <ReorderableGrid scope="favorites-home" items={favorites} editing={false} onEditing={() => setFavoritesEditorOpen(true)} onReorder={setFavorites} onAction={activateAction} prominent />
         </section>
 
-        <section className="mt-7" aria-labelledby="other-title">
+        <section className="mt-5" aria-labelledby="other-title">
           <div className="flex items-center justify-between gap-3"><h2 id="other-title" className="text-lg font-black">Autres actions</h2><button type="button" onClick={() => setCategoryOrdering((active) => !active)} className={`min-h-10 rounded-md px-3 text-sm font-bold ${categoryOrdering ? "bg-slate-950 text-white" : "text-green-800 hover:bg-white"}`}>{categoryOrdering ? "Terminer" : "Modifier l’ordre"}</button></div>
-          <div className="mt-2 flex gap-1 overflow-x-auto rounded-md bg-slate-200 p-1" role="tablist" aria-label="Catégories d’actions">
-            {PROTOTYPE_CATEGORIES.map((item) => <button key={item.id} type="button" role="tab" aria-selected={category === item.id} onClick={() => setCategory(item.id)} className={`min-h-10 shrink-0 flex-1 rounded px-3 text-sm font-bold ${category === item.id ? "bg-white text-slate-950 shadow-sm" : "text-slate-600"}`}>{item.label}</button>)}
+          <div className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-slate-200 p-1 sm:grid-cols-4" role="tablist" aria-label="Catégories d’actions">
+            {PROTOTYPE_CATEGORIES.map((item) => <button key={item.id} type="button" role="tab" aria-selected={category === item.id} onClick={() => setCategory(item.id)} className={`min-h-10 rounded px-2 text-sm font-bold ${category === item.id ? "bg-white text-slate-950 shadow-sm" : "text-slate-600"}`}>{item.label}</button>)}
           </div>
           <div aria-label={`Actions ${activeCategory.label}`}>
             <ReorderableGrid scope={`category-${category}`} items={categoryActions[category]} editing={categoryOrdering} onEditing={() => setCategoryOrdering(true)} onReorder={(items) => setCategoryActions((current) => ({ ...current, [category]: items }))} onAction={activateAction} />
           </div>
         </section>
 
-        <section className="mt-7 overflow-hidden rounded-md bg-white shadow-sm">
+        <section className="mt-5 overflow-hidden rounded-md bg-white shadow-sm">
           <button type="button" onClick={() => setOverviewOpen((open) => !open)} className="flex min-h-14 w-full items-center justify-between px-4 text-left" aria-expanded={overviewOpen}>
             <span><strong className="block font-black">Aperçu de l’élevage</strong><span className="text-xs text-slate-500">Quelques repères, quand vous en avez besoin</span></span>
             <ChevronDown className={`transition-transform ${overviewOpen ? "rotate-180" : ""}`} />
@@ -166,23 +162,24 @@ function PrototypeHeader({ activeNav, mobileMenu, query, searchOpen, animals, on
   onSearchOpen: (open: boolean) => void; onSimulate: (message: string) => void;
 }) {
   return <header className="sticky top-0 z-30 border-b border-green-900 bg-green-800 text-white shadow-sm">
-    <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-3 sm:px-5">
-      <button type="button" onClick={() => onNavigate("Accueil")} className="flex shrink-0 items-center gap-2" aria-label="Accueil du prototype"><Image src="/logo-cesam.jpg" alt="CESAM" width={38} height={38} className="rounded-md border border-white/40" /><span className="hidden text-sm font-black sm:block">CESAM</span></button>
+    <div className="mx-auto flex h-14 max-w-6xl items-center gap-1.5 px-2 sm:h-16 sm:gap-2 sm:px-5">
+      <button type="button" onClick={() => onNavigate("Accueil")} className="flex shrink-0 items-center gap-2" aria-label="Accueil du prototype"><Image src="/logo-cesam.jpg" alt="CESAM" width={34} height={34} className="rounded-md border border-white/40" /><span className="hidden text-sm font-black xl:block">CESAM</span></button>
       <nav className="hidden items-stretch self-stretch lg:flex" aria-label="Navigation du prototype">{NAV_ITEMS.map((item) => <button key={item} type="button" onClick={() => onNavigate(item)} className={`px-3 text-sm font-bold ${activeNav === item ? "bg-white text-green-900" : "text-green-50 hover:bg-green-700"}`}>{item}</button>)}</nav>
       <div className="relative ml-auto min-w-0 flex-1 sm:max-w-xs">
         <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
         <input value={query} onFocus={() => onSearchOpen(true)} onChange={(event) => { onQuery(event.target.value); onSearchOpen(true); }} placeholder="Rechercher un animal" aria-label="Rechercher rapidement un animal" className="h-11 w-full rounded-md bg-white pl-9 pr-3 text-sm font-semibold text-slate-950 outline-none ring-2 ring-transparent focus:ring-amber-400" />
-        {searchOpen && <div className="absolute right-0 top-12 w-full min-w-64 overflow-hidden rounded-md border border-slate-200 bg-white text-slate-950 shadow-xl"><div className="flex items-center justify-between border-b px-3 py-2 text-xs font-bold text-slate-500">Animaux fictifs<button type="button" onClick={() => onSearchOpen(false)} aria-label="Fermer la recherche" className="p-1"><X size={15} /></button></div>{animals.map((animal) => <button key={animal.number} type="button" onClick={() => { onSearchOpen(false); onSimulate(`Fiche ${animal.number} · consultation simulée`); }} className="flex min-h-12 w-full items-center justify-between gap-3 border-b border-slate-100 px-3 text-left last:border-0 hover:bg-green-50"><span><strong className="font-black">{animal.number}</strong><span className="ml-2 text-sm">{animal.name}</span></span><span className="text-xs text-slate-500">{animal.detail}</span></button>)}{animals.length === 0 && <p className="p-4 text-center text-sm text-slate-500">Aucun résultat fictif</p>}</div>}
+        {searchOpen && <div className="fixed left-2 right-2 top-16 overflow-hidden rounded-md border border-slate-200 bg-white text-slate-950 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-full sm:min-w-64"><div className="flex items-center justify-between border-b px-3 py-2 text-xs font-bold text-slate-500">Animaux fictifs<button type="button" onClick={() => onSearchOpen(false)} aria-label="Fermer la recherche" className="p-1"><X size={15} /></button></div>{animals.map((animal) => <button key={animal.number} type="button" onClick={() => { onSearchOpen(false); onSimulate(`Fiche ${animal.number} · consultation simulée`); }} className="flex min-h-12 w-full items-center justify-between gap-3 border-b border-slate-100 px-3 text-left last:border-0 hover:bg-green-50"><span><strong className="font-black">{animal.number}</strong><span className="ml-2 text-sm">{animal.name}</span></span><span className="text-xs text-slate-500">{animal.detail}</span></button>)}{animals.length === 0 && <p className="p-4 text-center text-sm text-slate-500">Aucun résultat fictif</p>}</div>}
       </div>
-      <button type="button" onClick={() => onSimulate("Paramètres · interaction simulée")} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-green-700" aria-label="Paramètres"><Settings size={22} /></button>
-      <button type="button" onClick={() => onMobileMenu(!mobileMenu)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-green-700 lg:hidden" aria-label={mobileMenu ? "Fermer le menu" : "Ouvrir le menu"}>{mobileMenu ? <X /> : <Menu />}</button>
+      <button type="button" onClick={() => onSimulate("Dictée d’action · interaction simulée")} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-green-700" aria-label="Dicter une action ou un événement" title="Dicter une action"><Mic size={21} /></button>
+      <button type="button" onClick={() => onSimulate("Note vocale libre · interaction simulée")} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-green-700" aria-label="Enregistrer une note vocale libre" title="Note vocale libre"><NotebookPen size={21} /></button>
+      <button type="button" onClick={() => onMobileMenu(!mobileMenu)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-green-700" aria-label={mobileMenu ? "Fermer le menu" : "Ouvrir le menu"}>{mobileMenu ? <X /> : <Menu />}</button>
     </div>
-    {mobileMenu && <nav className="grid grid-cols-2 gap-px border-t border-green-700 bg-green-700 px-3 py-2 sm:grid-cols-5" aria-label="Navigation mobile du prototype">{NAV_ITEMS.map((item) => <button key={item} type="button" onClick={() => onNavigate(item)} className={`min-h-11 px-2 text-sm font-bold ${activeNav === item ? "bg-white text-green-900" : "text-white"}`}>{item}</button>)}</nav>}
+    {mobileMenu && <div className="border-t border-green-700 bg-green-800 px-3 py-2"><nav className="grid grid-cols-2 gap-1 sm:grid-cols-5 lg:hidden" aria-label="Navigation mobile du prototype">{NAV_ITEMS.map((item) => <button key={item} type="button" onClick={() => onNavigate(item)} className={`min-h-11 rounded px-2 text-sm font-bold ${activeNav === item ? "bg-white text-green-900" : "text-white hover:bg-green-700"}`}>{item}</button>)}</nav><div className="grid grid-cols-1 gap-1 border-t border-green-700 pt-2 lg:ml-auto lg:max-w-xs lg:border-0 lg:pt-0">{MENU_ITEMS.map((item) => { const Icon = item.icon; return <button key={item.label} type="button" onClick={() => { onMobileMenu(false); onSimulate(`${item.label} · interaction simulée`); }} className="flex min-h-11 items-center gap-3 rounded px-3 text-left text-sm font-bold text-white hover:bg-green-700"><Icon size={19} />{item.label}</button>; })}</div></div>}
   </header>;
 }
 
-function NewsSection({ openNews, onOpen, onSimulate }: { openNews: string | null; onOpen: (id: string | null) => void; onSimulate: (message: string) => void }) {
-  return <section aria-labelledby="news-title"><div className="mb-2 flex items-center justify-between"><h2 id="news-title" className="text-lg font-black">Actualités</h2><span className="text-xs font-bold text-slate-500">4 à regarder</span></div><div className="grid gap-2 lg:grid-cols-2">{NEWS.map((item) => { const Icon = item.icon; const open = openNews === item.id; return <article key={item.id} className={`overflow-hidden rounded-md border-l-4 shadow-sm ${NEWS_TONES[item.tone]}`}><button type="button" onClick={() => onOpen(open ? null : item.id)} className="flex min-h-16 w-full items-center gap-3 px-3 text-left" aria-expanded={open}><Icon size={22} className="shrink-0" /><span className="min-w-0 flex-1"><strong className="block text-sm font-black">{item.title}</strong><span className="block truncate text-xs opacity-75">{item.info}</span></span><ChevronDown size={19} className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} /></button>{open && <div className="flex items-center justify-between gap-3 border-t border-black/10 bg-white/60 px-3 py-2"><p className="text-xs font-semibold">Situation fictive détectée.</p><button type="button" onClick={() => onSimulate(`${item.action} · interaction simulée`)} className="min-h-10 rounded-md bg-slate-950 px-4 text-sm font-black text-white">{item.action}</button></div>}</article>; })}</div></section>;
+function NewsSection({ onSimulate }: { onSimulate: (message: string) => void }) {
+  return <section aria-labelledby="news-title"><div className="mb-2 flex items-center justify-between"><h2 id="news-title" className="text-lg font-black">Actualités</h2><span className="text-xs font-bold text-slate-500">4 à regarder</span></div><div className="grid gap-1.5 lg:grid-cols-2">{NEWS.map((item) => { const Icon = item.icon; return <article key={item.id} className={`flex min-h-14 items-center gap-2 rounded-md border-l-4 px-2.5 py-1.5 shadow-sm ${NEWS_TONES[item.tone]}`}><Icon size={18} className="shrink-0" /><span className="min-w-0 flex-1"><strong className="block text-sm font-black leading-4">{item.title}</strong><span className="block truncate text-xs opacity-75">{item.info}</span></span><button type="button" onClick={() => onSimulate(`${item.action} · interaction simulée`)} className="min-h-11 shrink-0 rounded-md bg-slate-950 px-3 text-xs font-black text-white">{item.action}</button></article>; })}</div></section>;
 }
 
 function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction, onRemove, prominent = false, layout = "grid" }: {
@@ -335,7 +332,7 @@ function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction
     onReorder(reorderActions(renderedItems, actionId, target.id));
   }
 
-  return <div data-reorder-layout={layout} className={`mt-2 gap-2 ${layout === "list" ? "flex flex-col" : `grid grid-cols-2 ${prominent ? "sm:grid-cols-5" : "rounded-md bg-white p-2 shadow-sm sm:grid-cols-3 lg:grid-cols-5"}`}`}>
+  return <div data-reorder-layout={layout} className={`mt-2 gap-2 ${layout === "list" ? "flex flex-col" : `grid ${prominent ? "grid-cols-3" : "grid-cols-2 rounded-md bg-white p-2 shadow-sm sm:grid-cols-3 lg:grid-cols-5"}`}`}>
     {renderedItems.map((action) => <div key={action.id} ref={(node) => { if (node) cardNodes.current.set(action.id, node); else cardNodes.current.delete(action.id); }} data-reorder-id={action.id} data-reorder-scope={scope} className={`relative min-w-0 rounded-md ${preview?.action.id === action.id ? "outline-2 outline-dashed outline-slate-500" : ""}`}>
       <div className={preview?.action.id === action.id ? "opacity-20" : "opacity-100"}>
         <ActionButton action={action} onClick={() => onAction(action)} onLongPress={onEditing} disabled={editing} prominent={prominent} extraEditingSpace={Boolean(onRemove)} layout={layout} />
@@ -379,26 +376,26 @@ function ActionButton({ action, onClick, onLongPress, disabled, prominent = fals
 function ActionSurface({ action, prominent = false, editing = false, floating = false, extraEditingSpace = false, layout = "grid" }: { action: PrototypeAction; prominent?: boolean; editing?: boolean; floating?: boolean; extraEditingSpace?: boolean; layout?: "grid" | "list" }) {
   const Icon = ICONS[action.icon] ?? ChevronRight;
   const list = layout === "list";
-  return <span className={`flex w-full select-none items-center gap-3 rounded-md px-3 text-left font-black ring-1 ${list ? `min-h-16 border-l-4 bg-white text-slate-950 ring-slate-200 ${ACTION_LIST_ACCENTS[action.tone]}` : `min-h-20 ${ACTION_TONES[action.tone]}`} ${prominent ? "sm:min-h-24 sm:flex-col sm:justify-center sm:text-center" : ""} ${editing ? `${extraEditingSpace ? "pr-28" : "pr-14"} ${list ? "" : "ring-2 ring-amber-400"}` : ""} ${floating ? "h-full" : "shadow-sm"}`}><span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${list ? ACTION_TONES[action.tone] : "bg-white/80"}`}><Icon size={22} strokeWidth={2.5} /></span><span className="min-w-0 text-sm leading-5">{action.label}</span></span>;
+  return <span className={`flex w-full select-none items-center gap-2 rounded-md px-2.5 text-left font-black ring-1 ${list ? `min-h-16 border-l-4 bg-white text-slate-950 ring-slate-200 ${ACTION_LIST_ACCENTS[action.tone]}` : `min-h-16 ${ACTION_TONES[action.tone]}`} ${prominent ? "min-h-20 flex-col justify-center text-center" : ""} ${editing ? `${extraEditingSpace ? "pr-28" : "pr-14"} ${list ? "" : "ring-2 ring-amber-400"}` : ""} ${floating ? "h-full" : "shadow-sm"}`}><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${list ? ACTION_TONES[action.tone] : "bg-white/80"}`}><Icon size={21} strokeWidth={2.5} /></span><span className="min-w-0 text-sm leading-4">{action.label}</span></span>;
 }
 
 function FavoritesEditor({ favorites, onChange, onClose, onAction }: { favorites: PrototypeAction[]; onChange: (items: PrototypeAction[]) => void; onClose: () => void; onAction: (action: PrototypeAction) => void }) {
   const [filter, setFilter] = useState<PrototypeCategory["id"]>("reproduction");
   const selectedIds = new Set(favorites.map((item) => item.id));
   const available = ALL_PROTOTYPE_ACTIONS.filter((action) => action.category === filter && !selectedIds.has(action.id));
-  const remainingSlots = 5 - favorites.length;
+  const remainingSlots = MAX_FAVORITES - favorites.length;
 
   return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 sm:items-center sm:p-4" onMouseDown={onClose}>
     <section role="dialog" aria-modal="true" aria-labelledby="favorites-title" onMouseDown={(event) => event.stopPropagation()} className="flex max-h-[94vh] w-full max-w-2xl flex-col rounded-t-lg bg-white shadow-2xl sm:rounded-lg">
-      <div className="flex items-start justify-between border-b border-slate-200 p-4"><div><h2 id="favorites-title" className="text-lg font-black">Modifier les actions rapides</h2><p className="text-sm text-slate-500">{favorites.length}/5 sélectionnées{remainingSlots > 0 ? ` · ${remainingSlots} place${remainingSlots > 1 ? "s" : ""} restante${remainingSlots > 1 ? "s" : ""}` : ""}</p></div><button type="button" onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-md" aria-label="Fermer"><X /></button></div>
+      <div className="flex items-start justify-between border-b border-slate-200 p-4"><div><h2 id="favorites-title" className="text-lg font-black">Modifier les actions rapides</h2><p className="text-sm text-slate-500">{favorites.length}/{MAX_FAVORITES} sélectionnées{remainingSlots > 0 ? ` · ${remainingSlots} place${remainingSlots > 1 ? "s" : ""} restante${remainingSlots > 1 ? "s" : ""}` : ""}</p></div><button type="button" onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-md" aria-label="Fermer"><X /></button></div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-6">
         <h3 className="text-sm font-black">Actions sélectionnées</h3>
         <ReorderableGrid scope="favorites-editor" items={favorites} editing onEditing={() => {}} onReorder={onChange} onAction={onAction} onRemove={(action) => onChange(removeFavorite(favorites, action.id))} layout="list" />
 
-        <div className="mt-6 flex items-center justify-between gap-3"><h3 className="text-sm font-black">Actions disponibles</h3><span className="text-xs font-bold text-slate-500">Maximum 5</span></div>
+        <div className="mt-6 flex items-center justify-between gap-3"><h3 className="text-sm font-black">Actions disponibles</h3><span className="text-xs font-bold text-slate-500">Maximum {MAX_FAVORITES}</span></div>
         {remainingSlots === 0 && <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm font-bold text-amber-950">Retirez une action pour en ajouter une autre</p>}
-        <div className="mt-2 flex gap-1 overflow-x-auto rounded-md bg-slate-100 p-1" role="tablist" aria-label="Filtrer les actions disponibles">{PROTOTYPE_CATEGORIES.map((item) => <button key={item.id} type="button" role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)} className={`min-h-11 shrink-0 rounded px-3 text-sm font-bold ${filter === item.id ? "bg-white shadow" : "text-slate-600"}`}>{item.label}</button>)}</div>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2">{available.map((action) => <div key={action.id} className="flex min-h-14 items-center gap-2 rounded-md border border-slate-200 p-2"><div className="min-w-0 flex-1"><ActionSurface action={action} /></div><button type="button" disabled={favorites.length >= 5} onClick={() => onChange(addFavorite(favorites, action))} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-green-800 text-white disabled:bg-slate-300" aria-label={`Ajouter ${action.label}`}><Plus size={20} /></button></div>)}</div>
+        <div className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-1 sm:grid-cols-4" role="tablist" aria-label="Filtrer les actions disponibles">{PROTOTYPE_CATEGORIES.map((item) => <button key={item.id} type="button" role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)} className={`min-h-11 rounded px-2 text-sm font-bold ${filter === item.id ? "bg-white shadow" : "text-slate-600"}`}>{item.label}</button>)}</div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">{available.map((action) => <div key={action.id} className="flex min-h-14 items-center gap-2 rounded-md border border-slate-200 p-2"><div className="min-w-0 flex-1"><ActionSurface action={action} /></div><button type="button" disabled={favorites.length >= MAX_FAVORITES} onClick={() => onChange(addFavorite(favorites, action))} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-green-800 text-white disabled:bg-slate-300" aria-label={`Ajouter ${action.label}`}><Plus size={20} /></button></div>)}</div>
         {available.length === 0 && <p className="mt-3 rounded-md bg-slate-50 p-3 text-center text-sm text-slate-500">Toutes les actions de cette rubrique sont déjà sélectionnées.</p>}
       </div>
       <div className="sticky bottom-0 border-t border-slate-200 bg-white p-3"><button type="button" onClick={onClose} className="min-h-12 w-full rounded-md bg-green-800 px-4 text-sm font-black text-white">Terminer</button></div>
