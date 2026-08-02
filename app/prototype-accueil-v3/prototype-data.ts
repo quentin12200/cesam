@@ -82,6 +82,18 @@ export function reorderActions<T extends { id: string }>(items: T[], draggedId: 
   return next;
 }
 
+export function getSortableAutoScrollDelta(pointerY: number, top: number, bottom: number): number {
+  const edge = 56;
+  const maximumStep = 12;
+  if (pointerY < top + edge) {
+    return -Math.min(maximumStep, Math.max(0, Math.ceil((top + edge - pointerY) / 4)));
+  }
+  if (pointerY > bottom - edge) {
+    return Math.min(maximumStep, Math.max(0, Math.ceil((pointerY - (bottom - edge)) / 4)));
+  }
+  return 0;
+}
+
 export function filterPrototypeAnimals(query: string) {
   const normalized = query.trim().toLocaleLowerCase("fr-FR");
   if (!normalized) return PROTOTYPE_ANIMALS;

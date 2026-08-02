@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   ACTION_CATALOG, ALL_PROTOTYPE_ACTIONS, DEFAULT_FAVORITES, PROTOTYPE_CATEGORIES,
   PROTOTYPE_EXIT_REASONS, addFavorite, filterPrototypeAnimals, removeFavorite,
-  reorderActions,
+  getSortableAutoScrollDelta, reorderActions,
 } from "./prototype-data.ts";
 
 test("chaque action possède une identité visuelle stable et unique", () => {
@@ -37,6 +37,46 @@ test("le tri réordonne favoris et catégories sans muter leur source", () => {
   const category = reorderActions(source, "velage", "chaleur");
   assert.equal(category[0].id, "velage");
   assert.equal(source[0].id, "chaleur");
+});
+
+test("un seul déplacement traverse directement plusieurs positions", () => {
+  const lastToFirst = reorderActions(DEFAULT_FAVORITES, "pesee-rapide", "chaleur");
+  assert.deepEqual(lastToFirst.map((item) => item.id), [
+    "pesee-rapide", "chaleur", "saillie", "nouvel-evenement", "parage",
+  ]);
+
+  const firstToLast = reorderActions(DEFAULT_FAVORITES, "chaleur", "pesee-rapide");
+  assert.deepEqual(firstToLast.map((item) => item.id), [
+    "saillie", "nouvel-evenement", "parage", "pesee-rapide", "chaleur",
+  ]);
+
+  const acrossThreeRows = reorderActions(DEFAULT_FAVORITES, "parage", "chaleur");
+  assert.deepEqual(acrossThreeRows.map((item) => item.id), [
+    "parage", "chaleur", "saillie", "nouvel-evenement", "pesee-rapide",
+  ]);
+});
+
+test("le tri lointain conserve toutes les identités sans doublon", () => {
+  const result = reorderActions(DEFAULT_FAVORITES, "pesee-rapide", "chaleur");
+  assert.equal(new Set(result.map((item) => item.id)).size, DEFAULT_FAVORITES.length);
+  assert.deepEqual(new Set(result), new Set(DEFAULT_FAVORITES));
+  assert.equal(result[0].label, ACTION_CATALOG.peseeRapide.label);
+  assert.equal(result[0].icon, ACTION_CATALOG.peseeRapide.icon);
+  assert.equal(result[0].tone, ACTION_CATALOG.peseeRapide.tone);
+});
+
+test("la même logique permet un déplacement lointain dans une rubrique", () => {
+  const source = PROTOTYPE_CATEGORIES.find((item) => item.id === "troupeau")?.actions ?? [];
+  const result = reorderActions(source, "sortir-animal", "identification");
+  assert.deepEqual(result.map((item) => item.id), [
+    "sortir-animal", "identification", "sevrage", "genealogie", "ajouter-animal",
+  ]);
+});
+
+test("l’auto-scroll s’active uniquement près des bords", () => {
+  assert.ok(getSortableAutoScrollDelta(110, 100, 500) < 0);
+  assert.equal(getSortableAutoScrollDelta(300, 100, 500), 0);
+  assert.ok(getSortableAutoScrollDelta(490, 100, 500) > 0);
 });
 
 test("un favori peut être ajouté, retiré et ne peut pas être dupliqué", () => {
@@ -102,4 +142,7 @@ test("le prototype expose le sélecteur et le tri visuel partagé sans sortir de
   assert.match(source, /pointer-events-none fixed/);
   assert.match(source, /outline-dashed/);
   assert.match(source, /function ReorderableGrid/);
+  assert.match(source, /document\.addEventListener\("pointermove"/);
+  assert.match(source, /requestAnimationFrame/);
+  assert.equal(source.includes("onLostPointerCapture={stopDrag}"), false);
 });

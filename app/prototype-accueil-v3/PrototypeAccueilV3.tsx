@@ -7,14 +7,14 @@ import {
   ScanLine, Scissors, Search, Settings, Stethoscope, Tag, Thermometer, Trash2, X,
 } from "lucide-react";
 import {
-  useLayoutEffect, useMemo, useRef, useState, type ComponentType,
+  useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import HoofPrintIcon from "@/components/HoofPrintIcon";
 import {
   ALL_PROTOTYPE_ACTIONS, DEFAULT_FAVORITES, PROTOTYPE_CATEGORIES,
-  PROTOTYPE_EXIT_REASONS, addFavorite, filterPrototypeAnimals, removeFavorite,
-  reorderActions,
+  PROTOTYPE_EXIT_REASONS, addFavorite, filterPrototypeAnimals,
+  getSortableAutoScrollDelta, removeFavorite, reorderActions,
   type PrototypeAction, type PrototypeCategory,
 } from "./prototype-data";
 
@@ -191,12 +191,26 @@ function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction
   onRemove?: (action: PrototypeAction) => void; prominent?: boolean; layout?: "grid" | "list";
 }) {
   const draggedId = useRef<string | null>(null);
+  const activePointerId = useRef<number | null>(null);
   const cardNodes = useRef(new Map<string, HTMLDivElement>());
   const previousRects = useRef(new Map<string, DOMRect>());
+  const itemsRef = useRef(items);
+  const onReorderRef = useRef(onReorder);
+  const scrollContainer = useRef<HTMLElement | null>(null);
+  const scrollStep = useRef(0);
+  const scrollFrame = useRef<number | null>(null);
+  const lastPointer = useRef({ x: 0, y: 0 });
+  const moveDragRef = useRef<(x: number, y: number) => void>(() => {});
+  const finishDragRef = useRef<(commit: boolean) => void>(() => {});
+  const [draftItems, setDraftItems] = useState<PrototypeAction[] | null>(null);
   const [preview, setPreview] = useState<{
     action: PrototypeAction; x: number; y: number; offsetX: number; offsetY: number;
     width: number; height: number;
   } | null>(null);
+  const renderedItems = draftItems ?? items;
+
+  if (!draggedId.current) itemsRef.current = items;
+  onReorderRef.current = onReorder;
 
   useLayoutEffect(() => {
     for (const [id, node] of cardNodes.current) {
@@ -213,7 +227,28 @@ function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction
       }
     }
     previousRects.current.clear();
-  }, [items]);
+  }, [renderedItems]);
+
+  useEffect(() => {
+    function pointerMove(event: PointerEvent) {
+      if (event.pointerId === activePointerId.current) moveDragRef.current(event.clientX, event.clientY);
+    }
+    function pointerUp(event: PointerEvent) {
+      if (event.pointerId === activePointerId.current) finishDragRef.current(true);
+    }
+    function pointerCancel(event: PointerEvent) {
+      if (event.pointerId === activePointerId.current) finishDragRef.current(false);
+    }
+    document.addEventListener("pointermove", pointerMove);
+    document.addEventListener("pointerup", pointerUp);
+    document.addEventListener("pointercancel", pointerCancel);
+    return () => {
+      document.removeEventListener("pointermove", pointerMove);
+      document.removeEventListener("pointerup", pointerUp);
+      document.removeEventListener("pointercancel", pointerCancel);
+      if (scrollFrame.current !== null) window.cancelAnimationFrame(scrollFrame.current);
+    };
+  }, []);
 
   function rememberPositions() {
     previousRects.current = new Map(
@@ -226,7 +261,11 @@ function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction
     if (!card) return;
     const rect = card.getBoundingClientRect();
     draggedId.current = action.id;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    activePointerId.current = event.pointerId;
+    itemsRef.current = items;
+    setDraftItems(items);
+    scrollContainer.current = findScrollContainer(card);
+    lastPointer.current = { x: event.clientX, y: event.clientY };
     setPreview({
       action, x: event.clientX, y: event.clientY,
       offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top,
@@ -234,35 +273,88 @@ function ReorderableGrid({ scope, items, editing, onEditing, onReorder, onAction
     });
   }
 
-  function moveDrag(event: ReactPointerEvent<HTMLButtonElement>) {
+  function updateTarget(clientX: number, clientY: number) {
     if (!draggedId.current) return;
-    setPreview((current) => current ? { ...current, x: event.clientX, y: event.clientY } : current);
-    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-reorder-id]");
+    const target = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>("[data-reorder-id]");
     if (!target || target.dataset.reorderScope !== scope || !target.dataset.reorderId || target.dataset.reorderId === draggedId.current) return;
     rememberPositions();
-    onReorder(reorderActions(items, draggedId.current, target.dataset.reorderId));
+    const next = reorderActions(itemsRef.current, draggedId.current, target.dataset.reorderId);
+    if (next === itemsRef.current) return;
+    itemsRef.current = next;
+    setDraftItems(next);
   }
 
-  function stopDrag() { draggedId.current = null; setPreview(null); }
+  function runAutoScroll() {
+    if (scrollFrame.current !== null || scrollStep.current === 0) return;
+    function tick() {
+      const container = scrollContainer.current;
+      if (!container || scrollStep.current === 0 || !draggedId.current) {
+        scrollFrame.current = null;
+        return;
+      }
+      const previousTop = container.scrollTop;
+      container.scrollTop += scrollStep.current;
+      if (container.scrollTop !== previousTop) updateTarget(lastPointer.current.x, lastPointer.current.y);
+      scrollFrame.current = window.requestAnimationFrame(tick);
+    }
+    scrollFrame.current = window.requestAnimationFrame(tick);
+  }
+
+  moveDragRef.current = (clientX, clientY) => {
+    if (!draggedId.current) return;
+    lastPointer.current = { x: clientX, y: clientY };
+    setPreview((current) => current ? { ...current, x: clientX, y: clientY } : current);
+    updateTarget(clientX, clientY);
+    const container = scrollContainer.current;
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      scrollStep.current = getSortableAutoScrollDelta(clientY, rect.top, rect.bottom);
+      runAutoScroll();
+    }
+  };
+
+  finishDragRef.current = (commit) => {
+    if (!draggedId.current) return;
+    const finalItems = itemsRef.current;
+    draggedId.current = null;
+    activePointerId.current = null;
+    scrollStep.current = 0;
+    if (scrollFrame.current !== null) window.cancelAnimationFrame(scrollFrame.current);
+    scrollFrame.current = null;
+    scrollContainer.current = null;
+    setPreview(null);
+    setDraftItems(null);
+    if (commit) onReorderRef.current(finalItems);
+  };
 
   function moveWithKeyboard(actionId: string, direction: -1 | 1) {
-    const index = items.findIndex((item) => item.id === actionId);
-    const target = items[index + direction];
+    const index = renderedItems.findIndex((item) => item.id === actionId);
+    const target = renderedItems[index + direction];
     if (!target) return;
     rememberPositions();
-    onReorder(reorderActions(items, actionId, target.id));
+    onReorder(reorderActions(renderedItems, actionId, target.id));
   }
 
   return <div data-reorder-layout={layout} className={`mt-2 gap-2 ${layout === "list" ? "flex flex-col" : `grid grid-cols-2 ${prominent ? "sm:grid-cols-5" : "rounded-md bg-white p-2 shadow-sm sm:grid-cols-3 lg:grid-cols-5"}`}`}>
-    {items.map((action) => <div key={action.id} ref={(node) => { if (node) cardNodes.current.set(action.id, node); else cardNodes.current.delete(action.id); }} data-reorder-id={action.id} data-reorder-scope={scope} className={`relative min-w-0 rounded-md ${preview?.action.id === action.id ? "outline-2 outline-dashed outline-slate-500" : ""}`}>
+    {renderedItems.map((action) => <div key={action.id} ref={(node) => { if (node) cardNodes.current.set(action.id, node); else cardNodes.current.delete(action.id); }} data-reorder-id={action.id} data-reorder-scope={scope} className={`relative min-w-0 rounded-md ${preview?.action.id === action.id ? "outline-2 outline-dashed outline-slate-500" : ""}`}>
       <div className={preview?.action.id === action.id ? "opacity-20" : "opacity-100"}>
         <ActionButton action={action} onClick={() => onAction(action)} onLongPress={onEditing} disabled={editing} prominent={prominent} extraEditingSpace={Boolean(onRemove)} layout={layout} />
       </div>
-      {editing && onRemove && <button type="button" disabled={items.length === 1} onClick={() => onRemove(action)} className="absolute bottom-2 right-14 z-10 flex h-11 w-11 items-center justify-center rounded-md border border-red-200 bg-white text-red-700 shadow disabled:opacity-30" aria-label={`Retirer ${action.label}`}><Trash2 size={18} /></button>}
-      {editing && <button type="button" onPointerDown={(event) => startDrag(action, event)} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); moveWithKeyboard(action.id, -1); } if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); moveWithKeyboard(action.id, 1); } }} className="absolute inset-y-2 right-2 flex w-11 touch-none items-center justify-center rounded-md border-2 border-slate-400 bg-white text-slate-800 shadow" aria-label={`Déplacer ${action.label}`}><GripVertical size={23} /></button>}
+      {editing && onRemove && <button type="button" disabled={renderedItems.length === 1} onClick={() => onRemove(action)} className="absolute bottom-2 right-14 z-10 flex h-11 w-11 items-center justify-center rounded-md border border-red-200 bg-white text-red-700 shadow disabled:opacity-30" aria-label={`Retirer ${action.label}`}><Trash2 size={18} /></button>}
+      {editing && <button type="button" onPointerDown={(event) => startDrag(action, event)} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); moveWithKeyboard(action.id, -1); } if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); moveWithKeyboard(action.id, 1); } }} className="absolute inset-y-2 right-2 flex w-11 touch-none items-center justify-center rounded-md border-2 border-slate-400 bg-white text-slate-800 shadow" aria-label={`Déplacer ${action.label}`}><GripVertical size={23} /></button>}
     </div>)}
     {preview && <div aria-hidden="true" className="pointer-events-none fixed z-[90] scale-[1.02] opacity-95 shadow-2xl" style={{ left: preview.x - preview.offsetX, top: preview.y - preview.offsetY, width: preview.width, height: preview.height }}><ActionSurface action={preview.action} prominent={prominent} floating layout={layout} /></div>}
   </div>;
+}
+
+function findScrollContainer(element: HTMLElement): HTMLElement | null {
+  let current = element.parentElement;
+  while (current) {
+    const overflowY = window.getComputedStyle(current).overflowY;
+    if ((overflowY === "auto" || overflowY === "scroll") && current.scrollHeight > current.clientHeight) return current;
+    current = current.parentElement;
+  }
+  return null;
 }
 
 function ActionButton({ action, onClick, onLongPress, disabled, prominent = false, extraEditingSpace = false, layout = "grid" }: {
