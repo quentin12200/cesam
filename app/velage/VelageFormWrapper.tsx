@@ -72,22 +72,30 @@ export default function VelageFormWrapper({ initialOpen = false, initialMere = "
 
   function changerMere(value: string) { const n = value.toUpperCase(); setMere(n); setMereNom(null); if (debounce.current) clearTimeout(debounce.current); debounce.current = setTimeout(() => void chargerMere(n), 500); }
   function prochaineIdentification(existants: Veau[]) { return identificationsProposees.find((numero) => !numerosUtilises.includes(numero.nutrav) && !numerosNationauxUtilises.includes(numero.nunati) && !existants.some((veau) => veau.nutrav === numero.nutrav || veau.nunati === numero.nunati)) ?? { nutrav: "", nunati: "" }; }
-  function ajouterVeau() { setVeaux((v) => [...v, { ...vide(qualificatif === "MORT_NEE" ? "MORT_NE" : "VIVANT"), ...prochaineIdentification(v) }]); }
+  function ajouterVeau() {
+    setVeaux((v) => qualificatif === "MORT_NEE"
+      ? [...v, vide("MORT_NE")]
+      : [...v, { ...vide(), ...prochaineIdentification(v) }]);
+  }
   function supprimerVeau(index: number) {
-    if (veaux[index]?.animalId) {
-      setMessage({ text: "Un veau vivant déjà lié ne peut pas être retiré ici.", ok: false });
+    if (veaux[index]?.detailId || veaux[index]?.animalId) {
+      setMessage({ text: "Un veau déjà enregistré ne peut pas être retiré ici.", ok: false });
       return;
     }
     setVeaux((v) => v.filter((_, i) => i !== index));
   }
   function modifierVeau(index: number, data: Partial<Veau>) { setVeaux((v) => v.map((veau, i) => i === index ? { ...veau, ...data } : veau)); }
   function changerQualificatif(q: Qualificatif) {
-    if (editing && (q === "AVORTEMENT" || q === "MORT_NEE") && veaux.some((veau) => veau.animalId)) {
-      setMessage({ text: "Une fiche veau vivante existante ne peut pas être retirée ou transformée en mort-né.", ok: false });
+    if (editing && q === "AVORTEMENT" && veaux.some((veau) => veau.detailId || veau.animalId)) {
+      setMessage({ text: "Le passage en avortement supprimerait des veaux existants. Cette modification est bloquée.", ok: false });
       return;
     }
     setQualificatif(q); setPrecision(q === "NORMAL" ? "SEULE" : ""); if (q !== "DIFFICILE") setComplications(new Set());
-    if (q === "AVORTEMENT") setVeaux([]); else if (q === "MORT_NEE") setVeaux((v) => (v.length ? v : [{ ...vide(), nutrav: numeroVeauPropose, nunati: numeroNationalPropose }]).map((veau) => ({ ...veau, statut: "MORT_NE" })));
+    if (q === "AVORTEMENT") setVeaux([]); else if (q === "MORT_NEE") setVeaux((v) => (v.length ? v : [vide("MORT_NE")]).map((veau) => ({
+      ...veau,
+      ...(!veau.detailId && !veau.animalId ? { nutrav: "", nunati: "" } : {}),
+      statut: "MORT_NE",
+    })));
     else setVeaux((v) => {
       const presents = v.length ? v : [{ ...vide(), nutrav: numeroVeauPropose, nunati: numeroNationalPropose }];
       return qualificatif === "MORT_NEE" ? presents.map((veau) => ({ ...veau, statut: "VIVANT" as const })) : presents;
@@ -152,11 +160,14 @@ export default function VelageFormWrapper({ initialOpen = false, initialMere = "
           {veaux.map((veau, i) => {
             const doublon = veau.nutrav !== "" && veaux.some((autre, j) => j !== i && autre.nutrav === veau.nutrav);
             const disponible = veau.nutrav !== "" && !numerosPris.has(veau.nutrav) && !doublon;
-            return <div key={veau.detailId ?? veau.animalId ?? i} className="border border-gray-200 rounded-xl p-3 space-y-2.5"><div className="flex items-center justify-between"><p className="font-semibold text-gray-800">Veau {i + 1}</p>{(i > 0 || (editing && veaux.length > 1)) && !veau.animalId && <button type="button" onClick={() => supprimerVeau(i)} className="text-xs text-gray-500 px-2 py-1.5">Supprimer</button>}{veau.animalId && <span className="text-[11px] text-gray-500">Fiche existante conservée</span>}</div>
+            return <div key={veau.detailId ?? veau.animalId ?? i} className="border border-gray-200 rounded-xl p-3 space-y-2.5"><div className="flex items-center justify-between"><p className="font-semibold text-gray-800">Veau {i + 1}</p>{(i > 0 || (editing && veaux.length > 1)) && !veau.detailId && !veau.animalId && <button type="button" onClick={() => supprimerVeau(i)} className="text-xs text-gray-500 px-2 py-1.5">Retirer</button>}{veau.animalId && <span className="text-[11px] text-gray-500">Fiche existante conservée</span>}</div>
               <div className="space-y-2"><div><input value={veau.nutrav} onBlur={() => modifierVeau(i, { nutrav: normaliserNutrav(veau.nutrav, 4, true) })} onChange={(e) => modifierVeau(i, { nutrav: e.target.value.replace(/\D/g, "").slice(-4) })} placeholder="Numéro de travail" inputMode="numeric" className={`w-full border rounded-lg px-3 py-2.5 font-mono bg-white ${veau.nutrav && !disponible ? "border-red-400" : ""}`} />{veau.nutrav && <p className={`text-xs mt-1 ${disponible ? "text-emerald-600" : "text-red-600"}`}>{disponible ? "Numéro disponible" : "Numéro déjà utilisé"}</p>}</div><div><input value={veau.nunati} onChange={(e) => modifierVeau(i, { nunati: e.target.value.toUpperCase() })} placeholder="Numéro national" className={`w-full border rounded-lg px-3 py-2 text-sm font-mono bg-gray-50 ${veau.nunati && numerosNationauxUtilises.includes(veau.nunati) && !nationauxInitiaux.has(veau.nunati) ? "border-red-400" : ""}`} />{!veau.nunati && <p className="mt-1 text-xs text-gray-500">Numéro national à compléter</p>}</div><p className="text-[11px] leading-4 text-gray-500">Vérifiez que ces numéros correspondent bien à la boucle utilisée.</p></div>
               <div className="grid grid-cols-2 gap-2">{(["M", "F"] as const).map((s) => <button key={s} type="button" onClick={() => modifierVeau(i, { sexe: s })} className={`py-2 rounded-lg border text-sm ${veau.sexe === s ? (s === "M" ? "bg-sky-500 text-white border-sky-500" : "bg-pink-500 text-white border-pink-500") : "bg-white border-gray-200"}`}>{s === "M" ? "♂ Mâle" : "♀ Femelle"}</button>)}</div>
               <input value={veau.nom} onChange={(e) => modifierVeau(i, { nom: e.target.value })} placeholder="Nom / surnom (optionnel)" className="w-full border rounded-lg px-3 py-2.5 bg-white" />
-              {veau.animalId ? <p className="text-xs text-gray-500">Statut vivant conservé : ce veau possède déjà une fiche Animal.</p> : qualificatif === "MORT_NEE" ? <p className="text-xs text-gray-500">Statut mort-né appliqué automatiquement</p> : <button type="button" onClick={() => modifierVeau(i, { statut: veau.statut === "VIVANT" ? "MORT_NE" : "VIVANT" })} className="text-xs text-gray-500 underline underline-offset-2 py-1">{veau.statut === "VIVANT" ? "Signaler ce veau comme mort-né" : "Statut : mort-né — remettre vivant"}</button>}
+              {qualificatif === "MORT_NEE" ? <p className="text-xs text-gray-500">Statut mort-né appliqué automatiquement, sans consommation de boucle.</p> : <button type="button" onClick={() => modifierVeau(i, {
+                statut: veau.statut === "VIVANT" ? "MORT_NE" : "VIVANT",
+                ...(veau.statut === "VIVANT" && !veau.detailId && !veau.animalId ? { nutrav: "", nunati: "" } : {}),
+              })} className="text-xs text-gray-500 underline underline-offset-2 py-1">{veau.statut === "VIVANT" ? "Signaler ce veau comme mort-né" : "Statut : mort-né — remettre vivant"}</button>}
             </div>;
           })}
           <button type="button" onClick={ajouterVeau} className="text-sm text-purple-700 border border-purple-200 bg-purple-50 rounded-full px-3 py-2">+ Naissance multiple</button>
@@ -166,7 +177,7 @@ export default function VelageFormWrapper({ initialOpen = false, initialMere = "
         <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium mb-1">Nom du père</label><input value={pereNom} onChange={(e) => { setPereNom(e.target.value); setPereAuto(false); }} className="w-full border rounded-lg px-3 py-2.5" />{pereAuto && <p className="text-xs text-emerald-500 mt-1">Prérempli</p>}</div><div><label className="block text-sm font-medium mb-1">Capteur (optionnel)</label><select value={capteur} onChange={(e) => setCapteur(e.target.value)} className="w-full border rounded-lg px-3 py-2.5"><option value="">Aucun</option>{capteurs.map((c) => <option key={c.numero} value={c.numero}>Capteur {c.numero}{c.actif && c.animalNutrav ? ` — ${c.animalNutrav}` : ""}</option>)}</select></div></div>
         <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium mb-1">Moment (optionnel)</label><select value={moment} onChange={(e) => setMoment(e.target.value)} className="w-full border rounded-lg px-3 py-2.5"><option value="">Non renseigné</option><option value="Matin">Matin</option><option value="Soir">Soir</option></select></div><div><label className="block text-sm font-medium mb-1">Remarques</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full border rounded-lg px-3 py-2.5" /></div></div>
         {editing && changementsSensibles.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"><p className="text-sm font-semibold text-amber-950">Vous allez modifier :</p><ul className="mt-1 list-disc pl-5 text-xs leading-5 text-amber-900">{[...new Set(changementsSensibles)].map((changement) => <li key={changement}>{changement}</li>)}</ul></div>}
-        <button disabled={saving} className="w-full bg-pink-500 text-white py-3 rounded-xl font-semibold disabled:opacity-50">{saving ? "Enregistrement…" : editing ? "Enregistrer la modification" : "Enregistrer le vêlage"}</button>
+        <button disabled={saving} className="w-full bg-pink-500 text-white py-3 rounded-xl font-semibold disabled:opacity-50">{saving ? "Enregistrement…" : editing ? "Enregistrer les modifications" : "Enregistrer le vêlage"}</button>
       </form></div></div>}
   </>;
 }

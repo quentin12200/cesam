@@ -32,7 +32,6 @@ import {
   Clock,
   Printer,
   GitBranch,
-  Pencil,
 } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import EditAnimalDrawer from "./EditAnimalDrawer";
@@ -63,6 +62,7 @@ import ActiveHeatAction from "@/app/components/ActiveHeatAction";
 import HeatReturnReminder from "@/app/components/HeatReturnReminder";
 import { getHeatReturnReminder } from "@/lib/heat-return-monitoring";
 import ChaleursHistory from "./ChaleursHistory";
+import VelageActions from "./VelageActions";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -1058,9 +1058,11 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                           <div className="text-xs text-gray-500 mt-1">Père: {velage.pereNom}</div>
                         )}
                         {velage.capteur && <div className="text-xs text-gray-500 mt-1">Capteur utilisé : {velage.capteur}</div>}
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <Link href={`/velage?modifier=${velage.id}&returnTo=${encodeURIComponent(`/troupeau/${animal.nutrav}?onglet=reproduction`)}`} className="flex min-h-11 items-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 px-3 text-xs font-semibold text-pink-800"><Pencil size={14} /> Modifier</Link>
-                          <span className="max-w-sm text-[11px] leading-4 text-gray-500">La suppression sécurisée d’un vêlage avec veaux liés sera améliorée séparément.</span>
+                        <div className="mt-3 flex justify-end">
+                          <VelageActions
+                            velageId={velage.id}
+                            editHref={`/velage?modifier=${velage.id}&returnTo=${encodeURIComponent(`/troupeau/${animal.nutrav}?onglet=reproduction`)}`}
+                          />
                         </div>
                       </div>
                     );

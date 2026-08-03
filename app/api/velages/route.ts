@@ -6,6 +6,7 @@ import {
   obtenirLotBouclesActif,
   obtenirNumerosIdentificationUtilises,
 } from "@/lib/lot-boucles";
+import { consumesLoopNumber } from "@/lib/velage-safety";
 
 type VeauSaisi = { nutrav?: string; nunati?: string; sexe?: "M" | "F"; nom?: string; statut?: "VIVANT" | "MORT_NE" };
 
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
           await obtenirNumerosIdentificationUtilises()
         ).numeros
       : [];
-    if (lotActif && veaux.some((v) => v.nutrav && (!v.nunati || !numerosDuLot.some((numero) => numero.nutrav === v.nutrav && numero.nunati === v.nunati)))) return NextResponse.json({ error: "Cette boucle n'appartient pas au lot actif. Ajoutez un nouveau lot dans les Paramètres." }, { status: 400 });
+    if (lotActif && veaux.some((v) => consumesLoopNumber(v.statut) && v.nutrav && (!v.nunati || !numerosDuLot.some((numero) => numero.nutrav === v.nutrav && numero.nunati === v.nunati)))) return NextResponse.json({ error: "Cette boucle n'appartient pas au lot actif. Ajoutez un nouveau lot dans les Paramètres." }, { status: 400 });
     if (new Set(veaux.flatMap((v) => v.nutrav ? [v.nutrav] : [])).size !== veaux.filter((v) => v.nutrav).length) return NextResponse.json({ error: "Un numéro de travail est utilisé plusieurs fois" }, { status: 409 });
     if (new Set(veaux.flatMap((v) => v.nunati ? [v.nunati] : [])).size !== veaux.filter((v) => v.nunati).length) return NextResponse.json({ error: "Un numéro national est utilisé plusieurs fois" }, { status: 409 });
     for (const saisi of veaux.filter((v) => v.statut === "MORT_NE")) {
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
     if (lotActif) {
       const numerosConsommes = new Set(
         veaux.flatMap((veau) =>
+          consumesLoopNumber(veau.statut) &&
           numerosDuLot.some(
             (numero) =>
               numero.nunati === veau.nunati && numero.nutrav === veau.nutrav

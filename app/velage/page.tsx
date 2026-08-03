@@ -11,6 +11,7 @@ import GestationCalendarSection from "@/app/components/GestationCalendarSection"
 import TroupeauTabs from "@/components/TroupeauTabs";
 import { genererNumerosLibresDuLot } from "@/lib/identification";
 import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
+import { getVelageDetails } from "@/lib/velage-edit";
 
 async function getVelageData(modifierId?: string) {
   const now = new Date();
@@ -35,14 +36,7 @@ async function getVelageData(modifierId?: string) {
     prisma.animal.findMany({ select: { nutrav: true, numeroNational: true } }),
     prisma.veauVelage.findMany({ select: { nutrav: true, nunati: true } }),
     obtenirLotBouclesActif(),
-    modifierId ? prisma.velage.findUnique({
-      where: { id: modifierId },
-      include: {
-        vache: { select: { nutrav: true, nobovi: true } },
-        veau: { select: { id: true, nutrav: true, nunati: true, numeroNational: true, nobovi: true, sexbov: true } },
-        veauxDetails: { include: { animal: { select: { id: true, nutrav: true, nunati: true, numeroNational: true, nobovi: true, sexbov: true } } } },
-      },
-    }) : null,
+    modifierId ? getVelageDetails(modifierId, prisma) : null,
   ]);
 
   const numerosUtilises = [...new Set([...numerosAnimaux.map((animal) => animal.nutrav), ...numerosVeaux.flatMap((veau) => veau.nutrav ? [veau.nutrav] : [])])];
@@ -62,42 +56,12 @@ async function getVelageData(modifierId?: string) {
     : [];
   const proposition = identificationsProposees[0] ?? { nutrav: "", nunati: "" };
 
-  let initialVelage: EditableVelage | null = null;
-  if (velageAModifier) {
-    const details: EditableVelage["veaux"] = velageAModifier.veauxDetails.map((detail) => ({
-      detailId: detail.id,
-      animalId: detail.animalId,
-      nutrav: detail.animal?.nutrav ?? detail.nutrav ?? "",
-      nunati: detail.animal?.numeroNational ?? detail.nunati ?? "",
-      nom: detail.animal?.nobovi ?? detail.nom ?? "",
-      sexe: detail.animal?.sexbov === "M" || detail.animal?.sexbov === "F" ? detail.animal.sexbov : detail.sexe === "M" || detail.sexe === "F" ? detail.sexe : "" as const,
-      statut: detail.statut === "MORT_NE" ? "MORT_NE" as const : "VIVANT" as const,
-    }));
-    if (details.length === 0 && velageAModifier.veau) {
-      details.push({
-        detailId: null,
-        animalId: velageAModifier.veau.id,
-        nutrav: velageAModifier.veau.nutrav,
-        nunati: velageAModifier.veau.numeroNational ?? "",
-        nom: velageAModifier.veau.nobovi ?? "",
-        sexe: velageAModifier.veau.sexbov === "M" ? "M" : "F",
-        statut: "VIVANT",
-      });
-    }
-    initialVelage = {
-      id: velageAModifier.id,
-      vacheNutrav: velageAModifier.vache.nutrav,
-      vacheNom: velageAModifier.vache.nobovi,
-      date: velageAModifier.date.toISOString(),
-      moment: velageAModifier.moment,
-      qualificatif: (["NORMAL", "DIFFICILE", "AVORTEMENT", "MORT_NEE"].includes(velageAModifier.qualificatif) ? velageAModifier.qualificatif : "NORMAL") as EditableVelage["qualificatif"],
-      sousType: velageAModifier.sousType,
-      capteur: velageAModifier.capteur,
-      pereNom: velageAModifier.pereNom,
-      notes: velageAModifier.notes,
-      veaux: details,
-    };
-  }
+  const initialVelage: EditableVelage | null = velageAModifier ? {
+    ...velageAModifier,
+    qualificatif: (["NORMAL", "DIFFICILE", "AVORTEMENT", "MORT_NEE"].includes(velageAModifier.qualificatif)
+      ? velageAModifier.qualificatif
+      : "NORMAL") as EditableVelage["qualificatif"],
+  } : null;
 
   return { capteurs, gestationCalendar, velagesRecents, numerosUtilises, numerosNationauxUtilises, proposition, identificationsProposees, lotActif, initialVelage };
 }
@@ -175,7 +139,6 @@ export default async function VelagePage({ searchParams }: { searchParams: Promi
                     {velage.qualificatif}
                   </span>
                   <Link href={`/velage?modifier=${velage.id}&returnTo=${encodeURIComponent("/velage")}`} className="mt-2 flex min-h-11 items-center justify-center gap-1 rounded-lg border border-gray-300 px-3 text-xs font-semibold text-gray-800"><Pencil size={14} /> Modifier</Link>
-                  <p className="mt-1 max-w-44 text-[10px] leading-4 text-gray-500">La suppression sécurisée d’un vêlage avec veaux liés sera améliorée séparément.</p>
                 </div>
               </div>
             ))}
