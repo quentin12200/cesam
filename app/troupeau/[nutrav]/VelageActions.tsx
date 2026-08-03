@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { Loader2, Trash2, X } from "lucide-react";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import type { VelageDeletionPreview } from "@/lib/velage-edit";
+import { buildVelageEditHref } from "@/lib/velage-navigation";
 
 interface Props {
   velageId: string;
-  editHref: string;
+  returnTo: string;
 }
 
-export default function VelageActions({ velageId, editHref }: Props) {
+export default function VelageActions({ velageId, returnTo }: Props) {
   const router = useRouter();
   const [preview, setPreview] = useState<VelageDeletionPreview | null>(null);
   const [open, setOpen] = useState(false);
@@ -59,7 +60,7 @@ export default function VelageActions({ velageId, editHref }: Props) {
   return (
     <>
       <RecordActionsMenu
-        onEdit={() => router.push(editHref)}
+        onEdit={() => window.location.assign(buildVelageEditHref(velageId, returnTo))}
         actions={[{
           label: "Supprimer",
           tone: "danger",

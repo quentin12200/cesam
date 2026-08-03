@@ -1061,7 +1061,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                         <div className="mt-3 flex justify-end">
                           <VelageActions
                             velageId={velage.id}
-                            editHref={`/velage?modifier=${velage.id}&returnTo=${encodeURIComponent(`/troupeau/${animal.nutrav}?onglet=reproduction`)}`}
+                            returnTo={`/troupeau/${animal.nutrav}?onglet=reproduction`}
                           />
                         </div>
                       </div>
