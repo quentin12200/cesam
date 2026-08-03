@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, ExternalLink, FileText, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, FileText, Loader2, Plus } from "lucide-react";
 import {
   medicamentsDepuisProposition,
   type MedicamentPropose,
@@ -23,17 +23,32 @@ interface ExtractionInfo {
 interface MedChamps {
   key: string;
   ia?: MedicamentPropose;
+  medicationId: string;
   medicamentNom: string;
   numeroLot: string;
-  dose: string;
-  uniteDosage: string;
+  substanceActive: string;
+  concentration: string;
+  categorie: string;
+  familleTherapeutique: string;
+  formePharmaceutique: string;
+  conditionnement: string;
+  doseValue: string;
+  doseUnit: string;
+  referenceValue: string;
+  referenceUnit: string;
+  referenceType: string;
+  normalizedDoseValue: string;
+  normalizedDoseUnit: string;
   voie: string;
-  frequence: string;
-  dureeJours: string;
-  delaiAttenteViandeJ: string;
-  delaiAttenteLaitJ: string;
+  administrationCount: string;
+  administrationIntervalHours: string;
+  treatmentDurationDays: string;
+  repeatCondition: string;
+  administrationInstructions: string;
+  meatDays: string;
+  offalDays: string;
+  milkDays: string;
   precautions: string;
-  rappels: string;
 }
 
 let compteurCle = 0;
@@ -50,52 +65,78 @@ function versChamps(m: MedicamentPropose): MedChamps {
   return {
     key: nouvelleCle(),
     ia: m,
+    medicationId: m.medicationMatch?.id ?? "",
     medicamentNom: s(m.medicamentNom),
     numeroLot: s(m.numeroLot),
-    dose: s(m.dose),
-    uniteDosage: s(m.uniteDosage),
+    substanceActive: s(m.substanceActive),
+    concentration: s(m.concentration),
+    categorie: s(m.categorie),
+    familleTherapeutique: s(m.familleTherapeutique),
+    formePharmaceutique: s(m.formePharmaceutique),
+    conditionnement: s(m.conditionnement),
+    doseValue: s(m.doseValue),
+    doseUnit: s(m.doseUnit),
+    referenceValue: s(m.referenceValue),
+    referenceUnit: s(m.referenceUnit),
+    referenceType: s(m.referenceType),
+    normalizedDoseValue: s(m.normalizedDoseValue),
+    normalizedDoseUnit: s(m.normalizedDoseUnit),
     voie: s(m.voie),
-    frequence: s(m.frequence),
-    dureeJours: s(m.dureeJours),
-    delaiAttenteViandeJ: s(m.delaiAttenteViandeJ),
-    delaiAttenteLaitJ: s(m.delaiAttenteLaitJ),
+    administrationCount: s(m.administrationCount),
+    administrationIntervalHours: s(m.administrationIntervalHours),
+    treatmentDurationDays: s(m.treatmentDurationDays),
+    repeatCondition: s(m.repeatCondition),
+    administrationInstructions: s(m.administrationInstructions),
+    meatDays: s(m.withdrawalPeriods.meatDays),
+    offalDays: s(m.withdrawalPeriods.offalDays),
+    milkDays: s(m.withdrawalPeriods.milkDays),
     precautions: s(m.precautions),
-    rappels: s(m.rappels),
   };
 }
 
 function champsVides(): MedChamps {
   return {
     key: nouvelleCle(),
-    medicamentNom: "", numeroLot: "", dose: "", uniteDosage: "", voie: "",
-    frequence: "", dureeJours: "", delaiAttenteViandeJ: "", delaiAttenteLaitJ: "",
-    precautions: "", rappels: "",
+    medicationId: "", medicamentNom: "", numeroLot: "", substanceActive: "", concentration: "", categorie: "",
+    familleTherapeutique: "", formePharmaceutique: "", conditionnement: "", doseValue: "",
+    doseUnit: "", referenceValue: "", referenceUnit: "", referenceType: "",
+    normalizedDoseValue: "", normalizedDoseUnit: "", voie: "", administrationCount: "",
+    administrationIntervalHours: "", treatmentDurationDays: "", repeatCondition: "",
+    administrationInstructions: "", meatDays: "", offalDays: "", milkDays: "", precautions: "",
   };
 }
 
 const inputClass = "min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100";
 
-function AffichageIA({ valeur }: { valeur: string | number | null | undefined }) {
+function AffichageIA({
+  valeur,
+  preuve,
+}: {
+  valeur: string | number | null | undefined;
+  preuve?: { sourceText: string | null; confidence: number };
+}) {
   return (
-    <p className="mt-1 text-[11px] text-gray-400">
-      IA : {valeur === null || valeur === undefined || valeur === "" ? "non trouvé" : String(valeur)}
-    </p>
+    <div className={`mt-1 text-[11px] ${preuve && preuve.confidence < 0.7 ? "text-amber-700" : "text-gray-400"}`}>
+      <p>IA : {valeur === null || valeur === undefined || valeur === "" ? "non trouvé" : String(valeur)}</p>
+      {preuve?.sourceText && <p>Source : “{preuve.sourceText}” · confiance {Math.round(preuve.confidence * 100)} %</p>}
+    </div>
   );
 }
 
 function Champ({
-  label, valeurIA, children, className = "",
+  label, valeurIA, preuve, children, className = "",
 }: {
   label: string;
   valeurIA?: string | number | null;
+  preuve?: { sourceText: string | null; confidence: number };
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <label className={`block ${className}`}>
+    <label className={`block ${preuve && preuve.confidence < 0.7 ? "rounded-lg bg-amber-50 p-2" : ""} ${className}`}>
       <span className="mb-1 block text-xs font-medium text-gray-600">{label}</span>
       {children}
-      {valeurIA !== undefined && <AffichageIA valeur={valeurIA} />}
+      {valeurIA !== undefined && <AffichageIA valeur={valeurIA} preuve={preuve} />}
     </label>
   );
 }
@@ -111,7 +152,11 @@ export default function VerificationOrdonnanceClient({
   const { completeToOrigin, returnTo } = useOriginNavigation();
   const medsInitiaux = medicamentsDepuisProposition(propositionInitiale);
 
-  const [dateDebut, setDateDebut] = useState(propositionInitiale.dateDebut?.slice(0, 10) ?? "");
+  const [prescriptionDate, setPrescriptionDate] = useState(
+    (propositionInitiale.prescriptionDate ?? propositionInitiale.dateDebut)?.slice(0, 10) ?? "",
+  );
+  const [lastVisitDate, setLastVisitDate] = useState(propositionInitiale.lastVisitDate?.slice(0, 10) ?? "");
+  const [deliveryDate, setDeliveryDate] = useState(propositionInitiale.deliveryDate?.slice(0, 10) ?? "");
   const [ordonnanceNumero, setOrdonnanceNumero] = useState(propositionInitiale.ordonnanceNumero ?? "");
   const [veterinaire, setVeterinaire] = useState(propositionInitiale.veterinaire ?? "");
   const [motif, setMotif] = useState(propositionInitiale.motif ?? "");
@@ -130,6 +175,25 @@ export default function VerificationOrdonnanceClient({
     setMedicaments((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
   }
 
+  function utiliserFiche(index: number) {
+    setMedicaments((prev) => prev.map((med, i) => {
+      if (i !== index || !med.ia?.medicationMatch) return med;
+      const match = med.ia.medicationMatch;
+      return {
+        ...med,
+        medicationId: match.id,
+        medicamentNom: match.nom,
+        substanceActive: match.dci ?? med.substanceActive,
+        categorie: match.categorieLabel,
+        formePharmaceutique: match.forme ?? med.formePharmaceutique,
+        voie: match.voie ?? med.voie,
+        meatDays: s(match.delaiAttenteViandeJ ?? med.meatDays),
+        offalDays: s(match.delaiAttenteViandeJ ?? med.offalDays),
+        milkDays: s(match.delaiAttenteLaitJ ?? med.milkDays),
+      };
+    }));
+  }
+
   async function valider(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -139,23 +203,39 @@ export default function VerificationOrdonnanceClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          dateDebut,
+          prescriptionDate,
+          lastVisitDate,
+          deliveryDate,
           ordonnanceNumero,
           veterinaire,
           motif,
           animaux,
           medicaments: medicaments.map((m) => ({
+            medicationId: m.medicationId || null,
             medicamentNom: m.medicamentNom,
             numeroLot: m.numeroLot,
-            dose: m.dose,
-            uniteDosage: m.uniteDosage,
+            substanceActive: m.substanceActive,
+            concentration: m.concentration,
+            categorie: m.categorie,
+            familleTherapeutique: m.familleTherapeutique,
+            formePharmaceutique: m.formePharmaceutique,
+            conditionnement: m.conditionnement,
+            doseValue: m.doseValue,
+            doseUnit: m.doseUnit,
+            referenceValue: m.referenceValue,
+            referenceUnit: m.referenceUnit,
+            referenceType: m.referenceType,
+            normalizedDoseValue: m.normalizedDoseValue,
+            normalizedDoseUnit: m.normalizedDoseUnit,
             voie: m.voie,
-            frequence: m.frequence,
-            dureeJours: m.dureeJours,
-            delaiAttenteViandeJ: m.delaiAttenteViandeJ,
-            delaiAttenteLaitJ: m.delaiAttenteLaitJ,
+            administrationCount: m.administrationCount,
+            administrationIntervalHours: m.administrationIntervalHours,
+            treatmentDurationDays: m.treatmentDurationDays,
+            repeatCondition: m.repeatCondition,
+            administrationInstructions: m.administrationInstructions,
+            withdrawalPeriods: { meatDays: m.meatDays, offalDays: m.offalDays, milkDays: m.milkDays },
             precautions: m.precautions,
-            rappels: m.rappels,
+            evidence: m.ia?.evidence ?? {},
           })),
         }),
       });
@@ -218,8 +298,26 @@ export default function VerificationOrdonnanceClient({
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-gray-800">Ordonnance</h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Champ label="Date de l’ordonnance *" valeurIA={propositionInitiale.dateDebut}>
-              <input type="date" required value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} className={inputClass} />
+            <Champ
+              label="Date de l’ordonnance *"
+              valeurIA={propositionInitiale.prescriptionDate ?? propositionInitiale.dateDebut}
+              preuve={propositionInitiale.evidence?.prescriptionDate as { sourceText: string | null; confidence: number } | undefined}
+            >
+              <input type="date" required value={prescriptionDate} onChange={(e) => setPrescriptionDate(e.target.value)} className={inputClass} />
+            </Champ>
+            <Champ
+              label="Dernière visite"
+              valeurIA={propositionInitiale.lastVisitDate}
+              preuve={propositionInitiale.evidence?.lastVisitDate as { sourceText: string | null; confidence: number } | undefined}
+            >
+              <input type="date" value={lastVisitDate} onChange={(e) => setLastVisitDate(e.target.value)} className={inputClass} />
+            </Champ>
+            <Champ
+              label="Date de délivrance"
+              valeurIA={propositionInitiale.deliveryDate}
+              preuve={propositionInitiale.evidence?.deliveryDate as { sourceText: string | null; confidence: number } | undefined}
+            >
+              <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className={inputClass} />
             </Champ>
             <Champ label="Numéro ou référence" valeurIA={propositionInitiale.ordonnanceNumero}>
               <input value={ordonnanceNumero} onChange={(e) => setOrdonnanceNumero(e.target.value)} className={inputClass} />
@@ -260,6 +358,47 @@ export default function VerificationOrdonnanceClient({
                       }]} />
                     )}
                   </div>
+                  {ia?.medicationMatch && (
+                    <div className={`mb-3 rounded-lg border p-3 text-xs ${
+                      ia.medicationMatch.divergences.length > 0
+                        ? "border-amber-300 bg-amber-50 text-amber-950"
+                        : "border-green-200 bg-green-50 text-green-900"
+                    }`}>
+                      <div className="flex items-start gap-2">
+                        {ia.medicationMatch.divergences.length > 0
+                          ? <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                          : <CheckCircle2 size={16} className="mt-0.5 shrink-0" />}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold">Fiche proposée : {ia.medicationMatch.nom}</p>
+                          <p className="mt-0.5">{ia.medicationMatch.categorieLabel}{ia.medicationMatch.dci ? ` · ${ia.medicationMatch.dci}` : ""}</p>
+                          <p className="mt-1">
+                            {med.medicationId === ia.medicationMatch.id
+                              ? "Cette fiche sera associée lors de la validation."
+                              : "Cette fiche ne sera pas associée."}
+                          </p>
+                          {ia.medicationMatch.divergences.length > 0 && (
+                            <p className="mt-1">À vérifier : {ia.medicationMatch.divergences.join(", ")}.</p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 flex-col gap-1">
+                          <button
+                            type="button"
+                            onClick={() => utiliserFiche(i)}
+                            className="min-h-10 rounded-lg border border-current px-3 font-semibold"
+                          >
+                            Utiliser les valeurs de la fiche
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => majMed(i, "medicationId", "")}
+                            className="min-h-10 rounded-lg px-3 font-medium underline"
+                          >
+                            Ne pas associer
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Champ label="Nom du médicament *" valeurIA={ia?.medicamentNom} className="sm:col-span-2">
                       <input required value={med.medicamentNom} onChange={(e) => majMed(i, "medicamentNom", e.target.value)} className={`${inputClass} uppercase`} />
@@ -270,29 +409,103 @@ export default function VerificationOrdonnanceClient({
                     <Champ label="Voie d’administration" valeurIA={ia?.voie}>
                       <input value={med.voie} onChange={(e) => majMed(i, "voie", e.target.value)} className={inputClass} />
                     </Champ>
-                    <Champ label="Dose" valeurIA={ia?.dose}>
-                      <input type="number" min="0" step="0.01" value={med.dose} onChange={(e) => majMed(i, "dose", e.target.value)} className={inputClass} />
+                    <Champ label="Substance active" valeurIA={ia?.substanceActive}>
+                      <input value={med.substanceActive} onChange={(e) => majMed(i, "substanceActive", e.target.value)} className={inputClass} />
                     </Champ>
-                    <Champ label="Unité" valeurIA={ia?.uniteDosage}>
-                      <input value={med.uniteDosage} onChange={(e) => majMed(i, "uniteDosage", e.target.value)} className={inputClass} placeholder="ml, mg, g…" />
+                    <Champ label="Concentration" valeurIA={ia?.concentration}>
+                      <input value={med.concentration} onChange={(e) => majMed(i, "concentration", e.target.value)} className={inputClass} />
                     </Champ>
-                    <Champ label="Fréquence" valeurIA={ia?.frequence}>
-                      <input value={med.frequence} onChange={(e) => majMed(i, "frequence", e.target.value)} className={inputClass} />
+                    <Champ label="Catégorie" valeurIA={ia?.categorie}>
+                      <input value={med.categorie} onChange={(e) => majMed(i, "categorie", e.target.value)} className={inputClass} />
                     </Champ>
-                    <Champ label="Durée (jours)" valeurIA={ia?.dureeJours}>
-                      <input type="number" min="0" value={med.dureeJours} onChange={(e) => majMed(i, "dureeJours", e.target.value)} className={inputClass} />
+                    <Champ label="Famille thérapeutique" valeurIA={ia?.familleTherapeutique}>
+                      <input value={med.familleTherapeutique} onChange={(e) => majMed(i, "familleTherapeutique", e.target.value)} className={inputClass} />
                     </Champ>
-                    <Champ label="Délai viande (jours)" valeurIA={ia?.delaiAttenteViandeJ}>
-                      <input type="number" min="0" value={med.delaiAttenteViandeJ} onChange={(e) => majMed(i, "delaiAttenteViandeJ", e.target.value)} className={inputClass} />
+                    <Champ label="Forme pharmaceutique" valeurIA={ia?.formePharmaceutique}>
+                      <input value={med.formePharmaceutique} onChange={(e) => majMed(i, "formePharmaceutique", e.target.value)} className={inputClass} />
                     </Champ>
-                    <Champ label="Délai lait (jours)" valeurIA={ia?.delaiAttenteLaitJ}>
-                      <input type="number" min="0" value={med.delaiAttenteLaitJ} onChange={(e) => majMed(i, "delaiAttenteLaitJ", e.target.value)} className={inputClass} />
+                    <Champ label="Conditionnement" valeurIA={ia?.conditionnement}>
+                      <input value={med.conditionnement} onChange={(e) => majMed(i, "conditionnement", e.target.value)} className={inputClass} />
                     </Champ>
+                  </div>
+
+                  <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+                    <h3 className="mb-3 text-xs font-semibold text-gray-800">Posologie</h3>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <Champ label="Dose" valeurIA={ia?.doseValue} preuve={ia?.evidence.dose as { sourceText: string | null; confidence: number } | undefined}>
+                        <input type="number" min="0" step="0.01" value={med.doseValue} onChange={(e) => majMed(i, "doseValue", e.target.value)} className={inputClass} />
+                      </Champ>
+                      <Champ label="Unité" valeurIA={ia?.doseUnit}>
+                        <input value={med.doseUnit} onChange={(e) => majMed(i, "doseUnit", e.target.value)} className={inputClass} placeholder="ml, mg…" />
+                      </Champ>
+                      <Champ label="Pour" valeurIA={ia?.referenceValue}>
+                        <input type="number" min="0" step="0.01" value={med.referenceValue} onChange={(e) => majMed(i, "referenceValue", e.target.value)} className={inputClass} />
+                      </Champ>
+                      <Champ label="Unité de référence" valeurIA={ia?.referenceUnit}>
+                        <input value={med.referenceUnit} onChange={(e) => majMed(i, "referenceUnit", e.target.value)} className={inputClass} placeholder="kg" />
+                      </Champ>
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                      <Champ label="Type de dose" valeurIA={ia?.referenceType}>
+                        <select value={med.referenceType} onChange={(e) => majMed(i, "referenceType", e.target.value)} className={inputClass}>
+                          <option value="">Non précisé</option>
+                          <option value="live_weight">Selon le poids vif</option>
+                          <option value="animal">Dose fixe par animal</option>
+                        </select>
+                      </Champ>
+                      <Champ label="Dose normalisée" valeurIA={ia?.normalizedDoseValue}>
+                        <input type="number" min="0" step="0.001" value={med.normalizedDoseValue} onChange={(e) => majMed(i, "normalizedDoseValue", e.target.value)} className={inputClass} />
+                      </Champ>
+                      <Champ label="Unité normalisée" valeurIA={ia?.normalizedDoseUnit}>
+                        <input value={med.normalizedDoseUnit} onChange={(e) => majMed(i, "normalizedDoseUnit", e.target.value)} className={inputClass} placeholder="ml/kg" />
+                      </Champ>
+                    </div>
+                    {med.doseValue && med.doseUnit && med.referenceValue && med.referenceUnit && (
+                      <p className="mt-3 text-sm font-semibold text-gray-900">
+                        {med.doseValue} {med.doseUnit} / {med.referenceValue} {med.referenceUnit}{med.referenceType === "live_weight" ? " de poids vif" : ""}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+                    <h3 className="mb-3 text-xs font-semibold text-gray-800">Protocole d’administration</h3>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <Champ label="Nombre initial d’administrations" valeurIA={ia?.administrationCount}>
+                        <input type="number" min="0" value={med.administrationCount} onChange={(e) => majMed(i, "administrationCount", e.target.value)} className={inputClass} />
+                      </Champ>
+                      <Champ label="Intervalle éventuel (heures)" valeurIA={ia?.administrationIntervalHours}>
+                        <input type="number" min="0" value={med.administrationIntervalHours} onChange={(e) => majMed(i, "administrationIntervalHours", e.target.value)} className={inputClass} />
+                      </Champ>
+                      <Champ label="Durée du traitement (jours)" valeurIA={ia?.treatmentDurationDays}>
+                        <input type="number" min="0" value={med.treatmentDurationDays} onChange={(e) => majMed(i, "treatmentDurationDays", e.target.value)} className={inputClass} />
+                      </Champ>
+                      <Champ label="Condition de répétition" valeurIA={ia?.repeatCondition} className="sm:col-span-3">
+                        <input value={med.repeatCondition} onChange={(e) => majMed(i, "repeatCondition", e.target.value)} className={inputClass} />
+                      </Champ>
+                      <Champ label="Instructions" valeurIA={ia?.administrationInstructions} className="sm:col-span-3">
+                        <textarea value={med.administrationInstructions} onChange={(e) => majMed(i, "administrationInstructions", e.target.value)} rows={2} className={inputClass} />
+                      </Champ>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 p-3">
+                    <h3 className="mb-3 text-xs font-semibold text-orange-950">Délais d’attente</h3>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <Champ label="Viande (jours)" valeurIA={ia?.withdrawalPeriods.meatDays}>
+                        <input type="number" min="0" value={med.meatDays} onChange={(e) => majMed(i, "meatDays", e.target.value)} className={inputClass} />
+                      </Champ>
+                      <Champ label="Abats (jours)" valeurIA={ia?.withdrawalPeriods.offalDays}>
+                        <input type="number" min="0" value={med.offalDays} onChange={(e) => majMed(i, "offalDays", e.target.value)} className={inputClass} />
+                      </Champ>
+                      <Champ label="Lait (jours)" valeurIA={ia?.withdrawalPeriods.milkDays}>
+                        <input type="number" min="0" value={med.milkDays} onChange={(e) => majMed(i, "milkDays", e.target.value)} className={inputClass} />
+                      </Champ>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <Champ label="Précautions" valeurIA={ia?.precautions} className="sm:col-span-2">
                       <textarea value={med.precautions} onChange={(e) => majMed(i, "precautions", e.target.value)} rows={2} className={inputClass} />
-                    </Champ>
-                    <Champ label="Rappels ou administrations de suivi" valeurIA={ia?.rappels} className="sm:col-span-2">
-                      <textarea value={med.rappels} onChange={(e) => majMed(i, "rappels", e.target.value)} rows={2} className={inputClass} />
                     </Champ>
                   </div>
                 </div>

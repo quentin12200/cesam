@@ -18,6 +18,16 @@ interface OrdonnanceData {
   medicamentNom: string;
   dose: number | null;
   uniteDosage: string | null;
+  referenceValue: number | null;
+  referenceUnit: string | null;
+  referenceType: string | null;
+  administrationCount: number | null;
+  administrationIntervalHours: number | null;
+  repeatCondition: string | null;
+  administrationInstructions: string | null;
+  delaiAttenteViandeJ: number | null;
+  delaiAttenteAbatsJ: number | null;
+  delaiAttenteLaitJ: number | null;
   voie: string | null;
   dureeJours: number | null;
   motif: string | null;
@@ -266,7 +276,7 @@ export default function OrdonnanceDetailClient({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Date</label>
+            <label className="text-xs text-gray-500 block mb-1">Date de l’ordonnance</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 text-sm" />
           </div>
@@ -306,6 +316,34 @@ export default function OrdonnanceDetailClient({
               className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="IM" />
           </div>
         </div>
+
+        {ordonnance.referenceValue != null && (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-900">
+            Posologie : {ordonnance.dose ?? "—"} {ordonnance.uniteDosage ?? ""} / {ordonnance.referenceValue} {ordonnance.referenceUnit ?? "kg"}
+            {ordonnance.referenceType === "live_weight" ? " de poids vif" : ""}
+          </div>
+        )}
+
+        {(ordonnance.administrationCount != null || ordonnance.administrationIntervalHours != null || ordonnance.repeatCondition || ordonnance.administrationInstructions) && (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+            <p className="font-semibold text-gray-900">Protocole d’administration</p>
+            {ordonnance.administrationCount != null && <p>{ordonnance.administrationCount} administration(s) initiale(s)</p>}
+            {ordonnance.administrationIntervalHours != null && <p>Rappel possible après {ordonnance.administrationIntervalHours} h</p>}
+            {ordonnance.repeatCondition && <p>{ordonnance.repeatCondition}</p>}
+            {ordonnance.administrationInstructions && <p>{ordonnance.administrationInstructions}</p>}
+          </div>
+        )}
+
+        {(ordonnance.delaiAttenteViandeJ != null || ordonnance.delaiAttenteAbatsJ != null || ordonnance.delaiAttenteLaitJ != null) && (
+          <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-950">
+            <p className="font-semibold">Délais d’attente</p>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              {ordonnance.delaiAttenteViandeJ != null && <span>Viande : {ordonnance.delaiAttenteViandeJ} j</span>}
+              {ordonnance.delaiAttenteAbatsJ != null && <span>Abats : {ordonnance.delaiAttenteAbatsJ} j</span>}
+              {ordonnance.delaiAttenteLaitJ != null && <span>Lait : {ordonnance.delaiAttenteLaitJ} j</span>}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>

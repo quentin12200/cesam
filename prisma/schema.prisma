@@ -578,6 +578,7 @@ model Medicament {
   aliasesVocaux       MedicamentAliasVocal[]
   etapesProtocoles    EtapeProtocoleMedicament[]
   conditionnements    ConditionnementMedicament[]
+  ordonnances         Ordonnance[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 }
@@ -802,15 +803,35 @@ model Intervenant {
 model Ordonnance {
   id             String   @id @default(cuid())
   date           DateTime @default(now())
+  derniereVisite DateTime?
+  dateDelivrance DateTime?
   numero         String?
   veterinaireNom String?
+  medicamentId   String?
+  medicament     Medicament? @relation(fields: [medicamentId], references: [id], onDelete: SetNull)
   medicamentNom  String   @default("")
+  substanceActive String?
+  concentration String?
+  categorieMedicament String?
+  familleTherapeutique String?
+  formePharmaceutique String?
+  conditionnement String?
   dose           Float?
   uniteDosage    String?
+  referenceValue Float?
+  referenceUnit  String?
+  referenceType  String?
+  normalizedDoseValue Float?
+  normalizedDoseUnit String?
   voie           String?
   frequence      String?
   dureeJours     Int?
+  administrationCount Int?
+  administrationIntervalHours Int?
+  repeatCondition String?
+  administrationInstructions String?
   delaiAttenteViandeJ Int?
+  delaiAttenteAbatsJ  Int?
   delaiAttenteLaitJ   Int?
   precautions    String?
   rappels        String?
@@ -820,11 +841,14 @@ model Ordonnance {
   notes          String?
   photoUrl       String?
   photoUrls      String?  // JSON: string[] de toutes les pages du document
+  extractionStructuree String? // JSON: valeurs, textes sources et confiances valides
   traitements    Traitement[]
   vaccinations   Vaccination[]
   extraction     ExtractionOrdonnance?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([medicamentId])
 }
 
 model ExtractionOrdonnance {

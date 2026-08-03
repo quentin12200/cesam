@@ -1,0 +1,22 @@
+ALTER TABLE "Ordonnance" ADD COLUMN "derniereVisite" DATETIME;
+ALTER TABLE "Ordonnance" ADD COLUMN "dateDelivrance" DATETIME;
+ALTER TABLE "Ordonnance" ADD COLUMN "medicamentId" TEXT REFERENCES "Medicament"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Ordonnance" ADD COLUMN "substanceActive" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "concentration" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "categorieMedicament" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "familleTherapeutique" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "formePharmaceutique" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "conditionnement" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "referenceValue" REAL;
+ALTER TABLE "Ordonnance" ADD COLUMN "referenceUnit" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "referenceType" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "normalizedDoseValue" REAL;
+ALTER TABLE "Ordonnance" ADD COLUMN "normalizedDoseUnit" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "administrationCount" INTEGER;
+ALTER TABLE "Ordonnance" ADD COLUMN "administrationIntervalHours" INTEGER;
+ALTER TABLE "Ordonnance" ADD COLUMN "repeatCondition" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "administrationInstructions" TEXT;
+ALTER TABLE "Ordonnance" ADD COLUMN "delaiAttenteAbatsJ" INTEGER;
+ALTER TABLE "Ordonnance" ADD COLUMN "extractionStructuree" TEXT;
+
+CREATE INDEX "Ordonnance_medicamentId_idx" ON "Ordonnance"("medicamentId");

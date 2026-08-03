@@ -16,6 +16,9 @@ export interface OrdonnanceItem {
   medicamentNom: string;
   dose: number | null;
   uniteDosage: string | null;
+  referenceValue: number | null;
+  referenceUnit: string | null;
+  referenceType: string | null;
   voie: string | null;
   dureeJours: number | null;
   motif: string | null;
@@ -100,7 +103,7 @@ function OrdonnanceForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Date</label>
+          <label className="text-xs text-gray-500 block mb-1">Date de l’ordonnance</label>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm" />
         </div>
@@ -221,7 +224,11 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
             <span className="text-sm font-semibold text-gray-900">{ord.medicamentNom || "—"}</span>
             {ord.voie && <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{ord.voie}</span>}
             {ord.dose != null && (
-              <span className="text-xs text-gray-500">{ord.dose} {ord.uniteDosage ?? "ml"}</span>
+              <span className="text-xs text-gray-500">
+                {ord.dose} {ord.uniteDosage ?? "ml"}
+                {ord.referenceValue != null && ` / ${ord.referenceValue} ${ord.referenceUnit ?? "kg"}`}
+                {ord.referenceType === "live_weight" && " de poids vif"}
+              </span>
             )}
             {ord.dureeJours && (
               <span className="text-xs text-gray-400">{ord.dureeJours}j</span>
