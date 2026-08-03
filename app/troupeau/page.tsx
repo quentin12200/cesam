@@ -10,7 +10,7 @@ import {
   type CategorieAnimal,
 } from "@/lib/utils";
 import Link from "next/link";
-import { Search, Plus, SlidersHorizontal } from "lucide-react";
+import { ChevronRight, Search, Plus, SlidersHorizontal } from "lucide-react";
 import { addDays, differenceInDays, differenceInMonths, subDays } from "date-fns";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { Suspense } from "react";
@@ -191,6 +191,13 @@ async function getAnimaux(params: {
           select: {
             date: true,
             veau: { select: { nutrav: true, statut: true, sevreFait: true } },
+            veauxDetails: {
+              select: {
+                statut: true,
+                nutrav: true,
+                animal: { select: { nutrav: true, statut: true, sevreFait: true } },
+              },
+            },
           },
         },
         pesees: {
@@ -697,35 +704,48 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                     postCalvingRestDays
                   ))
                 : null;
-            const veau = animal.velagesVache[0]?.veau;
+            const dernierVelage = animal.velagesVache[0];
+            const veauxActifs = new Map<string, { nutrav: string; href: string | null }>();
+            if (!animal.tarieFaite && dernierVelage?.veau?.statut === "ACTIF" && !dernierVelage.veau.sevreFait) {
+              veauxActifs.set(dernierVelage.veau.nutrav, {
+                nutrav: dernierVelage.veau.nutrav,
+                href: `/troupeau/${dernierVelage.veau.nutrav}`,
+              });
+            }
+            if (!animal.tarieFaite) {
+              for (const detail of dernierVelage?.veauxDetails ?? []) {
+                const nutrav = detail.animal?.nutrav ?? detail.nutrav;
+                const actif = detail.statut !== "MORT_NE"
+                  && (!detail.animal || (detail.animal.statut === "ACTIF" && !detail.animal.sevreFait));
+                if (nutrav && actif) {
+                  veauxActifs.set(nutrav, {
+                    nutrav,
+                    href: detail.animal ? `/troupeau/${detail.animal.nutrav}` : null,
+                  });
+                }
+              }
+            }
             const enAttente = animal.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente);
 
             return (
-              <Link
+              <article
                 key={animal.id}
-                href={`/troupeau/${animal.nutrav}`}
-                className="block bg-white rounded-xl shadow p-4 hover:shadow-md transition-shadow"
+                className="relative rounded-xl bg-white p-4 shadow transition-shadow hover:shadow-md"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <NutravBadge nutrav={animal.nutrav} />
-                    <div className="min-w-0">
-                      <div className="font-semibold text-gray-800 text-sm truncate">
-                        {animal.nobovi ?? <span className="text-gray-400 italic">Sans nom</span>}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <span className="text-xs text-gray-500">{formatAge(animal.danais)}</span>
-                        <span className="text-gray-300">·</span>
-                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${catColor}`}>
-                          {animal.sexbov === "F" ? "♀" : "♂"} {catLabel}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {enAttente && (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700" title="Animal interdit à la vente pendant le délai d'attente">
-                            ⛔ Vente interdite
-                          </span>
-                        )}
+                <Link
+                  href={`/troupeau/${animal.nutrav}`}
+                  className="absolute inset-0 rounded-xl"
+                  aria-label={`Ouvrir la fiche de ${animal.nutrav}`}
+                />
+                <div className="pointer-events-none relative flex items-center gap-3">
+                  <NutravBadge nutrav={animal.nutrav} className="!bg-emerald-600" />
+                  <div className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900">
+                    {animal.nobovi ?? <span className="font-medium italic text-gray-400">Sans nom</span>}
+                  </div>
+                  <ChevronRight aria-hidden="true" size={18} className="shrink-0 text-gray-400" />
+                </div>
+
+                <div className="pointer-events-none relative mt-2 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         {etat && (
                           <ReproductionListBadge
                             etat={etat}
@@ -741,19 +761,37 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                                 ? differenceInDays(new Date(), animal.saillies[0].date)
                                 : null
                             }
+                            className={etat === "VERT" ? "!px-2.5 !py-1 !font-extrabold" : ""}
                           />
+                        )}
+                        {[...veauxActifs.values()].map((veau) => veau.href ? (
+                          <Link
+                            key={veau.nutrav}
+                            href={veau.href}
+                            className="pointer-events-auto relative z-10 rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-700"
+                          >
+                            🍼{veau.nutrav}
+                          </Link>
+                        ) : (
+                          <span key={veau.nutrav} className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-700">
+                            🍼{veau.nutrav}
+                          </span>
+                        ))}
+                        <span className="shrink-0 text-xs text-gray-500">{formatAge(animal.danais)}</span>
+                        <span className={`shrink-0 rounded-full px-1.5 py-px text-[11px] font-normal opacity-75 ${catColor}`}>
+                          {animal.sexbov === "F" ? "♀" : "♂"} {catLabel}
+                        </span>
+                        {enAttente && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700" title="Animal interdit à la vente pendant le délai d'attente">
+                            ⛔ Vente interdite
+                          </span>
                         )}
                         {animal.demandesEchographie.length > 0 && (
                           <span
-                            className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full"
+                            className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800"
                             title={animal.demandesEchographie[0]?.origine === "AUTOMATIQUE" ? "Demande automatique" : "Demande manuelle"}
                           >
                             Écho à faire
-                          </span>
-                        )}
-                        {veau && veau.statut === "ACTIF" && !veau.sevreFait && !animal.tarieFaite && (
-                          <span className="text-xs text-blue-700 font-mono font-bold bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
-                            🍼 {veau.nutrav}
                           </span>
                         )}
                         {animal.pesees[0] && (
@@ -765,16 +803,12 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                           </span>
                         )}
                         {animal.groupe && (
-                          <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+                          <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
                             {animal.groupe.nom}
                           </span>
                         )}
-                      </div>
-                    </div>
-                  </div>
-                  <svg className="text-gray-400 flex-shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
                 </div>
-              </Link>
+              </article>
             );
           })}
           {animaux.length === 0 && (
