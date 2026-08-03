@@ -613,7 +613,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
       <div className="grid grid-cols-2 gap-3">
         <div className="text-center p-3 bg-green-50 rounded-lg">
           <div className="text-2xl font-bold text-green-700">{data.pctPleine}%</div>
-          <div className="text-xs text-gray-600 mt-1">Vaches pleines</div>
+          <div className="text-xs text-gray-600 mt-1">Vaches gestantes</div>
           <div className="text-xs text-gray-400">
             {data.vachesPleine} / {data.vachesActives}
           </div>
@@ -1005,7 +1005,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
             </Link>
             <Link href="/reproduction" className="rounded-xl bg-emerald-50 p-3 text-center">
               <div className="text-xl font-bold text-emerald-700">{data.pctPleine}%</div>
-              <div className="text-xs text-gray-600">Vaches pleines</div>
+              <div className="text-xs text-gray-600">Vaches gestantes</div>
             </Link>
             <Link href="/velage" className={`rounded-xl p-3 text-center ${VELAGE_IMMINENT_COLORS.surface}`}>
               <div className={`text-xl font-bold ${VELAGE_IMMINENT_COLORS.text}`}>{data.velagesPrevus}</div>

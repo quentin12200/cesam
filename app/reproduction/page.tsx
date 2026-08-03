@@ -20,6 +20,7 @@ import {
 } from "@/lib/voice-actions";
 import { normalizeSearch } from "@/lib/fuzzy-search";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
+import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
@@ -62,11 +63,11 @@ type FilterEtat = "TOUS" | EtatGestation;
 
 const filterLabels: Record<FilterEtat, string> = {
   TOUS: "Tous", GRIS: "Récente", JAUNE: "À écho",
-  VERT: "Pleine", ROUGE: "Vide", ROSE: "Imminent", REPOS: "Repos",
+  VERT: "Gestante", ROUGE: "Vide", ROSE: "Imminent", REPOS: "Repos",
 };
 
 const reproductionCardStates: Record<EtatGestation, { label: string; border: string; text: string }> = {
-  VERT: { label: "Pleine", border: "border-green-500", text: "text-green-700" },
+  VERT: { label: "Gestante", border: "border-green-500", text: "text-green-700" },
   ROUGE: { label: "Vide", border: "border-red-400", text: "text-red-700" },
   JAUNE: { label: "À écho", border: "border-amber-400", text: "text-amber-700" },
   REPOS: { label: "Repos post-vêlage", border: "border-sky-400", text: "text-sky-700" },
@@ -928,6 +929,10 @@ function ReproductionContent() {
             const joursAvantVelage = vache.dateVelagePrevue
               ? differenceInDays(new Date(vache.dateVelagePrevue), now) : null;
             const carteEtat = reproductionCardStates[vache.etat];
+            const gestationDays =
+              vache.etat === "VERT" && vache.gestationEtat === "VERT" && vache.derniereSaillie
+                ? differenceInDays(now, new Date(vache.derniereSaillie))
+                : null;
             const categorie = vache.estGenisse
               ? "Génisse"
               : vache.categorie === "A_ENGRAISSER"
@@ -974,9 +979,18 @@ function ReproductionContent() {
                         Écho à faire · {vache.echoRequestOrigine === "AUTOMATIQUE" ? "Auto" : "Manuelle"}
                       </span>
                     )}
-                    <span className={`max-w-28 text-right text-[11px] font-bold leading-tight ${carteEtat.text}`}>
-                      {carteEtat.label}
-                    </span>
+                    {vache.etat === "VERT" ? (
+                      <ReproductionListBadge
+                        etat="VERT"
+                        fallbackLabel={carteEtat.label}
+                        gestationDays={gestationDays}
+                        className="max-w-32 text-[11px]"
+                      />
+                    ) : (
+                      <span className={`max-w-28 text-right text-[11px] font-bold leading-tight ${carteEtat.text}`}>
+                        {carteEtat.label}
+                      </span>
+                    )}
                     <ReproductionStatusEditor
                       animalIds={[vache.id]}
                       currentStatus={vache.etat as EtatGestationPartage}

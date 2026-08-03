@@ -43,7 +43,7 @@ export default async function CalendrierGestationPage() {
           <h1 className="text-xl font-bold text-gray-900">GAEC CESAM — Calendrier de gestation</h1>
           <p className="text-sm text-gray-600">
             Imprimé le {now.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
-            {" · "}{gestationsList.length} vache{gestationsList.length !== 1 ? "s" : ""} pleines
+            {" · "}{gestationsList.length} vache{gestationsList.length !== 1 ? "s" : ""} gestante{gestationsList.length !== 1 ? "s" : ""}
           </p>
         </div>
 
@@ -52,7 +52,7 @@ export default async function CalendrierGestationPage() {
           <div className="flex gap-3 no-print">
             <div className="bg-white rounded-xl shadow px-4 py-3 flex-1 text-center">
               <div className="text-2xl font-bold text-green-700">{gestationsList.length}</div>
-              <div className="text-xs text-gray-500">Vaches pleines</div>
+              <div className="text-xs text-gray-500">Vaches gestantes</div>
             </div>
             <div className={`${VELAGE_IMMINENT_COLORS.surface} rounded-xl shadow px-4 py-3 flex-1 text-center`}>
               <div className={`text-2xl font-bold ${VELAGE_IMMINENT_COLORS.text}`}>{imminentes.length}</div>

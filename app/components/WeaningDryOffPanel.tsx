@@ -12,10 +12,10 @@ import {
 } from "lucide-react";
 import {
   formatAge,
-  getBadgeClass,
   getEtatLabel,
   type EtatGestation,
 } from "@/lib/utils";
+import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 import type {
   WeaningDryOffAction,
   WeaningDryOffCandidate,
@@ -218,13 +218,13 @@ function CandidateLine({
                   Âge du veau · {formatAge(new Date(candidate.calf.birthDate))}
                 </span>
                 {motherReproductionStatus && (
-                  <span
-                    className={`rounded-full px-2 py-1 text-[11px] font-bold ${getBadgeClass(
-                      motherReproductionStatus
-                    )}`}
-                  >
-                    Mère · {getEtatLabel(motherReproductionStatus)}
-                  </span>
+                  <ReproductionListBadge
+                    etat={motherReproductionStatus}
+                    fallbackLabel={getEtatLabel(motherReproductionStatus)}
+                    gestationDays={null}
+                    prefix="Mère · "
+                    className="py-1 text-[11px]"
+                  />
                 )}
               </div>
             </>

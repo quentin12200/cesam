@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import {
   getEtatGestation,
-  getBadgeClass,
   formatAge,
   getCategorie,
   getCategorieLabel,
@@ -23,6 +22,7 @@ import TroupeauTableau, { type AnimalRow } from "./TroupeauTableau";
 import MoreMenu from "./MoreMenu";
 import TroupeauTabs from "@/components/TroupeauTabs";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
+import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 
 interface PageProps {
   searchParams: Promise<{
@@ -539,7 +539,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
               <div className="flex gap-1.5 flex-wrap">
                 {[
                   { value: undefined, label: "Toutes" },
-                  { value: "PLEINE", label: "Pleines" },
+                  { value: "PLEINE", label: "Gestantes" },
                   { value: "VIDE", label: "Vides" },
                   { value: "A_ECO", label: "À écho" },
                 ].map((opt) => (
@@ -727,14 +727,21 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
                           </span>
                         )}
                         {etat && (
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getBadgeClass(etat)}`}>
-                            {etat === "VERT" ? "Pleine"
-                              : etat === "ROSE" ? "Imminente"
-                              : etat === "JAUNE" ? "À écho"
-                              : etat === "GRIS" ? "Saillie récente"
-                              : etat === "REPOS" ? "Repos"
-                              : "Vide"}
-                          </span>
+                          <ReproductionListBadge
+                            etat={etat}
+                            fallbackLabel={
+                              etat === "ROSE" ? "Imminente"
+                                : etat === "JAUNE" ? "À écho"
+                                : etat === "GRIS" ? "Saillie récente"
+                                : etat === "REPOS" ? "Repos"
+                                : "Vide"
+                            }
+                            gestationDays={
+                              etat === "VERT" && animal.saillies[0]?.gestation?.etat === "VERT"
+                                ? differenceInDays(new Date(), animal.saillies[0].date)
+                                : null
+                            }
+                          />
                         )}
                         {animal.demandesEchographie.length > 0 && (
                           <span

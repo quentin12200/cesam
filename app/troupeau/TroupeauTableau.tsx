@@ -3,15 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
+import { differenceInDays } from "date-fns";
 import {
   getCategorie,
   getCategorieLabel,
   getCategorieColor,
   getEtatGestation,
-  getBadgeClass,
   formatAgeCompact,
   type EtatGestation,
 } from "@/lib/utils";
+import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 
 export interface AnimalRow {
   id: string;
@@ -50,7 +51,7 @@ interface FilterOption {
 }
 
 const ETAT_LABEL: Record<string, string> = {
-  VERT: "Pleine",
+  VERT: "Gestante",
   ROSE: "Imminente",
   JAUNE: "À écho",
   GRIS: "En attente",
@@ -72,7 +73,7 @@ const CATS_OPTIONS: FilterOption[] = [
 
 const REPRO_OPTIONS: FilterOption[] = [
   { value: undefined, label: "Tous statuts" },
-  { value: "PLEINE", label: "Pleines" },
+  { value: "PLEINE", label: "Gestantes" },
   { value: "VIDE", label: "Vides" },
   { value: "A_ECO", label: "À échographier" },
 ];
@@ -341,6 +342,10 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
                 animal.veauNutrav && animal.veauStatut === "ACTIF" && !animal.veauSevreFait && !animal.tarieFaite
                   ? animal.veauNutrav
                   : null;
+              const gestationDays =
+                etat === "VERT" && animal.gestationEtat === "VERT" && animal.saillieDate
+                  ? differenceInDays(new Date(), new Date(animal.saillieDate))
+                  : null;
 
               return (
                 <tr
@@ -394,11 +399,11 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
                   <td className="px-3 py-2.5">
                     {etat ? (
                       <div className="flex flex-wrap gap-1">
-                        <span
-                          className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${getBadgeClass(etat)}`}
-                        >
-                          {ETAT_LABEL[etat] ?? etat}
-                        </span>
+                        <ReproductionListBadge
+                          etat={etat}
+                          fallbackLabel={ETAT_LABEL[etat] ?? etat}
+                          gestationDays={gestationDays}
+                        />
                         {animal.aEchographier && etat !== "JAUNE" && (
                           <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full">
                             À écho

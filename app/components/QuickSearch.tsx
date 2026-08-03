@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
-import { VELAGE_IMMINENT_COLORS } from "@/lib/utils";
+import { VELAGE_IMMINENT_COLORS, type EtatGestation } from "@/lib/utils";
+import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 
 interface SearchResult {
   nutrav: string;
@@ -25,7 +26,7 @@ const ETAT_COLORS: Record<string, string> = {
 };
 
 const ETAT_LABELS: Record<string, string> = {
-  VERT: "Pleine",
+  VERT: "Gestante",
   ROSE: "Imminente",
   JAUNE: "À écho",
   ROUGE: "Vide",
@@ -161,9 +162,12 @@ export default function QuickSearch() {
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className="text-xs text-gray-400">{r.ageLabel}</span>
                   {r.etatGestation && (
-                    <span className={`text-xs font-bold text-white px-1.5 py-0.5 rounded-full ${ETAT_COLORS[r.etatGestation] ?? "bg-gray-400"}`}>
-                      {ETAT_LABELS[r.etatGestation] ?? r.etatGestation}
-                    </span>
+                    <ReproductionListBadge
+                      etat={r.etatGestation as EtatGestation}
+                      fallbackLabel={ETAT_LABELS[r.etatGestation] ?? r.etatGestation}
+                      gestationDays={null}
+                      className={r.etatGestation === "VERT" ? "" : ETAT_COLORS[r.etatGestation] ?? "bg-gray-400"}
+                    />
                   )}
                   {r.dernierPoids && (
                     <span className="text-xs text-gray-500">{r.dernierPoids} kg</span>

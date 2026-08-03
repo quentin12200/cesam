@@ -120,7 +120,7 @@ export default async function TroupeauImpressionPage({ searchParams }: PageProps
   if (categorie && categorie !== "TOUS") filterParts.push(categorie.replace(/_/g, " ").toLowerCase());
   if (tarie === "non") filterParts.push("Non taries");
   if (tarie === "oui") filterParts.push("Taries");
-  if (repro === "PLEINE") filterParts.push("Pleines");
+  if (repro === "PLEINE") filterParts.push("Gestantes");
   if (repro === "VIDE") filterParts.push("Vides");
   if (repro === "A_ECO") filterParts.push("À échographier");
   if (q) filterParts.push(`Recherche : "${q}"`);

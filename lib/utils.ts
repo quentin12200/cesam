@@ -138,6 +138,25 @@ export function formatDateShort(date: Date | null | undefined): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Libellé compact de gestation pour les listes et cartes récapitulatives. */
+export function formatGestationDuration(
+  joursGestation: number | null | undefined
+): string {
+  if (
+    joursGestation === null ||
+    joursGestation === undefined ||
+    !Number.isFinite(joursGestation) ||
+    joursGestation < 0
+  ) {
+    return "Gestante";
+  }
+
+  const jours = Math.round(joursGestation);
+  if (jours < 60) return `Gestante ${jours} j`;
+
+  return `Gestante ${Math.max(1, Math.round(jours / 30))} mois`;
+}
+
 export type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
 export const ECHOGRAPHY_WAIT_DAYS = 35;
