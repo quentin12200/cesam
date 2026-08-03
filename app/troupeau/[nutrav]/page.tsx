@@ -996,6 +996,26 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   {animal.velagesVache.map((velage, i) => {
                     const older = animal.velagesVache[i + 1];
                     const ivv = older ? differenceInDays(velage.date, older.date) : null;
+                    const veauxAffiches = velage.veauxDetails.length > 0
+                      ? velage.veauxDetails.map((veau) => ({
+                          key: veau.id,
+                          animal: veau.animal,
+                          nutrav: veau.animal?.nutrav ?? veau.nutrav,
+                          nom: veau.animal?.nobovi ?? veau.nom,
+                          sexe: veau.animal?.sexbov ?? veau.sexe,
+                          statut: veau.statut,
+                        }))
+                      : velage.veau
+                        ? [{
+                            key: `ancien-${velage.veau.nutrav}`,
+                            animal: velage.veau,
+                            nutrav: velage.veau.nutrav,
+                            nom: velage.veau.nobovi,
+                            sexe: velage.veau.sexbov,
+                            statut: "VIVANT",
+                          }]
+                        : [];
+                    const numeroterVeaux = veauxAffiches.length > 1;
                     return (
                       <div key={velage.id} className="border border-gray-100 rounded-lg p-3 text-sm">
                         <div className="flex items-center justify-between">
@@ -1019,37 +1039,43 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                             </span>
                           </div>
                         </div>
-                        {velage.veau && velage.veauxDetails.length === 0 && (
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <Link
-                              href={`/troupeau/${velage.veau.nutrav}`}
-                              className="font-mono font-bold text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded hover:underline"
-                            >
-                              {velage.veau.nutrav}
-                            </Link>
-                            {velage.veau.nobovi && (
-                              <span className="text-xs text-gray-700">{velage.veau.nobovi}</span>
-                            )}
-                            <span className="text-xs text-gray-400">
-                              {velage.veau.sexbov === "M" ? "♂ Mâle" : "♀ Femelle"}
-                            </span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                              velage.veau.statut === "ACTIF"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-500"
-                            }`}>
-                              {velage.veau.statut === "ACTIF" ? "Présent" : "Sorti"}
-                            </span>
-                          </div>
-                        )}
-                        {velage.veauxDetails.length > 0 && (
+                        {veauxAffiches.length > 0 && (
                           <div className="mt-1.5 space-y-1">
-                            {velage.veauxDetails.map((veau, index) => (
-                              <div key={veau.id} className="flex items-center gap-2 text-xs text-gray-600">
-                                <span>Veau {index + 1}:</span>
-                                {veau.animal ? <Link href={`/troupeau/${veau.animal.nutrav}`} className="font-mono font-bold text-green-700 hover:underline">{veau.animal.nutrav}</Link> : <span className="font-mono">{veau.nutrav ?? veau.nom ?? "sans numéro"}</span>}
-                                <span>{veau.sexe === "M" ? "♂ Mâle" : veau.sexe === "F" ? "♀ Femelle" : "Sexe inconnu"}</span>
-                                <span className={veau.statut === "MORT_NE" ? "text-gray-700 font-medium" : "text-green-700"}>{veau.statut === "MORT_NE" ? "Mort-né" : "Vivant"}</span>
+                            {veauxAffiches.map((veau, index) => (
+                              <div
+                                key={veau.key}
+                                className={`flex items-center gap-2 text-xs text-gray-600 ${numeroterVeaux ? "" : "flex-wrap"}`}
+                              >
+                                {numeroterVeaux && <span>Veau {index + 1}:</span>}
+                                {veau.animal ? (
+                                  <Link
+                                    href={`/troupeau/${veau.animal.nutrav}`}
+                                    className={numeroterVeaux
+                                      ? "font-mono font-bold text-green-700 hover:underline"
+                                      : "rounded bg-green-100 px-1.5 py-0.5 font-mono font-bold text-green-700 hover:underline"}
+                                  >
+                                    {veau.animal.nutrav}
+                                  </Link>
+                                ) : (
+                                  <span className={numeroterVeaux ? "font-mono" : "font-mono font-bold"}>
+                                    {veau.nutrav ?? veau.nom ?? "sans numéro"}
+                                  </span>
+                                )}
+                                {veau.nom && (veau.animal || veau.nutrav) && (
+                                  <span className="text-gray-700">{veau.nom}</span>
+                                )}
+                                <span className="text-gray-400">
+                                  {veau.sexe === "M" ? "♂ Mâle" : veau.sexe === "F" ? "♀ Femelle" : "Sexe inconnu"}
+                                </span>
+                                <span className={numeroterVeaux
+                                  ? veau.statut === "MORT_NE" ? "font-medium text-gray-700" : "text-green-700"
+                                  : `rounded-full px-1.5 py-0.5 ${
+                                      veau.statut === "MORT_NE"
+                                        ? "bg-gray-100 font-medium text-gray-700"
+                                        : "bg-green-100 text-green-700"
+                                    }`}>
+                                  {veau.statut === "MORT_NE" ? "Mort-né" : "Vivant"}
+                                </span>
                               </div>
                             ))}
                           </div>

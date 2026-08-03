@@ -60,12 +60,17 @@ export default function VelageActions({ velageId, returnTo }: Props) {
   return (
     <>
       <RecordActionsMenu
-        onEdit={() => window.location.assign(buildVelageEditHref(velageId, returnTo))}
-        actions={[{
-          label: "Supprimer",
-          tone: "danger",
-          onSelect: loadDeletionPreview,
-        }]}
+        actions={[
+          {
+            label: "Modifier",
+            onSelect: () => window.location.assign(buildVelageEditHref(velageId, returnTo)),
+          },
+          {
+            label: "Supprimer",
+            tone: "danger",
+            onSelect: loadDeletionPreview,
+          },
+        ]}
       />
 
       {open && (
