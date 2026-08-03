@@ -32,6 +32,7 @@ import {
   Clock,
   Printer,
   GitBranch,
+  Pencil,
 } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import EditAnimalDrawer from "./EditAnimalDrawer";
@@ -49,7 +50,6 @@ import ReproductiveCyclePreview, {
 import GroupeButton from "./GroupeButton";
 import EvenementsSection from "./EvenementsSection";
 import DeleteHistoriqueButton from "./DeleteHistoriqueButton";
-import LierVeauButton from "./LierVeauButton";
 import ReproductionStatusEditor from "@/components/ReproductionStatusEditor";
 import type { EtatGestation } from "@/lib/utils";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
@@ -160,6 +160,12 @@ async function getAnimal(nutrav: string) {
           vache: { select: { nutrav: true, nobovi: true } },
         },
       },
+      veauxVelage: {
+        take: 1,
+        include: {
+          velage: { include: { vache: { select: { nutrav: true, nobovi: true } } } },
+        },
+      },
       saillies: {
         orderBy: { date: "desc" },
         include: { gestation: true, taureau: true },
@@ -183,6 +189,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   ]);
 
   if (!animal) notFound();
+  const birthVelage = animal.velageVeau ?? animal.veauxVelage[0]?.velage ?? null;
   const lastCalving = animal.velagesVache[0]?.date ?? null;
   const currentBreeding = getCurrentCycleBreeding(animal.saillies, lastCalving);
   const activeEchoRequest = animal.demandesEchographie[0] ?? null;
@@ -495,7 +502,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             </div>
 
             {/* Naissance (si c'est un veau) */}
-            {animal.velageVeau && (
+            {birthVelage && (
               <div className="bg-white rounded-xl shadow p-3">
                 <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                   <Baby size={16} className="text-pink-500" />
@@ -504,19 +511,19 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500">Date</span>
-                    <span>{formatDate(animal.velageVeau.date)}</span>
+                    <span>{formatDate(birthVelage.date)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500">Mère</span>
                     <Link
-                      href={`/troupeau/${animal.velageVeau.vache.nutrav}`}
+                      href={`/troupeau/${birthVelage.vache.nutrav}`}
                       className="text-green-700 font-medium hover:underline flex items-center gap-1"
                     >
                       <span className="font-mono text-xs bg-green-100 px-1.5 py-0.5 rounded">
-                        {animal.velageVeau.vache.nutrav}
+                        {birthVelage.vache.nutrav}
                       </span>
-                      {animal.velageVeau.vache.nobovi && (
-                        <span>{animal.velageVeau.vache.nobovi}</span>
+                      {birthVelage.vache.nobovi && (
+                        <span>{birthVelage.vache.nobovi}</span>
                       )}
                     </Link>
                   </div>
@@ -524,20 +531,21 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     <span className="text-gray-500">Qualificatif</span>
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        animal.velageVeau.qualificatif === "NORMAL"
+                        birthVelage.qualificatif === "NORMAL"
                           ? "bg-green-100 text-green-700"
                           : "bg-yellow-100 text-yellow-700"
                       }`}
                     >
-                      {animal.velageVeau.qualificatif}
+                      {birthVelage.qualificatif}
                     </span>
                   </div>
-                  {animal.velageVeau.pereNom && (
+                  {birthVelage.pereNom && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Père (déclaré)</span>
-                      <span className="font-medium">{animal.velageVeau.pereNom}</span>
+                      <span className="font-medium">{birthVelage.pereNom}</span>
                     </div>
                   )}
+                  <Link href={`/velage?modifier=${birthVelage.id}&returnTo=${encodeURIComponent(`/troupeau/${animal.nutrav}`)}`} className="mt-2 flex min-h-11 items-center justify-center rounded-lg border border-pink-200 bg-pink-50 px-3 text-sm font-semibold text-pink-800">Voir le vêlage</Link>
                 </div>
               </div>
             )}
@@ -1050,14 +1058,10 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                           <div className="text-xs text-gray-500 mt-1">Père: {velage.pereNom}</div>
                         )}
                         {velage.capteur && <div className="text-xs text-gray-500 mt-1">Capteur utilisé : {velage.capteur}</div>}
-                        {!velage.veau && velage.veauxDetails.length === 0 && (
-                          <LierVeauButton velageId={velage.id} />
-                        )}
-                        <DeleteHistoriqueButton
-                          endpoint={`/api/velages/${velage.id}`}
-                          label="🗑 Supprimer ce vêlage"
-                          confirmLabel="Supprimer ce vêlage ?"
-                        />
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <Link href={`/velage?modifier=${velage.id}&returnTo=${encodeURIComponent(`/troupeau/${animal.nutrav}?onglet=reproduction`)}`} className="flex min-h-11 items-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 px-3 text-xs font-semibold text-pink-800"><Pencil size={14} /> Modifier</Link>
+                          <span className="max-w-sm text-[11px] leading-4 text-gray-500">La suppression sécurisée d’un vêlage avec veaux liés sera améliorée séparément.</span>
+                        </div>
                       </div>
                     );
                   })}

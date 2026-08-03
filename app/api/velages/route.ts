@@ -12,7 +12,7 @@ type VeauSaisi = { nutrav?: string; nunati?: string; sexe?: "M" | "F"; nom?: str
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { vacheNutrav, date, sousType, capteur, pereNom } = body;
+    const { vacheNutrav, date, moment, sousType, capteur, pereNom, notes } = body;
     const qualificatif = ["NORMAL", "DIFFICILE", "AVORTEMENT", "MORT_NEE"].includes(body.qualificatif) ? body.qualificatif : "NORMAL";
     if (!vacheNutrav || !date) return NextResponse.json({ error: "La vache et la date sont requises" }, { status: 400 });
 
@@ -75,10 +75,10 @@ export async function POST(request: NextRequest) {
     const premierVivant = resolus.find((v) => v.saisi.statut === "VIVANT" && v.animalId);
     const velage = await prisma.$transaction(async (tx) => {
       const cree = await tx.velage.create({ data: {
-        vacheId: vache.id, veauId: premierVivant?.animalId ?? null, date: new Date(date), qualificatif,
+        vacheId: vache.id, veauId: premierVivant?.animalId ?? null, date: new Date(date), moment: moment?.trim() || null, qualificatif,
         sousType: sousType ?? (qualificatif === "NORMAL" ? "SEULE" : null), capteur: capteur ?? null,
         pereNom: pereNom ?? null, pereNunati: gestation?.saillie.taureau?.nupere ?? null,
-        jumeaux: veaux.length === 2, nombreVeaux: veaux.length, gestationId: gestation?.id ?? null,
+        jumeaux: veaux.length === 2, nombreVeaux: veaux.length, gestationId: gestation?.id ?? null, notes: notes?.trim() || null,
         veauxDetails: { create: resolus.map((v) => ({ animalId: v.animalId, nutrav: v.saisi.nutrav ?? null, nunati: v.saisi.nunati ?? null, nom: v.saisi.nom ?? null, sexe: v.saisi.sexe ?? null, statut: v.saisi.statut ?? "VIVANT" })) },
       } });
       if (gestation) await tx.gestation.update({ where: { id: gestation.id }, data: { etat: "VELAGE" } });
