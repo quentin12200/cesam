@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Beef, CalendarDays, Check, ChevronDown, Milk, Pencil, Syringe } from "lucide-react";
+import { AlertTriangle, Beef, CalendarDays, Check, ChevronDown, Milk, Pencil, RotateCcw, Syringe } from "lucide-react";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import type { MedicamentCorrespondant, MedicamentPropose } from "@/lib/ordonnance-types";
 import {
@@ -84,6 +84,7 @@ export default function MedicamentVerificationCard({
   const [editing, setEditing] = useState(false);
   const [validated, setValidated] = useState(false);
   const [associating, setAssociating] = useState(false);
+  const [absenceConfirmee, setAbsenceConfirmee] = useState(false);
   const match = med.ia?.medicationMatches.find((item) => item.id === med.medicationId)
     ?? (med.medicationId ? med.ia?.medicationMatch : null)
     ?? pharmacyOptions.find((item) => item.id === med.medicationId);
@@ -94,16 +95,14 @@ export default function MedicamentVerificationCard({
   const renouvellement = formaterRenouvellement(med);
   const voie = formaterVoie(med.voie);
   const voieCompacte = /^[a-z]{2,3}$/i.test(med.voie.trim()) ? med.voie.toUpperCase() : voie;
-  const protocoleCompact = [
+  const rythmeEtDuree = [
     rythme,
     med.treatmentDurationDays
       ? `${med.treatmentDurationDays} jour${med.treatmentDurationDays === "1" ? "" : "s"}`
       : null,
-    renouvellement,
-  ].filter(Boolean).join(", ");
+  ].filter(Boolean).join(" • ");
   const nomAffiche = match?.nom ?? (med.medicamentNom || `Médicament ${index + 1}`);
   const delaisComplets = med.meatDays || med.offalDays || med.milkDays;
-  const viandeEtAbats = med.meatDays && med.offalDays && med.meatDays === med.offalDays;
   const lectureAVerifier = Boolean(med.ia && Object.values(med.ia.evidence).some(
     (evidence) => evidence.confidence < 0.7 || !evidence.sourceText,
   ));
@@ -111,6 +110,13 @@ export default function MedicamentVerificationCard({
   const change = (field: keyof MedicationFields, value: string) => {
     setValidated(false);
     onChange(field, value);
+  };
+
+  const choisirAssociation = (id: string) => {
+    setValidated(false);
+    setAssociating(false);
+    setAbsenceConfirmee(false);
+    onUseMatch(id);
   };
 
   return (
@@ -142,10 +148,13 @@ export default function MedicamentVerificationCard({
 
       <div className="mt-3 space-y-1.5 text-sm text-gray-800">
         {(voieCompacte || dose) && (
-          <p className="flex items-center gap-2"><Syringe size={15} className="shrink-0 text-green-700" /> {[voieCompacte, dose].filter(Boolean).join(" · ")}</p>
+          <p className="flex items-center gap-2"><Syringe size={15} className="shrink-0 text-green-700" /> {[voieCompacte, dose].filter(Boolean).join(" • ")}</p>
         )}
-        {protocoleCompact && (
-          <p className="flex items-start gap-2"><CalendarDays size={15} className="mt-0.5 shrink-0 text-blue-700" /> {protocoleCompact}</p>
+        {rythmeEtDuree && (
+          <p className="flex items-start gap-2"><CalendarDays size={15} className="mt-0.5 shrink-0 text-blue-700" /> {rythmeEtDuree}</p>
+        )}
+        {renouvellement && (
+          <p className="flex items-start gap-2"><RotateCcw size={15} className="mt-0.5 shrink-0 text-violet-700" /> {renouvellement}</p>
         )}
       </div>
 
@@ -154,28 +163,36 @@ export default function MedicamentVerificationCard({
         {delaisComplets ? (
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
             {(med.meatDays || med.offalDays) && (
-              <span className="inline-flex items-center gap-1"><Beef size={13} /> {viandeEtAbats
-                ? `Viande et abats ${med.meatDays} j`
-                : [med.meatDays && `Viande ${med.meatDays} j`, med.offalDays && `Abats ${med.offalDays} j`].filter(Boolean).join(" · ")}</span>
+              <span className="inline-flex items-center gap-1"><Beef size={13} /> {[med.meatDays && `Viande : ${med.meatDays} j`, med.offalDays && `Abats : ${med.offalDays} j`].filter(Boolean).join(" • ")}</span>
             )}
-            {med.milkDays && <span className="inline-flex items-center gap-1"><Milk size={13} /> Lait {med.milkDays} j</span>}
+            {med.milkDays && <span className="inline-flex items-center gap-1"><Milk size={13} /> Lait : {med.milkDays} j</span>}
           </div>
         ) : <p className="mt-0.5 text-orange-800">Délai non détecté — à vérifier</p>}
       </div>
 
       {med.medicationId ? (
         <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-900">
-          <p className="font-semibold">✓ Fiche pharmacie reconnue</p>
-          <p className="mt-0.5 text-green-800">
-            {[match?.nom, match?.categorieLabel, match?.dci, match?.forme ?? match?.voie].filter(Boolean).join(" · ")}
-          </p>
+          <p className="font-semibold">✅ Médicament reconnu</p>
+          {match?.categorieLabel && <p className="mt-0.5 text-green-800">{match.categorieLabel}</p>}
+          <button type="button" onClick={() => setAssociating((value) => !value)} className="mt-1 text-[11px] font-medium text-green-700 underline-offset-2 hover:underline">
+            Changer d’association
+          </button>
+          {associating && (
+            <select
+              value={med.medicationId}
+              onChange={(event) => event.target.value && choisirAssociation(event.target.value)}
+              className="mt-2 min-h-9 w-full rounded-lg border border-green-200 bg-white px-2 text-xs"
+            >
+              {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}</option>)}
+            </select>
+          )}
         </div>
       ) : med.ia && med.ia.medicationMatches.length > 0 ? (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
           <p className="flex items-center gap-2 font-semibold"><AlertTriangle size={15} /> Plusieurs correspondances possibles — à confirmer</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {med.ia.medicationMatches.map((candidate) => (
-              <button key={candidate.id} type="button" onClick={() => { setValidated(false); onUseMatch(candidate.id); }} className="min-h-9 rounded-lg border border-amber-400 bg-white px-3 font-semibold">
+              <button key={candidate.id} type="button" onClick={() => choisirAssociation(candidate.id)} className="min-h-9 rounded-lg border border-amber-400 bg-white px-3 font-semibold">
                 Utiliser cette fiche : {candidate.nom}
               </button>
             ))}
@@ -183,24 +200,31 @@ export default function MedicamentVerificationCard({
         </div>
       ) : (
         <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
-          <p className="font-semibold text-gray-900">Médicament non reconnu dans votre pharmacie</p>
+          <p className="font-semibold text-gray-900">⚠ Médicament non reconnu</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" onClick={() => setAssociating((value) => !value)} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
-              Associer à un médicament existant
+              Associer à une fiche existante
             </button>
-            <button type="button" onClick={() => { setValidated(false); onDecision({ medicationId: "", createMedication: !med.createMedication }); }} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
-              {med.createMedication ? "Création confirmée" : "Créer une fiche"}
-            </button>
+            {absenceConfirmee && (
+              <button type="button" onClick={() => { setValidated(false); onDecision({ medicationId: "", createMedication: !med.createMedication }); }} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
+                {med.createMedication ? "Création confirmée" : "Créer une fiche"}
+              </button>
+            )}
           </div>
           {associating && (
-            <select
-              defaultValue=""
-              onChange={(event) => { if (event.target.value) { setValidated(false); onUseMatch(event.target.value); } }}
-              className="mt-2 min-h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm"
-            >
-              <option value="">Choisir dans la pharmacie…</option>
-              {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}</option>)}
-            </select>
+            <div className="mt-2 space-y-2">
+              <select
+                defaultValue=""
+                onChange={(event) => event.target.value && choisirAssociation(event.target.value)}
+                className="min-h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm"
+              >
+                <option value="">Choisir dans la pharmacie…</option>
+                {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}</option>)}
+              </select>
+              <button type="button" onClick={() => { setAssociating(false); setAbsenceConfirmee(true); }} className="text-[11px] font-medium text-gray-500 underline-offset-2 hover:underline">
+                Aucune fiche ne correspond
+              </button>
+            </div>
           )}
         </div>
       )}

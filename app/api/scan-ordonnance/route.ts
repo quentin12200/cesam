@@ -75,8 +75,9 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
 
 Regles obligatoires :
 - Associe chaque date a son libelle proche. La date pres de "derniere visite" est lastVisitDate et jamais prescriptionDate.
-- La date de l'ordonnance est prioritairement celle du bloc "ordonnance n ..." suivi de "le JJ/MM/AAAA".
+- La date de l'ordonnance est exclusivement celle du bloc "ordonnance n ..." suivi de "le JJ/MM/AAAA".
   evidence.prescriptionDate.sourceText doit conserver ensemble le numero d'ordonnance et cette date.
+- Si ce bloc complet n'est pas lisible, prescriptionDate reste null : n'utilise aucune autre date par defaut.
 - Ne corrige jamais le mois d'une date lisible : "01/06/2026" signifie le 1er juin, pas le 1er avril.
 - Une date isolee sans libelle ni proximite semantique certaine reste non classee.
 - deliveryDate reste null sauf si la date est explicitement associee a une mention de delivrance
@@ -94,6 +95,8 @@ Regles obligatoires :
   de renouvellement. administrationInstructions contient uniquement les consignes pratiques (agiter,
   nettoyer, position du flacon, parage, seringue, ponctions), jamais la frequence.
 - Les nombres des delais viande, abats ou lait ne sont jamais une duree de traitement.
+- Recherche et conserve separement les trois delais meatDays, offalDays et milkDays lorsqu'ils sont ecrits.
+  "viande et abats : 21 jours, lait : 7 jours" signifie meatDays=21, offalDays=21 et milkDays=7.
 - Pour chaque champ important, fournis le texte source et une confiance entre 0 et 1.
 - Si une information n'est pas lisible, mets null.`;
 

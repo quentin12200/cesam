@@ -79,6 +79,34 @@ test("prend la date lisible du bloc ordonnance plutot qu'une valeur IA erronee",
   assert.notEqual(dates.prescriptionDate, "2026-04-01");
 });
 
+test("prend exclusivement la date placee apres le numero d'ordonnance", () => {
+  const dates = normaliserAnalyseOrdonnance({
+    dates: { prescriptionDate: "2026-04-14" },
+    evidence: {
+      prescriptionDate: {
+        value: "2026-04-14",
+        sourceText: "Dernière visite le 14/04/2026 — ordonnance n°26-06-0002[V] le 01/06/2026 — délivré ce jour",
+        confidence: 0.99,
+      },
+      deliveryDate: { value: null, sourceText: "Délivré ce jour", confidence: 0.98 },
+    },
+    medicaments: [{ medicamentNom: "TENALINE" }],
+  });
+  assert.equal(dates.prescriptionDate, "2026-06-01");
+  assert.equal(dates.deliveryDate, "2026-06-01");
+});
+
+test("refuse une date de prescription sans numero d'ordonnance adjacent", () => {
+  const dates = normaliserAnalyseOrdonnance({
+    dates: { prescriptionDate: "2026-04-14" },
+    evidence: {
+      prescriptionDate: { value: "2026-04-14", sourceText: "Prescription le 14/04/2026", confidence: 0.99 },
+    },
+    medicaments: [{ medicamentNom: "TENALINE" }],
+  });
+  assert.equal(dates.prescriptionDate, null);
+});
+
 test("affiche la date en francais apres son classement", () => {
   const date = new Date("2026-06-01T12:00:00.000Z");
   assert.equal(date.toLocaleDateString("fr-FR", {
@@ -109,6 +137,16 @@ test("separe le protocole des delais d'attente", () => {
   assert.equal(med.administrationCount, 1);
   assert.equal(med.administrationIntervalHours, 72);
   assert.equal(med.treatmentDurationDays, null);
+  assert.deepEqual(med.withdrawalPeriods, { meatDays: 21, offalDays: 21, milkDays: 7 });
+});
+
+test("conserve les trois delais d'attente detectes", () => {
+  const med = normaliserAnalyseOrdonnance({
+    medicaments: [{
+      medicamentNom: "TENALINE",
+      withdrawalPeriods: { meatDays: 21, offalDays: 21, milkDays: 7 },
+    }],
+  }).medicaments![0];
   assert.deepEqual(med.withdrawalPeriods, { meatDays: 21, offalDays: 21, milkDays: 7 });
 });
 

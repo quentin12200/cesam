@@ -40,19 +40,30 @@ test("la carte principale est compacte et les donnees techniques sont repliees",
 });
 
 test("la carte separe pharmacie, dose, rythme et instructions", () => {
-  assert.match(medicationCard, /✓ Fiche pharmacie reconnue/);
-  assert.match(medicationCard, /Médicament non reconnu dans votre pharmacie/);
-  assert.match(medicationCard, /Associer à un médicament existant/);
+  assert.match(medicationCard, /✅ Médicament reconnu/);
+  assert.match(medicationCard, /⚠ Médicament non reconnu/);
+  assert.match(medicationCard, /Associer à une fiche existante/);
   assert.match(medicationCard, /Créer une fiche/);
+  assert.match(medicationCard, /Changer d’association/);
+  assert.match(medicationCard, /absenceConfirmee &&/);
   assert.match(medicationCard, /formaterDoseCompacte/);
-  assert.match(medicationCard, /protocoleCompact/);
+  assert.match(medicationCard, /rythmeEtDuree/);
+  assert.match(medicationCard, /RotateCcw/);
   assert.match(medicationCard, /label="Instructions"/);
 });
 
 test("les delais viande abats et lait ne sont pas melanges", () => {
-  assert.match(medicationCard, /Viande et abats/);
-  assert.match(medicationCard, /Lait \{med\.milkDays\} j/);
+  assert.match(medicationCard, /Viande : \$\{med\.meatDays\} j/);
+  assert.match(medicationCard, /Abats : \$\{med\.offalDays\} j/);
+  assert.match(medicationCard, /Lait : \{med\.milkDays\} j/);
   assert.doesNotMatch(medicationCard, /Abats \{med\.milkDays\}/);
+});
+
+test("le resume final ne montre plus les anciens compteurs techniques", () => {
+  assert.match(verification, /Médicaments reconnus : \{medicamentsRattaches\}/);
+  assert.match(verification, /À vérifier : \{medicamentsAConfirmer\}/);
+  assert.match(verification, /Tous les médicaments sont prêts à être enregistrés/);
+  assert.doesNotMatch(verification, /rattaché\{medicamentsRattaches/);
 });
 
 test("une carte est rendue pour chaque medicament", () => {

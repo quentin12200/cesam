@@ -36,8 +36,8 @@ test("formate la posologie ponderale en une phrase compacte", () => {
 
 test("rend la voie et le protocole lisibles", () => {
   assert.equal(formaterVoie("IM"), "Intramusculaire");
-  assert.equal(formaterRythme({ administrationCount: "1", administrationInstructions: "" }), "1 injection");
-  assert.equal(formaterRenouvellement({ administrationIntervalHours: "72", repeatCondition: "si les signes persistent" }), "renouvelable après 72 h si les signes persistent");
+  assert.equal(formaterRythme({ administrationCount: "1", administrationInstructions: "" }), "Injection unique");
+  assert.equal(formaterRenouvellement({ administrationIntervalHours: "72", repeatCondition: "si les signes persistent" }), "Renouvelable après 72 h si les signes persistent");
 });
 
 test("privilegie la dose pratique en volume dans le resume", () => {

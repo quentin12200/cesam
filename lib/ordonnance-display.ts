@@ -78,7 +78,7 @@ export function formaterRythme(med: {
   administrationCount: string;
   administrationInstructions: string;
 }): string | null {
-  if (med.administrationCount === "1") return "1 injection";
+  if (med.administrationCount === "1") return "Injection unique";
   if (med.administrationCount) return `${med.administrationCount} injections`;
   const instructions = med.administrationInstructions.trim();
   if (instructions && !estInstructionPratique(instructions) && instructions.length <= 60) return instructions;
@@ -96,8 +96,8 @@ export function formaterRenouvellement(med: {
       .test(sansAccents(condition));
     if (intervalleDejaPresent) return condition;
     return condition
-      ? `renouvelable après ${med.administrationIntervalHours} h ${condition}`
-      : `renouvelable après ${med.administrationIntervalHours} h`;
+      ? `Renouvelable après ${med.administrationIntervalHours} h ${condition}`
+      : `Renouvelable après ${med.administrationIntervalHours} h`;
   }
   return condition || null;
 }

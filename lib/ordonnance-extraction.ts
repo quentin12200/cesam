@@ -7,10 +7,10 @@ import type {
 } from "./ordonnance-types.ts";
 import { medicamentVide } from "./ordonnance-types.ts";
 import {
-  extraireDateFrancaise,
-  securiserDateDelivrance,
+  extraireDateDelivrance,
+  extraireDateDerniereVisite,
+  extraireDateOrdonnance,
   sourceIndiqueDelivreCeJour,
-  sourceJustifieDateDelivrance,
 } from "./ordonnance-dates.ts";
 
 export interface MedicamentCandidat {
@@ -78,10 +78,11 @@ export function normaliserNomMedicament(value: string): string {
     .replace(/\s+/g, " ");
 }
 
-function classerDates(
-  p: Record<string, unknown>,
-  dates: Record<string, unknown>,
-): { prescriptionDate: string | null; lastVisitDate: string | null; deliveryDate: string | null } {
+function classerDates(p: Record<string, unknown>): {
+  prescriptionDate: string | null;
+  lastVisitDate: string | null;
+  deliveryDate: string | null;
+} {
   let prescriptionDate: string | null = null;
   let lastVisitDate: string | null = null;
   let deliveryDate: string | null = null;
@@ -92,50 +93,42 @@ function classerDates(
 
   const classer = (
     source: string | null | undefined,
-    value: string | null,
     confidence = 0,
   ) => {
-    const contexte = normaliserNomMedicament(source ?? "");
-    const dateSource = extraireDateFrancaise(source);
-    const date = dateSource ?? value;
-    if (!date) return;
-    const score = (dateSource ? 100 : 80) + confidence;
-    if (contexte.includes("DERNIERE VISITE") && score > scoreVisite) {
-      lastVisitDate = date;
+    const dateOrdonnance = extraireDateOrdonnance(source);
+    const dateVisite = extraireDateDerniereVisite(source);
+    const dateDelivrance = extraireDateDelivrance(source);
+    const score = 100 + confidence;
+    if (dateOrdonnance && score > scorePrescription) {
+      prescriptionDate = dateOrdonnance;
+      scorePrescription = score;
+      return;
+    }
+    if (dateVisite && score > scoreVisite) {
+      lastVisitDate = dateVisite;
       scoreVisite = score;
       return;
     }
-    if (sourceJustifieDateDelivrance(source) && !sourceIndiqueDelivreCeJour(source) && score > scoreDelivrance) {
-      deliveryDate = date;
+    if (dateDelivrance && score > scoreDelivrance) {
+      deliveryDate = dateDelivrance;
       scoreDelivrance = score;
-      return;
-    }
-    if ((contexte.includes("ORDONNANCE") || contexte.includes("PRESCRIPTION")) && score > scorePrescription) {
-      prescriptionDate = date;
-      scorePrescription = score;
     }
   };
 
   classer(
     evidence.prescriptionDate?.sourceText,
-    texte(dates.prescriptionDate ?? p.dateDebut),
     evidence.prescriptionDate?.confidence,
   );
-  classer(evidence.lastVisitDate?.sourceText, texte(dates.lastVisitDate), evidence.lastVisitDate?.confidence);
+  classer(evidence.lastVisitDate?.sourceText, evidence.lastVisitDate?.confidence);
   const delivreCeJour = sourceIndiqueDelivreCeJour(evidence.deliveryDate?.sourceText);
-  classer(
-    evidence.deliveryDate?.sourceText,
-    delivreCeJour ? null : securiserDateDelivrance(texte(dates.deliveryDate), evidence.deliveryDate),
-    evidence.deliveryDate?.confidence,
-  );
+  classer(evidence.deliveryDate?.sourceText, evidence.deliveryDate?.confidence);
 
   if (Array.isArray(p.dateCandidates)) {
     for (const raw of p.dateCandidates) {
       if (!raw || typeof raw !== "object") continue;
       const candidate = raw as Record<string, unknown>;
-      const value = texte(candidate.value);
       const source = texte(candidate.sourceText) ?? "";
-      classer(source, value, nombre(candidate.confidence) ?? 0);
+      classer(source, nombre(candidate.confidence) ?? 0);
     }
   }
   if (!deliveryDate && prescriptionDate && delivreCeJour) {
@@ -228,8 +221,7 @@ export function normaliserAnalyseOrdonnance(
   candidats: MedicamentCandidat[] = [],
 ): PropositionOrdonnance {
   const p = parsed && typeof parsed === "object" ? parsed : {};
-  const dates = (p.dates && typeof p.dates === "object" ? p.dates : p) as Record<string, unknown>;
-  const datesClassees = classerDates(p, dates);
+  const datesClassees = classerDates(p);
   const medicamentsBruts = Array.isArray(p.medicaments) ? p.medicaments : [p];
 
   const medicaments = medicamentsBruts.map((raw) => {

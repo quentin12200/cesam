@@ -152,9 +152,9 @@ export default function VerificationOrdonnanceClient({
         categorie: match.categorieLabel,
         formePharmaceutique: match.forme ?? med.formePharmaceutique,
         voie: match.voie ?? med.voie,
-        meatDays: s(match.delaiAttenteViandeJ ?? med.meatDays),
-        offalDays: s(match.delaiAttenteViandeJ ?? med.offalDays),
-        milkDays: s(match.delaiAttenteLaitJ ?? med.milkDays),
+        meatDays: med.meatDays || s(match.delaiAttenteViandeJ),
+        offalDays: med.offalDays || s(match.delaiAttenteViandeJ),
+        milkDays: med.milkDays || s(match.delaiAttenteLaitJ),
       };
     }));
   }
@@ -281,9 +281,12 @@ export default function VerificationOrdonnanceClient({
           </button>
 
           {error && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-          <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700">
-            {medicaments.length} médicament{medicaments.length > 1 ? "s" : ""} · {medicamentsRattaches} rattaché{medicamentsRattaches > 1 ? "s" : ""} · {medicamentsACreer} à créer · {medicamentsAConfirmer} à vérifier
-            {medicamentsAConfirmer > 0 && <p className="mt-1 font-semibold text-amber-800">Choisissez une fiche ou confirmez la création avant de valider.</p>}
+          <div className="mt-3 space-y-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700">
+            <p>🟢 Médicaments reconnus : {medicamentsRattaches}</p>
+            <p>🟠 À vérifier : {medicamentsAConfirmer}</p>
+            {medicamentsAConfirmer === 0
+              ? <p className="font-semibold text-green-800">✅ Tous les médicaments sont prêts à être enregistrés.</p>
+              : <p className="font-semibold text-amber-800">Choisissez une fiche ou confirmez la création avant de valider.</p>}
           </div>
           <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Link href={returnTo ?? "/ordonnances"} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-600">Vérifier plus tard</Link>
