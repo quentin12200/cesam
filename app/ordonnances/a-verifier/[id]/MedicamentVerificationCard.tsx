@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, Pencil } from "lucide-react";
+import { AlertTriangle, Beef, CalendarDays, Check, ChevronDown, Milk, Pencil, Syringe } from "lucide-react";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
-import type { MedicamentPropose } from "@/lib/ordonnance-types";
+import type { MedicamentCorrespondant, MedicamentPropose } from "@/lib/ordonnance-types";
 import {
   analyserPresentation,
   formaterDose,
+  formaterDoseCompacte,
   formaterRenouvellement,
   formaterRythme,
   formaterVoie,
@@ -69,6 +70,7 @@ export default function MedicamentVerificationCard({
   onDecision,
   onUseMatch,
   onRemove,
+  pharmacyOptions,
 }: {
   med: MedicationFields;
   index: number;
@@ -77,19 +79,34 @@ export default function MedicamentVerificationCard({
   onDecision: (values: Partial<Pick<MedicationFields, "medicationId" | "createMedication" | "categoryConfirmed">>) => void;
   onUseMatch: (matchId?: string) => void;
   onRemove: () => void;
+  pharmacyOptions: MedicamentCorrespondant[];
 }) {
   const [editing, setEditing] = useState(false);
   const [validated, setValidated] = useState(false);
+  const [associating, setAssociating] = useState(false);
   const match = med.ia?.medicationMatches.find((item) => item.id === med.medicationId)
-    ?? (med.medicationId ? med.ia?.medicationMatch : null);
+    ?? (med.medicationId ? med.ia?.medicationMatch : null)
+    ?? pharmacyOptions.find((item) => item.id === med.medicationId);
   const presentation = analyserPresentation(med.conditionnement);
-  const dose = formaterDose(med);
+  const dose = formaterDoseCompacte(med);
+  const doseDetaillee = formaterDose(med);
   const rythme = formaterRythme(med);
   const renouvellement = formaterRenouvellement(med);
   const voie = formaterVoie(med.voie);
+  const voieCompacte = /^[a-z]{2,3}$/i.test(med.voie.trim()) ? med.voie.toUpperCase() : voie;
+  const protocoleCompact = [
+    rythme,
+    med.treatmentDurationDays
+      ? `${med.treatmentDurationDays} jour${med.treatmentDurationDays === "1" ? "" : "s"}`
+      : null,
+    renouvellement,
+  ].filter(Boolean).join(", ");
   const nomAffiche = match?.nom ?? (med.medicamentNom || `Médicament ${index + 1}`);
   const delaisComplets = med.meatDays || med.offalDays || med.milkDays;
   const viandeEtAbats = med.meatDays && med.offalDays && med.meatDays === med.offalDays;
+  const lectureAVerifier = Boolean(med.ia && Object.values(med.ia.evidence).some(
+    (evidence) => evidence.confidence < 0.7 || !evidence.sourceText,
+  ));
 
   const change = (field: keyof MedicationFields, value: string) => {
     setValidated(false);
@@ -100,7 +117,10 @@ export default function MedicamentVerificationCard({
     <article className={`rounded-xl border bg-white p-3 shadow-sm ${validated ? "border-green-300" : "border-gray-200"}`}>
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Médicament {index + 1}</p>
+          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+            Médicament {index + 1}
+            {lectureAVerifier && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">À vérifier</span>}
+          </p>
           <h3 className="truncate text-lg font-bold text-gray-950">{nomAffiche}</h3>
           {(presentation.presentation || presentation.quantite !== null) && (
             <p className="mt-0.5 text-sm text-gray-600">
@@ -121,47 +141,67 @@ export default function MedicamentVerificationCard({
       </header>
 
       <div className="mt-3 space-y-1.5 text-sm text-gray-800">
-        <Ligne label="Voie" value={voie} />
-        <Ligne label="Dose" value={dose} />
-        <Ligne label="Rythme" value={rythme} />
-        <Ligne label="Durée" value={med.treatmentDurationDays ? `${med.treatmentDurationDays} jour${med.treatmentDurationDays === "1" ? "" : "s"}` : null} />
-        <Ligne label="Renouvellement" value={renouvellement} />
+        {(voieCompacte || dose) && (
+          <p className="flex items-center gap-2"><Syringe size={15} className="shrink-0 text-green-700" /> {[voieCompacte, dose].filter(Boolean).join(" · ")}</p>
+        )}
+        {protocoleCompact && (
+          <p className="flex items-start gap-2"><CalendarDays size={15} className="mt-0.5 shrink-0 text-blue-700" /> {protocoleCompact}</p>
+        )}
       </div>
 
       <div className="mt-3 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-950">
         <p className="font-semibold">Délais d’attente</p>
         {delaisComplets ? (
-          <p className="mt-0.5">
-            {viandeEtAbats
-              ? `Viande et abats : ${med.meatDays} j`
-              : [med.meatDays && `Viande : ${med.meatDays} j`, med.offalDays && `Abats : ${med.offalDays} j`].filter(Boolean).join(" · ")}
-            {med.milkDays ? `${med.meatDays || med.offalDays ? " · " : ""}Lait : ${med.milkDays} j` : ""}
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+            {(med.meatDays || med.offalDays) && (
+              <span className="inline-flex items-center gap-1"><Beef size={13} /> {viandeEtAbats
+                ? `Viande et abats ${med.meatDays} j`
+                : [med.meatDays && `Viande ${med.meatDays} j`, med.offalDays && `Abats ${med.offalDays} j`].filter(Boolean).join(" · ")}</span>
+            )}
+            {med.milkDays && <span className="inline-flex items-center gap-1"><Milk size={13} /> Lait {med.milkDays} j</span>}
+          </div>
         ) : <p className="mt-0.5 text-orange-800">Délai non détecté — à vérifier</p>}
       </div>
 
       {med.medicationId ? (
-        <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-800">
-          <CheckCircle2 size={15} /> Médicament reconnu dans la pharmacie
+        <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-900">
+          <p className="font-semibold">✓ Fiche pharmacie reconnue</p>
+          <p className="mt-0.5 text-green-800">
+            {[match?.nom, match?.categorieLabel, match?.dci, match?.forme ?? match?.voie].filter(Boolean).join(" · ")}
+          </p>
         </div>
       ) : med.ia && med.ia.medicationMatches.length > 0 ? (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
           <p className="flex items-center gap-2 font-semibold"><AlertTriangle size={15} /> Plusieurs correspondances possibles — à confirmer</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {med.ia.medicationMatches.map((candidate) => (
-              <button key={candidate.id} type="button" onClick={() => onUseMatch(candidate.id)} className="min-h-9 rounded-lg border border-amber-400 bg-white px-3 font-semibold">
+              <button key={candidate.id} type="button" onClick={() => { setValidated(false); onUseMatch(candidate.id); }} className="min-h-9 rounded-lg border border-amber-400 bg-white px-3 font-semibold">
                 Utiliser cette fiche : {candidate.nom}
               </button>
             ))}
           </div>
         </div>
       ) : (
-        <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-950">
-          <p className="font-semibold">Nouveau médicament</p>
-          <p className="mt-0.5">Aucun nom commercial suffisamment proche n’a été trouvé.</p>
-          <button type="button" onClick={() => onDecision({ medicationId: "", createMedication: !med.createMedication })} className="mt-2 min-h-9 rounded-lg border border-blue-600 bg-white px-3 font-semibold">
-            {med.createMedication ? "Création confirmée" : "Créer cette fiche après vérification"}
-          </button>
+        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+          <p className="font-semibold text-gray-900">Médicament non reconnu dans votre pharmacie</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" onClick={() => setAssociating((value) => !value)} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
+              Associer à un médicament existant
+            </button>
+            <button type="button" onClick={() => { setValidated(false); onDecision({ medicationId: "", createMedication: !med.createMedication }); }} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
+              {med.createMedication ? "Création confirmée" : "Créer une fiche"}
+            </button>
+          </div>
+          {associating && (
+            <select
+              defaultValue=""
+              onChange={(event) => { if (event.target.value) { setValidated(false); onUseMatch(event.target.value); } }}
+              className="mt-2 min-h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm"
+            >
+              <option value="">Choisir dans la pharmacie…</option>
+              {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}</option>)}
+            </select>
+          )}
         </div>
       )}
 
@@ -175,8 +215,13 @@ export default function MedicamentVerificationCard({
           <Ligne label="Catégorie" value={med.categorie || null} />
           <Ligne label="Famille thérapeutique" value={med.familleTherapeutique || null} />
           <Ligne label="Forme pharmaceutique" value={med.formePharmaceutique || null} />
+          <Ligne label="Conditionnement" value={med.conditionnement || null} />
           <Ligne label="Lot" value={med.numeroLot || null} />
+          <Ligne label="Dose brute" value={doseDetaillee} />
           <Ligne label="Dose normalisée" value={med.normalizedDoseValue && med.normalizedDoseUnit ? `${med.normalizedDoseValue} ${med.normalizedDoseUnit}` : null} />
+          <Ligne label="Protocole" value={rythme} />
+          <Ligne label="Renouvellement" value={renouvellement} />
+          <Ligne label="Instructions" value={med.administrationInstructions || null} />
           <Ligne label="Précautions" value={med.precautions || null} />
         </div>
         {med.ia && Object.keys(med.ia.evidence).length > 0 && (
@@ -204,7 +249,7 @@ export default function MedicamentVerificationCard({
             <Field label="Pour"><input type="number" min="0" step="0.01" value={med.referenceValue} onChange={(e) => change("referenceValue", e.target.value)} className={inputClass} /></Field>
             <Field label="Unité de référence"><input value={med.referenceUnit} onChange={(e) => change("referenceUnit", e.target.value)} className={inputClass} /></Field>
             <Field label="Type de dose"><select value={med.referenceType} onChange={(e) => change("referenceType", e.target.value)} className={inputClass}><option value="">Non précisé</option><option value="live_weight">Selon le poids vif</option><option value="animal">Par animal</option></select></Field>
-            <Field label="Rythme / instructions"><input value={med.administrationInstructions} onChange={(e) => change("administrationInstructions", e.target.value)} className={inputClass} /></Field>
+            <Field label="Instructions pratiques"><input value={med.administrationInstructions} onChange={(e) => change("administrationInstructions", e.target.value)} className={inputClass} /></Field>
             <Field label="Nombre d’administrations"><input type="number" min="0" value={med.administrationCount} onChange={(e) => change("administrationCount", e.target.value)} className={inputClass} /></Field>
             <Field label="Intervalle (heures)"><input type="number" min="0" value={med.administrationIntervalHours} onChange={(e) => change("administrationIntervalHours", e.target.value)} className={inputClass} /></Field>
             <Field label="Durée (jours)"><input type="number" min="0" value={med.treatmentDurationDays} onChange={(e) => change("treatmentDurationDays", e.target.value)} className={inputClass} /></Field>

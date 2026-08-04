@@ -7,6 +7,7 @@ import type {
 } from "./ordonnance-types.ts";
 import { medicamentVide } from "./ordonnance-types.ts";
 import {
+  extraireDateFrancaise,
   securiserDateDelivrance,
   sourceIndiqueDelivreCeJour,
   sourceJustifieDateDelivrance,
@@ -81,11 +82,52 @@ function classerDates(
   p: Record<string, unknown>,
   dates: Record<string, unknown>,
 ): { prescriptionDate: string | null; lastVisitDate: string | null; deliveryDate: string | null } {
-  let prescriptionDate = texte(dates.prescriptionDate ?? p.dateDebut);
-  let lastVisitDate = texte(dates.lastVisitDate);
+  let prescriptionDate: string | null = null;
+  let lastVisitDate: string | null = null;
   let deliveryDate: string | null = null;
+  let scorePrescription = -1;
+  let scoreVisite = -1;
+  let scoreDelivrance = -1;
   const evidence = preuves(p.evidence);
-  deliveryDate = securiserDateDelivrance(texte(dates.deliveryDate), evidence.deliveryDate);
+
+  const classer = (
+    source: string | null | undefined,
+    value: string | null,
+    confidence = 0,
+  ) => {
+    const contexte = normaliserNomMedicament(source ?? "");
+    const dateSource = extraireDateFrancaise(source);
+    const date = dateSource ?? value;
+    if (!date) return;
+    const score = (dateSource ? 100 : 80) + confidence;
+    if (contexte.includes("DERNIERE VISITE") && score > scoreVisite) {
+      lastVisitDate = date;
+      scoreVisite = score;
+      return;
+    }
+    if (sourceJustifieDateDelivrance(source) && !sourceIndiqueDelivreCeJour(source) && score > scoreDelivrance) {
+      deliveryDate = date;
+      scoreDelivrance = score;
+      return;
+    }
+    if ((contexte.includes("ORDONNANCE") || contexte.includes("PRESCRIPTION")) && score > scorePrescription) {
+      prescriptionDate = date;
+      scorePrescription = score;
+    }
+  };
+
+  classer(
+    evidence.prescriptionDate?.sourceText,
+    texte(dates.prescriptionDate ?? p.dateDebut),
+    evidence.prescriptionDate?.confidence,
+  );
+  classer(evidence.lastVisitDate?.sourceText, texte(dates.lastVisitDate), evidence.lastVisitDate?.confidence);
+  const delivreCeJour = sourceIndiqueDelivreCeJour(evidence.deliveryDate?.sourceText);
+  classer(
+    evidence.deliveryDate?.sourceText,
+    delivreCeJour ? null : securiserDateDelivrance(texte(dates.deliveryDate), evidence.deliveryDate),
+    evidence.deliveryDate?.confidence,
+  );
 
   if (Array.isArray(p.dateCandidates)) {
     for (const raw of p.dateCandidates) {
@@ -93,20 +135,10 @@ function classerDates(
       const candidate = raw as Record<string, unknown>;
       const value = texte(candidate.value);
       const source = texte(candidate.sourceText) ?? "";
-      const contexte = normaliserNomMedicament(source);
-      if (!value) continue;
-      if (contexte.includes("DERNIERE VISITE")) lastVisitDate = value;
-      else if (sourceJustifieDateDelivrance(source)) deliveryDate = value;
-      else if (contexte.includes("ORDONNANCE") || contexte.includes("PRESCRIPTION")) prescriptionDate = value;
+      classer(source, value, nombre(candidate.confidence) ?? 0);
     }
   }
-
-  const prescriptionSource = normaliserNomMedicament(evidence.prescriptionDate?.sourceText ?? "");
-  if (prescriptionDate && prescriptionSource.includes("DERNIERE VISITE")) {
-    lastVisitDate = prescriptionDate;
-    prescriptionDate = null;
-  }
-  if (!deliveryDate && prescriptionDate && sourceIndiqueDelivreCeJour(evidence.deliveryDate?.sourceText)) {
+  if (!deliveryDate && prescriptionDate && delivreCeJour) {
     deliveryDate = prescriptionDate;
   }
   return { prescriptionDate, lastVisitDate, deliveryDate };
@@ -137,7 +169,10 @@ export function trouverCorrespondancesMedicaments(
   for (const candidat of candidats) {
     const noms = [candidat.nom, ...candidat.aliases].map(normaliserNomMedicament).filter(Boolean);
     const exact = noms.some((item) => item === nom);
-    const inclus = noms.some((item) => nom.startsWith(item) || item.startsWith(nom));
+    const nomContenu = noms.some((item) => {
+      if (item.length < 4) return false;
+      return ` ${nom} `.includes(` ${item} `) || ` ${item} `.includes(` ${nom} `);
+    });
     const tokensNom = new Set(nom.split(" "));
     const tokenScore = Math.max(...noms.map((item) => {
       const tokens = item.split(" ").filter(Boolean);
@@ -147,7 +182,7 @@ export function trouverCorrespondancesMedicaments(
       substanceActive && candidat.dci
       && normaliserNomMedicament(substanceActive).includes(normaliserNomMedicament(candidat.dci)),
     );
-    const score = Math.min(1, exact ? 1 : inclus ? 0.94 : tokenScore * 0.85 + (dciConcorde ? 0.15 : 0));
+    const score = Math.min(1, exact ? 1 : nomContenu ? 0.97 : tokenScore * 0.85 + (dciConcorde ? 0.15 : 0));
     if (score >= 0.72) resultats.push({ candidat, score });
   }
   return resultats

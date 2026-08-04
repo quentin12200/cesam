@@ -4,7 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ExternalLink, FileText, Loader2, Plus } from "lucide-react";
-import { medicamentsDepuisProposition, type MedicamentPropose, type PropositionOrdonnance } from "@/lib/ordonnance-types";
+import {
+  medicamentsDepuisProposition,
+  type MedicamentCorrespondant,
+  type MedicamentPropose,
+  type PropositionOrdonnance,
+} from "@/lib/ordonnance-types";
 import {
   securiserDateDelivrance,
   sourceIndiqueDelivreCeJour,
@@ -92,9 +97,11 @@ function Field({ label, children, wide = false }: { label: string; children: Rea
 export default function VerificationOrdonnanceClient({
   extraction,
   propositionInitiale,
+  medicamentsPharmacie,
 }: {
   extraction: ExtractionInfo;
   propositionInitiale: PropositionOrdonnance;
+  medicamentsPharmacie: MedicamentCorrespondant[];
 }) {
   const router = useRouter();
   const { completeToOrigin, returnTo } = useOriginNavigation();
@@ -133,7 +140,9 @@ export default function VerificationOrdonnanceClient({
   function utiliserFiche(index: number, matchId?: string) {
     setMedicaments((previous) => previous.map((med, i) => {
       if (i !== index) return med;
-      const match = med.ia?.medicationMatches.find((item) => item.id === matchId) ?? med.ia?.medicationMatch;
+      const match = med.ia?.medicationMatches.find((item) => item.id === matchId)
+        ?? med.ia?.medicationMatch
+        ?? medicamentsPharmacie.find((item) => item.id === matchId);
       if (!match) return med;
       return {
         ...med,
@@ -262,6 +271,7 @@ export default function VerificationOrdonnanceClient({
                 onChange={(field, value) => majMed(index, field, value)}
                 onDecision={(values) => majDecision(index, values)}
                 onUseMatch={(matchId) => utiliserFiche(index, matchId)}
+                pharmacyOptions={medicamentsPharmacie}
                 onRemove={() => setMedicaments((previous) => previous.filter((_, i) => i !== index))}
               />
             ))}

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import BackButton from "@/app/components/BackButton";
 import { parseDocumentUrls, type PropositionOrdonnance } from "@/lib/ordonnance-types";
+import { getCategorieMedicament } from "@/lib/medicament-categories";
 import VerificationOrdonnanceClient from "./VerificationOrdonnanceClient";
 
 interface PageProps {
@@ -12,7 +13,23 @@ interface PageProps {
 
 export default async function VerificationOrdonnancePage({ params }: PageProps) {
   const { id } = await params;
-  const extraction = await prisma.extractionOrdonnance.findUnique({ where: { id } });
+  const [extraction, medicamentsPharmacie] = await Promise.all([
+    prisma.extractionOrdonnance.findUnique({ where: { id } }),
+    prisma.medicament.findMany({
+      where: { actif: true },
+      orderBy: { nom: "asc" },
+      select: {
+        id: true,
+        nom: true,
+        dci: true,
+        forme: true,
+        categorie: true,
+        voie: true,
+        delaiAttenteViandeJ: true,
+        delaiAttenteLaitJ: true,
+      },
+    }),
+  ]);
   if (!extraction) notFound();
   if (extraction.statut === "VALIDEE" && extraction.ordonnanceId) {
     redirect(`/ordonnances/${extraction.ordonnanceId}`);
@@ -47,6 +64,13 @@ export default async function VerificationOrdonnancePage({ params }: PageProps) 
           analyseLe: extraction.analyseLe.toISOString(),
         }}
         propositionInitiale={propositionInitiale}
+        medicamentsPharmacie={medicamentsPharmacie.map((medicament) => ({
+          ...medicament,
+          categorieLabel: getCategorieMedicament(medicament.categorie).label,
+          score: 0,
+          concordances: [],
+          divergences: [],
+        }))}
       />
     </div>
   );

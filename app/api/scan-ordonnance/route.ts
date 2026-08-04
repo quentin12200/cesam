@@ -75,7 +75,10 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
 
 Regles obligatoires :
 - Associe chaque date a son libelle proche. La date pres de "derniere visite" est lastVisitDate et jamais prescriptionDate.
-- La date de l'ordonnance est celle proche de "ordonnance n" ou de la mention "le" dans l'en-tete de prescription.
+- La date de l'ordonnance est prioritairement celle du bloc "ordonnance n ..." suivi de "le JJ/MM/AAAA".
+  evidence.prescriptionDate.sourceText doit conserver ensemble le numero d'ordonnance et cette date.
+- Ne corrige jamais le mois d'une date lisible : "01/06/2026" signifie le 1er juin, pas le 1er avril.
+- Une date isolee sans libelle ni proximite semantique certaine reste non classee.
 - deliveryDate reste null sauf si la date est explicitement associee a une mention de delivrance
   ("delivre le", "date de delivrance", "delivrance" ou formulation non ambigue equivalente).
 - Une date isolee, ancienne ou rattachee a un autre contenu ne doit jamais alimenter deliveryDate.
@@ -87,6 +90,9 @@ Regles obligatoires :
 - Une dose "1 ml pour 10 kg" est ponderale : doseValue=1, referenceValue=10, referenceType=live_weight, normalizedDoseValue=0.1. Ce n'est pas une dose fixe de 1 ml.
 - Accepte aussi les doses fixes par animal et les doses en mg/kg.
 - Separe une injection initiale, un rappel conditionnel et la duree du traitement.
+- administrationCount contient le nombre d'administrations. repeatCondition contient uniquement la condition
+  de renouvellement. administrationInstructions contient uniquement les consignes pratiques (agiter,
+  nettoyer, position du flacon, parage, seringue, ponctions), jamais la frequence.
 - Les nombres des delais viande, abats ou lait ne sont jamais une duree de traitement.
 - Pour chaque champ important, fournis le texte source et une confiance entre 0 et 1.
 - Si une information n'est pas lisible, mets null.`;

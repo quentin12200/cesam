@@ -57,6 +57,45 @@ test("classe les dates selon leur libelle", () => {
   assert.equal(analyse.lastVisitDate, "2026-04-14");
 });
 
+test("prend la date lisible du bloc ordonnance plutot qu'une valeur IA erronee", () => {
+  const dates = normaliserAnalyseOrdonnance({
+    dates: { prescriptionDate: "2026-04-01", lastVisitDate: "2026-06-01" },
+    dateCandidates: [
+      {
+        value: "2026-04-01",
+        sourceText: "ordonnance n°26-06-0002[V] le 01/06/2026",
+        confidence: 0.99,
+      },
+      {
+        value: "2026-06-01",
+        sourceText: "Dernière visite le 14/04/2026",
+        confidence: 0.98,
+      },
+    ],
+    medicaments: [{ medicamentNom: "TENALINE" }],
+  });
+  assert.equal(dates.prescriptionDate, "2026-06-01");
+  assert.equal(dates.lastVisitDate, "2026-04-14");
+  assert.notEqual(dates.prescriptionDate, "2026-04-01");
+});
+
+test("affiche la date en francais apres son classement", () => {
+  const date = new Date("2026-06-01T12:00:00.000Z");
+  assert.equal(date.toLocaleDateString("fr-FR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+  }), "01/06/2026");
+});
+
+test("ne classe pas une date isolee sans libelle", () => {
+  const dates = normaliserAnalyseOrdonnance({
+    dates: { prescriptionDate: "2026-06-01", lastVisitDate: "2026-04-14" },
+    dateCandidates: [{ value: "2026-06-01", sourceText: "01/06/2026" }],
+    medicaments: [{ medicamentNom: "TENALINE" }],
+  });
+  assert.equal(dates.prescriptionDate, null);
+  assert.equal(dates.lastVisitDate, null);
+});
+
 test("conserve la posologie ponderale sans la convertir en dose fixe", () => {
   const med = analyse.medicaments![0];
   assert.equal(med.doseValue, 1);
@@ -126,6 +165,8 @@ test("ignore une date de delivrance sans libelle justificatif", () => {
       deliveryDate: "2023-01-12",
     },
     evidence: {
+      prescriptionDate: { value: "2026-08-03", sourceText: "Ordonnance n° 1 le 03/08/2026", confidence: 0.95 },
+      lastVisitDate: { value: "2026-04-14", sourceText: "Dernière visite le 14/04/2026", confidence: 0.95 },
       deliveryDate: { value: "2023-01-12", sourceText: "12/01/2023", confidence: 0.91 },
     },
     medicaments: [{ medicamentNom: "TENALINE LA" }],
@@ -161,15 +202,21 @@ test("conserve un flacon delivre et distingue sa quantite de son volume", () => 
   });
 });
 
-test("utilise la date de l'ordonnance quand le document indique delivre ce jour", () => {
+test("utilise uniquement la date de l'ordonnance quand le document indique delivre ce jour", () => {
   const dates = normaliserAnalyseOrdonnance({
-    dates: { prescriptionDate: "2026-08-03", deliveryDate: null },
+    dates: { prescriptionDate: "2026-08-03", deliveryDate: "2023-01-12" },
     evidence: {
+      prescriptionDate: {
+        value: "2026-08-03",
+        sourceText: "Ordonnance n° 1 le 03/08/2026",
+        confidence: 0.99,
+      },
       deliveryDate: { value: null, sourceText: "Délivré ce jour", confidence: 0.98 },
     },
     medicaments: [{ medicamentNom: "TENALINE" }],
   });
   assert.equal(dates.deliveryDate, "2026-08-03");
+  assert.notEqual(dates.deliveryDate, "2023-01-12");
 });
 
 test("conserve le rapprochement des brouillons crees avant la liste de candidats", () => {

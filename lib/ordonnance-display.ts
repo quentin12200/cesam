@@ -54,13 +54,34 @@ export function formaterDose(med: {
   return `${base} pour ${med.referenceValue} ${med.referenceUnit}${med.referenceType === "live_weight" ? " de poids vif" : ""}`;
 }
 
+export function formaterDoseCompacte(med: {
+  doseValue: string;
+  doseUnit: string;
+  referenceValue: string;
+  referenceUnit: string;
+  referenceType: string;
+}): string | null {
+  if (!med.doseValue || !med.doseUnit) return null;
+  const base = `${med.doseValue} ${med.doseUnit}`;
+  if (med.referenceType === "animal") return `${base} / animal`;
+  if (!med.referenceValue || !med.referenceUnit) return base;
+  return `${base} / ${med.referenceValue} ${med.referenceUnit}`;
+}
+
+export function estInstructionPratique(value: string | null | undefined): boolean {
+  if (!value?.trim()) return false;
+  const normalized = sansAccents(value).toLowerCase();
+  return /\b(agiter|vertical|debout|nettoyer|parage|ponction|seringue|flacon|application|desinfecter|aiguille)\b/.test(normalized);
+}
+
 export function formaterRythme(med: {
   administrationCount: string;
   administrationInstructions: string;
 }): string | null {
-  if (med.administrationInstructions.trim()) return med.administrationInstructions.trim();
-  if (med.administrationCount === "1") return "Administration unique";
-  if (med.administrationCount) return `${med.administrationCount} administrations`;
+  if (med.administrationCount === "1") return "1 injection";
+  if (med.administrationCount) return `${med.administrationCount} injections`;
+  const instructions = med.administrationInstructions.trim();
+  if (instructions && !estInstructionPratique(instructions) && instructions.length <= 60) return instructions;
   return null;
 }
 
@@ -69,8 +90,14 @@ export function formaterRenouvellement(med: {
   repeatCondition: string;
 }): string | null {
   if (!med.administrationIntervalHours && !med.repeatCondition) return null;
-  const intervalle = med.administrationIntervalHours
-    ? `possible après ${med.administrationIntervalHours} h`
-    : "possible";
-  return med.repeatCondition ? `${intervalle} ${med.repeatCondition}` : intervalle;
+  const condition = med.repeatCondition.trim();
+  if (med.administrationIntervalHours) {
+    const intervalleDejaPresent = new RegExp(`apres\\s+${med.administrationIntervalHours}\\s*(?:h|heure)`, "i")
+      .test(sansAccents(condition));
+    if (intervalleDejaPresent) return condition;
+    return condition
+      ? `renouvelable après ${med.administrationIntervalHours} h ${condition}`
+      : `renouvelable après ${med.administrationIntervalHours} h`;
+  }
+  return condition || null;
 }
