@@ -43,7 +43,7 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
     "categorie": "string ou null",
     "familleTherapeutique": "string ou null",
     "formePharmaceutique": "string ou null",
-    "conditionnement": "string ou null",
+    "conditionnement": "presentation exacte avec quantite delivree si elle est explicite, par exemple 1 flacon de 100 ml, ou null",
     "voie": "IM, SC, IV, PO ou texte exact, ou null",
     "dose": {
       "doseValue": "number ou null",
@@ -80,6 +80,10 @@ Regles obligatoires :
   ("delivre le", "date de delivrance", "delivrance" ou formulation non ambigue equivalente).
 - Une date isolee, ancienne ou rattachee a un autre contenu ne doit jamais alimenter deliveryDate.
 - Si deliveryDate est renseignee, evidence.deliveryDate doit contenir le libelle exact qui la justifie.
+- Si le document indique "delivre ce jour", utilise la date de l'ordonnance comme deliveryDate et conserve
+  cette mention exacte dans evidence.deliveryDate.sourceText.
+- Pour le conditionnement, conserve distinctement dans la meme phrase le nombre d'unites delivrees et la
+  presentation, par exemple "1 flacon de 100 ml". N'invente jamais une quantite absente du document.
 - Une dose "1 ml pour 10 kg" est ponderale : doseValue=1, referenceValue=10, referenceType=live_weight, normalizedDoseValue=0.1. Ce n'est pas une dose fixe de 1 ml.
 - Accepte aussi les doses fixes par animal et les doses en mg/kg.
 - Separe une injection initiale, un rappel conditionnel et la duree du traitement.

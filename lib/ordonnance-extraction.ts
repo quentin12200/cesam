@@ -6,7 +6,11 @@ import type {
   PropositionOrdonnance,
 } from "./ordonnance-types.ts";
 import { medicamentVide } from "./ordonnance-types.ts";
-import { securiserDateDelivrance, sourceJustifieDateDelivrance } from "./ordonnance-dates.ts";
+import {
+  securiserDateDelivrance,
+  sourceIndiqueDelivreCeJour,
+  sourceJustifieDateDelivrance,
+} from "./ordonnance-dates.ts";
 
 export interface MedicamentCandidat {
   id: string;
@@ -66,7 +70,7 @@ export function normaliserNomMedicament(value: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase()
-    .replace(/\b(SOLUTION|SOL|INJECTABLE|INJ|FLACON|FL|ML|CLAS)\b\.?/g, " ")
+    .replace(/\b(SOLUTION|SOL|INJECTABLE|INJ|FLACON|FL|AEROSOL|AER|AMPOULE|AMP|BOITE|BT|COMPRIME|CP|ML|MG|MCG|G|KG|CLAS)\b\.?/g, " ")
     .replace(/\b\d+(?:[.,]\d+)?\b/g, " ")
     .replace(/[^A-Z0-9]+/g, " ")
     .trim()
@@ -101,6 +105,9 @@ function classerDates(
   if (prescriptionDate && prescriptionSource.includes("DERNIERE VISITE")) {
     lastVisitDate = prescriptionDate;
     prescriptionDate = null;
+  }
+  if (!deliveryDate && prescriptionDate && sourceIndiqueDelivreCeJour(evidence.deliveryDate?.sourceText)) {
+    deliveryDate = prescriptionDate;
   }
   return { prescriptionDate, lastVisitDate, deliveryDate };
 }

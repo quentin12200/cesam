@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-const [verification, route, detail, schema] = await Promise.all([
+const [verification, medicationCard, route, detail, schema] = await Promise.all([
   readFile(new URL("../app/ordonnances/a-verifier/[id]/VerificationOrdonnanceClient.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/ordonnances/a-verifier/[id]/MedicamentVerificationCard.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/api/extractions-ordonnance/[id]/valider/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/ordonnances/[id]/OrdonnanceDetailClient.tsx", import.meta.url), "utf8"),
   readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
@@ -17,10 +18,28 @@ test("l'ecran annonce le nombre de medicaments sans multiplier les ordonnances",
 });
 
 test("les correspondances ambigues exigent un choix explicite", () => {
-  assert.match(verification, /Plusieurs correspondances possibles — à confirmer/);
-  assert.match(verification, /Utiliser cette fiche/);
-  assert.match(verification, /Créer cette fiche après vérification/);
+  assert.match(medicationCard, /Plusieurs correspondances possibles — à confirmer/);
+  assert.match(medicationCard, /Utiliser cette fiche/);
+  assert.match(medicationCard, /Créer cette fiche après vérification/);
   assert.match(verification, /medicamentsAConfirmer > 0/);
+});
+
+test("la carte principale est compacte et les donnees techniques sont repliees", () => {
+  const avantDetails = medicationCard.slice(0, medicationCard.indexOf("<details"));
+  assert.match(avantDetails, /Présentation|presentation/);
+  assert.match(avantDetails, /Quantité/);
+  assert.match(avantDetails, /Dose/);
+  assert.match(avantDetails, /Délais d’attente/);
+  assert.doesNotMatch(avantDetails, /Substance active/);
+  assert.doesNotMatch(avantDetails, /Dose normalisée/);
+  assert.match(medicationCard, /Voir les détails/);
+  assert.match(medicationCard, /Lecture OCR/);
+  assert.doesNotMatch(medicationCard, /IA :/);
+});
+
+test("la date de delivrance identique a l'ordonnance reste masquee", () => {
+  assert.match(verification, /masquerDateDelivrance/);
+  assert.match(verification, /deliveryDateSourcee && !masquerDateDelivrance/);
 });
 
 test("la route utilise une transaction et un seul service de creation", () => {

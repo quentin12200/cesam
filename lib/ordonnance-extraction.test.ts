@@ -5,6 +5,7 @@ import {
   trouverCorrespondancesMedicaments,
 } from "./ordonnance-extraction.ts";
 import { medicamentsDepuisProposition } from "./ordonnance-types.ts";
+import { analyserPresentation } from "./ordonnance-display.ts";
 
 const tenaline = {
   id: "med-tenaline",
@@ -79,6 +80,14 @@ test("rapproche Tenaline de la fiche existante sans en creer une", () => {
   assert.equal(match?.categorieLabel, "Antibiotique");
 });
 
+test("rapproche le nom OCR complet de la fiche commerciale Tenaline", () => {
+  const proposition = normaliserAnalyseOrdonnance({
+    medicaments: [{ medicamentNom: "TENALINE LA CLAS SOL INJ FL. 100 ML" }],
+  }, [{ ...tenaline, nom: "Ténaline" }]);
+  assert.equal(proposition.medicaments?.[0].medicationMatch?.id, "med-tenaline");
+  assert.equal(proposition.medicaments?.[0].medicationMatchStatus, "matched");
+});
+
 test("conserve plusieurs medicaments dans une seule extraction structuree", () => {
   const multi = normaliserAnalyseOrdonnance({
     medicaments: [
@@ -137,6 +146,28 @@ test("conserve une date de delivrance explicitement sourcee", () => {
       },
     },
     medicaments: [{ medicamentNom: "TENALINE LA" }],
+  });
+  assert.equal(dates.deliveryDate, "2026-08-03");
+});
+
+test("conserve un flacon delivre et distingue sa quantite de son volume", () => {
+  const proposition = normaliserAnalyseOrdonnance({
+    medicaments: [{ medicamentNom: "TENALINE", conditionnement: "1 flacon de 100 ml" }],
+  });
+  assert.equal(proposition.medicaments?.[0].conditionnement, "1 flacon de 100 ml");
+  assert.deepEqual(analyserPresentation(proposition.medicaments?.[0].conditionnement), {
+    presentation: "flacon de 100 ml",
+    quantite: 1,
+  });
+});
+
+test("utilise la date de l'ordonnance quand le document indique delivre ce jour", () => {
+  const dates = normaliserAnalyseOrdonnance({
+    dates: { prescriptionDate: "2026-08-03", deliveryDate: null },
+    evidence: {
+      deliveryDate: { value: null, sourceText: "Délivré ce jour", confidence: 0.98 },
+    },
+    medicaments: [{ medicamentNom: "TENALINE" }],
   });
   assert.equal(dates.deliveryDate, "2026-08-03");
 });
