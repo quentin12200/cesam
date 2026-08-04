@@ -6,6 +6,7 @@ import type {
   PropositionOrdonnance,
 } from "./ordonnance-types.ts";
 import { medicamentVide } from "./ordonnance-types.ts";
+import { securiserDateDelivrance, sourceJustifieDateDelivrance } from "./ordonnance-dates.ts";
 
 export interface MedicamentCandidat {
   id: string;
@@ -78,7 +79,9 @@ function classerDates(
 ): { prescriptionDate: string | null; lastVisitDate: string | null; deliveryDate: string | null } {
   let prescriptionDate = texte(dates.prescriptionDate ?? p.dateDebut);
   let lastVisitDate = texte(dates.lastVisitDate);
-  let deliveryDate = texte(dates.deliveryDate);
+  let deliveryDate: string | null = null;
+  const evidence = preuves(p.evidence);
+  deliveryDate = securiserDateDelivrance(texte(dates.deliveryDate), evidence.deliveryDate);
 
   if (Array.isArray(p.dateCandidates)) {
     for (const raw of p.dateCandidates) {
@@ -89,12 +92,11 @@ function classerDates(
       const contexte = normaliserNomMedicament(source);
       if (!value) continue;
       if (contexte.includes("DERNIERE VISITE")) lastVisitDate = value;
-      else if (contexte.includes("DELIVRE CE JOUR") || contexte.includes("DATE DELIVRANCE")) deliveryDate = value;
+      else if (sourceJustifieDateDelivrance(source)) deliveryDate = value;
       else if (contexte.includes("ORDONNANCE") || contexte.includes("PRESCRIPTION")) prescriptionDate = value;
     }
   }
 
-  const evidence = preuves(p.evidence);
   const prescriptionSource = normaliserNomMedicament(evidence.prescriptionDate?.sourceText ?? "");
   if (prescriptionDate && prescriptionSource.includes("DERNIERE VISITE")) {
     lastVisitDate = prescriptionDate;
@@ -108,11 +110,23 @@ export function trouverMedicament(
   substanceActive: string | null,
   candidats: MedicamentCandidat[],
 ): MedicamentCorrespondant | null {
-  if (!nomExtrait) return null;
-  const nom = normaliserNomMedicament(nomExtrait);
-  if (!nom) return null;
+  const matches = trouverCorrespondancesMedicaments(nomExtrait, substanceActive, candidats);
+  const premier = matches[0];
+  const second = matches[1];
+  if (!premier || premier.score < 0.9 || (second && premier.score - second.score < 0.08)) return null;
+  return premier;
+}
 
-  let meilleur: { candidat: MedicamentCandidat; score: number } | null = null;
+export function trouverCorrespondancesMedicaments(
+  nomExtrait: string | null,
+  substanceActive: string | null,
+  candidats: MedicamentCandidat[],
+): MedicamentCorrespondant[] {
+  if (!nomExtrait) return [];
+  const nom = normaliserNomMedicament(nomExtrait);
+  if (!nom) return [];
+
+  const resultats: Array<{ candidat: MedicamentCandidat; score: number }> = [];
   for (const candidat of candidats) {
     const noms = [candidat.nom, ...candidat.aliases].map(normaliserNomMedicament).filter(Boolean);
     const exact = noms.some((item) => item === nom);
@@ -127,25 +141,24 @@ export function trouverMedicament(
       && normaliserNomMedicament(substanceActive).includes(normaliserNomMedicament(candidat.dci)),
     );
     const score = Math.min(1, exact ? 1 : inclus ? 0.94 : tokenScore * 0.85 + (dciConcorde ? 0.15 : 0));
-    if (!meilleur || score > meilleur.score) meilleur = { candidat, score };
+    if (score >= 0.72) resultats.push({ candidat, score });
   }
-  if (!meilleur || meilleur.score < 0.72) return null;
-
-  const { candidat, score } = meilleur;
-  return {
-    id: candidat.id,
-    nom: candidat.nom,
-    dci: candidat.dci,
-    forme: candidat.forme,
-    categorie: candidat.categorie,
-    categorieLabel: getCategorieMedicament(candidat.categorie).label,
-    voie: candidat.voie,
-    delaiAttenteViandeJ: candidat.delaiAttenteViandeJ,
-    delaiAttenteLaitJ: candidat.delaiAttenteLaitJ,
-    score,
-    concordances: [],
-    divergences: [],
-  };
+  return resultats
+    .sort((a, b) => b.score - a.score || a.candidat.nom.localeCompare(b.candidat.nom, "fr"))
+    .map(({ candidat, score }) => ({
+      id: candidat.id,
+      nom: candidat.nom,
+      dci: candidat.dci,
+      forme: candidat.forme,
+      categorie: candidat.categorie,
+      categorieLabel: getCategorieMedicament(candidat.categorie).label,
+      voie: candidat.voie,
+      delaiAttenteViandeJ: candidat.delaiAttenteViandeJ,
+      delaiAttenteLaitJ: candidat.delaiAttenteLaitJ,
+      score,
+      concordances: [],
+      divergences: [],
+    }));
 }
 
 export function comparerAvecReference(
@@ -217,8 +230,21 @@ export function normaliserAnalyseOrdonnance(
       medicationMatch: null,
       evidence: preuves(m.evidence),
     };
+    const matches = trouverCorrespondancesMedicaments(
+      proposition.medicamentNom,
+      proposition.substanceActive,
+      candidats,
+    ).map((match) => comparerAvecReference(proposition, match));
     const match = trouverMedicament(proposition.medicamentNom, proposition.substanceActive, candidats);
-    return { ...proposition, medicationMatch: match ? comparerAvecReference(proposition, match) : null };
+    const medicationMatchStatus: MedicamentPropose["medicationMatchStatus"] = match
+      ? "matched"
+      : matches.length > 0 ? "ambiguous" : "unmatched";
+    return {
+      ...proposition,
+      medicationMatch: match ? comparerAvecReference(proposition, match) : null,
+      medicationMatches: matches,
+      medicationMatchStatus,
+    };
   }).filter((m) => m.medicamentNom || m.doseValue || m.numeroLot);
 
   return {

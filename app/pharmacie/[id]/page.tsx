@@ -13,7 +13,7 @@ interface PageProps {
 export default async function MedicamentDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  const [medicament, traitements] = await Promise.all([
+  const [medicament, traitements, ordonnanceLinks] = await Promise.all([
     prisma.medicament.findUnique({
       where: { id },
       include: {
@@ -30,11 +30,27 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
       },
       orderBy: { dateDebut: "desc" },
     }),
+    prisma.ordonnanceMedicament.findMany({
+      where: { medicamentId: id },
+      include: {
+        ordonnance: { select: { id: true, numero: true, date: true, veterinaireNom: true, statut: true } },
+      },
+      orderBy: { ordonnance: { date: "desc" } },
+    }),
   ]);
 
   if (!medicament) notFound();
 
   const ordonnancesMap = new Map<string, { id: string; numero: string | null; date: string; veterinaireNom: string | null; statut: string }>();
+  for (const link of ordonnanceLinks) {
+    ordonnancesMap.set(link.ordonnance.id, {
+      id: link.ordonnance.id,
+      numero: link.ordonnance.numero,
+      date: link.ordonnance.date.toISOString(),
+      veterinaireNom: link.ordonnance.veterinaireNom,
+      statut: link.ordonnance.statut,
+    });
+  }
   for (const t of traitements) {
     if (t.ordonnance && !ordonnancesMap.has(t.ordonnance.id)) {
       ordonnancesMap.set(t.ordonnance.id, {

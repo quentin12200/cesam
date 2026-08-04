@@ -51,6 +51,8 @@ export interface MedicamentPropose {
   withdrawalPeriods: PeriodesAttente;
   precautions: string | null;
   medicationMatch: MedicamentCorrespondant | null;
+  medicationMatches: MedicamentCorrespondant[];
+  medicationMatchStatus: "matched" | "ambiguous" | "unmatched" | "manually_confirmed";
   evidence: Record<string, ChampExtrait<unknown>>;
 
   // Compatibilite avec les brouillons crees avant l'extraction structuree.
@@ -113,6 +115,8 @@ export function medicamentVide(): MedicamentPropose {
     withdrawalPeriods: { meatDays: null, offalDays: null, milkDays: null },
     precautions: null,
     medicationMatch: null,
+    medicationMatches: [],
+    medicationMatchStatus: "unmatched",
     evidence: {},
   };
 }
@@ -120,18 +124,26 @@ export function medicamentVide(): MedicamentPropose {
 export function medicamentsDepuisProposition(prop: PropositionOrdonnance | null | undefined): MedicamentPropose[] {
   if (!prop || typeof prop !== "object") return [medicamentVide()];
   if (Array.isArray(prop.medicaments) && prop.medicaments.length > 0) {
-    return prop.medicaments.map((m) => ({
-      ...medicamentVide(),
-      ...m,
-      doseValue: m.doseValue ?? m.dose ?? null,
-      doseUnit: m.doseUnit ?? m.uniteDosage ?? null,
-      treatmentDurationDays: m.treatmentDurationDays ?? m.dureeJours ?? null,
-      withdrawalPeriods: {
-        meatDays: m.withdrawalPeriods?.meatDays ?? m.delaiAttenteViandeJ ?? null,
-        offalDays: m.withdrawalPeriods?.offalDays ?? m.delaiAttenteViandeJ ?? null,
-        milkDays: m.withdrawalPeriods?.milkDays ?? m.delaiAttenteLaitJ ?? null,
-      },
-    }));
+    return prop.medicaments.map((m) => {
+      const medicationMatches = Array.isArray(m.medicationMatches)
+        ? m.medicationMatches
+        : m.medicationMatch ? [m.medicationMatch] : [];
+      return {
+        ...medicamentVide(),
+        ...m,
+        medicationMatches,
+        medicationMatchStatus: m.medicationMatchStatus
+          ?? (m.medicationMatch ? "matched" : medicationMatches.length > 0 ? "ambiguous" : "unmatched"),
+        doseValue: m.doseValue ?? m.dose ?? null,
+        doseUnit: m.doseUnit ?? m.uniteDosage ?? null,
+        treatmentDurationDays: m.treatmentDurationDays ?? m.dureeJours ?? null,
+        withdrawalPeriods: {
+          meatDays: m.withdrawalPeriods?.meatDays ?? m.delaiAttenteViandeJ ?? null,
+          offalDays: m.withdrawalPeriods?.offalDays ?? m.delaiAttenteViandeJ ?? null,
+          milkDays: m.withdrawalPeriods?.milkDays ?? m.delaiAttenteLaitJ ?? null,
+        },
+      };
+    });
   }
   return [{
     ...medicamentVide(),

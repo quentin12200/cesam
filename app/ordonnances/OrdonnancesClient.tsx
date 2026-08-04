@@ -26,6 +26,7 @@ export interface OrdonnanceItem {
   statut: string;
   notes: string | null;
   photoUrl: string | null;
+  medicaments?: Array<{ nomExtrait: string }>;
 }
 
 export interface ExtractionAVerifierItem {
@@ -221,16 +222,31 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
           </div>
 
           <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-gray-900">{ord.medicamentNom || "—"}</span>
-            {ord.voie && <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{ord.voie}</span>}
-            {ord.dose != null && (
+            {ord.medicaments && ord.medicaments.length > 0 ? (
+              <>
+                <span className="text-xs font-semibold text-gray-500">
+                  {ord.medicaments.length} médicament{ord.medicaments.length > 1 ? "s" : ""}
+                </span>
+                {ord.medicaments.map((medicament, index) => (
+                  <span key={`${medicament.nomExtrait}-${index}`} className="rounded bg-gray-100 px-1.5 py-0.5 text-sm font-semibold text-gray-900">
+                    {medicament.nomExtrait}
+                  </span>
+                ))}
+              </>
+            ) : (
+              <span className="text-sm font-semibold text-gray-900">{ord.medicamentNom || "—"}</span>
+            )}
+            {(!ord.medicaments || ord.medicaments.length <= 1) && ord.voie && (
+              <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{ord.voie}</span>
+            )}
+            {(!ord.medicaments || ord.medicaments.length <= 1) && ord.dose != null && (
               <span className="text-xs text-gray-500">
                 {ord.dose} {ord.uniteDosage ?? "ml"}
                 {ord.referenceValue != null && ` / ${ord.referenceValue} ${ord.referenceUnit ?? "kg"}`}
                 {ord.referenceType === "live_weight" && " de poids vif"}
               </span>
             )}
-            {ord.dureeJours && (
+            {(!ord.medicaments || ord.medicaments.length <= 1) && ord.dureeJours && (
               <span className="text-xs text-gray-400">{ord.dureeJours}j</span>
             )}
           </div>

@@ -53,6 +53,19 @@ interface LinkedVaccination {
   animalNom: string | null;
 }
 
+interface LinkedMedication {
+  id: string;
+  nomExtrait: string;
+  nomPharmacie: string;
+  categorie: string;
+  posologieExtraite: string | null;
+  voieExtraite: string | null;
+  dureeExtraite: number | null;
+  delaiAttenteViande: number | null;
+  delaiAttenteLait: number | null;
+  statutCorrespondance: string;
+}
+
 interface Extracted {
   medicamentNom: string | null;
   voie: string | null;
@@ -67,10 +80,12 @@ interface Extracted {
 
 export default function OrdonnanceDetailClient({
   ordonnance,
+  medicaments,
   traitements,
   vaccinations,
 }: {
   ordonnance: OrdonnanceData;
+  medicaments: LinkedMedication[];
   traitements: LinkedTraitement[];
   vaccinations: LinkedVaccination[];
 }) {
@@ -270,7 +285,44 @@ export default function OrdonnanceDetailClient({
         )}
       </div>
 
-      {/* Champs éditables */}
+      {medicaments.length > 0 && (
+        <section className="rounded-xl bg-white p-4 shadow">
+          <h3 className="font-semibold text-gray-800">
+            {medicaments.length} médicament{medicaments.length > 1 ? "s" : ""}
+          </h3>
+          <div className="mt-3 space-y-2">
+            {medicaments.map((medicament) => (
+              <article key={medicament.id} className="rounded-lg border border-gray-200 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-gray-900">{medicament.nomPharmacie}</p>
+                    {medicament.nomExtrait !== medicament.nomPharmacie && (
+                      <p className="text-xs text-gray-500">Lu sur le document : {medicament.nomExtrait}</p>
+                    )}
+                  </div>
+                  <span className="rounded-full bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-800">
+                    {medicament.statutCorrespondance === "matched" ? "Retrouvé" : "Confirmé manuellement"}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
+                  {medicament.posologieExtraite && <span>{medicament.posologieExtraite}</span>}
+                  {medicament.voieExtraite && <span>Voie : {medicament.voieExtraite}</span>}
+                  {medicament.dureeExtraite != null && <span>{medicament.dureeExtraite} j</span>}
+                </div>
+                {(medicament.delaiAttenteViande != null || medicament.delaiAttenteLait != null) && (
+                  <p className="mt-2 text-xs text-orange-800">
+                    {medicament.delaiAttenteViande != null && `Viande : ${medicament.delaiAttenteViande} j`}
+                    {medicament.delaiAttenteViande != null && medicament.delaiAttenteLait != null && " · "}
+                    {medicament.delaiAttenteLait != null && `Lait : ${medicament.delaiAttenteLait} j`}
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Champs éditables historiques, conservés pour compatibilité */}
       <div className="bg-white rounded-xl shadow p-4 space-y-3">
         <h3 className="font-semibold text-gray-800">Informations</h3>
 

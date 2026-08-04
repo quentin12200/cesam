@@ -2,9 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthorizedEmail } from "@/lib/cesam-auth";
 import { parseDocumentUrls } from "@/lib/ordonnance-types";
+import {
+  creerOrdonnanceAvecMedicaments,
+  OrdonnanceValidationError,
+  type OrdonnancePersistence,
+} from "@/lib/ordonnance-validation";
+import { securiserDateDelivrance } from "@/lib/ordonnance-dates";
+import type { ChampExtrait } from "@/lib/ordonnance-types";
 
 type MedicamentFinal = {
   medicationId: string | null;
+  createMedication: boolean;
+  categoryConfirmed: boolean;
   medicamentNom: string;
   numeroLot: string | null;
   substanceActive: string | null;
@@ -72,6 +81,8 @@ function normaliserMedicament(brut: Record<string, unknown>): MedicamentFinal {
   const delais = objet(brut.withdrawalPeriods);
   return {
     medicationId: texte(brut.medicationId),
+    createMedication: brut.createMedication === true,
+    categoryConfirmed: brut.categoryConfirmed === true,
     medicamentNom: texte(brut.medicamentNom) ?? "",
     numeroLot: texte(brut.numeroLot),
     substanceActive: texte(brut.substanceActive),
@@ -107,15 +118,20 @@ function normaliser(body: Record<string, unknown>): ValeursFinales {
   const medicaments = (Array.isArray(body.medicaments) ? body.medicaments : [body])
     .map((medicament) => normaliserMedicament(objet(medicament)))
     .filter((medicament) => medicament.medicamentNom);
+  const evidence = objet(body.evidence);
+  const deliveryEvidence = objet(evidence.deliveryDate) as unknown as ChampExtrait<unknown>;
   return {
     prescriptionDate: texte(body.prescriptionDate ?? body.dateDebut) ?? "",
     lastVisitDate: texte(body.lastVisitDate),
-    deliveryDate: texte(body.deliveryDate),
+    deliveryDate: securiserDateDelivrance(
+      texte(body.deliveryDate),
+      deliveryEvidence,
+    ),
     ordonnanceNumero: texte(body.ordonnanceNumero),
     veterinaire: texte(body.veterinaire),
     motif: texte(body.motif),
     animaux: texte(body.animaux),
-    evidence: objet(body.evidence),
+    evidence,
     medicaments,
   };
 }
@@ -148,81 +164,41 @@ export async function POST(
   }
 
   const pages = parseDocumentUrls(extraction.documentUrls, extraction.documentUrl);
-  const ordonnanceIds = await prisma.$transaction(async (tx) => {
-    const ids: string[] = [];
-    for (const med of finale.medicaments) {
-      if (med.medicationId) {
-        const existe = await tx.medicament.findUnique({ where: { id: med.medicationId }, select: { id: true } });
-        if (!existe) throw new Error("MEDICAMENT_INTROUVABLE");
-      }
-      const created = await tx.ordonnance.create({
+  try {
+    const resultat = await prisma.$transaction(async (tx) => {
+      const created = await creerOrdonnanceAvecMedicaments(
+        tx as unknown as OrdonnancePersistence,
+        {
+          ...finale,
+          prescriptionDate,
+          lastVisitDate: dateOptionnelle(finale.lastVisitDate),
+          deliveryDate: dateOptionnelle(finale.deliveryDate),
+        },
+        pages,
+      );
+      await tx.extractionOrdonnance.update({
+        where: { id, statut: "A_VERIFIER" },
         data: {
-          date: prescriptionDate,
-          derniereVisite: dateOptionnelle(finale.lastVisitDate),
-          dateDelivrance: dateOptionnelle(finale.deliveryDate),
-          numero: finale.ordonnanceNumero,
-          veterinaireNom: finale.veterinaire,
-          medicamentId: med.medicationId,
-          medicamentNom: med.medicamentNom,
-          substanceActive: med.substanceActive,
-          concentration: med.concentration,
-          categorieMedicament: med.categorie,
-          familleTherapeutique: med.familleTherapeutique,
-          formePharmaceutique: med.formePharmaceutique,
-          conditionnement: med.conditionnement,
-          dose: med.doseValue,
-          uniteDosage: med.doseUnit,
-          referenceValue: med.referenceValue,
-          referenceUnit: med.referenceUnit,
-          referenceType: med.referenceType,
-          normalizedDoseValue: med.normalizedDoseValue,
-          normalizedDoseUnit: med.normalizedDoseUnit,
-          voie: med.voie,
-          frequence: med.administrationInstructions,
-          dureeJours: med.treatmentDurationDays,
-          administrationCount: med.administrationCount,
-          administrationIntervalHours: med.administrationIntervalHours,
-          repeatCondition: med.repeatCondition,
-          administrationInstructions: med.administrationInstructions,
-          motif: finale.motif,
-          animaux: finale.animaux,
-          delaiAttenteViandeJ: med.withdrawalPeriods.meatDays,
-          delaiAttenteAbatsJ: med.withdrawalPeriods.offalDays,
-          delaiAttenteLaitJ: med.withdrawalPeriods.milkDays,
-          precautions: med.precautions,
-          rappels: med.repeatCondition,
-          photoUrl: pages[0] ?? extraction.documentUrl,
-          photoUrls: JSON.stringify(pages),
-          extractionStructuree: JSON.stringify({ evidence: finale.evidence, medicamentEvidence: med.evidence }),
-          statut: "VALIDE",
+          statut: "VALIDEE",
+          valeursCorrigees: JSON.stringify(finale),
+          resultatFinal: JSON.stringify({ ...finale, ordonnanceId: created.ordonnanceId }),
+          valideeLe: new Date(),
+          ordonnanceId: created.ordonnanceId,
         },
       });
-      ids.push(created.id);
-    }
-
-    await tx.extractionOrdonnance.update({
-      where: { id, statut: "A_VERIFIER" },
-      data: {
-        statut: "VALIDEE",
-        valeursCorrigees: JSON.stringify(finale),
-        resultatFinal: JSON.stringify({ ...finale, ordonnanceIds: ids }),
-        valideeLe: new Date(),
-        ordonnanceId: ids[0],
-      },
+      return created;
     });
-    return ids;
-  }).catch((error: unknown) => {
-    if (error instanceof Error && error.message === "MEDICAMENT_INTROUVABLE") return null;
-    throw error;
-  });
 
-  if (!ordonnanceIds) {
-    return NextResponse.json({ error: "La fiche medicament proposee n'existe plus" }, { status: 409 });
+    return NextResponse.json({
+      ordonnanceId: resultat.ordonnanceId,
+      count: resultat.medicamentIds.length,
+      statut: "VALIDEE",
+    });
+  } catch (error) {
+    if (error instanceof OrdonnanceValidationError) {
+      const status = error.code === "MEDICAMENT_INTROUVABLE" ? 409 : 400;
+      return NextResponse.json({ error: error.message, code: error.code }, { status });
+    }
+    throw error;
   }
-  return NextResponse.json({
-    ordonnanceId: ordonnanceIds[0],
-    ordonnanceIds,
-    count: ordonnanceIds.length,
-    statut: "VALIDEE",
-  });
 }

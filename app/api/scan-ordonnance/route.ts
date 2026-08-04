@@ -76,7 +76,10 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
 Regles obligatoires :
 - Associe chaque date a son libelle proche. La date pres de "derniere visite" est lastVisitDate et jamais prescriptionDate.
 - La date de l'ordonnance est celle proche de "ordonnance n" ou de la mention "le" dans l'en-tete de prescription.
-- "Delivre ce jour" alimente deliveryDate seulement si une date est associee.
+- deliveryDate reste null sauf si la date est explicitement associee a une mention de delivrance
+  ("delivre le", "date de delivrance", "delivrance" ou formulation non ambigue equivalente).
+- Une date isolee, ancienne ou rattachee a un autre contenu ne doit jamais alimenter deliveryDate.
+- Si deliveryDate est renseignee, evidence.deliveryDate doit contenir le libelle exact qui la justifie.
 - Une dose "1 ml pour 10 kg" est ponderale : doseValue=1, referenceValue=10, referenceType=live_weight, normalizedDoseValue=0.1. Ce n'est pas une dose fixe de 1 ml.
 - Accepte aussi les doses fixes par animal et les doses en mg/kg.
 - Separe une injection initiale, un rappel conditionnel et la duree du traitement.

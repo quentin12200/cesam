@@ -16,6 +16,10 @@ export default async function OrdonnanceDetailPage({ params }: PageProps) {
   const ordonnance = await prisma.ordonnance.findUnique({
     where: { id },
     include: {
+      medicaments: {
+        include: { medicament: { select: { nom: true, categorie: true } } },
+        orderBy: { createdAt: "asc" },
+      },
       traitements: {
         include: { animal: { select: { nutrav: true, nobovi: true } } },
         orderBy: { dateDebut: "desc" },
@@ -66,6 +70,18 @@ export default async function OrdonnanceDetailPage({ params }: PageProps) {
           notes: ordonnance.notes,
           photoUrl: ordonnance.photoUrl,
         }}
+        medicaments={ordonnance.medicaments.map((item) => ({
+          id: item.id,
+          nomExtrait: item.nomExtrait,
+          nomPharmacie: item.medicament.nom,
+          categorie: item.medicament.categorie,
+          posologieExtraite: item.posologieExtraite,
+          voieExtraite: item.voieExtraite,
+          dureeExtraite: item.dureeExtraite,
+          delaiAttenteViande: item.delaiAttenteViande,
+          delaiAttenteLait: item.delaiAttenteLait,
+          statutCorrespondance: item.statutCorrespondance,
+        }))}
         traitements={ordonnance.traitements.map((t) => ({
           id: t.id,
           medicamentNom: t.medicamentNom,

@@ -6,10 +6,17 @@ export async function GET(request: NextRequest) {
   const nom = searchParams.get("nom")?.trim().toLowerCase();
   if (!nom) return NextResponse.json([]);
 
-  const all = await prisma.ordonnance.findMany({ orderBy: { date: "desc" }, take: 500 });
+  const all = await prisma.ordonnance.findMany({
+    orderBy: { date: "desc" },
+    take: 500,
+    include: { medicaments: { select: { nomExtrait: true, medicament: { select: { nom: true } } } } },
+  });
   const matches = all.filter((o) => {
-    const on = o.medicamentNom.toLowerCase();
-    return on.length > 0 && (on.includes(nom) || nom.includes(on));
+    const noms = [
+      o.medicamentNom,
+      ...o.medicaments.flatMap((item) => [item.nomExtrait, item.medicament.nom]),
+    ].map((value) => value.toLowerCase()).filter(Boolean);
+    return noms.some((value) => value.includes(nom) || nom.includes(value));
   });
 
   return NextResponse.json(matches.slice(0, 20));

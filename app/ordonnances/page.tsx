@@ -9,6 +9,7 @@ async function getOrdonnances(): Promise<OrdonnanceItem[]> {
   const rows = await prisma.ordonnance.findMany({
     orderBy: { date: "desc" },
     take: 200,
+    include: { medicaments: { select: { nomExtrait: true }, orderBy: { createdAt: "asc" } } },
   });
   return rows.map((o) => ({
     id: o.id,
@@ -28,6 +29,7 @@ async function getOrdonnances(): Promise<OrdonnanceItem[]> {
     statut: o.statut,
     notes: o.notes,
     photoUrl: o.photoUrl,
+    medicaments: o.medicaments,
   }));
 }
 
@@ -38,14 +40,20 @@ async function getExtractionsAVerifier(): Promise<ExtractionAVerifierItem[]> {
     take: 50,
   });
   return rows.map((row) => {
-    let proposition: { medicamentNom?: string | null; ordonnanceNumero?: string | null } = {};
+    let proposition: {
+      medicamentNom?: string | null;
+      medicaments?: Array<{ medicamentNom?: string | null }>;
+      ordonnanceNumero?: string | null;
+    } = {};
     try {
       proposition = JSON.parse(row.propositionInitiale);
     } catch {}
     return {
       id: row.id,
       analyseLe: row.analyseLe.toISOString(),
-      medicamentNom: proposition.medicamentNom ?? null,
+      medicamentNom: proposition.medicaments && proposition.medicaments.length > 1
+        ? `${proposition.medicaments.length} médicaments détectés`
+        : proposition.medicaments?.[0]?.medicamentNom ?? proposition.medicamentNom ?? null,
       ordonnanceNumero: proposition.ordonnanceNumero ?? null,
     };
   });

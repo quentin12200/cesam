@@ -39,6 +39,7 @@ async function getData() {
     prisma.ordonnance.findMany({
       orderBy: { date: "desc" },
       take: 200,
+      include: { medicaments: { select: { nomExtrait: true }, orderBy: { createdAt: "asc" } } },
     }),
   ]);
 
@@ -81,6 +82,7 @@ async function getData() {
     statut: o.statut,
     notes: o.notes,
     photoUrl: o.photoUrl,
+    medicaments: o.medicaments,
   }));
 
   return { medicamentItems, ordonnanceItems };

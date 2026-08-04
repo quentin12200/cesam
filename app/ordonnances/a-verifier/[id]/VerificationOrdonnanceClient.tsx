@@ -11,6 +11,7 @@ import {
 } from "@/lib/ordonnance-types";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
+import { securiserDateDelivrance, sourceJustifieDateDelivrance } from "@/lib/ordonnance-dates";
 
 interface ExtractionInfo {
   id: string;
@@ -24,6 +25,8 @@ interface MedChamps {
   key: string;
   ia?: MedicamentPropose;
   medicationId: string;
+  createMedication: boolean;
+  categoryConfirmed: boolean;
   medicamentNom: string;
   numeroLot: string;
   substanceActive: string;
@@ -65,7 +68,9 @@ function versChamps(m: MedicamentPropose): MedChamps {
   return {
     key: nouvelleCle(),
     ia: m,
-    medicationId: m.medicationMatch?.id ?? "",
+    medicationId: m.medicationMatchStatus === "matched" ? m.medicationMatch?.id ?? "" : "",
+    createMedication: false,
+    categoryConfirmed: false,
     medicamentNom: s(m.medicamentNom),
     numeroLot: s(m.numeroLot),
     substanceActive: s(m.substanceActive),
@@ -97,7 +102,8 @@ function versChamps(m: MedicamentPropose): MedChamps {
 function champsVides(): MedChamps {
   return {
     key: nouvelleCle(),
-    medicationId: "", medicamentNom: "", numeroLot: "", substanceActive: "", concentration: "", categorie: "",
+    medicationId: "", createMedication: false, categoryConfirmed: false,
+    medicamentNom: "", numeroLot: "", substanceActive: "", concentration: "", categorie: "",
     familleTherapeutique: "", formePharmaceutique: "", conditionnement: "", doseValue: "",
     doseUnit: "", referenceValue: "", referenceUnit: "", referenceType: "",
     normalizedDoseValue: "", normalizedDoseUnit: "", voie: "", administrationCount: "",
@@ -156,7 +162,10 @@ export default function VerificationOrdonnanceClient({
     (propositionInitiale.prescriptionDate ?? propositionInitiale.dateDebut)?.slice(0, 10) ?? "",
   );
   const [lastVisitDate, setLastVisitDate] = useState(propositionInitiale.lastVisitDate?.slice(0, 10) ?? "");
-  const [deliveryDate, setDeliveryDate] = useState(propositionInitiale.deliveryDate?.slice(0, 10) ?? "");
+  const deliveryEvidence = propositionInitiale.evidence?.deliveryDate;
+  const deliveryDateSourcee = sourceJustifieDateDelivrance(deliveryEvidence?.sourceText);
+  const initialDeliveryDate = securiserDateDelivrance(propositionInitiale.deliveryDate, deliveryEvidence);
+  const [deliveryDate, setDeliveryDate] = useState(initialDeliveryDate?.slice(0, 10) ?? "");
   const [ordonnanceNumero, setOrdonnanceNumero] = useState(propositionInitiale.ordonnanceNumero ?? "");
   const [veterinaire, setVeterinaire] = useState(propositionInitiale.veterinaire ?? "");
   const [motif, setMotif] = useState(propositionInitiale.motif ?? "");
@@ -164,6 +173,9 @@ export default function VerificationOrdonnanceClient({
   const [medicaments, setMedicaments] = useState<MedChamps[]>(medsInitiaux.map(versChamps));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const medicamentsRattaches = medicaments.filter((med) => med.medicationId).length;
+  const medicamentsACreer = medicaments.filter((med) => med.createMedication).length;
+  const medicamentsAConfirmer = medicaments.length - medicamentsRattaches - medicamentsACreer;
 
   function majMed(index: number, champ: keyof MedChamps, valeur: string) {
     setMedicaments((prev) => prev.map((m, i) => (i === index ? { ...m, [champ]: valeur } : m)));
@@ -174,14 +186,20 @@ export default function VerificationOrdonnanceClient({
   function retirerMed(index: number) {
     setMedicaments((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
   }
+  function majDecisionMed(index: number, values: Partial<Pick<MedChamps, "medicationId" | "createMedication" | "categoryConfirmed">>) {
+    setMedicaments((prev) => prev.map((m, i) => (i === index ? { ...m, ...values } : m)));
+  }
 
-  function utiliserFiche(index: number) {
+  function utiliserFiche(index: number, matchId?: string) {
     setMedicaments((prev) => prev.map((med, i) => {
-      if (i !== index || !med.ia?.medicationMatch) return med;
-      const match = med.ia.medicationMatch;
+      if (i !== index) return med;
+      const match = med.ia?.medicationMatches.find((item) => item.id === matchId)
+        ?? med.ia?.medicationMatch;
+      if (!match) return med;
       return {
         ...med,
         medicationId: match.id,
+        createMedication: false,
         medicamentNom: match.nom,
         substanceActive: match.dci ?? med.substanceActive,
         categorie: match.categorieLabel,
@@ -210,8 +228,11 @@ export default function VerificationOrdonnanceClient({
           veterinaire,
           motif,
           animaux,
+          evidence: propositionInitiale.evidence ?? {},
           medicaments: medicaments.map((m) => ({
             medicationId: m.medicationId || null,
+            createMedication: m.createMedication,
+            categoryConfirmed: m.categoryConfirmed,
             medicamentNom: m.medicamentNom,
             numeroLot: m.numeroLot,
             substanceActive: m.substanceActive,
@@ -317,7 +338,14 @@ export default function VerificationOrdonnanceClient({
               valeurIA={propositionInitiale.deliveryDate}
               preuve={propositionInitiale.evidence?.deliveryDate as { sourceText: string | null; confidence: number } | undefined}
             >
-              <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className={inputClass} />
+              <input
+                type="date"
+                value={deliveryDate}
+                disabled={!deliveryDateSourcee}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+                className={inputClass}
+              />
+              {!deliveryDateSourcee && <span className="mt-1 block text-[11px] text-gray-400">Non trouvée</span>}
             </Champ>
             <Champ label="Numéro ou référence" valeurIA={propositionInitiale.ordonnanceNumero}>
               <input value={ordonnanceNumero} onChange={(e) => setOrdonnanceNumero(e.target.value)} className={inputClass} />
@@ -337,9 +365,9 @@ export default function VerificationOrdonnanceClient({
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-800">
-              Médicaments ({medicaments.length})
+              {medicaments.length} médicament{medicaments.length > 1 ? "s" : ""} détecté{medicaments.length > 1 ? "s" : ""}
             </h2>
-            <span className="text-[11px] text-gray-400">1 médicament = 1 ordonnance</span>
+            <span className="text-[11px] text-gray-400">Une seule ordonnance</span>
           </div>
 
           <div className="space-y-4">
@@ -358,45 +386,56 @@ export default function VerificationOrdonnanceClient({
                       }]} />
                     )}
                   </div>
-                  {ia?.medicationMatch && (
+                  {ia && ia.medicationMatches.length > 0 ? (
                     <div className={`mb-3 rounded-lg border p-3 text-xs ${
-                      ia.medicationMatch.divergences.length > 0
-                        ? "border-amber-300 bg-amber-50 text-amber-950"
-                        : "border-green-200 bg-green-50 text-green-900"
+                      ia.medicationMatch
+                        ? "border-green-200 bg-green-50 text-green-900"
+                        : "border-amber-300 bg-amber-50 text-amber-950"
                     }`}>
                       <div className="flex items-start gap-2">
-                        {ia.medicationMatch.divergences.length > 0
-                          ? <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                          : <CheckCircle2 size={16} className="mt-0.5 shrink-0" />}
+                        {ia.medicationMatch
+                          ? <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+                          : <AlertTriangle size={16} className="mt-0.5 shrink-0" />}
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold">Fiche proposée : {ia.medicationMatch.nom}</p>
-                          <p className="mt-0.5">{ia.medicationMatch.categorieLabel}{ia.medicationMatch.dci ? ` · ${ia.medicationMatch.dci}` : ""}</p>
-                          <p className="mt-1">
-                            {med.medicationId === ia.medicationMatch.id
-                              ? "Cette fiche sera associée lors de la validation."
-                              : "Cette fiche ne sera pas associée."}
+                          <p className="font-semibold">
+                            {ia.medicationMatch
+                              ? "Médicament retrouvé dans la pharmacie"
+                              : "Plusieurs correspondances possibles — à confirmer"}
                           </p>
-                          {ia.medicationMatch.divergences.length > 0 && (
-                            <p className="mt-1">À vérifier : {ia.medicationMatch.divergences.join(", ")}.</p>
-                          )}
-                        </div>
-                        <div className="flex shrink-0 flex-col gap-1">
-                          <button
-                            type="button"
-                            onClick={() => utiliserFiche(i)}
-                            className="min-h-10 rounded-lg border border-current px-3 font-semibold"
-                          >
-                            Utiliser les valeurs de la fiche
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => majMed(i, "medicationId", "")}
-                            className="min-h-10 rounded-lg px-3 font-medium underline"
-                          >
-                            Ne pas associer
-                          </button>
+                          <div className="mt-2 space-y-2">
+                            {ia.medicationMatches.map((match) => (
+                              <div key={match.id} className="flex flex-col gap-2 rounded-lg border border-current/20 bg-white/70 p-2 sm:flex-row sm:items-center">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold">{match.nom}</p>
+                                  <p>{match.categorieLabel}{match.dci ? ` · ${match.dci}` : ""}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => utiliserFiche(i, match.id)}
+                                  className="min-h-10 rounded-lg border border-current px-3 font-semibold"
+                                >
+                                  {med.medicationId === match.id ? "Fiche utilisée" : "Utiliser cette fiche"}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
+                    </div>
+                  ) : (
+                    <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-950">
+                      <p className="font-semibold">Nouveau médicament</p>
+                      <p className="mt-1">Aucune fiche suffisamment proche n’a été trouvée.</p>
+                      <button
+                        type="button"
+                        onClick={() => majDecisionMed(i, {
+                          medicationId: "",
+                          createMedication: !med.createMedication,
+                        })}
+                        className="mt-2 min-h-10 rounded-lg border border-blue-700 px-3 font-semibold"
+                      >
+                        {med.createMedication ? "Création confirmée" : "Créer cette fiche après vérification"}
+                      </button>
                     </div>
                   )}
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -418,6 +457,21 @@ export default function VerificationOrdonnanceClient({
                     <Champ label="Catégorie" valeurIA={ia?.categorie}>
                       <input value={med.categorie} onChange={(e) => majMed(i, "categorie", e.target.value)} className={inputClass} />
                     </Champ>
+                    {med.createMedication && med.categorie && (
+                      <button
+                        type="button"
+                        onClick={() => majDecisionMed(i, { categoryConfirmed: !med.categoryConfirmed })}
+                        className={`min-h-11 rounded-lg border px-3 text-left text-xs font-semibold ${
+                          med.categoryConfirmed
+                            ? "border-green-300 bg-green-50 text-green-800"
+                            : "border-amber-300 bg-amber-50 text-amber-900"
+                        }`}
+                      >
+                        {med.categoryConfirmed
+                          ? "✓ Catégorie vérifiée"
+                          : "Suggestion IA — confirmer la catégorie"}
+                      </button>
+                    )}
                     <Champ label="Famille thérapeutique" valeurIA={ia?.familleTherapeutique}>
                       <input value={med.familleTherapeutique} onChange={(e) => majMed(i, "familleTherapeutique", e.target.value)} className={inputClass} />
                     </Champ>
@@ -523,21 +577,27 @@ export default function VerificationOrdonnanceClient({
 
           {error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+            <p className="font-semibold">Avant validation</p>
+            <p className="mt-1">
+              {medicaments.length} médicament{medicaments.length > 1 ? "s" : ""} · {medicamentsRattaches} rattaché{medicamentsRattaches > 1 ? "s" : ""} · {medicamentsACreer} à créer · {medicamentsAConfirmer} à vérifier
+            </p>
+            {medicamentsAConfirmer > 0 && (
+              <p className="mt-1 font-semibold text-amber-800">Choisissez une fiche ou confirmez la création avant de valider.</p>
+            )}
+          </div>
+
           <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Link href={returnTo ?? "/ordonnances"} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-600 hover:bg-gray-50">
               Vérifier plus tard
             </Link>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || medicamentsAConfirmer > 0}
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-green-700 px-5 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
             >
               {saving ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
-              {saving
-                ? "Validation…"
-                : medicaments.length > 1
-                  ? `Valider ${medicaments.length} ordonnances`
-                  : "Valider l’ordonnance"}
+              {saving ? "Validation…" : "Valider l’ordonnance"}
             </button>
           </div>
         </div>

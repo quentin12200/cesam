@@ -1,0 +1,170 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  creerOrdonnanceAvecMedicaments,
+  OrdonnanceValidationError,
+  type MedicamentValidationInput,
+  type OrdonnancePersistence,
+  type OrdonnanceValidationInput,
+} from "./ordonnance-validation.ts";
+
+function medicamentInput(overrides: Partial<MedicamentValidationInput> = {}): MedicamentValidationInput {
+  return {
+    medicationId: "med-tenaline",
+    createMedication: false,
+    categoryConfirmed: false,
+    medicamentNom: "TENALINE LA FL. 250 ML",
+    numeroLot: "2111AA",
+    substanceActive: "Oxytetracycline",
+    concentration: null,
+    categorie: "Antibiotique",
+    familleTherapeutique: "Tetracyclines",
+    formePharmaceutique: "Solution injectable",
+    conditionnement: "Flacon 250 ml",
+    voie: "IM",
+    doseValue: 1,
+    doseUnit: "ml",
+    referenceValue: 10,
+    referenceUnit: "kg",
+    referenceType: "live_weight",
+    normalizedDoseValue: 0.1,
+    normalizedDoseUnit: "ml/kg",
+    administrationCount: 1,
+    administrationIntervalHours: null,
+    treatmentDurationDays: 3,
+    repeatCondition: null,
+    administrationInstructions: null,
+    withdrawalPeriods: { meatDays: 21, offalDays: 21, milkDays: 7 },
+    precautions: null,
+    evidence: { dose: { sourceText: "1 ml / 10 kg", confidence: 0.98 } },
+    ...overrides,
+  };
+}
+
+function ordonnanceInput(medicaments: MedicamentValidationInput[]): OrdonnanceValidationInput {
+  return {
+    prescriptionDate: new Date("2026-08-03"),
+    lastVisitDate: new Date("2026-04-14"),
+    deliveryDate: null,
+    ordonnanceNumero: "26-08-0001",
+    veterinaire: "Dr Test",
+    motif: null,
+    animaux: null,
+    evidence: {},
+    medicaments,
+  };
+}
+
+function creerMemoire(options: { failLinkAt?: number } = {}) {
+  const state = {
+    medicaments: [{
+      id: "med-tenaline",
+      nom: "Tenaline LA",
+      dci: "Oxytetracycline" as string | null,
+      forme: "Solution injectable" as string | null,
+      categorie: "ANTIBIOTIQUE",
+      voie: "IM" as string | null,
+      delaiAttenteViandeJ: 21 as number | null,
+      delaiAttenteLaitJ: 7 as number | null,
+      aliasesVocaux: [] as Array<{ alias: string; transcription: string }>,
+    }],
+    ordonnances: [] as Array<Record<string, unknown>>,
+    liens: [] as Array<Record<string, unknown>>,
+  };
+  const tx: OrdonnancePersistence = {
+    medicament: {
+      async findMany() { return state.medicaments; },
+      async findUnique(args) {
+        const id = (args as { where: { id: string } }).where.id;
+        return state.medicaments.find((medicament) => medicament.id === id) ?? null;
+      },
+      async create(args) {
+        const data = (args as { data: Record<string, unknown> }).data;
+        const created = {
+          id: `med-${state.medicaments.length + 1}`,
+          nom: String(data.nom),
+          dci: data.dci as string | null,
+          forme: data.forme as string | null,
+          categorie: String(data.categorie),
+          voie: data.voie as string | null,
+          delaiAttenteViandeJ: data.delaiAttenteViandeJ as number | null,
+          delaiAttenteLaitJ: data.delaiAttenteLaitJ as number | null,
+          aliasesVocaux: [],
+        };
+        state.medicaments.push(created);
+        return created;
+      },
+    },
+    ordonnance: {
+      async create(args) {
+        const data = (args as { data: Record<string, unknown> }).data;
+        state.ordonnances.push(data);
+        return { id: `ord-${state.ordonnances.length}` };
+      },
+    },
+    ordonnanceMedicament: {
+      async create(args) {
+        if (options.failLinkAt === state.liens.length) throw new Error("SIMULATED_LINK_FAILURE");
+        const data = (args as { data: Record<string, unknown> }).data;
+        state.liens.push(data);
+        return { id: `link-${state.liens.length}` };
+      },
+    },
+  };
+  return { state, tx };
+}
+
+test("cree une seule ordonnance et une liaison pour un medicament", async () => {
+  const { state, tx } = creerMemoire();
+  const result = await creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([medicamentInput()]), ["doc.jpg"]);
+  assert.equal(state.ordonnances.length, 1);
+  assert.equal(state.liens.length, 1);
+  assert.equal(result.medicamentIds.length, 1);
+  assert.equal(state.liens[0].posologieExtraite, "1 ml / 10 kg de poids vif");
+  assert.equal(state.liens[0].numeroLot, "2111AA");
+});
+
+test("cree une seule ordonnance et plusieurs liaisons", async () => {
+  const { state, tx } = creerMemoire();
+  const second = medicamentInput({
+    medicationId: null,
+    createMedication: true,
+    medicamentNom: "PRODUIT DISTINCT",
+    substanceActive: null,
+    numeroLot: null,
+    categorie: "Vaccin",
+    categoryConfirmed: false,
+  });
+  await creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([medicamentInput(), second]), ["doc.jpg"]);
+  assert.equal(state.ordonnances.length, 1);
+  assert.equal(state.liens.length, 2);
+  assert.equal(state.medicaments[1].categorie, "AUTRE", "une catégorie IA non confirmée reste incertaine");
+});
+
+test("refuse de creer un doublon ressemblant", async () => {
+  const { tx } = creerMemoire();
+  await assert.rejects(
+    creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([
+      medicamentInput({ medicationId: null, createMedication: true }),
+    ]), ["doc.jpg"]),
+    (error: unknown) => error instanceof OrdonnanceValidationError
+      && error.code === "MEDICAMENT_POSSIBLE_EXISTANT",
+  );
+});
+
+test("une erreur de liaison peut annuler toute la transaction", async () => {
+  const { state, tx } = creerMemoire({ failLinkAt: 0 });
+  const snapshot = structuredClone(state);
+  await assert.rejects(async () => {
+    try {
+      await creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([medicamentInput()]), ["doc.jpg"]);
+    } catch (error) {
+      state.medicaments.splice(0, state.medicaments.length, ...snapshot.medicaments);
+      state.ordonnances.splice(0, state.ordonnances.length, ...snapshot.ordonnances);
+      state.liens.splice(0, state.liens.length, ...snapshot.liens);
+      throw error;
+    }
+  }, /SIMULATED_LINK_FAILURE/);
+  assert.equal(state.ordonnances.length, 0);
+  assert.equal(state.liens.length, 0);
+});
