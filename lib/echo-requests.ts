@@ -6,34 +6,42 @@ import { getEchoListEntryDays } from "@/lib/echo-list-status";
 
 export const ACTIVE_ECHO_REQUEST_WHERE = { etat: "A_FAIRE" } as const;
 
+const UPSERT_BATCH_SIZE = 5;
+
 export async function syncAutomaticEchoRequests() {
-  const storedRules = await prisma.exploitationConfig.findUnique({
-    where: { id: "singleton" },
-    select: { reproductionRulesJson: true },
-  }).catch(() => null);
+  const [storedRules, females, activeAutomaticRequests] = await Promise.all([
+    prisma.exploitationConfig.findUnique({
+      where: { id: "singleton" },
+      select: { reproductionRulesJson: true },
+    }).catch(() => null),
+    prisma.animal.findMany({
+      where: {
+        statut: "ACTIF",
+        sexbov: "F",
+      },
+      select: {
+        id: true,
+        saillies: {
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+          select: { id: true, date: true, gestation: { select: { dateEcho: true } } },
+        },
+        velagesVache: {
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+          take: 1,
+          select: { date: true },
+        },
+      },
+    }),
+    prisma.demandeEchographie.findMany({
+      where: { origine: "AUTOMATIQUE", etat: "A_FAIRE" },
+      select: { id: true, animalId: true, saillieId: true },
+    }),
+  ]);
+
   const rules = parseReproductionRules(storedRules?.reproductionRulesJson);
   const echoPhase = rules.phases.find((phase) => phase.id === "echo_due");
   const listDisplayEnabled = echoPhase?.enabledAlert ?? true;
   const thresholdDays = getEchoListEntryDays(rules.echoTiming);
-
-  const females = await prisma.animal.findMany({
-    where: {
-      statut: "ACTIF",
-      sexbov: "F",
-    },
-    select: {
-      id: true,
-      saillies: {
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-        select: { id: true, date: true, gestation: { select: { dateEcho: true } } },
-      },
-      velagesVache: {
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-        take: 1,
-        select: { date: true },
-      },
-    },
-  });
 
   const latestByAnimal = new Map<string, string>();
   const currentAttemptByAnimal = new Map<string, string>();
@@ -52,10 +60,6 @@ export async function syncAutomaticEchoRequests() {
     }
   }
 
-  const activeAutomaticRequests = await prisma.demandeEchographie.findMany({
-    where: { origine: "AUTOMATIQUE", etat: "A_FAIRE" },
-    select: { id: true, animalId: true, saillieId: true },
-  });
   const obsoleteRequestIds = activeAutomaticRequests
     .filter((request) => currentAttemptByAnimal.get(request.animalId) !== request.saillieId)
     .map((request) => request.id);
@@ -66,19 +70,33 @@ export async function syncAutomaticEchoRequests() {
     });
   }
 
-  for (const [animalId, saillieId] of latestByAnimal) {
-    await prisma.demandeEchographie.upsert({
-      where: { requestKey: `AUTO:${saillieId}` },
-      create: {
-        animalId,
-        saillieId,
-        origine: "AUTOMATIQUE",
-        etat: "A_FAIRE",
-        motif: "DIAGNOSTIC_GESTATION",
-        requestKey: `AUTO:${saillieId}`,
-      },
-      update: {},
-    });
+  const obsoleteRequestIdSet = new Set(obsoleteRequestIds);
+  const existingActiveSaillieIds = new Set(
+    activeAutomaticRequests
+      .filter((request) => !obsoleteRequestIdSet.has(request.id) && request.saillieId)
+      .map((request) => request.saillieId as string),
+  );
+  const missingRequests = [...latestByAnimal]
+    .filter(([, saillieId]) => !existingActiveSaillieIds.has(saillieId));
+
+  for (let index = 0; index < missingRequests.length; index += UPSERT_BATCH_SIZE) {
+    const batch = missingRequests.slice(index, index + UPSERT_BATCH_SIZE);
+    await Promise.all(
+      batch.map(([animalId, saillieId]) =>
+        prisma.demandeEchographie.upsert({
+          where: { requestKey: `AUTO:${saillieId}` },
+          create: {
+            animalId,
+            saillieId,
+            origine: "AUTOMATIQUE",
+            etat: "A_FAIRE",
+            motif: "DIAGNOSTIC_GESTATION",
+            requestKey: `AUTO:${saillieId}`,
+          },
+          update: {},
+        }),
+      ),
+    );
   }
 
   const activeAnimalIds = await prisma.demandeEchographie.findMany({
