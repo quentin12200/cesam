@@ -1,0 +1,4 @@
+/* L’accueil sert à agir, pas à consulter des statistiques générales. */
+[data-layout-section="accueil-apercu-elevage"] {
+  display: none !important;
+}
