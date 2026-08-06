@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Baby, ClipboardList, HeartPulse, Percent, Scale, TrendingUp } from "lucide-react";
+import { Baby, ClipboardList, HeartPulse, LayoutDashboard, Percent, Scale, TrendingUp } from "lucide-react";
 import FinancesTabs from "./FinancesTabs";
 
 export default function PerformancesOverview() {
@@ -13,6 +13,15 @@ export default function PerformancesOverview() {
           <h3 className="font-semibold text-gray-800">Performances techniques</h3>
         </div>
         <div className="divide-y divide-gray-100">
+          <Link href="/finances/performances/vue-ensemble" className="min-h-16 flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
+            <span className="h-10 w-10 flex items-center justify-center rounded-lg bg-green-50 text-green-700 shrink-0">
+              <LayoutDashboard size={20} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-gray-800">Vue d’ensemble de l’élevage</p>
+              <p className="text-xs text-gray-500">Composition du troupeau, gestation, vêlages et mortalité</p>
+            </div>
+          </Link>
           <Link href="/troupeau/gmq" className="min-h-16 flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
             <span className="h-10 w-10 flex items-center justify-center rounded-lg bg-green-50 text-green-700 shrink-0">
               <TrendingUp size={20} />
