@@ -7,8 +7,12 @@ import { getEchoListEntryDays } from "@/lib/echo-list-status";
 export const ACTIVE_ECHO_REQUEST_WHERE = { etat: "A_FAIRE" } as const;
 
 const UPSERT_BATCH_SIZE = 5;
+const SYNC_FRESHNESS_MS = 2 * 60 * 1000;
 
-export async function syncAutomaticEchoRequests() {
+let lastSuccessfulSyncAt = 0;
+let syncInFlight: Promise<void> | null = null;
+
+async function performAutomaticEchoSync() {
   const [storedRules, females, activeAutomaticRequests] = await Promise.all([
     prisma.exploitationConfig.findUnique({
       where: { id: "singleton" },
@@ -115,4 +119,28 @@ export async function syncAutomaticEchoRequests() {
       data: { aEchographier: true },
     });
   }
+}
+
+export async function syncAutomaticEchoRequests(options?: { force?: boolean }) {
+  const force = options?.force === true;
+  const now = Date.now();
+
+  if (!force && lastSuccessfulSyncAt > 0 && now - lastSuccessfulSyncAt < SYNC_FRESHNESS_MS) {
+    return;
+  }
+
+  if (syncInFlight) {
+    await syncInFlight;
+    return;
+  }
+
+  syncInFlight = performAutomaticEchoSync()
+    .then(() => {
+      lastSuccessfulSyncAt = Date.now();
+    })
+    .finally(() => {
+      syncInFlight = null;
+    });
+
+  await syncInFlight;
 }
