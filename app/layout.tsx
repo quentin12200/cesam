@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Geist } from "next/font/google";
 import "./globals.css";
+import "./home-cleanup.css";
 import TopNav from "@/components/TopNav";
 import SplashScreen from "@/components/SplashScreen";
 import InstallPrompt from "@/app/components/InstallPrompt";
