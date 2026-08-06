@@ -9,8 +9,31 @@ import { isWeighingSessionStatus, type WeighingSessionStatus } from "@/lib/weigh
 
 export const dynamic = "force-dynamic";
 
-const dateFormat = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" });
-const timeFormat = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
+const dateFormat = new Intl.DateTimeFormat("fr-FR", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatSessionDay(date: Date, now: Date = new Date()) {
+  const daysAgo = Math.max(
+    0,
+    Math.round(
+      (startOfLocalDay(now).getTime() - startOfLocalDay(date).getTime()) / DAY_MS,
+    ),
+  );
+
+  if (daysAgo === 0) return "Aujourd’hui";
+  if (daysAgo === 1) return "Hier";
+  if (daysAgo <= 6) return `Il y a ${daysAgo} jours`;
+  return dateFormat.format(date);
+}
 
 export default async function WeighingSessionsPage({
   searchParams,
@@ -60,16 +83,14 @@ export default async function WeighingSessionsPage({
       ) : (
         <div className="mt-5 space-y-3">
           <div className="hidden grid-cols-[1.2fr_1fr_0.8fr_0.8fr_1fr_1fr_auto] gap-3 border-b border-gray-300 px-3 pb-2 text-xs font-bold uppercase text-gray-600 md:grid">
-            <span>Date</span><span>Statut</span><span>Animaux</span><span>Sexes</span><span>Poids moyen</span><span>GMQ moyen</span><span>Action</span>
+            <span>Jour</span><span>Statut</span><span>Animaux</span><span>Sexes</span><span>Poids moyen</span><span>GMQ moyen</span><span>Action</span>
           </div>
           {result.items.map((session) => {
-            const started = new Date(session.startedAt);
-            const ended = session.endedAt ? new Date(session.endedAt) : null;
+            const sessionDay = new Date(session.startedAt);
             return (
               <article key={session.id} className="rounded-md border border-gray-300 bg-white p-3 shadow-sm md:grid md:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_1fr_1fr_auto] md:items-center md:gap-3">
                 <div>
-                  <p className="font-bold">{dateFormat.format(started)}</p>
-                  <p className="text-sm text-gray-600">{timeFormat.format(started)}{ended ? ` – ${timeFormat.format(ended)}` : ""}</p>
+                  <p className="font-bold">{formatSessionDay(sessionDay)}</p>
                 </div>
                 <p className="mt-2 font-semibold md:mt-0">{statusLabel(session.status)}</p>
                 <p className="mt-2 text-sm md:mt-0"><strong>{session.count}</strong> animaux</p>
