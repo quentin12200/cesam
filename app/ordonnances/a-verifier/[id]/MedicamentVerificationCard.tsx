@@ -89,7 +89,10 @@ export default function MedicamentVerificationCard({
     ?? (med.medicationId ? med.ia?.medicationMatch : null)
     ?? pharmacyOptions.find((item) => item.id === med.medicationId);
   const presentation = analyserPresentation(med.conditionnement);
-  const dose = formaterDoseCompacte(med);
+  const dose = formaterDoseCompacte({
+    ...med,
+    doseSourceText: med.ia?.evidence.dose?.sourceText,
+  });
   const doseDetaillee = formaterDose(med);
   const rythme = formaterRythme(med);
   const renouvellement = formaterRenouvellement(med);

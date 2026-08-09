@@ -89,6 +89,9 @@ Regles obligatoires :
 - Pour le conditionnement, conserve distinctement dans la meme phrase le nombre d'unites delivrees et la
   presentation, par exemple "1 flacon de 100 ml". N'invente jamais une quantite absente du document.
 - Une dose "1 ml pour 10 kg" est ponderale : doseValue=1, referenceValue=10, referenceType=live_weight, normalizedDoseValue=0.1. Ce n'est pas une dose fixe de 1 ml.
+- Lorsqu'une dose pratique (ml, g, comprime ou bolus) et une dose de substance active en mg/kg sont toutes les deux lisibles,
+  renseigne doseValue/doseUnit/referenceValue/referenceUnit avec la dose pratique. Conserve le passage complet dans
+  evidence.dose.sourceText afin que la dose pharmacologique reste verifiable. N'invente aucune conversion entre mg et ml.
 - Accepte aussi les doses fixes par animal et les doses en mg/kg.
 - Separe une injection initiale, un rappel conditionnel et la duree du traitement.
 - administrationCount contient le nombre d'administrations. repeatCondition contient uniquement la condition
@@ -107,7 +110,9 @@ interface ImageEntree {
 
 async function chargerCandidats(): Promise<MedicamentCandidat[]> {
   const medicaments = await prisma.medicament.findMany({
-    where: { actif: true },
+    // La pharmacie affiche aussi les fiches inactives : elles doivent rester
+    // reconnaissables pour éviter de recréer un médicament déjà existant.
+    orderBy: { nom: "asc" },
     select: {
       id: true,
       nom: true,

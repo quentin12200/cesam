@@ -42,11 +42,39 @@ test("rend la voie et le protocole lisibles", () => {
 
 test("privilegie la dose pratique en volume dans le resume", () => {
   const dose = {
-    doseValue: "1", doseUnit: "ml", referenceValue: "10", referenceUnit: "kg", referenceType: "live_weight",
-    normalizedDoseValue: "20", normalizedDoseUnit: "mg/kg",
+    doseValue: "20", doseUnit: "mg", referenceValue: "1", referenceUnit: "kg", referenceType: "live_weight",
+    formePharmaceutique: "Solution injectable",
+    doseSourceText: "20 mg d'oxytétracycline par kg de poids vif, soit 1 ml pour 10 kg",
   };
   assert.equal(formaterDoseCompacte(dose), "1 ml / 10 kg");
   assert.doesNotMatch(formaterDoseCompacte(dose) ?? "", /20 mg/);
+  assert.equal(formaterDose(dose), "20 mg pour 1 kg de poids vif");
+});
+
+test("n'invente aucune conversion entre mg et ml", () => {
+  assert.equal(formaterDoseCompacte({
+    doseValue: "20",
+    doseUnit: "mg",
+    referenceValue: "1",
+    referenceUnit: "kg",
+    referenceType: "live_weight",
+    formePharmaceutique: "Solution injectable",
+    doseSourceText: "20 mg par kg de poids vif",
+  }), "20 mg / 1 kg");
+});
+
+test("ignore une dose pratique issue d'une autre preuve OCR", () => {
+  const doseAvecAutrePreuve = {
+    doseValue: "20",
+    doseUnit: "mg",
+    referenceValue: "1",
+    referenceUnit: "kg",
+    referenceType: "live_weight",
+    formePharmaceutique: "Solution injectable",
+    doseSourceText: "20 mg par kg de poids vif",
+    autreSourceOcr: "1 ml pour 10 kg",
+  };
+  assert.equal(formaterDoseCompacte(doseAvecAutrePreuve), "20 mg / 1 kg");
 });
 
 test("ne transforme pas une consigne pratique en rythme", () => {
