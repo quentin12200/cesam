@@ -158,10 +158,23 @@ test("rapproche Tenaline de la fiche existante sans en creer une", () => {
 });
 
 test("rapproche le nom OCR complet de la fiche commerciale Tenaline", () => {
+  const candidatPharmacie = {
+    id: "med-tenaline-pharmacie",
+    nom: "Ténaline",
+    dci: "Oxytétracycline",
+    forme: "Solution injectable",
+    categorie: "ANTIBIOTIQUE",
+    voie: "IM",
+    delaiAttenteViandeJ: 21,
+    delaiAttenteLaitJ: 7,
+    aliases: [],
+  };
   const proposition = normaliserAnalyseOrdonnance({
     medicaments: [{ medicamentNom: "TENALINE LA CLAS SOL INJ FL. 100 ML" }],
-  }, [{ ...tenaline, nom: "Ténaline" }]);
-  assert.equal(proposition.medicaments?.[0].medicationMatch?.id, "med-tenaline");
+  }, [candidatPharmacie]);
+  assert.equal(proposition.medicaments?.[0].medicationMatch?.id, "med-tenaline-pharmacie");
+  assert.equal(proposition.medicaments?.[0].medicationMatch?.nom, "Ténaline");
+  assert.equal(proposition.medicaments?.[0].medicationMatch?.categorieLabel, "Antibiotique");
   assert.equal(proposition.medicaments?.[0].medicationMatchStatus, "matched");
 });
 

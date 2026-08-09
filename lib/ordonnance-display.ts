@@ -60,12 +60,46 @@ export function formaterDoseCompacte(med: {
   referenceValue: string;
   referenceUnit: string;
   referenceType: string;
+  formePharmaceutique?: string;
+  conditionnement?: string;
+  doseSourceText?: string | null;
 }): string | null {
+  const dosePratique = extraireDosePratique(
+    med.doseSourceText,
+    [med.formePharmaceutique, med.conditionnement].filter(Boolean).join(" "),
+  );
+  if (dosePratique) return dosePratique;
   if (!med.doseValue || !med.doseUnit) return null;
   const base = `${med.doseValue} ${med.doseUnit}`;
   if (med.referenceType === "animal") return `${base} / animal`;
   if (!med.referenceValue || !med.referenceUnit) return base;
   return `${base} / ${med.referenceValue} ${med.referenceUnit}`;
+}
+
+function extraireDosePratique(
+  doseSourceText: string | null | undefined,
+  presentation: string,
+): string | null {
+  const texte = doseSourceText?.trim() ?? "";
+  if (!texte) return null;
+  const contexte = sansAccents(`${presentation} ${texte}`).toLowerCase();
+  const estLiquide = /\b(solution|injectable|injection|flacon|liquide|aerosol)\b/.test(contexte);
+  const estPoudre = /\bpoudre\b/.test(contexte);
+  const estUnite = /\b(comprime|cp|bolus)\b/.test(contexte);
+  const unites = estLiquide ? "ml" : estPoudre ? "g" : estUnite ? "comprim(?:e|é)s?|cp|bolus" : "ml|g|comprim(?:e|é)s?|cp|bolus";
+  const pattern = new RegExp(
+    `\\b(\\d+(?:[.,]\\d+)?)\\s*(${unites})\\s*(?:pour|par|/)\\s*(?:(\\d+(?:[.,]\\d+)?)\\s*)?(kg|animal(?:aux)?|bovin(?:s)?)\\b`,
+    "i",
+  );
+  const match = texte.match(pattern);
+  if (!match) return null;
+  const valeur = match[1].replace(",", ".");
+  const uniteBrute = sansAccents(match[2]).toLowerCase();
+  const unite = /^(?:comprime|cp)/.test(uniteBrute) ? "comprimé" : uniteBrute;
+  const reference = sansAccents(match[4]).toLowerCase() === "kg"
+    ? `${match[3]?.replace(",", ".") ?? "1"} kg`
+    : "animal";
+  return `${valeur} ${unite} / ${reference}`;
 }
 
 export function estInstructionPratique(value: string | null | undefined): boolean {

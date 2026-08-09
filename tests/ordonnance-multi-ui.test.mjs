@@ -2,13 +2,23 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-const [verification, medicationCard, route, detail, schema] = await Promise.all([
+const [verification, medicationCard, route, detail, schema, scanRoute] = await Promise.all([
   readFile(new URL("../app/ordonnances/a-verifier/[id]/VerificationOrdonnanceClient.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/ordonnances/a-verifier/[id]/MedicamentVerificationCard.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/api/extractions-ordonnance/[id]/valider/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/ordonnances/[id]/OrdonnanceDetailClient.tsx", import.meta.url), "utf8"),
   readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
+  readFile(new URL("../app/api/scan-ordonnance/route.ts", import.meta.url), "utf8"),
 ]);
+
+test("le scan charge toutes les fiches visibles dans la pharmacie", () => {
+  const chargement = scanRoute.slice(
+    scanRoute.indexOf("async function chargerCandidats"),
+    scanRoute.indexOf("function construireResultat"),
+  );
+  assert.match(chargement, /prisma\.medicament\.findMany/);
+  assert.doesNotMatch(chargement, /where:\s*\{\s*actif:\s*true\s*\}/);
+});
 
 test("l'ecran annonce le nombre de medicaments sans multiplier les ordonnances", () => {
   assert.match(verification, /médicament\{medicaments\.length > 1 \? "s" : ""\} détecté/);
@@ -47,6 +57,12 @@ test("la carte separe pharmacie, dose, rythme et instructions", () => {
   assert.match(medicationCard, /Changer d’association/);
   assert.match(medicationCard, /absenceConfirmee &&/);
   assert.match(medicationCard, /formaterDoseCompacte/);
+  assert.match(medicationCard, /med\.ia\?\.evidence\.dose\?\.sourceText/);
+  const calculDose = medicationCard.slice(
+    medicationCard.indexOf("const dose ="),
+    medicationCard.indexOf("const doseDetaillee"),
+  );
+  assert.doesNotMatch(calculDose, /Object\.values\(med\.ia\.evidence\)/);
   assert.match(medicationCard, /rythmeEtDuree/);
   assert.match(medicationCard, /RotateCcw/);
   assert.match(medicationCard, /label="Instructions"/);
