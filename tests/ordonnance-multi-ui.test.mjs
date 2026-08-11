@@ -80,6 +80,15 @@ test("la carte separe pharmacie, dose, rythme et instructions", () => {
   assert.match(medicationCard, /label="Instructions"/);
 });
 
+test("la carte abandonne la preuve OCR des qu'une dose est corrigee manuellement", () => {
+  assert.match(verification, /resoudreDosePratique/);
+  assert.match(verification, /doseValue:\s*dosePratique\.doseValue/);
+  assert.match(verification, /doseManuallyEdited:\s*med\.doseManuallyEdited \|\| champDose/);
+  assert.match(medicationCard, /preferStructuredDose:\s*med\.doseManuallyEdited/);
+  assert.match(verification, /doseValue:\s*med\.doseValue/);
+  assert.match(verification, /referenceValue:\s*med\.referenceValue/);
+});
+
 test("la carte supprime la validation individuelle sans toucher a la validation globale", () => {
   assert.doesNotMatch(medicationCard, /useState\(false\).*validated/);
   assert.doesNotMatch(medicationCard, /setValidated/);

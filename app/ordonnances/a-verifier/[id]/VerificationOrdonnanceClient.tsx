@@ -16,6 +16,7 @@ import {
   sourceJustifieDateDelivrance,
 } from "@/lib/ordonnance-dates";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
+import { resoudreDosePratique } from "@/lib/ordonnance-display";
 import MedicamentVerificationCard, { type MedicationFields } from "./MedicamentVerificationCard";
 
 interface ExtractionInfo {
@@ -37,6 +38,19 @@ function s(value: string | number | null | undefined): string {
 }
 
 function versChamps(m: MedicamentPropose): MedicationFields {
+  const doseInitiale = {
+    doseValue: s(m.doseValue),
+    doseUnit: s(m.doseUnit),
+    referenceValue: s(m.referenceValue),
+    referenceUnit: s(m.referenceUnit),
+    referenceType: s(m.referenceType),
+  };
+  const dosePratique = resoudreDosePratique({
+    ...doseInitiale,
+    formePharmaceutique: s(m.formePharmaceutique),
+    conditionnement: s(m.conditionnement),
+    doseSourceText: m.evidence.dose?.sourceText,
+  }) ?? doseInitiale;
   return {
     key: nouvelleCle(),
     ia: m,
@@ -51,11 +65,12 @@ function versChamps(m: MedicamentPropose): MedicationFields {
     familleTherapeutique: s(m.familleTherapeutique),
     formePharmaceutique: s(m.formePharmaceutique),
     conditionnement: s(m.conditionnement),
-    doseValue: s(m.doseValue),
-    doseUnit: s(m.doseUnit),
-    referenceValue: s(m.referenceValue),
-    referenceUnit: s(m.referenceUnit),
-    referenceType: s(m.referenceType),
+    doseValue: dosePratique.doseValue,
+    doseUnit: dosePratique.doseUnit,
+    referenceValue: dosePratique.referenceValue,
+    referenceUnit: dosePratique.referenceUnit,
+    referenceType: dosePratique.referenceType,
+    doseManuallyEdited: false,
     normalizedDoseValue: s(m.normalizedDoseValue),
     normalizedDoseUnit: s(m.normalizedDoseUnit),
     voie: s(m.voie),
@@ -77,7 +92,7 @@ function champsVides(): MedicationFields {
     medicamentNom: "", numeroLot: "", substanceActive: "", concentration: "", categorie: "",
     familleTherapeutique: "", formePharmaceutique: "", conditionnement: "", doseValue: "",
     doseUnit: "", referenceValue: "", referenceUnit: "", referenceType: "", normalizedDoseValue: "",
-    normalizedDoseUnit: "", voie: "", administrationCount: "", administrationIntervalHours: "",
+    doseManuallyEdited: false, normalizedDoseUnit: "", voie: "", administrationCount: "", administrationIntervalHours: "",
     treatmentDurationDays: "", repeatCondition: "", administrationInstructions: "", meatDays: "",
     offalDays: "", milkDays: "", precautions: "",
   };
@@ -130,7 +145,12 @@ export default function VerificationOrdonnanceClient({
     || Boolean(deliveryDate && prescriptionDate && deliveryDate === prescriptionDate);
 
   function majMed(index: number, field: keyof MedicationFields, value: string) {
-    setMedicaments((previous) => previous.map((med, i) => (i === index ? { ...med, [field]: value } : med)));
+    const champDose = ["doseValue", "doseUnit", "referenceValue", "referenceUnit", "referenceType"].includes(field);
+    setMedicaments((previous) => previous.map((med, i) => (i === index ? {
+      ...med,
+      [field]: value,
+      doseManuallyEdited: med.doseManuallyEdited || champDose,
+    } : med)));
   }
 
   function majDecision(index: number, values: Partial<Pick<MedicationFields, "medicationId" | "createMedication" | "categoryConfirmed">>) {

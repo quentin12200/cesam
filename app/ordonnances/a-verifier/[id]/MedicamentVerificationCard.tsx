@@ -32,6 +32,7 @@ export interface MedicationFields {
   referenceValue: string;
   referenceUnit: string;
   referenceType: string;
+  doseManuallyEdited: boolean;
   normalizedDoseValue: string;
   normalizedDoseUnit: string;
   voie: string;
@@ -92,6 +93,7 @@ export default function MedicamentVerificationCard({
   const dose = formaterDoseCompacte({
     ...med,
     doseSourceText: med.ia?.evidence.dose?.sourceText,
+    preferStructuredDose: med.doseManuallyEdited,
   });
   const doseDetaillee = formaterDose(med);
   const rythme = formaterRythme(med);

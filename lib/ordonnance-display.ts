@@ -71,12 +71,50 @@ export function formaterDoseCompacte(med: {
   formePharmaceutique?: string;
   conditionnement?: string;
   doseSourceText?: string | null;
+  preferStructuredDose?: boolean;
 }): string | null {
-  const dosePratique = extraireDosePratique(
+  const doseStructuree = formaterDoseStructureeCompacte(med);
+  if (med.preferStructuredDose) return doseStructuree;
+  const dosePratique = resoudreDosePratique(med);
+  if (dosePratique) return formaterDoseStructureeCompacte(dosePratique);
+  return doseStructuree;
+}
+
+interface DoseStructuree {
+  doseValue: string;
+  doseUnit: string;
+  referenceValue: string;
+  referenceUnit: string;
+  referenceType: string;
+}
+
+export function resoudreDosePratique(med: DoseStructuree & {
+  formePharmaceutique?: string;
+  conditionnement?: string;
+  doseSourceText?: string | null;
+}): DoseStructuree | null {
+  if (med.doseValue && med.doseUnit && estUniteDosePratique(med.doseUnit)) {
+    return {
+      doseValue: med.doseValue,
+      doseUnit: med.doseUnit,
+      referenceValue: med.referenceValue,
+      referenceUnit: med.referenceUnit,
+      referenceType: med.referenceType,
+    };
+  }
+  return extraireDosePratique(
     med.doseSourceText,
     [med.formePharmaceutique, med.conditionnement].filter(Boolean).join(" "),
   );
-  if (dosePratique) return dosePratique;
+}
+
+function formaterDoseStructureeCompacte(med: {
+  doseValue: string;
+  doseUnit: string;
+  referenceValue: string;
+  referenceUnit: string;
+  referenceType: string;
+}): string | null {
   if (!med.doseValue || !med.doseUnit) return null;
   const base = `${med.doseValue} ${med.doseUnit}`;
   if (med.referenceType === "animal") return `${base} / animal`;
@@ -84,10 +122,15 @@ export function formaterDoseCompacte(med: {
   return `${base} / ${med.referenceValue} ${med.referenceUnit}`;
 }
 
+function estUniteDosePratique(value: string): boolean {
+  const unite = sansAccents(value).toLowerCase().replace(/[^a-z]/g, "");
+  return /^(?:ml|cl|l|g|grammes?|comprimes?|cp|bolus|unites?)$/.test(unite);
+}
+
 function extraireDosePratique(
   doseSourceText: string | null | undefined,
   presentation: string,
-): string | null {
+): DoseStructuree | null {
   const texte = doseSourceText?.trim() ?? "";
   if (!texte) return null;
   const contexte = sansAccents(`${presentation} ${texte}`).toLowerCase();
@@ -104,10 +147,14 @@ function extraireDosePratique(
   const valeur = match[1].replace(",", ".");
   const uniteBrute = sansAccents(match[2]).toLowerCase();
   const unite = /^(?:comprime|cp)/.test(uniteBrute) ? "comprimé" : uniteBrute;
-  const reference = sansAccents(match[4]).toLowerCase() === "kg"
-    ? `${match[3]?.replace(",", ".") ?? "1"} kg`
-    : "animal";
-  return `${valeur} ${unite} / ${reference}`;
+  const referenceKg = sansAccents(match[4]).toLowerCase() === "kg";
+  return {
+    doseValue: valeur,
+    doseUnit: unite,
+    referenceValue: referenceKg ? match[3]?.replace(",", ".") ?? "1" : "",
+    referenceUnit: referenceKg ? "kg" : "",
+    referenceType: referenceKg ? "live_weight" : "animal",
+  };
 }
 
 export function estInstructionPratique(value: string | null | undefined): boolean {
