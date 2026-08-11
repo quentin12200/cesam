@@ -41,6 +41,14 @@ export function analyserPresentation(value: string | null | undefined): Presenta
   return { presentation: presentation || null, quantite: Number.isFinite(quantite) ? quantite : null };
 }
 
+export function formaterPresentationCompacte(value: string | null | undefined): string | null {
+  const { presentation, quantite } = analyserPresentation(value);
+  const libelle = presentation
+    ?.replace(/^(flacons?|a[ée]rosols?|ampoules?|bo[iî]tes?)\s+de\s+(?=\d)/i, "$1 ")
+    .replace(/^./, (premiereLettre) => premiereLettre.toUpperCase());
+  return [libelle, quantite !== null ? `Qté ${quantite}` : null].filter(Boolean).join(" · ") || null;
+}
+
 export function formaterDose(med: {
   doseValue: string;
   doseUnit: string;

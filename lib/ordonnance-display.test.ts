@@ -5,6 +5,7 @@ import {
   estInstructionPratique,
   formaterDose,
   formaterDoseCompacte,
+  formaterPresentationCompacte,
   formaterRenouvellement,
   formaterRythme,
   formaterVoie,
@@ -22,6 +23,11 @@ test("conserve une presentation sans inventer de quantite", () => {
     presentation: "Flacon de 250 ml",
     quantite: null,
   });
+});
+
+test("affiche la presentation et la quantite sans doublon", () => {
+  assert.equal(formaterPresentationCompacte("1 flacon de 100 ml"), "Flacon 100 ml · Qté 1");
+  assert.equal(formaterPresentationCompacte("Flacon 250 ml"), "Flacon 250 ml");
 });
 
 test("formate la posologie ponderale en une phrase compacte", () => {

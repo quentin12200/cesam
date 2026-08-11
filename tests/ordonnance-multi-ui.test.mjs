@@ -37,7 +37,10 @@ test("les correspondances ambigues exigent un choix explicite", () => {
 test("la carte principale est compacte et les donnees techniques sont repliees", () => {
   const avantDetails = medicationCard.slice(0, medicationCard.indexOf("<details"));
   assert.match(avantDetails, /Présentation|presentation/);
-  assert.match(avantDetails, /Quantité/);
+  assert.match(avantDetails, /presentationCompacte/);
+  assert.match(avantDetails, /Dose à vérifier/);
+  assert.match(avantDetails, /Durée à vérifier/);
+  assert.match(avantDetails, /Délai à vérifier/);
   assert.match(avantDetails, /Dose/);
   assert.match(avantDetails, /Délais d’attente/);
   assert.doesNotMatch(avantDetails, /Substance active/);
@@ -50,8 +53,8 @@ test("la carte principale est compacte et les donnees techniques sont repliees",
 });
 
 test("la carte separe pharmacie, dose, rythme et instructions", () => {
-  assert.match(medicationCard, /✅ Médicament reconnu/);
-  assert.match(medicationCard, /⚠ Médicament non reconnu/);
+  assert.match(medicationCard, /✓ Pharmacie/);
+  assert.match(medicationCard, /Non reconnu/);
   assert.match(medicationCard, /Associer à une fiche existante/);
   assert.match(medicationCard, /Créer une fiche/);
   assert.match(medicationCard, /Changer d’association/);
@@ -66,6 +69,22 @@ test("la carte separe pharmacie, dose, rythme et instructions", () => {
   assert.match(medicationCard, /rythmeEtDuree/);
   assert.match(medicationCard, /RotateCcw/);
   assert.match(medicationCard, /label="Instructions"/);
+});
+
+test("la carte supprime la validation individuelle sans toucher a la validation globale", () => {
+  assert.doesNotMatch(medicationCard, /useState\(false\).*validated/);
+  assert.doesNotMatch(medicationCard, /setValidated/);
+  assert.doesNotMatch(medicationCard, />Valider</);
+  assert.match(verification, /Valider l’ordonnance/);
+});
+
+test("la carte ne repete plus le numero generique du medicament", () => {
+  assert.doesNotMatch(medicationCard, /Médicament \{index \+ 1\}/);
+});
+
+test("un encadre de delais n'est affiche que lorsque des delais existent", () => {
+  assert.match(medicationCard, /\{delaisComplets && \(/);
+  assert.doesNotMatch(medicationCard, /Délai non détecté/);
 });
 
 test("les delais viande abats et lait ne sont pas melanges", () => {

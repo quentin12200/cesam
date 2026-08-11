@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Beef, CalendarDays, Check, ChevronDown, Milk, Pencil, RotateCcw, Syringe } from "lucide-react";
+import { AlertTriangle, Beef, CalendarDays, ChevronDown, Milk, Pencil, RotateCcw, Syringe } from "lucide-react";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import type { MedicamentCorrespondant, MedicamentPropose } from "@/lib/ordonnance-types";
 import {
-  analyserPresentation,
   formaterDose,
   formaterDoseCompacte,
+  formaterPresentationCompacte,
   formaterRenouvellement,
   formaterRythme,
   formaterVoie,
@@ -82,13 +82,13 @@ export default function MedicamentVerificationCard({
   pharmacyOptions: MedicamentCorrespondant[];
 }) {
   const [editing, setEditing] = useState(false);
-  const [validated, setValidated] = useState(false);
   const [associating, setAssociating] = useState(false);
   const [absenceConfirmee, setAbsenceConfirmee] = useState(false);
-  const match = med.ia?.medicationMatches.find((item) => item.id === med.medicationId)
+  const correspondances = med.ia?.medicationMatches ?? [];
+  const match = correspondances.find((item) => item.id === med.medicationId)
     ?? (med.medicationId ? med.ia?.medicationMatch : null)
     ?? pharmacyOptions.find((item) => item.id === med.medicationId);
-  const presentation = analyserPresentation(med.conditionnement);
+  const presentationCompacte = formaterPresentationCompacte(med.conditionnement);
   const dose = formaterDoseCompacte({
     ...med,
     doseSourceText: med.ia?.evidence.dose?.sourceText,
@@ -106,37 +106,46 @@ export default function MedicamentVerificationCard({
   ].filter(Boolean).join(" • ");
   const nomAffiche = match?.nom ?? (med.medicamentNom || `Médicament ${index + 1}`);
   const delaisComplets = med.meatDays || med.offalDays || med.milkDays;
-  const lectureAVerifier = Boolean(med.ia && Object.values(med.ia.evidence).some(
-    (evidence) => evidence.confidence < 0.7 || !evidence.sourceText,
-  ));
+  const preuveFaible = (cles: string[]) => cles.some((cle) => {
+    const evidence = med.ia?.evidence[cle];
+    return Boolean(evidence && (evidence.confidence < 0.7 || !evidence.sourceText));
+  });
+  const doseAVerifier = !dose || preuveFaible(["dose"]);
+  const dureeAVerifier = preuveFaible(["duration", "treatmentDurationDays", "administrationProtocol"]);
+  const delaiAVerifier = !delaisComplets || preuveFaible(["withdrawalPeriods", "meatDays", "offalDays", "milkDays"]);
+  const correspondancesAmbigues = !med.medicationId && correspondances.length > 0;
+  const statutPharmacie = med.medicationId
+    ? { label: "✓ Pharmacie", className: "bg-green-100 text-green-800" }
+    : correspondancesAmbigues
+      ? { label: "À associer", className: "bg-amber-100 text-amber-800" }
+      : { label: "Non reconnu", className: "bg-gray-100 text-gray-700" };
 
   const change = (field: keyof MedicationFields, value: string) => {
-    setValidated(false);
     onChange(field, value);
   };
 
   const choisirAssociation = (id: string) => {
-    setValidated(false);
     setAssociating(false);
     setAbsenceConfirmee(false);
     onUseMatch(id);
   };
 
   return (
-    <article className={`rounded-xl border bg-white p-3 shadow-sm ${validated ? "border-green-300" : "border-gray-200"}`}>
+    <article className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-            Médicament {index + 1}
-            {lectureAVerifier && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">À vérifier</span>}
-          </p>
-          <h3 className="truncate text-lg font-bold text-gray-950">{nomAffiche}</h3>
-          {(presentation.presentation || presentation.quantite !== null) && (
-            <p className="mt-0.5 text-sm text-gray-600">
-              {presentation.quantite !== null && presentation.presentation ? `${presentation.quantite} ` : ""}
-              {presentation.presentation}{presentation.presentation && presentation.quantite !== null ? " · " : ""}
-              {presentation.quantite !== null ? `Quantité : ${presentation.quantite}` : ""}
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="min-w-0 truncate text-lg font-bold text-gray-950">{nomAffiche}</h3>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statutPharmacie.className}`}>{statutPharmacie.label}</span>
+          </div>
+          {match?.categorieLabel && <p className="mt-0.5 text-xs font-medium text-green-800">{match.categorieLabel}</p>}
+          {presentationCompacte && <p className="mt-1 text-sm text-gray-600">{presentationCompacte}</p>}
+          {(doseAVerifier || dureeAVerifier || delaiAVerifier) && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-amber-800">
+              {doseAVerifier && <span className="rounded bg-amber-50 px-1.5 py-0.5">Dose à vérifier</span>}
+              {dureeAVerifier && <span className="rounded bg-amber-50 px-1.5 py-0.5">Durée à vérifier</span>}
+              {delaiAVerifier && <span className="rounded bg-amber-50 px-1.5 py-0.5">Délai à vérifier</span>}
+            </div>
           )}
         </div>
         {total > 1 && (
@@ -161,40 +170,38 @@ export default function MedicamentVerificationCard({
         )}
       </div>
 
-      <div className="mt-3 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-950">
-        <p className="font-semibold">Délais d’attente</p>
-        {delaisComplets ? (
+      {delaisComplets && (
+        <div className="mt-3 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-950">
+          <p className="font-semibold">Délais d’attente</p>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
             {(med.meatDays || med.offalDays) && (
               <span className="inline-flex items-center gap-1"><Beef size={13} /> {[med.meatDays && `Viande : ${med.meatDays} j`, med.offalDays && `Abats : ${med.offalDays} j`].filter(Boolean).join(" • ")}</span>
             )}
             {med.milkDays && <span className="inline-flex items-center gap-1"><Milk size={13} /> Lait : {med.milkDays} j</span>}
           </div>
-        ) : <p className="mt-0.5 text-orange-800">Délai non détecté — à vérifier</p>}
-      </div>
+        </div>
+      )}
 
       {med.medicationId ? (
-        <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-900">
-          <p className="font-semibold">✅ Médicament reconnu</p>
-          {match?.categorieLabel && <p className="mt-0.5 text-green-800">{match.categorieLabel}</p>}
-          <button type="button" onClick={() => setAssociating((value) => !value)} className="mt-1 text-[11px] font-medium text-green-700 underline-offset-2 hover:underline">
+        <div className="mt-2 text-xs">
+          <button type="button" onClick={() => setAssociating((value) => !value)} className="text-[11px] font-medium text-gray-500 underline-offset-2 hover:underline">
             Changer d’association
           </button>
           {associating && (
             <select
               value={med.medicationId}
               onChange={(event) => event.target.value && choisirAssociation(event.target.value)}
-              className="mt-2 min-h-9 w-full rounded-lg border border-green-200 bg-white px-2 text-xs"
+              className="mt-2 min-h-9 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs"
             >
               {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}</option>)}
             </select>
           )}
         </div>
-      ) : med.ia && med.ia.medicationMatches.length > 0 ? (
+      ) : correspondancesAmbigues ? (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
           <p className="flex items-center gap-2 font-semibold"><AlertTriangle size={15} /> Plusieurs correspondances possibles — à confirmer</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            {med.ia.medicationMatches.map((candidate) => (
+            {correspondances.map((candidate) => (
               <button key={candidate.id} type="button" onClick={() => choisirAssociation(candidate.id)} className="min-h-9 rounded-lg border border-amber-400 bg-white px-3 font-semibold">
                 Utiliser cette fiche : {candidate.nom}
               </button>
@@ -209,7 +216,7 @@ export default function MedicamentVerificationCard({
               Associer à une fiche existante
             </button>
             {absenceConfirmee && (
-              <button type="button" onClick={() => { setValidated(false); onDecision({ medicationId: "", createMedication: !med.createMedication }); }} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
+              <button type="button" onClick={() => onDecision({ medicationId: "", createMedication: !med.createMedication })} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
                 {med.createMedication ? "Création confirmée" : "Créer une fiche"}
               </button>
             )}
@@ -301,12 +308,9 @@ export default function MedicamentVerificationCard({
         </div>
       )}
 
-      <footer className="mt-3 flex gap-2">
-        <button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700">
+      <footer className="mt-3">
+        <button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 sm:w-auto">
           <Pencil size={14} /> {editing ? "Fermer la modification" : "Modifier"}
-        </button>
-        <button type="button" onClick={() => { setValidated(true); setEditing(false); }} className={`inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold ${validated ? "bg-green-100 text-green-800" : "bg-green-700 text-white"}`}>
-          <Check size={15} /> {validated ? "Validé" : "Valider"}
         </button>
       </footer>
     </article>
