@@ -78,6 +78,53 @@ test("la carte supprime la validation individuelle sans toucher a la validation 
   assert.match(verification, /Valider l’ordonnance/);
 });
 
+test("le formulaire de modification montre d'abord les informations pratiques", () => {
+  const formulaire = medicationCard.slice(
+    medicationCard.indexOf('aria-labelledby="medication-edit-heading"'),
+    medicationCard.indexOf('<footer className="mt-3">'),
+  );
+  const avantAvance = formulaire.slice(0, formulaire.indexOf('Détails avancés'));
+
+  assert.match(avantAvance, />Médicament</);
+  assert.match(avantAvance, /Nom du médicament/);
+  assert.match(avantAvance, /Présentation et quantité délivrée/);
+  assert.match(avantAvance, />Administration</);
+  assert.match(avantAvance, /Dose pratique/);
+  assert.match(avantAvance, /doseValue/);
+  assert.match(avantAvance, /referenceType/);
+  assert.match(avantAvance, />Traitement</);
+  assert.match(avantAvance, /administrationCount/);
+  assert.match(avantAvance, />Renouvellement</);
+  assert.match(avantAvance, />Délais d’attente</);
+});
+
+test("les donnees techniques restent editables dans les details avances replies", () => {
+  const formulaire = medicationCard.slice(
+    medicationCard.indexOf('aria-labelledby="medication-edit-heading"'),
+    medicationCard.indexOf('<footer className="mt-3">'),
+  );
+  const avances = formulaire.slice(formulaire.indexOf('<details'));
+
+  assert.match(avances, /Détails avancés/);
+  assert.doesNotMatch(avances, /<details[^>]*\sopen(?:\s|>)/);
+  for (const field of [
+    "numeroLot",
+    "substanceActive",
+    "concentration",
+    "categorie",
+    "familleTherapeutique",
+    "formePharmaceutique",
+    "normalizedDoseValue",
+    "normalizedDoseUnit",
+    "administrationInstructions",
+    "precautions",
+  ]) {
+    assert.match(avances, new RegExp(`change\\("${field}"`));
+  }
+  assert.match(formulaire, /categoryConfirmed/);
+  assert.match(formulaire, /confirmer la catégorie/);
+});
+
 test("la carte ne repete plus le numero generique du medicament", () => {
   assert.doesNotMatch(medicationCard, /Médicament \{index \+ 1\}/);
 });

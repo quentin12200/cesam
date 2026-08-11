@@ -271,41 +271,84 @@ export default function MedicamentVerificationCard({
       </details>
 
       {editing && (
-        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <p className="mb-3 text-xs font-semibold text-gray-700">Modifier les informations</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Nom du médicament *" wide><input required value={med.medicamentNom} onChange={(e) => change("medicamentNom", e.target.value)} className={inputClass} /></Field>
-            <Field label="Présentation et quantité délivrée" wide><input value={med.conditionnement} onChange={(e) => change("conditionnement", e.target.value)} className={inputClass} placeholder="1 flacon de 100 ml" /></Field>
-            <Field label="Voie"><input value={med.voie} onChange={(e) => change("voie", e.target.value)} className={inputClass} /></Field>
-            <Field label="N° de lot"><input value={med.numeroLot} onChange={(e) => change("numeroLot", e.target.value)} className={inputClass} /></Field>
-            <Field label="Dose"><input type="number" min="0" step="0.01" value={med.doseValue} onChange={(e) => change("doseValue", e.target.value)} className={inputClass} /></Field>
-            <Field label="Unité"><input value={med.doseUnit} onChange={(e) => change("doseUnit", e.target.value)} className={inputClass} /></Field>
-            <Field label="Pour"><input type="number" min="0" step="0.01" value={med.referenceValue} onChange={(e) => change("referenceValue", e.target.value)} className={inputClass} /></Field>
-            <Field label="Unité de référence"><input value={med.referenceUnit} onChange={(e) => change("referenceUnit", e.target.value)} className={inputClass} /></Field>
-            <Field label="Type de dose"><select value={med.referenceType} onChange={(e) => change("referenceType", e.target.value)} className={inputClass}><option value="">Non précisé</option><option value="live_weight">Selon le poids vif</option><option value="animal">Par animal</option></select></Field>
-            <Field label="Instructions pratiques"><input value={med.administrationInstructions} onChange={(e) => change("administrationInstructions", e.target.value)} className={inputClass} /></Field>
-            <Field label="Nombre d’administrations"><input type="number" min="0" value={med.administrationCount} onChange={(e) => change("administrationCount", e.target.value)} className={inputClass} /></Field>
-            <Field label="Intervalle (heures)"><input type="number" min="0" value={med.administrationIntervalHours} onChange={(e) => change("administrationIntervalHours", e.target.value)} className={inputClass} /></Field>
-            <Field label="Durée (jours)"><input type="number" min="0" value={med.treatmentDurationDays} onChange={(e) => change("treatmentDurationDays", e.target.value)} className={inputClass} /></Field>
-            <Field label="Condition de renouvellement"><input value={med.repeatCondition} onChange={(e) => change("repeatCondition", e.target.value)} className={inputClass} /></Field>
-            <Field label="Viande (jours)"><input type="number" min="0" value={med.meatDays} onChange={(e) => change("meatDays", e.target.value)} className={inputClass} /></Field>
-            <Field label="Abats (jours)"><input type="number" min="0" value={med.offalDays} onChange={(e) => change("offalDays", e.target.value)} className={inputClass} /></Field>
-            <Field label="Lait (jours)"><input type="number" min="0" value={med.milkDays} onChange={(e) => change("milkDays", e.target.value)} className={inputClass} /></Field>
-            <Field label="Substance active"><input value={med.substanceActive} onChange={(e) => change("substanceActive", e.target.value)} className={inputClass} /></Field>
-            <Field label="Concentration"><input value={med.concentration} onChange={(e) => change("concentration", e.target.value)} className={inputClass} /></Field>
-            <Field label="Catégorie"><input value={med.categorie} onChange={(e) => change("categorie", e.target.value)} className={inputClass} /></Field>
-            <Field label="Famille thérapeutique"><input value={med.familleTherapeutique} onChange={(e) => change("familleTherapeutique", e.target.value)} className={inputClass} /></Field>
-            <Field label="Forme pharmaceutique"><input value={med.formePharmaceutique} onChange={(e) => change("formePharmaceutique", e.target.value)} className={inputClass} /></Field>
-            <Field label="Dose normalisée"><input type="number" min="0" step="0.001" value={med.normalizedDoseValue} onChange={(e) => change("normalizedDoseValue", e.target.value)} className={inputClass} /></Field>
-            <Field label="Unité normalisée"><input value={med.normalizedDoseUnit} onChange={(e) => change("normalizedDoseUnit", e.target.value)} className={inputClass} /></Field>
-            <Field label="Précautions" wide><textarea value={med.precautions} onChange={(e) => change("precautions", e.target.value)} rows={2} className={inputClass} /></Field>
+        <section aria-labelledby="medication-edit-heading" className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <h4 id="medication-edit-heading" className="mb-3 text-sm font-semibold text-gray-800">Modifier les informations pratiques</h4>
+
+          <div className="space-y-4">
+            <div>
+              <p className="mb-2 text-xs font-semibold text-gray-700">Médicament</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Nom du médicament *" wide><input required value={med.medicamentNom} onChange={(e) => change("medicamentNom", e.target.value)} className={inputClass} /></Field>
+                <Field label="Présentation et quantité délivrée" wide><input value={med.conditionnement} onChange={(e) => change("conditionnement", e.target.value)} className={inputClass} placeholder="1 flacon de 100 ml" /></Field>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-3">
+              <p className="mb-2 text-xs font-semibold text-gray-700">Administration</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Voie" wide><input value={med.voie} onChange={(e) => change("voie", e.target.value)} className={inputClass} /></Field>
+              </div>
+              <div className="mt-3 rounded-lg border border-gray-200 bg-white p-2.5">
+                <p className="mb-2 text-[11px] font-semibold text-gray-600">Dose pratique</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                  <Field label="Valeur"><input type="number" min="0" step="0.01" value={med.doseValue} onChange={(e) => change("doseValue", e.target.value)} className={inputClass} /></Field>
+                  <Field label="Unité"><input value={med.doseUnit} onChange={(e) => change("doseUnit", e.target.value)} className={inputClass} /></Field>
+                  <Field label="Pour"><input type="number" min="0" step="0.01" value={med.referenceValue} onChange={(e) => change("referenceValue", e.target.value)} className={inputClass} /></Field>
+                  <Field label="Unité de référence"><input value={med.referenceUnit} onChange={(e) => change("referenceUnit", e.target.value)} className={inputClass} /></Field>
+                  <Field label="Type de dose"><select value={med.referenceType} onChange={(e) => change("referenceType", e.target.value)} className={inputClass}><option value="">Non précisé</option><option value="live_weight">Selon le poids vif</option><option value="animal">Par animal</option></select></Field>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-3">
+              <p className="mb-2 text-xs font-semibold text-gray-700">Traitement</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Nombre d’administrations"><input type="number" min="0" value={med.administrationCount} onChange={(e) => change("administrationCount", e.target.value)} className={inputClass} /></Field>
+                <Field label="Durée (jours)"><input type="number" min="0" value={med.treatmentDurationDays} onChange={(e) => change("treatmentDurationDays", e.target.value)} className={inputClass} /></Field>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-3">
+              <p className="mb-2 text-xs font-semibold text-gray-700">Renouvellement</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Intervalle (heures)"><input type="number" min="0" value={med.administrationIntervalHours} onChange={(e) => change("administrationIntervalHours", e.target.value)} className={inputClass} /></Field>
+                <Field label="Condition de renouvellement"><input value={med.repeatCondition} onChange={(e) => change("repeatCondition", e.target.value)} className={inputClass} /></Field>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-3">
+              <p className="mb-2 text-xs font-semibold text-gray-700">Délais d’attente</p>
+              <div className="grid grid-cols-3 gap-2">
+                <Field label="Viande (jours)"><input type="number" min="0" value={med.meatDays} onChange={(e) => change("meatDays", e.target.value)} className={inputClass} /></Field>
+                <Field label="Abats (jours)"><input type="number" min="0" value={med.offalDays} onChange={(e) => change("offalDays", e.target.value)} className={inputClass} /></Field>
+                <Field label="Lait (jours)"><input type="number" min="0" value={med.milkDays} onChange={(e) => change("milkDays", e.target.value)} className={inputClass} /></Field>
+              </div>
+            </div>
+
+            <details className="group border-t border-gray-200 pt-3">
+              <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between text-xs font-semibold text-gray-700">
+                Détails avancés <ChevronDown size={15} className="transition group-open:rotate-180" />
+              </summary>
+              <div className="mt-2 grid gap-3 rounded-lg border border-gray-200 bg-white p-2.5 sm:grid-cols-2">
+                <Field label="N° de lot"><input value={med.numeroLot} onChange={(e) => change("numeroLot", e.target.value)} className={inputClass} /></Field>
+                <Field label="Substance active"><input value={med.substanceActive} onChange={(e) => change("substanceActive", e.target.value)} className={inputClass} /></Field>
+                <Field label="Concentration"><input value={med.concentration} onChange={(e) => change("concentration", e.target.value)} className={inputClass} /></Field>
+                <Field label="Catégorie"><input value={med.categorie} onChange={(e) => change("categorie", e.target.value)} className={inputClass} /></Field>
+                <Field label="Famille thérapeutique"><input value={med.familleTherapeutique} onChange={(e) => change("familleTherapeutique", e.target.value)} className={inputClass} /></Field>
+                <Field label="Forme pharmaceutique"><input value={med.formePharmaceutique} onChange={(e) => change("formePharmaceutique", e.target.value)} className={inputClass} /></Field>
+                <Field label="Dose normalisée"><input type="number" min="0" step="0.001" value={med.normalizedDoseValue} onChange={(e) => change("normalizedDoseValue", e.target.value)} className={inputClass} /></Field>
+                <Field label="Unité normalisée"><input value={med.normalizedDoseUnit} onChange={(e) => change("normalizedDoseUnit", e.target.value)} className={inputClass} /></Field>
+                <Field label="Instructions pratiques" wide><textarea value={med.administrationInstructions} onChange={(e) => change("administrationInstructions", e.target.value)} rows={2} className={inputClass} /></Field>
+                <Field label="Précautions" wide><textarea value={med.precautions} onChange={(e) => change("precautions", e.target.value)} rows={2} className={inputClass} /></Field>
+              </div>
+            </details>
           </div>
           {med.createMedication && med.categorie && (
             <button type="button" onClick={() => onDecision({ categoryConfirmed: !med.categoryConfirmed })} className="mt-3 min-h-10 rounded-lg border border-amber-300 bg-amber-50 px-3 text-xs font-semibold text-amber-900">
               {med.categoryConfirmed ? "✓ Catégorie vérifiée" : "Suggestion IA — confirmer la catégorie"}
             </button>
           )}
-        </div>
+        </section>
       )}
 
       <footer className="mt-3">
