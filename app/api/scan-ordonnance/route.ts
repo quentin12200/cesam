@@ -3,6 +3,7 @@ import { getAuthorizedEmail } from "@/lib/cesam-auth";
 import { prisma } from "@/lib/prisma";
 import type { PropositionOrdonnance } from "@/lib/ordonnance-types";
 import { normaliserAnalyseOrdonnance, type MedicamentCandidat } from "@/lib/ordonnance-extraction";
+import { chargerCandidatsOrdonnance } from "@/lib/ordonnance-medication-candidates";
 
 export const maxDuration = 60;
 
@@ -108,29 +109,6 @@ interface ImageEntree {
   mimeType: string;
 }
 
-async function chargerCandidats(): Promise<MedicamentCandidat[]> {
-  const medicaments = await prisma.medicament.findMany({
-    // La pharmacie affiche aussi les fiches inactives : elles doivent rester
-    // reconnaissables pour éviter de recréer un médicament déjà existant.
-    orderBy: { nom: "asc" },
-    select: {
-      id: true,
-      nom: true,
-      dci: true,
-      forme: true,
-      categorie: true,
-      voie: true,
-      delaiAttenteViandeJ: true,
-      delaiAttenteLaitJ: true,
-      aliasesVocaux: { select: { alias: true, transcription: true } },
-    },
-  });
-  return medicaments.map((medicament) => ({
-    ...medicament,
-    aliases: medicament.aliasesVocaux.flatMap((alias) => [alias.alias, alias.transcription]),
-  }));
-}
-
 function construireResultat(
   parsed: Record<string, unknown> | null | undefined,
   raw: string,
@@ -214,7 +192,7 @@ export async function POST(req: NextRequest) {
 
   const data = await response.json();
   const raw: string = data.choices?.[0]?.message?.content ?? "";
-  const candidats = await chargerCandidats();
+  const candidats = await chargerCandidatsOrdonnance((args) => prisma.medicament.findMany(args));
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     return NextResponse.json(construireResultat(parsed, raw, candidats));

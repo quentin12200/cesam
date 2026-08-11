@@ -21,6 +21,7 @@ export interface MedicamentCorrespondant {
   voie: string | null;
   delaiAttenteViandeJ: number | null;
   delaiAttenteLaitJ: number | null;
+  actif?: boolean;
   score: number;
   concordances: string[];
   divergences: string[];

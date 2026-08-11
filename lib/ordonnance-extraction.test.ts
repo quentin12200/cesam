@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   normaliserAnalyseOrdonnance,
+  reevaluerCorrespondancesOrdonnance,
   trouverCorrespondancesMedicaments,
 } from "./ordonnance-extraction.ts";
 import { medicamentsDepuisProposition } from "./ordonnance-types.ts";
@@ -16,6 +17,7 @@ const tenaline = {
   voie: "IM",
   delaiAttenteViandeJ: 21,
   delaiAttenteLaitJ: 7,
+  actif: true,
   aliases: [],
 };
 
@@ -167,6 +169,7 @@ test("rapproche le nom OCR complet de la fiche commerciale Tenaline", () => {
     voie: "IM",
     delaiAttenteViandeJ: 21,
     delaiAttenteLaitJ: 7,
+    actif: true,
     aliases: [],
   };
   const proposition = normaliserAnalyseOrdonnance({
@@ -176,6 +179,62 @@ test("rapproche le nom OCR complet de la fiche commerciale Tenaline", () => {
   assert.equal(proposition.medicaments?.[0].medicationMatch?.nom, "Ténaline");
   assert.equal(proposition.medicaments?.[0].medicationMatch?.categorieLabel, "Antibiotique");
   assert.equal(proposition.medicaments?.[0].medicationMatchStatus, "matched");
+  assert.equal(proposition.medicaments?.[0].medicationMatch?.actif, true);
+});
+
+test("retrouve une fiche Tenaline inactive sans proposer un doublon", () => {
+  const proposition = normaliserAnalyseOrdonnance({
+    medicaments: [{ medicamentNom: "TENALINE LA CLAS SOL INJ FL. 100 ML" }],
+  }, [{ ...tenaline, actif: false }]);
+  assert.equal(proposition.medicaments?.[0].medicationMatch?.id, "med-tenaline");
+  assert.equal(proposition.medicaments?.[0].medicationMatch?.actif, false);
+  assert.equal(proposition.medicaments?.[0].medicationMatchStatus, "matched");
+});
+
+test("tolere une espace ou une confusion de lettre mineure dans le nom commercial", () => {
+  const fichePharmacie = { ...tenaline, nom: "Ténaline" };
+  for (const nom of ["TENA LINE", "TENALlNE"]) {
+    const proposition = normaliserAnalyseOrdonnance({
+      medicaments: [{ medicamentNom: nom }],
+    }, [fichePharmacie]);
+    assert.equal(proposition.medicaments?.[0].medicationMatch?.id, "med-tenaline", nom);
+    assert.equal(proposition.medicaments?.[0].medicationMatchStatus, "matched", nom);
+  }
+});
+
+test("reevalue une ancienne extraction non rapprochee", () => {
+  const ancienMedicament = {
+    ...analyse.medicaments![0],
+    medicationMatch: null,
+    medicationMatches: [],
+    medicationMatchStatus: "unmatched" as const,
+  };
+  const reevaluee = reevaluerCorrespondancesOrdonnance({ medicaments: [ancienMedicament] }, [tenaline]);
+  assert.equal(reevaluee.medicaments?.[0].medicationMatch?.id, "med-tenaline");
+  assert.equal(reevaluee.medicaments?.[0].medicationMatchStatus, "matched");
+});
+
+test("reevalue aussi une ancienne extraction ambigue sans choix manuel", () => {
+  const ancienMedicament = {
+    ...analyse.medicaments![0],
+    medicationMatch: null,
+    medicationMatches: [],
+    medicationMatchStatus: "ambiguous" as const,
+  };
+  const reevaluee = reevaluerCorrespondancesOrdonnance({ medicaments: [ancienMedicament] }, [tenaline]);
+  assert.equal(reevaluee.medicaments?.[0].medicationMatch?.id, "med-tenaline");
+  assert.equal(reevaluee.medicaments?.[0].medicationMatchStatus, "matched");
+});
+
+test("ne remplace jamais une association manuelle existante", () => {
+  const manuel = {
+    ...analyse.medicaments![0],
+    medicationMatchStatus: "manually_confirmed" as const,
+    medicationMatch: { ...analyse.medicaments![0].medicationMatch!, id: "med-choisi-manuellement" },
+  };
+  const reevaluee = reevaluerCorrespondancesOrdonnance({ medicaments: [manuel] }, [tenaline]);
+  assert.equal(reevaluee.medicaments?.[0].medicationMatch?.id, "med-choisi-manuellement");
+  assert.equal(reevaluee.medicaments?.[0].medicationMatchStatus, "manually_confirmed");
 });
 
 test("conserve plusieurs medicaments dans une seule extraction structuree", () => {

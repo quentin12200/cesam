@@ -114,8 +114,11 @@ export default function MedicamentVerificationCard({
   const dureeAVerifier = preuveFaible(["duration", "treatmentDurationDays", "administrationProtocol"]);
   const delaiAVerifier = !delaisComplets || preuveFaible(["withdrawalPeriods", "meatDays", "offalDays", "milkDays"]);
   const correspondancesAmbigues = !med.medicationId && correspondances.length > 0;
+  const matchInactif = match?.actif === false;
   const statutPharmacie = med.medicationId
-    ? { label: "✓ Pharmacie", className: "bg-green-100 text-green-800" }
+    ? matchInactif
+      ? { label: "Pharmacie · inactive", className: "bg-amber-100 text-amber-900" }
+      : { label: "✓ Pharmacie", className: "bg-green-100 text-green-800" }
     : correspondancesAmbigues
       ? { label: "À associer", className: "bg-amber-100 text-amber-800" }
       : { label: "Non reconnu", className: "bg-gray-100 text-gray-700" };
@@ -139,6 +142,7 @@ export default function MedicamentVerificationCard({
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statutPharmacie.className}`}>{statutPharmacie.label}</span>
           </div>
           {match?.categorieLabel && <p className="mt-0.5 text-xs font-medium text-green-800">{match.categorieLabel}</p>}
+          {matchInactif && <p className="mt-0.5 text-[11px] font-medium text-amber-800">Fiche inactive — conservée pour éviter un doublon.</p>}
           {presentationCompacte && <p className="mt-1 text-sm text-gray-600">{presentationCompacte}</p>}
           {(doseAVerifier || dureeAVerifier || delaiAVerifier) && (
             <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-amber-800">
@@ -193,7 +197,7 @@ export default function MedicamentVerificationCard({
               onChange={(event) => event.target.value && choisirAssociation(event.target.value)}
               className="mt-2 min-h-9 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs"
             >
-              {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}</option>)}
+              {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}{option.actif === false ? " — inactive" : ""}</option>)}
             </select>
           )}
         </div>
@@ -203,7 +207,7 @@ export default function MedicamentVerificationCard({
           <div className="mt-2 flex flex-wrap gap-2">
             {correspondances.map((candidate) => (
               <button key={candidate.id} type="button" onClick={() => choisirAssociation(candidate.id)} className="min-h-9 rounded-lg border border-amber-400 bg-white px-3 font-semibold">
-                Utiliser cette fiche : {candidate.nom}
+                Utiliser cette fiche : {candidate.nom}{candidate.actif === false ? " — inactive" : ""}
               </button>
             ))}
           </div>
@@ -229,7 +233,7 @@ export default function MedicamentVerificationCard({
                 className="min-h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm"
               >
                 <option value="">Choisir dans la pharmacie…</option>
-                {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}</option>)}
+                {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}{option.actif === false ? " — inactive" : ""}</option>)}
               </select>
               <button type="button" onClick={() => { setAssociating(false); setAbsenceConfirmee(true); }} className="text-[11px] font-medium text-gray-500 underline-offset-2 hover:underline">
                 Aucune fiche ne correspond

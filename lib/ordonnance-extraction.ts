@@ -5,7 +5,7 @@ import type {
   MedicamentPropose,
   PropositionOrdonnance,
 } from "./ordonnance-types.ts";
-import { medicamentVide } from "./ordonnance-types.ts";
+import { medicamentVide, medicamentsDepuisProposition } from "./ordonnance-types.ts";
 import {
   extraireDateDelivrance,
   extraireDateDerniereVisite,
@@ -22,6 +22,7 @@ export interface MedicamentCandidat {
   voie: string | null;
   delaiAttenteViandeJ: number | null;
   delaiAttenteLaitJ: number | null;
+  actif?: boolean;
   aliases: string[];
 }
 
@@ -76,6 +77,33 @@ export function normaliserNomMedicament(value: string): string {
     .replace(/[^A-Z0-9]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+function distanceEdition(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const precedente = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const courante = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      courante[j] = Math.min(
+        courante[j - 1] + 1,
+        precedente[j] + 1,
+        precedente[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    precedente.splice(0, precedente.length, ...courante);
+  }
+  return precedente[b.length];
+}
+
+function scoreNomProche(nom: string, candidat: string): number {
+  const nomCompact = nom.replaceAll(" ", "");
+  const candidatCompact = candidat.replaceAll(" ", "");
+  if (nomCompact.length < 6 || candidatCompact.length < 6) return 0;
+  if (nomCompact === candidatCompact) return 0.98;
+  return distanceEdition(nomCompact, candidatCompact) === 1 ? 0.94 : 0;
 }
 
 function classerDates(p: Record<string, unknown>): {
@@ -166,6 +194,7 @@ export function trouverCorrespondancesMedicaments(
       if (item.length < 4) return false;
       return ` ${nom} `.includes(` ${item} `) || ` ${item} `.includes(` ${nom} `);
     });
+    const scoreProche = Math.max(...noms.map((item) => scoreNomProche(nom, item)));
     const tokensNom = new Set(nom.split(" "));
     const tokenScore = Math.max(...noms.map((item) => {
       const tokens = item.split(" ").filter(Boolean);
@@ -175,7 +204,10 @@ export function trouverCorrespondancesMedicaments(
       substanceActive && candidat.dci
       && normaliserNomMedicament(substanceActive).includes(normaliserNomMedicament(candidat.dci)),
     );
-    const score = Math.min(1, exact ? 1 : nomContenu ? 0.97 : tokenScore * 0.85 + (dciConcorde ? 0.15 : 0));
+    const score = Math.min(1, exact ? 1 : nomContenu ? 0.97 : Math.max(
+      scoreProche,
+      tokenScore * 0.85 + (dciConcorde ? 0.15 : 0),
+    ));
     if (score >= 0.72) resultats.push({ candidat, score });
   }
   return resultats
@@ -190,10 +222,45 @@ export function trouverCorrespondancesMedicaments(
       voie: candidat.voie,
       delaiAttenteViandeJ: candidat.delaiAttenteViandeJ,
       delaiAttenteLaitJ: candidat.delaiAttenteLaitJ,
+      actif: candidat.actif !== false,
       score,
       concordances: [],
       divergences: [],
     }));
+}
+
+function evaluerCorrespondance(
+  proposition: MedicamentPropose,
+  candidats: MedicamentCandidat[],
+): MedicamentPropose {
+  const matches = trouverCorrespondancesMedicaments(
+    proposition.medicamentNom,
+    proposition.substanceActive,
+    candidats,
+  ).map((match) => comparerAvecReference(proposition, match));
+  const match = trouverMedicament(proposition.medicamentNom, proposition.substanceActive, candidats);
+  return {
+    ...proposition,
+    medicationMatch: match ? comparerAvecReference(proposition, match) : null,
+    medicationMatches: matches,
+    medicationMatchStatus: match ? "matched" : matches.length > 0 ? "ambiguous" : "unmatched",
+  };
+}
+
+export function reevaluerCorrespondancesOrdonnance(
+  proposition: PropositionOrdonnance,
+  candidats: MedicamentCandidat[],
+): PropositionOrdonnance {
+  const medicaments = medicamentsDepuisProposition(proposition);
+  return {
+    ...proposition,
+    medicaments: medicaments.map((medicament) => {
+      if (medicament.medicationMatchStatus === "matched" || medicament.medicationMatchStatus === "manually_confirmed") {
+        return medicament;
+      }
+      return evaluerCorrespondance(medicament, candidats);
+    }),
+  };
 }
 
 export function comparerAvecReference(
@@ -264,21 +331,7 @@ export function normaliserAnalyseOrdonnance(
       medicationMatch: null,
       evidence: preuves(m.evidence),
     };
-    const matches = trouverCorrespondancesMedicaments(
-      proposition.medicamentNom,
-      proposition.substanceActive,
-      candidats,
-    ).map((match) => comparerAvecReference(proposition, match));
-    const match = trouverMedicament(proposition.medicamentNom, proposition.substanceActive, candidats);
-    const medicationMatchStatus: MedicamentPropose["medicationMatchStatus"] = match
-      ? "matched"
-      : matches.length > 0 ? "ambiguous" : "unmatched";
-    return {
-      ...proposition,
-      medicationMatch: match ? comparerAvecReference(proposition, match) : null,
-      medicationMatches: matches,
-      medicationMatchStatus,
-    };
+    return evaluerCorrespondance(proposition, candidats);
   }).filter((m) => m.medicamentNom || m.doseValue || m.numeroLot);
 
   return {

@@ -2,22 +2,31 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-const [verification, medicationCard, route, detail, schema, scanRoute] = await Promise.all([
+const [verification, medicationCard, route, detail, schema, scanRoute, verificationPage, validationService, candidatesSource] = await Promise.all([
   readFile(new URL("../app/ordonnances/a-verifier/[id]/VerificationOrdonnanceClient.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/ordonnances/a-verifier/[id]/MedicamentVerificationCard.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/api/extractions-ordonnance/[id]/valider/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/ordonnances/[id]/OrdonnanceDetailClient.tsx", import.meta.url), "utf8"),
   readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
   readFile(new URL("../app/api/scan-ordonnance/route.ts", import.meta.url), "utf8"),
+  readFile(new URL("../app/ordonnances/a-verifier/[id]/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../lib/ordonnance-validation.ts", import.meta.url), "utf8"),
+  readFile(new URL("../lib/ordonnance-medication-candidates.ts", import.meta.url), "utf8"),
 ]);
 
-test("le scan charge toutes les fiches visibles dans la pharmacie", () => {
-  const chargement = scanRoute.slice(
-    scanRoute.indexOf("async function chargerCandidats"),
-    scanRoute.indexOf("function construireResultat"),
-  );
-  assert.match(chargement, /prisma\.medicament\.findMany/);
-  assert.doesNotMatch(chargement, /where:\s*\{\s*actif:\s*true\s*\}/);
+test("scan verification et validation partagent les memes candidats pharmacie", () => {
+  assert.match(scanRoute, /chargerCandidatsOrdonnance/);
+  assert.match(verificationPage, /chargerCandidatsOrdonnance/);
+  assert.match(validationService, /chargerCandidatsOrdonnance/);
+  assert.match(candidatesSource, /actif:\s*true/);
+  assert.doesNotMatch(candidatesSource, /where:\s*\{\s*actif:\s*true\s*\}/);
+  assert.match(verificationPage, /reevaluerCorrespondancesOrdonnance/);
+});
+
+test("la carte signale explicitement une fiche pharmacie inactive", () => {
+  assert.match(medicationCard, /Pharmacie · inactive/);
+  assert.match(medicationCard, /Fiche inactive — conservée pour éviter un doublon/);
+  assert.match(medicationCard, /option\.actif === false/);
 });
 
 test("l'ecran annonce le nombre de medicaments sans multiplier les ordonnances", () => {

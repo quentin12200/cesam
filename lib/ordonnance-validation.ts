@@ -3,8 +3,11 @@ import {
   normaliserNomMedicament,
   trouverCorrespondancesMedicaments,
   trouverMedicament,
-  type MedicamentCandidat,
 } from "./ordonnance-extraction.ts";
+import {
+  chargerCandidatsOrdonnance,
+  type MedicamentCandidateRecord,
+} from "./ordonnance-medication-candidates.ts";
 
 export type StatutCorrespondance = "matched" | "ambiguous" | "unmatched" | "manually_confirmed";
 
@@ -50,17 +53,7 @@ export interface OrdonnanceValidationInput {
   medicaments: MedicamentValidationInput[];
 }
 
-interface MedicamentRecord {
-  id: string;
-  nom: string;
-  dci: string | null;
-  forme: string | null;
-  categorie: string;
-  voie: string | null;
-  delaiAttenteViandeJ: number | null;
-  delaiAttenteLaitJ: number | null;
-  aliasesVocaux?: Array<{ alias: string; transcription: string }>;
-}
+type MedicamentRecord = MedicamentCandidateRecord;
 
 export interface OrdonnancePersistence {
   medicament: {
@@ -94,20 +87,6 @@ function normaliserCategorie(value: string | null): string {
   )?.code ?? "AUTRE";
 }
 
-function versCandidats(medicaments: MedicamentRecord[]): MedicamentCandidat[] {
-  return medicaments.map((medicament) => ({
-    id: medicament.id,
-    nom: medicament.nom,
-    dci: medicament.dci,
-    forme: medicament.forme,
-    categorie: medicament.categorie,
-    voie: medicament.voie,
-    delaiAttenteViandeJ: medicament.delaiAttenteViandeJ,
-    delaiAttenteLaitJ: medicament.delaiAttenteLaitJ,
-    aliases: (medicament.aliasesVocaux ?? []).flatMap((alias) => [alias.alias, alias.transcription]),
-  }));
-}
-
 export function formatPosologieExtraite(med: MedicamentValidationInput): string | null {
   if (med.doseValue === null) return null;
   const dose = `${med.doseValue}${med.doseUnit ? ` ${med.doseUnit}` : ""}`;
@@ -124,35 +103,16 @@ function sourcesEvidence(evidence: Record<string, unknown>): string | null {
   return sources.length > 0 ? sources.join("\n") : null;
 }
 
-async function chargerMedicaments(tx: OrdonnancePersistence): Promise<MedicamentRecord[]> {
-  return tx.medicament.findMany({
-    where: { actif: true },
-    select: {
-      id: true,
-      nom: true,
-      dci: true,
-      forme: true,
-      categorie: true,
-      voie: true,
-      delaiAttenteViandeJ: true,
-      delaiAttenteLaitJ: true,
-      aliasesVocaux: { select: { alias: true, transcription: true } },
-    },
-  });
-}
-
 async function resoudreMedicament(
   tx: OrdonnancePersistence,
   med: MedicamentValidationInput,
 ): Promise<{ medicament: MedicamentRecord; statut: StatutCorrespondance; score: number | null; candidats: unknown[] }> {
-  const disponibles = await chargerMedicaments(tx);
-  const candidats = versCandidats(disponibles);
+  const candidats = await chargerCandidatsOrdonnance((args) => tx.medicament.findMany(args));
   const correspondances = trouverCorrespondancesMedicaments(med.medicamentNom, med.substanceActive, candidats);
   const matchFort = trouverMedicament(med.medicamentNom, med.substanceActive, candidats);
 
   if (med.medicationId) {
-    const medicament = disponibles.find((item) => item.id === med.medicationId)
-      ?? await tx.medicament.findUnique({ where: { id: med.medicationId } });
+    const medicament = await tx.medicament.findUnique({ where: { id: med.medicationId } });
     if (!medicament) {
       throw new OrdonnanceValidationError("MEDICAMENT_INTROUVABLE", "La fiche médicament choisie n’existe plus.");
     }

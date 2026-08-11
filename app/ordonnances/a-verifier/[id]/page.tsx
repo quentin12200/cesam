@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import BackButton from "@/app/components/BackButton";
 import { parseDocumentUrls, type PropositionOrdonnance } from "@/lib/ordonnance-types";
 import { getCategorieMedicament } from "@/lib/medicament-categories";
+import { reevaluerCorrespondancesOrdonnance } from "@/lib/ordonnance-extraction";
+import { chargerCandidatsOrdonnance } from "@/lib/ordonnance-medication-candidates";
 import VerificationOrdonnanceClient from "./VerificationOrdonnanceClient";
 
 interface PageProps {
@@ -13,22 +15,9 @@ interface PageProps {
 
 export default async function VerificationOrdonnancePage({ params }: PageProps) {
   const { id } = await params;
-  const [extraction, medicamentsPharmacie] = await Promise.all([
+  const [extraction, candidatsPharmacie] = await Promise.all([
     prisma.extractionOrdonnance.findUnique({ where: { id } }),
-    prisma.medicament.findMany({
-      where: { actif: true },
-      orderBy: { nom: "asc" },
-      select: {
-        id: true,
-        nom: true,
-        dci: true,
-        forme: true,
-        categorie: true,
-        voie: true,
-        delaiAttenteViandeJ: true,
-        delaiAttenteLaitJ: true,
-      },
-    }),
+    chargerCandidatsOrdonnance((args) => prisma.medicament.findMany(args)),
   ]);
   if (!extraction) notFound();
   if (extraction.statut === "VALIDEE" && extraction.ordonnanceId) {
@@ -41,6 +30,7 @@ export default async function VerificationOrdonnancePage({ params }: PageProps) 
   } catch {
     propositionInitiale = {};
   }
+  propositionInitiale = reevaluerCorrespondancesOrdonnance(propositionInitiale, candidatsPharmacie);
 
   return (
     <div className="p-4 pb-24 max-w-5xl mx-auto space-y-4">
@@ -64,7 +54,7 @@ export default async function VerificationOrdonnancePage({ params }: PageProps) 
           analyseLe: extraction.analyseLe.toISOString(),
         }}
         propositionInitiale={propositionInitiale}
-        medicamentsPharmacie={medicamentsPharmacie.map((medicament) => ({
+        medicamentsPharmacie={candidatsPharmacie.map((medicament) => ({
           ...medicament,
           categorieLabel: getCategorieMedicament(medicament.categorie).label,
           score: 0,

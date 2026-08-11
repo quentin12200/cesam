@@ -55,7 +55,7 @@ function ordonnanceInput(medicaments: MedicamentValidationInput[]): OrdonnanceVa
   };
 }
 
-function creerMemoire(options: { failLinkAt?: number } = {}) {
+function creerMemoire(options: { failLinkAt?: number; medicamentActif?: boolean } = {}) {
   const state = {
     medicaments: [{
       id: "med-tenaline",
@@ -66,6 +66,7 @@ function creerMemoire(options: { failLinkAt?: number } = {}) {
       voie: "IM" as string | null,
       delaiAttenteViandeJ: 21 as number | null,
       delaiAttenteLaitJ: 7 as number | null,
+      actif: options.medicamentActif ?? true,
       aliasesVocaux: [] as Array<{ alias: string; transcription: string }>,
     }],
     ordonnances: [] as Array<Record<string, unknown>>,
@@ -89,6 +90,7 @@ function creerMemoire(options: { failLinkAt?: number } = {}) {
           voie: data.voie as string | null,
           delaiAttenteViandeJ: data.delaiAttenteViandeJ as number | null,
           delaiAttenteLaitJ: data.delaiAttenteLaitJ as number | null,
+          actif: true,
           aliasesVocaux: [],
         };
         state.medicaments.push(created);
@@ -143,6 +145,17 @@ test("cree une seule ordonnance et plusieurs liaisons", async () => {
 
 test("refuse de creer un doublon ressemblant", async () => {
   const { tx } = creerMemoire();
+  await assert.rejects(
+    creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([
+      medicamentInput({ medicationId: null, createMedication: true }),
+    ]), ["doc.jpg"]),
+    (error: unknown) => error instanceof OrdonnanceValidationError
+      && error.code === "MEDICAMENT_POSSIBLE_EXISTANT",
+  );
+});
+
+test("refuse aussi de dupliquer une fiche inactive ressemblante", async () => {
+  const { tx } = creerMemoire({ medicamentActif: false });
   await assert.rejects(
     creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([
       medicamentInput({ medicationId: null, createMedication: true }),
