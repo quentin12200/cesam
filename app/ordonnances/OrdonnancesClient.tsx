@@ -285,7 +285,23 @@ export default function OrdonnancesClient({
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState("");
   const [showArchives, setShowArchives] = useState(false);
+  const [deletingExtractionId, setDeletingExtractionId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  async function supprimerExtraction(id: string) {
+    setDeletingExtractionId(id);
+    setScanError("");
+    try {
+      const response = await fetch(`/api/extractions-ordonnance/${id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "La suppression a échoué");
+      router.refresh();
+    } catch (error) {
+      setScanError(error instanceof Error ? error.message : "La suppression a échoué");
+    } finally {
+      setDeletingExtractionId(null);
+    }
+  }
 
   async function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -347,19 +363,28 @@ export default function OrdonnancesClient({
           </h3>
           <div className="space-y-1.5">
             {extractionsAVerifier.map((extraction) => (
-              <Link
-                key={extraction.id}
-                href={hrefWithOrigin(`/ordonnances/a-verifier/${extraction.id}`)}
-                className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm hover:bg-amber-50"
-              >
-                <span className="min-w-0 truncate font-medium text-gray-800">
-                  {extraction.medicamentNom || "Médicament à vérifier"}
-                  {extraction.ordonnanceNumero ? ` · n°${extraction.ordonnanceNumero}` : ""}
-                </span>
-                <span className="shrink-0 text-xs text-gray-400">
-                  {new Date(extraction.analyseLe).toLocaleDateString("fr-FR")}
-                </span>
-              </Link>
+              <div key={extraction.id} className="flex min-h-11 items-center gap-1 rounded-lg border border-amber-200 bg-white px-1 py-1 hover:bg-amber-50">
+                <Link
+                  href={hrefWithOrigin(`/ordonnances/a-verifier/${extraction.id}`)}
+                  className="flex min-w-0 flex-1 items-center justify-between gap-3 px-2 py-1 text-sm"
+                >
+                  <span className="min-w-0 truncate font-medium text-gray-800">
+                    {extraction.medicamentNom || "Médicament à vérifier"}
+                    {extraction.ordonnanceNumero ? ` · n°${extraction.ordonnanceNumero}` : ""}
+                  </span>
+                  <span className="shrink-0 text-xs text-gray-400">
+                    {new Date(extraction.analyseLe).toLocaleDateString("fr-FR")}
+                  </span>
+                </Link>
+                <RecordActionsMenu actions={[{
+                  label: "Supprimer",
+                  tone: "danger",
+                  disabled: deletingExtractionId === extraction.id,
+                  confirmMessage: "Supprimer cette ordonnance à vérifier ? Elle devra être rescannée si vous souhaitez la traiter de nouveau.",
+                  confirmLabel: "Supprimer",
+                  onSelect: () => supprimerExtraction(extraction.id),
+                }]} />
+              </div>
             ))}
           </div>
         </section>

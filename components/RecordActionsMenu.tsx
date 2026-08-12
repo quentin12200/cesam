@@ -9,6 +9,7 @@ export interface RecordAction {
   tone?: "default" | "danger";
   disabled?: boolean;
   confirmMessage?: string;
+  confirmLabel?: string;
 }
 
 interface RecordActionsMenuProps {
@@ -130,7 +131,7 @@ export default function RecordActionsMenu({
               </button>
               <button type="button" disabled={busy} onClick={() => void run(confirmAction)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
                 {busy && <Loader2 size={15} className="animate-spin" />}
-                Confirmer
+                {confirmAction.confirmLabel ?? "Confirmer"}
               </button>
             </div>
           </div>
