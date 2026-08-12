@@ -7,12 +7,14 @@ import type {
 } from "./ordonnance-types.ts";
 import { medicamentVide, medicamentsDepuisProposition } from "./ordonnance-types.ts";
 import {
+  dateIsoValide,
   extraireDateDelivrance,
   extraireDateDerniereVisite,
   extraireDateOrdonnance,
   sourceIndiqueDelivreCeJour,
 } from "./ordonnance-dates.ts";
 import { resoudreSourcesDose, type DoseSourceStructuree } from "./ordonnance-dose-sources.ts";
+import { normaliserConditionnementExtrait } from "./ordonnance-display.ts";
 
 export interface MedicamentCandidat {
   id: string;
@@ -79,6 +81,23 @@ function preuves(value: unknown): Record<string, ChampExtrait<unknown>> {
       .map(([key, raw]) => [key, champ(raw)] as const)
       .filter((entry): entry is [string, ChampExtrait<unknown>] => entry[1] !== null),
   );
+}
+
+function objet(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function collecterTextesSources(value: unknown, profondeur = 0): string[] {
+  if (!value || typeof value !== "object" || profondeur > 5) return [];
+  const resultats: string[] = [];
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (key === "sourceText" && typeof child === "string" && child.trim()) {
+      resultats.push(child.trim());
+    } else if (child && typeof child === "object") {
+      resultats.push(...collecterTextesSources(child, profondeur + 1));
+    }
+  }
+  return [...new Set(resultats)];
 }
 
 function doseSource(value: unknown): DoseSourceStructuree | null {
@@ -151,6 +170,20 @@ function classerDates(p: Record<string, unknown>): {
   let scoreVisite = -1;
   let scoreDelivrance = -1;
   const evidence = preuves(p.evidence);
+  const dates = objet(p.dates);
+
+  const sourcePrescription = evidence.prescriptionDate?.sourceText;
+  const sourcePrescriptionContradictoire = Boolean(
+    extraireDateDerniereVisite(sourcePrescription) && !extraireDateOrdonnance(sourcePrescription),
+  );
+  if (!sourcePrescriptionContradictoire) {
+    prescriptionDate = dateIsoValide(evidence.prescriptionDate?.value)
+      ?? dateIsoValide(dates.prescriptionDate);
+    if (prescriptionDate) scorePrescription = 10;
+  }
+  lastVisitDate = dateIsoValide(evidence.lastVisitDate?.value)
+    ?? dateIsoValide(dates.lastVisitDate);
+  if (lastVisitDate) scoreVisite = 10;
 
   const classer = (
     source: string | null | undefined,
@@ -196,6 +229,44 @@ function classerDates(p: Record<string, unknown>): {
     deliveryDate = prescriptionDate;
   }
   return { prescriptionDate, lastVisitDate, deliveryDate };
+}
+
+function normaliserDoseSource(dose: DoseSourceStructuree | null): {
+  value: number;
+  unit: string;
+} | null {
+  if (!dose?.doseValue || !dose.doseUnit || dose.referenceUnit.toLowerCase() !== "kg") return null;
+  const valeur = Number(dose.doseValue.replace(",", "."));
+  const reference = Number((dose.referenceValue || "1").replace(",", "."));
+  if (!Number.isFinite(valeur) || !Number.isFinite(reference) || reference <= 0) return null;
+  return { value: valeur / reference, unit: `${dose.doseUnit}/kg` };
+}
+
+function nombreAdministrationsCertain({
+  administrationCount,
+  administrationIntervalHours,
+  repeatCondition,
+  sourceTexts,
+}: {
+  administrationCount: number | null;
+  administrationIntervalHours: number | null;
+  repeatCondition: string | null;
+  sourceTexts: string[];
+}): number | null {
+  if (administrationCount !== 2 || !administrationIntervalHours || !repeatCondition) {
+    return administrationCount;
+  }
+  const normaliser = (value: string) => value.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const condition = normaliser(repeatCondition);
+  const conditionnelle = /\b(si|si necessaire|si besoin|en cas|eventuellement|facultati|peut|pourra)\b/.test(condition);
+  const preuveRenouvellement = sourceTexts.some((source) => {
+    const texteSource = normaliser(source);
+    return /\b(deuxieme|seconde|2e|2eme|renouvel|repeter|nouvelle administration)\b/.test(texteSource)
+      && /\b(si|si necessaire|si besoin|en cas|eventuellement|facultati|peut|pourra)\b/.test(texteSource);
+  });
+  return conditionnelle && preuveRenouvellement ? 1 : administrationCount;
 }
 
 export function trouverMedicament(
@@ -351,6 +422,19 @@ export function normaliserAnalyseOrdonnance(
       ? m.administrationProtocol : m) as Record<string, unknown>;
     const delais = (m.withdrawalPeriods && typeof m.withdrawalPeriods === "object"
       ? m.withdrawalPeriods : m) as Record<string, unknown>;
+    const evidenceMedicament = preuves(m.evidence);
+    const textesSourcesMedicament = collecterTextesSources(m);
+    const presentation = objet(m.presentation);
+    const textesPresentation = [
+      texte(m.medicamentNom),
+      evidenceMedicament.conditionnement?.sourceText,
+      evidenceMedicament.presentation?.sourceText,
+      evidenceMedicament.deliveredQuantity?.sourceText,
+      typeof presentation.sourceText === "string" ? presentation.sourceText : null,
+    ].filter((value): value is string => Boolean(value));
+    const administrationCountBrut = entier(protocole.administrationCount);
+    const administrationIntervalHours = entier(protocole.administrationIntervalHours);
+    const repeatCondition = texte(protocole.repeatCondition);
     const proposition: MedicamentPropose = {
       ...medicamentVide(),
       medicamentNom: texte(m.medicamentNom),
@@ -360,7 +444,11 @@ export function normaliserAnalyseOrdonnance(
       categorie: texte(m.categorie),
       familleTherapeutique: texte(m.familleTherapeutique),
       formePharmaceutique: texte(m.formePharmaceutique),
-      conditionnement: texte(m.conditionnement),
+      conditionnement: normaliserConditionnementExtrait({
+        conditionnement: texte(m.conditionnement),
+        presentation,
+        sourceTexts: textesPresentation,
+      }),
       voie: texte(m.voie),
       doseValue: nombre(dose.doseValue ?? m.dose),
       doseUnit: texte(dose.doseUnit ?? m.uniteDosage),
@@ -368,12 +456,17 @@ export function normaliserAnalyseOrdonnance(
       referenceUnit: texte(dose.referenceUnit),
       referenceType: dose.referenceType === "live_weight" || dose.referenceType === "animal"
         ? dose.referenceType : null,
-      normalizedDoseValue: nombre(dose.normalizedDoseValue),
-      normalizedDoseUnit: texte(dose.normalizedDoseUnit),
-      administrationCount: entier(protocole.administrationCount),
-      administrationIntervalHours: entier(protocole.administrationIntervalHours),
+      normalizedDoseValue: null,
+      normalizedDoseUnit: null,
+      administrationCount: nombreAdministrationsCertain({
+        administrationCount: administrationCountBrut,
+        administrationIntervalHours,
+        repeatCondition,
+        sourceTexts: textesSourcesMedicament,
+      }),
+      administrationIntervalHours,
       treatmentDurationDays: entier(protocole.treatmentDurationDays ?? m.dureeJours),
-      repeatCondition: texte(protocole.repeatCondition),
+      repeatCondition,
       administrationInstructions: texte(protocole.administrationInstructions ?? m.frequence),
       withdrawalPeriods: {
         meatDays: entier(delais.meatDays ?? m.delaiAttenteViandeJ),
@@ -382,7 +475,7 @@ export function normaliserAnalyseOrdonnance(
       },
       precautions: texte(m.precautions),
       medicationMatch: null,
-      evidence: preuves(m.evidence),
+      evidence: evidenceMedicament,
     };
     const resolutionDose = resoudreSourcesDose({
       doseValue: proposition.doseValue === null ? "" : String(proposition.doseValue),
@@ -391,10 +484,14 @@ export function normaliserAnalyseOrdonnance(
       referenceUnit: proposition.referenceUnit ?? "",
       referenceType: proposition.referenceType ?? "",
       doseSourceText: proposition.evidence.dose?.sourceText,
+      doseSourceTexts: textesSourcesMedicament,
       dosePratique: doseSource(m.dosePratique),
       dosePharmacologique: doseSource(m.dosePharmacologique),
     });
     const doseRetenue = resolutionDose.doseAffichee;
+    const doseNormalisee = normaliserDoseSource(
+      resolutionDose.dosePharmacologique ?? resolutionDose.dosePratique ?? doseRetenue,
+    );
     const confianceDose = proposition.evidence.dose?.confidence ?? 0;
     const evidence = {
       ...proposition.evidence,
@@ -421,6 +518,8 @@ export function normaliserAnalyseOrdonnance(
       referenceUnit: doseRetenue?.referenceUnit || null,
       referenceType: doseRetenue?.referenceType === "live_weight" || doseRetenue?.referenceType === "animal"
         ? doseRetenue.referenceType : null,
+      normalizedDoseValue: doseNormalisee?.value ?? null,
+      normalizedDoseUnit: doseNormalisee?.unit ?? null,
       dosePratique: resolutionDose.dosePratique,
       dosePharmacologique: resolutionDose.dosePharmacologique,
       doseSourceConflict: resolutionDose.sourceHybrideDetectee,

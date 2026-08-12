@@ -35,10 +35,20 @@ function dateValide(jourBrut: string, moisBrut: string, anneeBrute: string): str
 
 export function extraireDateOrdonnance(sourceText: string | null | undefined): string | null {
   if (!sourceText) return null;
-  const match = sourceText.match(
-    /ordonnance\s+n(?:[°o.]?\s*)?[a-z0-9][\s\S]{0,60}?\ble\s+([0-3]?\d)[/.\-]([01]?\d)[/.\-](\d{4})/i,
+  const marqueur = /ordonnance\s+n/i.exec(sourceText);
+  if (!marqueur) return null;
+  const apresMarqueur = sourceText.slice(marqueur.index + marqueur[0].length, marqueur.index + 160);
+  const dateApresLe = apresMarqueur.match(
+    /\ble\s+([0-3]?\d)[/.\-]([01]?\d)[/.\-](\d{4})/i,
   );
-  return match ? dateValide(match[1], match[2], match[3]) : null;
+  if (dateApresLe) return dateValide(dateApresLe[1], dateApresLe[2], dateApresLe[3]);
+  return extraireDateFrancaise(apresMarqueur);
+}
+
+export function dateIsoValide(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? dateValide(match[3], match[2], match[1]) : null;
 }
 
 export function extraireDateDerniereVisite(sourceText: string | null | undefined): string | null {

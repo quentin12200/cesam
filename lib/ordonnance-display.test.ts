@@ -9,6 +9,7 @@ import {
   formaterRenouvellement,
   formaterRythme,
   formaterVoie,
+  normaliserConditionnementExtrait,
   resoudreDosePratique,
 } from "./ordonnance-display.ts";
 
@@ -29,6 +30,24 @@ test("conserve une presentation sans inventer de quantite", () => {
 test("affiche la presentation et la quantite sans doublon", () => {
   assert.equal(formaterPresentationCompacte("1 flacon de 100 ml"), "Flacon 100 ml · Qté 1");
   assert.equal(formaterPresentationCompacte("Flacon 250 ml"), "Flacon 250 ml");
+});
+
+test("ne transforme jamais un volume initial en quantite delivree", () => {
+  assert.deepEqual(analyserPresentation("100 ml"), {
+    presentation: "100 ml",
+    quantite: null,
+  });
+  assert.equal(formaterPresentationCompacte("100 ml"), "100 ml");
+  assert.notEqual(formaterPresentationCompacte("100 ml"), "Ml · Qté 100");
+});
+
+test("reconstruit le flacon et la quantite depuis des preuves explicites", () => {
+  const conditionnement = normaliserConditionnementExtrait({
+    conditionnement: "100 MI",
+    sourceTexts: ["TENALINE LA CLAS SOL INJ FL. 100 ML — Qté : 1"],
+  });
+  assert.equal(conditionnement, "1 flacon de 100 ml");
+  assert.equal(formaterPresentationCompacte(conditionnement), "Flacon 100 ml · Qté 1");
 });
 
 test("formate la posologie ponderale en une phrase compacte", () => {
@@ -100,6 +119,7 @@ test("une dose pratique structuree prime sur une preuve OCR plus ancienne", () =
     referenceType: "live_weight",
     formePharmaceutique: "Solution injectable",
     doseSourceText: "1 ml pour 10 kg",
+    preferStructuredDose: true,
   }), "2 ml / 10 kg");
 });
 

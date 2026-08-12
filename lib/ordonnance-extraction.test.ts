@@ -98,7 +98,7 @@ test("prend exclusivement la date placee apres le numero d'ordonnance", () => {
   assert.equal(dates.deliveryDate, "2026-06-01");
 });
 
-test("refuse une date de prescription sans numero d'ordonnance adjacent", () => {
+test("conserve une date ISO explicitement classee comme prescription", () => {
   const dates = normaliserAnalyseOrdonnance({
     dates: { prescriptionDate: "2026-04-14" },
     evidence: {
@@ -106,7 +106,21 @@ test("refuse une date de prescription sans numero d'ordonnance adjacent", () => 
     },
     medicaments: [{ medicamentNom: "TENALINE" }],
   });
-  assert.equal(dates.prescriptionDate, null);
+  assert.equal(dates.prescriptionDate, "2026-04-14");
+});
+
+test("tolere les variantes typographiques du numero d'ordonnance", () => {
+  for (const sourceText of [
+    "Ordonnance nÂ°26-06-0002[V] le 01/06/2026",
+    "Ordonnance nº26-06-0002[V] le 01/06/2026",
+    "Ordonnance n°26-06-0002[V] 01/06/2026",
+  ]) {
+    const dates = normaliserAnalyseOrdonnance({
+      evidence: { prescriptionDate: { value: "2026-06-01", sourceText, confidence: 0.95 } },
+      medicaments: [{ medicamentNom: "TENALINE" }],
+    });
+    assert.equal(dates.prescriptionDate, "2026-06-01");
+  }
 });
 
 test("affiche la date en francais apres son classement", () => {
@@ -118,7 +132,6 @@ test("affiche la date en francais apres son classement", () => {
 
 test("ne classe pas une date isolee sans libelle", () => {
   const dates = normaliserAnalyseOrdonnance({
-    dates: { prescriptionDate: "2026-06-01", lastVisitDate: "2026-04-14" },
     dateCandidates: [{ value: "2026-06-01", sourceText: "01/06/2026" }],
     medicaments: [{ medicamentNom: "TENALINE" }],
   });
@@ -150,6 +163,98 @@ test("conserve les trois delais d'attente detectes", () => {
     }],
   }).medicaments![0];
   assert.deepEqual(med.withdrawalPeriods, { meatDays: 21, offalDays: 21, milkDays: 7 });
+});
+
+test("securise le scan reel Tenaline mal structure par l'IA", () => {
+  const proposition = normaliserAnalyseOrdonnance({
+    dates: { prescriptionDate: "2026-06-01", lastVisitDate: "2026-04-14" },
+    evidence: {
+      prescriptionDate: {
+        value: "2026-06-01",
+        sourceText: "Ordonnance nÂ°26-06-0002[V] le 01/06/2026",
+        confidence: 0.95,
+      },
+      lastVisitDate: {
+        value: "2026-04-14",
+        sourceText: "Dernière visite le 14/04/2026",
+        confidence: 0.95,
+      },
+    },
+    medicaments: [{
+      medicamentNom: "TENALINE LA CLAS SOL INJ FL. 100 ML",
+      conditionnement: "100 MI",
+      voie: "IM",
+      dose: {
+        doseValue: 20,
+        doseUnit: "mg",
+        referenceValue: 10,
+        referenceUnit: "kg",
+        referenceType: "live_weight",
+        normalizedDoseValue: 2,
+        normalizedDoseUnit: "mg/kg",
+      },
+      dosePharmacologique: {
+        doseValue: 20,
+        doseUnit: "mg",
+        referenceValue: 1,
+        referenceUnit: "kg",
+        referenceType: "live_weight",
+        sourceText: "20 mg d’oxytétracycline par kg de poids vif",
+      },
+      administrationProtocol: {
+        administrationCount: 2,
+        administrationIntervalHours: 72,
+        treatmentDurationDays: null,
+        repeatCondition: "si nécessaire",
+        administrationInstructions: "Injection intramusculaire",
+      },
+      withdrawalPeriods: { meatDays: 21, offalDays: 21, milkDays: 7 },
+      evidence: {
+        dose: {
+          value: "20 mg/kg",
+          sourceText: "20 mg d’oxytétracycline par kg de poids vif",
+          confidence: 0.94,
+        },
+        posologiePratique: {
+          value: "1 ml / 10 kg",
+          sourceText: "soit 1 ml de solution injectable pour 10 kg de poids vif",
+          confidence: 0.9,
+        },
+        conditionnement: {
+          value: "100 ml, quantité 1",
+          sourceText: "TENALINE LA CLAS SOL INJ FL. 100 ML — Qté : 1",
+          confidence: 0.9,
+        },
+        administrationProtocol: {
+          value: "deux injections possibles",
+          sourceText: "Une injection. Une deuxième administration pourra être pratiquée après 72 h si nécessaire.",
+          confidence: 0.9,
+        },
+      },
+    }],
+  }, [tenaline]);
+
+  const med = proposition.medicaments![0];
+  assert.equal(proposition.prescriptionDate, "2026-06-01");
+  assert.equal(proposition.lastVisitDate, "2026-04-14");
+  assert.equal(med.conditionnement, "1 flacon de 100 ml");
+  assert.deepEqual(analyserPresentation(med.conditionnement), {
+    presentation: "flacon de 100 ml",
+    quantite: 1,
+  });
+  assert.equal(med.doseValue, 1);
+  assert.equal(med.doseUnit, "ml");
+  assert.equal(med.referenceValue, 10);
+  assert.equal(med.dosePratique?.sourceText, "soit 1 ml de solution injectable pour 10 kg de poids vif");
+  assert.equal(med.dosePharmacologique?.doseValue, "20");
+  assert.equal(med.dosePharmacologique?.referenceValue, "1");
+  assert.equal(med.normalizedDoseValue, 20);
+  assert.equal(med.normalizedDoseUnit, "mg/kg");
+  assert.equal(med.administrationCount, 1);
+  assert.equal(med.administrationIntervalHours, 72);
+  assert.equal(med.repeatCondition, "si nécessaire");
+  assert.notEqual(`${med.doseValue} ${med.doseUnit} / ${med.referenceValue} ${med.referenceUnit}`, "20 mg / 10 kg");
+  assert.notEqual(med.normalizedDoseValue, 2);
 });
 
 test("rapproche Tenaline de la fiche existante sans en creer une", () => {

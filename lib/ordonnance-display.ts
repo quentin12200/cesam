@@ -37,12 +37,94 @@ export interface PresentationDelivree {
   quantite: number | null;
 }
 
+function uniteVolume(value: string): string {
+  const unite = sansAccents(value).toLowerCase();
+  return /^m(?:l|i|1)$/.test(unite) ? "ml" : unite;
+}
+
+function contenant(value: string): string | null {
+  const normalized = sansAccents(value).toLowerCase();
+  if (/\b(?:fl|flacon)s?\b\.?/.test(normalized)) return "flacon";
+  if (/\b(?:aer|aerosol)s?\b\.?/.test(normalized)) return "aérosol";
+  if (/\b(?:amp|ampoule)s?\b\.?/.test(normalized)) return "ampoule";
+  if (/\b(?:bt|boite)s?\b\.?/.test(normalized)) return "boîte";
+  return null;
+}
+
+function volume(value: string): { valeur: string; unite: string } | null {
+  const match = value.match(/\b(\d+(?:[.,]\d+)?)\s*(m(?:l|i|1)|cl|l)\b/i);
+  return match ? { valeur: match[1].replace(",", "."), unite: uniteVolume(match[2]) } : null;
+}
+
+function quantiteExplicite(value: string): number | null {
+  const match = value.match(/\b(?:qt[eé]|quantit[eé])\s*[:=]?\s*(\d+)\b/i);
+  return match ? Number(match[1]) : null;
+}
+
+export function normaliserConditionnementExtrait({
+  conditionnement,
+  presentation,
+  sourceTexts = [],
+}: {
+  conditionnement: string | null;
+  presentation?: Record<string, unknown> | null;
+  sourceTexts?: string[];
+}): string | null {
+  const textes = [
+    conditionnement,
+    typeof presentation?.sourceText === "string" ? presentation.sourceText : null,
+    ...sourceTexts,
+  ].filter((value): value is string => Boolean(value?.trim()));
+  const volumeStructure = typeof presentation?.volumeValue === "number"
+    && typeof presentation?.volumeUnit === "string"
+    ? { valeur: String(presentation.volumeValue), unite: uniteVolume(presentation.volumeUnit) }
+    : null;
+  const volumeTrouve = volumeStructure ?? textes.map(volume).find(Boolean) ?? null;
+  const contenantStructure = typeof presentation?.containerType === "string"
+    ? contenant(presentation.containerType)
+    : null;
+  const contenantTrouve = contenantStructure ?? textes.map(contenant).find(Boolean) ?? null;
+  const quantiteStructure = typeof presentation?.deliveredQuantity === "number"
+    ? presentation.deliveredQuantity
+    : null;
+  const quantiteHorsConditionnement = sourceTexts
+    .map(quantiteExplicite)
+    .find((value) => value !== null) ?? null;
+  const quantiteTrouvee = quantiteStructure
+    ?? textes.map(quantiteExplicite).find((value) => value !== null)
+    ?? (() => {
+      const match = conditionnement?.match(/^\s*(\d+)\s*[x×]?\s*(?:fl\.?|flacons?|aer\.?|a[ée]rosols?|amp\.?|ampoules?|bt\.?|bo[iî]tes?)\b/i);
+      return match ? Number(match[1]) : null;
+    })();
+
+  if (!volumeTrouve) return conditionnement?.trim() || null;
+  if (
+    conditionnement
+    && volume(conditionnement)
+    && contenant(conditionnement)
+    && quantiteStructure === null
+    && quantiteHorsConditionnement === null
+  ) {
+    return conditionnement.trim();
+  }
+  const volumeLibelle = `${volumeTrouve.valeur} ${volumeTrouve.unite}`;
+  if (contenantTrouve) {
+    return quantiteTrouvee !== null
+      ? `${quantiteTrouvee} ${contenantTrouve} de ${volumeLibelle}`
+      : `${contenantTrouve} de ${volumeLibelle}`;
+  }
+  return quantiteTrouvee !== null ? `${volumeLibelle} · Qté ${quantiteTrouvee}` : volumeLibelle;
+}
+
 export function analyserPresentation(value: string | null | undefined): PresentationDelivree {
   if (!value?.trim()) return { presentation: null, quantite: null };
   const nettoye = value.trim().replace(/\s+/g, " ");
-  const match = nettoye.match(/^(\d+)\s*[x×]?\s*(.+)$/i);
-  const quantite = match ? Number(match[1]) : null;
-  let presentation = (match?.[2] ?? nettoye).trim();
+  const quantiteSuffixe = quantiteExplicite(nettoye);
+  const match = nettoye.match(/^(\d+)\s*[x×]?\s*((?:fl\.?|flacons?|aer\.?|a[ée]rosols?|amp\.?|ampoules?|bt\.?|bo[iî]tes?)\b.*)$/i);
+  const quantite = quantiteSuffixe ?? (match ? Number(match[1]) : null);
+  let presentation = (match?.[2] ?? nettoye)
+    .replace(/\s*[·-]?\s*(?:qt[eé]|quantit[eé])\s*[:=]?\s*\d+\s*$/i, "")
+    .trim();
   presentation = presentation
     .replace(/^fl\.?(?:\s+|$)/i, "flacon ")
     .replace(/^aer\.?(?:\s+|$)/i, "aérosol ")

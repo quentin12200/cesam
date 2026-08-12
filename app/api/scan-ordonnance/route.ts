@@ -9,7 +9,7 @@ export const maxDuration = 60;
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
-const PROMPT_VERSION = "ordonnance-v4-doses-separees";
+const PROMPT_VERSION = "ordonnance-v5-post-ocr-robuste";
 
 interface OrdonnanceResult extends PropositionOrdonnance {
   raw: string;
@@ -45,6 +45,13 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
     "familleTherapeutique": "string ou null",
     "formePharmaceutique": "string ou null",
     "conditionnement": "presentation exacte avec quantite delivree si elle est explicite, par exemple 1 flacon de 100 ml, ou null",
+    "presentation": {
+      "containerType": "flacon, aerosol, ampoule, boite ou null",
+      "volumeValue": "number ou null",
+      "volumeUnit": "ml, cl, l ou null",
+      "deliveredQuantity": "nombre d'unites delivrees ou null",
+      "sourceText": "expression exacte complete ou null"
+    },
     "voie": "IM, SC, IV, PO ou texte exact, ou null",
     "dose": {
       "doseValue": "number ou null",
@@ -85,7 +92,9 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
     },
     "precautions": "string ou null",
     "evidence": {
-      "dose": { "value": "texte interprete", "sourceText": "texte exact", "confidence": 0.95, "zone": "prescription" }
+      "dose": { "value": "texte interprete", "sourceText": "texte exact complet", "confidence": 0.95, "zone": "prescription" },
+      "administrationProtocol": { "value": "texte interprete", "sourceText": "protocole exact complet", "confidence": 0.95, "zone": "prescription" },
+      "conditionnement": { "value": "texte interprete", "sourceText": "nom, presentation et quantite exacts", "confidence": 0.95, "zone": "delivrance" }
     }
   }]
 }
@@ -105,16 +114,22 @@ Regles obligatoires :
   cette mention exacte dans evidence.deliveryDate.sourceText.
 - Pour le conditionnement, conserve distinctement dans la meme phrase le nombre d'unites delivrees et la
   presentation, par exemple "1 flacon de 100 ml". N'invente jamais une quantite absente du document.
+- "100 ml" est un volume unitaire et jamais une quantite de 100 unites. Une mention separee "Qte : 1"
+  signifie deliveredQuantity=1. "FL." signifie flacon uniquement lorsqu'il est bien present dans le texte source.
 - Une dose "1 ml pour 10 kg" est ponderale : doseValue=1, referenceValue=10, referenceType=live_weight, normalizedDoseValue=0.1. Ce n'est pas une dose fixe de 1 ml.
 - Conserve séparément dosePratique et dosePharmacologique. Chaque valeur, unité et référence doit provenir de la même
   expression exacte conservée dans son sourceText. Ne combine jamais une valeur en mg avec la référence d'une expression en ml.
 - Le bloc dose principal reprend la dose pratique lorsqu'elle existe, sinon la dose pharmacologique. N'invente aucune conversion
   entre mg et ml et conserve le passage complet dans evidence.dose.sourceText.
+- Si dose pratique et dose pharmacologique figurent dans une meme phrase, evidence.dose.sourceText doit conserver la phrase
+  entiere contenant les deux expressions, sans en supprimer une. Chaque bloc sourceText conserve sa propre expression complete.
 - Accepte aussi les doses fixes par animal et les doses en mg/kg.
 - Separe une injection initiale, un rappel conditionnel et la duree du traitement.
 - administrationCount contient le nombre d'administrations. repeatCondition contient uniquement la condition
   de renouvellement. administrationInstructions contient uniquement les consignes pratiques (agiter,
   nettoyer, position du flacon, parage, seringue, ponctions), jamais la frequence.
+- Une seconde administration seulement possible ou conditionnelle ne compte pas dans administrationCount : une injection
+  certaine puis une repetition eventuelle apres 72 h donne administrationCount=1 et repeatCondition renseigne.
 - Les nombres des delais viande, abats ou lait ne sont jamais une duree de traitement.
 - Recherche et conserve separement les trois delais meatDays, offalDays et milkDays lorsqu'ils sont ecrits.
   "viande et abats : 21 jours, lait : 7 jours" signifie meatDays=21, offalDays=21 et milkDays=7.

@@ -58,6 +58,23 @@ test("separe les deux expressions du cas Tenaline et rejette le tuple hybride", 
   assert.notEqual(formaterDoseSource(resolution.doseAffichee), "20 mg / 10 kg");
 });
 
+test("retrouve deux doses dans deux preuves du meme medicament sans les melanger", () => {
+  const resolution = resoudreSourcesDose({
+    ...base,
+    doseValue: "20",
+    doseUnit: "mg",
+    referenceValue: "10",
+    referenceUnit: "kg",
+    doseSourceText: "20 mg d’oxytétracycline par kg de poids vif",
+    doseSourceTexts: ["1 ml de solution injectable pour 10 kg de poids vif"],
+  });
+  assert.equal(formaterDoseSource(resolution.dosePratique), "1 ml / 10 kg");
+  assert.equal(formaterDoseSource(resolution.dosePharmacologique), "20 mg / 1 kg");
+  assert.equal(formaterDoseSource(resolution.doseAffichee), "1 ml / 10 kg");
+  assert.equal(resolution.sourceHybrideDetectee, true);
+  assert.notEqual(formaterDoseSource(resolution.doseAffichee), "20 mg / 10 kg");
+});
+
 test("une correction humaine reste prioritaire sur les anciennes preuves OCR", () => {
   const resolution = resoudreSourcesDose({
     ...base,

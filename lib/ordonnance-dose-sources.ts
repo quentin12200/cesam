@@ -21,6 +21,7 @@ interface DoseStructureeEntree {
   referenceUnit: string;
   referenceType: string;
   doseSourceText?: string | null;
+  doseSourceTexts?: Array<string | null | undefined>;
   dosePratique?: DoseSourceStructuree | null;
   dosePharmacologique?: DoseSourceStructuree | null;
   correctionManuelle?: boolean;
@@ -50,7 +51,7 @@ function referenceType(referenceUnit: string): string {
   return uniteNormalisee(referenceUnit) === "kg" ? "live_weight" : "animal";
 }
 
-function doseDepuisMatch(match: RegExpMatchArray, unite: string): DoseSourceStructuree {
+function doseDepuisMatch(match: RegExpMatchArray, unite: string, sourceText: string): DoseSourceStructuree {
   const reference = match[3] ?? "";
   const referenceUnit = match[4] ?? "";
   return {
@@ -59,7 +60,7 @@ function doseDepuisMatch(match: RegExpMatchArray, unite: string): DoseSourceStru
     referenceValue: referenceUnit && uniteNormalisee(referenceUnit) === "kg" ? nombre(reference || "1") : "",
     referenceUnit: referenceUnit && uniteNormalisee(referenceUnit) === "kg" ? "kg" : "",
     referenceType: referenceType(referenceUnit),
-    sourceText: match[0].trim(),
+    sourceText: sourceText.trim(),
   };
 }
 
@@ -84,8 +85,8 @@ export function extraireSourcesDose(sourceText: string | null | undefined): {
     ? uniteNormalisee(pharmacologique[2]).replace("μ", "µ")
     : "";
   return {
-    dosePratique: pratique ? doseDepuisMatch(pratique, unitePratique) : null,
-    dosePharmacologique: pharmacologique ? doseDepuisMatch(pharmacologique, unitePharmacologique) : null,
+    dosePratique: pratique ? doseDepuisMatch(pratique, unitePratique, texte) : null,
+    dosePharmacologique: pharmacologique ? doseDepuisMatch(pharmacologique, unitePharmacologique, texte) : null,
   };
 }
 
@@ -125,26 +126,30 @@ export function resoudreSourcesDose(input: DoseStructureeEntree): ResolutionSour
     };
   }
 
-  const depuisPreuve = extraireSourcesDose(input.doseSourceText);
-  const pratiqueExplicite = input.dosePratique?.sourceText
-    ? extraireSourcesDose(input.dosePratique.sourceText).dosePratique
-    : null;
-  const pharmacologiqueExplicite = input.dosePharmacologique?.sourceText
-    ? extraireSourcesDose(input.dosePharmacologique.sourceText).dosePharmacologique
-    : null;
-  const dosePratique = (structuree && estUniteDosePratique(structuree.doseUnit) ? structuree : null)
-    ?? pratiqueExplicite ?? depuisPreuve.dosePratique;
-  const dosePharmacologique = pharmacologiqueExplicite ?? depuisPreuve.dosePharmacologique
-    ?? (structuree && estUniteDosePharmacologique(structuree.doseUnit) ? structuree : null);
-
-  const correspondAUneExpression = Boolean(
+  const textesSources = [
+    input.dosePratique?.sourceText,
+    input.dosePharmacologique?.sourceText,
+    input.doseSourceText,
+    ...(input.doseSourceTexts ?? []),
+  ].filter((value, index, values): value is string => (
+    Boolean(value?.trim()) && values.indexOf(value) === index
+  ));
+  const dosesSourcees = textesSources.map(extraireSourcesDose);
+  const dosePratiqueSourcee = dosesSourcees.find((dose) => dose.dosePratique)?.dosePratique ?? null;
+  const dosePharmacologiqueSourcee = dosesSourcees.find((dose) => dose.dosePharmacologique)?.dosePharmacologique ?? null;
+  const structureeCorrespondAUneSource = Boolean(
     structuree
-    && [dosePratique, dosePharmacologique].some((dose) => dose && memeDose(structuree, dose)),
+    && [dosePratiqueSourcee, dosePharmacologiqueSourcee].some((dose) => dose && memeDose(structuree, dose)),
   );
+  const dosePratique = dosePratiqueSourcee
+    ?? (textesSources.length === 0 && structuree && estUniteDosePratique(structuree.doseUnit) ? structuree : null);
+  const dosePharmacologique = dosePharmacologiqueSourcee
+    ?? (textesSources.length === 0 && structuree && estUniteDosePharmacologique(structuree.doseUnit) ? structuree : null);
+
   const sourceHybrideDetectee = Boolean(
     structuree
-    && input.doseSourceText
-    && !correspondAUneExpression
+    && textesSources.length > 0
+    && !structureeCorrespondAUneSource
     && (
       (dosePharmacologique
         && structuree.doseValue === dosePharmacologique.doseValue
@@ -156,7 +161,7 @@ export function resoudreSourcesDose(input: DoseStructureeEntree): ResolutionSour
   );
 
   const doseAffichee = dosePratique ?? dosePharmacologique
-    ?? (sourceHybrideDetectee ? null : structuree);
+    ?? (textesSources.length > 0 ? null : structuree);
   return { dosePratique, dosePharmacologique, doseAffichee, sourceHybrideDetectee };
 }
 
