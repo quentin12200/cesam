@@ -14,7 +14,10 @@ import {
   sourceIndiqueDelivreCeJour,
 } from "./ordonnance-dates.ts";
 import { resoudreSourcesDose, type DoseSourceStructuree } from "./ordonnance-dose-sources.ts";
-import { normaliserConditionnementExtrait } from "./ordonnance-display.ts";
+import {
+  normaliserConditionnementExtrait,
+  normaliserConditionRenouvellement,
+} from "./ordonnance-display.ts";
 
 export interface MedicamentCandidat {
   id: string;
@@ -98,6 +101,43 @@ function collecterTextesSources(value: unknown, profondeur = 0): string[] {
     }
   }
   return [...new Set(resultats)];
+}
+
+export function extraireDelaisAttente(sourceTexts: string[]): {
+  meatDays: number | null;
+  offalDays: number | null;
+  milkDays: number | null;
+} {
+  let meatDays: number | null = null;
+  let offalDays: number | null = null;
+  let milkDays: number | null = null;
+  for (const sourceText of sourceTexts) {
+    const source = sourceText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const viandeEtAbats = source.match(
+      /\bviande\s+(?:et|&)\s+abats?\s*[:=\-]?\s*(\d{1,3})\s*(?:j|jour|jours)\b/i,
+    );
+    if (viandeEtAbats) {
+      meatDays = Number(viandeEtAbats[1]);
+      offalDays = Number(viandeEtAbats[1]);
+    }
+    for (const match of source.matchAll(
+      /\b(viande|abats?|lait)\b\s*[:=\-]?\s*(\d{1,3})\s*(?:j|jour|jours)\b/gi,
+    )) {
+      const valeur = Number(match[2]);
+      if (match[1] === "viande") meatDays = valeur;
+      else if (match[1].startsWith("abat")) offalDays = valeur;
+      else milkDays = valeur;
+    }
+  }
+  return { meatDays, offalDays, milkDays };
+}
+
+function extraireConditionRenouvellement(value: unknown, sourceTexts: string[]): string | null {
+  for (const candidate of [texte(value), ...sourceTexts]) {
+    const condition = normaliserConditionRenouvellement(candidate);
+    if (condition) return condition;
+  }
+  return null;
 }
 
 function doseSource(value: unknown): DoseSourceStructuree | null {
@@ -432,7 +472,11 @@ export function normaliserAnalyseOrdonnance(
     ].filter((value): value is string => Boolean(value));
     const administrationCountBrut = entier(protocole.administrationCount);
     const administrationIntervalHours = entier(protocole.administrationIntervalHours);
-    const repeatCondition = texte(protocole.repeatCondition);
+    const repeatCondition = extraireConditionRenouvellement(
+      protocole.repeatCondition,
+      textesSourcesMedicament,
+    );
+    const delaisSources = extraireDelaisAttente(textesSourcesMedicament);
     const proposition: MedicamentPropose = {
       ...medicamentVide(),
       medicamentNom: texte(m.medicamentNom),
@@ -467,9 +511,9 @@ export function normaliserAnalyseOrdonnance(
       repeatCondition,
       administrationInstructions: texte(protocole.administrationInstructions ?? m.frequence),
       withdrawalPeriods: {
-        meatDays: entier(delais.meatDays ?? m.delaiAttenteViandeJ),
-        offalDays: entier(delais.offalDays ?? m.delaiAttenteViandeJ),
-        milkDays: entier(delais.milkDays ?? m.delaiAttenteLaitJ),
+        meatDays: delaisSources.meatDays ?? entier(delais.meatDays ?? m.delaiAttenteViandeJ),
+        offalDays: delaisSources.offalDays ?? entier(delais.offalDays ?? m.delaiAttenteViandeJ),
+        milkDays: delaisSources.milkDays ?? entier(delais.milkDays ?? m.delaiAttenteLaitJ),
       },
       precautions: texte(m.precautions),
       medicationMatch: null,

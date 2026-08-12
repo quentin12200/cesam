@@ -206,10 +206,10 @@ test("securise le scan reel Tenaline mal structure par l'IA", () => {
         administrationCount: 2,
         administrationIntervalHours: 72,
         treatmentDurationDays: null,
-        repeatCondition: "si nécessaire",
+        repeatCondition: "administration une deuxième administration de 20 mg d’oxytétracycline après 72 heures",
         administrationInstructions: "Injection intramusculaire",
       },
-      withdrawalPeriods: { meatDays: 21, offalDays: 21, milkDays: 7 },
+      withdrawalPeriods: { meatDays: 1, offalDays: 1, milkDays: null },
       evidence: {
         dose: {
           value: "20 mg/kg",
@@ -229,6 +229,11 @@ test("securise le scan reel Tenaline mal structure par l'IA", () => {
         administrationProtocol: {
           value: "deux injections possibles",
           sourceText: "Une injection. Une deuxième administration pourra être pratiquée après 72 h si nécessaire.",
+          confidence: 0.9,
+        },
+        withdrawalPeriods: {
+          value: "viande 1 jour, abats 1 jour",
+          sourceText: "Délais d’attente — Viande : 21 jours · Abats : 21 jours · Lait : 7 jours",
           confidence: 0.9,
         },
       },
@@ -254,6 +259,7 @@ test("securise le scan reel Tenaline mal structure par l'IA", () => {
   assert.equal(med.administrationCount, 1);
   assert.equal(med.administrationIntervalHours, 72);
   assert.equal(med.repeatCondition, "si nécessaire");
+  assert.deepEqual(med.withdrawalPeriods, { meatDays: 21, offalDays: 21, milkDays: 7 });
   assert.notEqual(`${med.doseValue} ${med.doseUnit} / ${med.referenceValue} ${med.referenceUnit}`, "20 mg / 10 kg");
   assert.notEqual(med.normalizedDoseValue, 2);
 });

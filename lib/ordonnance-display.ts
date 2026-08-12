@@ -266,7 +266,7 @@ export function formaterRenouvellement(med: {
   repeatCondition: string;
 }): string | null {
   if (!med.administrationIntervalHours && !med.repeatCondition) return null;
-  const condition = med.repeatCondition.trim();
+  const condition = normaliserConditionRenouvellement(med.repeatCondition);
   if (med.administrationIntervalHours) {
     const intervalleDejaPresent = new RegExp(`apres\\s+${med.administrationIntervalHours}\\s*(?:h|heure)`, "i")
       .test(sansAccents(condition));
@@ -276,4 +276,24 @@ export function formaterRenouvellement(med: {
       : `Renouvelable après ${med.administrationIntervalHours} h`;
   }
   return condition || null;
+}
+
+export function normaliserConditionRenouvellement(value: string | null | undefined): string {
+  const condition = value?.trim() ?? "";
+  if (!condition) return "";
+  const sansAccent = sansAccents(condition).toLowerCase();
+  if (/\bsi\s+necessaire\b/.test(sansAccent)) return "si nécessaire";
+  if (/\bsi\s+besoin\b/.test(sansAccent)) return "si besoin";
+  if (/\bsi\s+(?:les\s+)?signes?\s+persist(?:e|ent)\b/.test(sansAccent)) {
+    return "si les signes persistent";
+  }
+  if (/\ben\s+cas\s+de\b/.test(sansAccent)) {
+    const debut = sansAccent.indexOf("en cas de");
+    return condition.slice(debut).trim();
+  }
+  // Une phrase contenant une dose ou la description d'une administration
+  // n'est pas une condition de renouvellement exploitable.
+  if (/\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|µg|ug|ml|cl|g|kg)\b/i.test(condition)
+    || /\b(?:administration|injection|dose)\b/i.test(sansAccent)) return "";
+  return condition.length <= 60 ? condition : "";
 }

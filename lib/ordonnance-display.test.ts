@@ -160,6 +160,13 @@ test("evite de repeter l'intervalle de renouvellement", () => {
     administrationIntervalHours: "72",
     repeatCondition: "Renouvelable après 72 heures si nécessaire",
   });
-  assert.equal(result, "Renouvelable après 72 heures si nécessaire");
+  assert.equal(result, "Renouvelable après 72 h si nécessaire");
   assert.equal((result?.match(/72/g) ?? []).length, 1);
+});
+
+test("retire la dose pharmacologique du renouvellement", () => {
+  assert.equal(formaterRenouvellement({
+    administrationIntervalHours: "72",
+    repeatCondition: "administration une deuxième administration de 20 mg d’oxytétracycline après 72 heures si nécessaire",
+  }), "Renouvelable après 72 h si nécessaire");
 });

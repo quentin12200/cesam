@@ -9,7 +9,7 @@ export const maxDuration = 60;
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
-const PROMPT_VERSION = "ordonnance-v5-post-ocr-robuste";
+const PROMPT_VERSION = "ordonnance-v6-renouvellement-delais";
 
 interface OrdonnanceResult extends PropositionOrdonnance {
   raw: string;
@@ -94,6 +94,7 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
     "evidence": {
       "dose": { "value": "texte interprete", "sourceText": "texte exact complet", "confidence": 0.95, "zone": "prescription" },
       "administrationProtocol": { "value": "texte interprete", "sourceText": "protocole exact complet", "confidence": 0.95, "zone": "prescription" },
+      "withdrawalPeriods": { "value": "delais interpretes", "sourceText": "texte exact complet viande, abats et lait", "confidence": 0.95, "zone": "prescription" },
       "conditionnement": { "value": "texte interprete", "sourceText": "nom, presentation et quantite exacts", "confidence": 0.95, "zone": "delivrance" }
     }
   }]
@@ -128,6 +129,7 @@ Regles obligatoires :
 - administrationCount contient le nombre d'administrations. repeatCondition contient uniquement la condition
   de renouvellement. administrationInstructions contient uniquement les consignes pratiques (agiter,
   nettoyer, position du flacon, parage, seringue, ponctions), jamais la frequence.
+- repeatCondition ne contient jamais la dose, la substance active ni la description complète de la seconde administration.
 - Une seconde administration seulement possible ou conditionnelle ne compte pas dans administrationCount : une injection
   certaine puis une repetition eventuelle apres 72 h donne administrationCount=1 et repeatCondition renseigne.
 - Les nombres des delais viande, abats ou lait ne sont jamais une duree de traitement.
