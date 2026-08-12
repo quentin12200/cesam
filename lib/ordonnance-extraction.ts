@@ -196,12 +196,10 @@ function classerDates(p: Record<string, unknown>): {
     if (dateOrdonnance && score > scorePrescription) {
       prescriptionDate = dateOrdonnance;
       scorePrescription = score;
-      return;
     }
     if (dateVisite && score > scoreVisite) {
       lastVisitDate = dateVisite;
       scoreVisite = score;
-      return;
     }
     if (dateDelivrance && score > scoreDelivrance) {
       deliveryDate = dateDelivrance;

@@ -58,6 +58,21 @@ test("separe les deux expressions du cas Tenaline et rejette le tuple hybride", 
   assert.notEqual(formaterDoseSource(resolution.doseAffichee), "20 mg / 10 kg");
 });
 
+test("interdit a 20 mg de recuperer la reference d'une dose pratique plus loin", () => {
+  const resolution = resoudreSourcesDose({
+    ...base,
+    doseValue: "20",
+    doseUnit: "mg",
+    referenceValue: "10",
+    referenceUnit: "kg",
+    doseSourceText: "20 mg d’oxytétracycline soit 1 ml de solution injectable pour 10 kg de poids vif",
+  });
+
+  assert.equal(resolution.dosePharmacologique, null);
+  assert.equal(formaterDoseSource(resolution.dosePratique), "1 ml / 10 kg");
+  assert.notEqual(formaterDoseSource(resolution.doseAffichee), "20 mg / 10 kg");
+});
+
 test("retrouve deux doses dans deux preuves du meme medicament sans les melanger", () => {
   const resolution = resoudreSourcesDose({
     ...base,

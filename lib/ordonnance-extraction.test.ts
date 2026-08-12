@@ -7,6 +7,7 @@ import {
 } from "./ordonnance-extraction.ts";
 import { medicamentsDepuisProposition } from "./ordonnance-types.ts";
 import { analyserPresentation } from "./ordonnance-display.ts";
+import { formaterDoseSource } from "./ordonnance-dose-sources.ts";
 
 const tenaline = {
   id: "med-tenaline",
@@ -255,6 +256,41 @@ test("securise le scan reel Tenaline mal structure par l'IA", () => {
   assert.equal(med.repeatCondition, "si nécessaire");
   assert.notEqual(`${med.doseValue} ${med.doseUnit} / ${med.referenceValue} ${med.referenceUnit}`, "20 mg / 10 kg");
   assert.notEqual(med.normalizedDoseValue, 2);
+});
+
+test("fait primer les lignes OCR explicites et separe strictement les doses", () => {
+  const blocOcr = [
+    "Dernière visite : 14/04/2026",
+    "ordonnance nÂ°26-06-0002[V] le 01/06/2026",
+    "20 mg d’oxytétracycline par kg de poids vif",
+    "soit 1 ml de solution injectable pour 10 kg de poids vif",
+  ].join("\n");
+  const proposition = normaliserAnalyseOrdonnance({
+    dates: { prescriptionDate: "2026-01-01", lastVisitDate: "2023-04-14" },
+    evidence: {
+      prescriptionDate: { value: "2026-01-01", sourceText: blocOcr, confidence: 0.95 },
+    },
+    medicaments: [{
+      medicamentNom: "TENALINE LA CLAS SOL INJ FL. 100 ML",
+      dose: {
+        doseValue: 20,
+        doseUnit: "mg",
+        referenceValue: 10,
+        referenceUnit: "kg",
+        referenceType: "live_weight",
+      },
+      evidence: {
+        dose: { value: "20 mg / 10 kg", sourceText: blocOcr, confidence: 0.95 },
+      },
+    }],
+  }, [tenaline]);
+
+  const med = proposition.medicaments![0];
+  assert.equal(proposition.prescriptionDate, "2026-06-01");
+  assert.equal(proposition.lastVisitDate, "2026-04-14");
+  assert.equal(formaterDoseSource(med.dosePharmacologique ?? null), "20 mg / 1 kg");
+  assert.equal(formaterDoseSource(med.dosePratique ?? null), "1 ml / 10 kg");
+  assert.notEqual(`${med.doseValue} ${med.doseUnit} / ${med.referenceValue} ${med.referenceUnit}`, "20 mg / 10 kg");
 });
 
 test("rapproche Tenaline de la fiche existante sans en creer une", () => {

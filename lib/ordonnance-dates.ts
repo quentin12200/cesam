@@ -35,9 +35,10 @@ function dateValide(jourBrut: string, moisBrut: string, anneeBrute: string): str
 
 export function extraireDateOrdonnance(sourceText: string | null | undefined): string | null {
   if (!sourceText) return null;
-  const marqueur = /ordonnance\s+n/i.exec(sourceText);
+  const sourceNormalisee = sourceText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const marqueur = /\bordonnance\b/i.exec(sourceNormalisee);
   if (!marqueur) return null;
-  const apresMarqueur = sourceText.slice(marqueur.index + marqueur[0].length, marqueur.index + 160);
+  const apresMarqueur = sourceNormalisee.slice(marqueur.index + marqueur[0].length, marqueur.index + 160);
   const dateApresLe = apresMarqueur.match(
     /\ble\s+([0-3]?\d)[/.\-]([01]?\d)[/.\-](\d{4})/i,
   );
@@ -53,8 +54,9 @@ export function dateIsoValide(value: unknown): string | null {
 
 export function extraireDateDerniereVisite(sourceText: string | null | undefined): string | null {
   if (!sourceText) return null;
-  const match = sourceText.match(
-    /derni[eè]re\s+visite(?:\s+le)?\s*:?\s*([0-3]?\d)[/.\-]([01]?\d)[/.\-](\d{4})/i,
+  const sourceNormalisee = sourceText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const match = sourceNormalisee.match(
+    /derniere\s+visite\s*(?:(?:le\b\s*)|(?:[:;,.\-]\s*))*([0-3]?\d)[/.\-]([01]?\d)[/.\-](\d{4})/i,
   );
   return match ? dateValide(match[1], match[2], match[3]) : null;
 }

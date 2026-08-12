@@ -71,23 +71,48 @@ export function extraireSourcesDose(sourceText: string | null | undefined): {
   const texte = sourceText?.trim() ?? "";
   if (!texte) return { dosePratique: null, dosePharmacologique: null };
 
-  const pratique = texte.match(
-    /\b(\d+(?:[.,]\d+)?)\s*(ml|cl|l|g|grammes?|comprim(?:e|é)s?|cp|bolus|unit(?:e|é)s?)(?:\s+de\s+[^,;]{1,60}?)?\s*(?:pour|par|\/)\s*(?:(\d+(?:[.,]\d+)?)\s*)?(kg|animal(?:aux)?|bovin(?:s)?)\b/i,
-  );
-  const pharmacologique = texte.match(
-    /\b(\d+(?:[.,]\d+)?)\s*(mg|mcg|µg|μg|ug)(?:\s+d[’'][^,;]{1,80}?)?\s*(?:pour|par|\/)\s*(?:(\d+(?:[.,]\d+)?)\s*)?(kg)\b/i,
-  );
+  const tokens = Array.from(texte.matchAll(
+    /\b(\d+(?:[.,]\d+)?)\s*(ml|cl|l|g|grammes?|comprim(?:e|é)s?|cp|bolus|unit(?:e|é)s?|mg|mcg|µg|μg|ug)\b/giu,
+  ));
+  let dosePratique: DoseSourceStructuree | null = null;
+  let dosePharmacologique: DoseSourceStructuree | null = null;
 
-  const unitePratique = pratique?.[2]
-    ? (/^(?:comprime|cp)/i.test(sansAccents(pratique[2])) ? "comprimé" : uniteNormalisee(pratique[2]))
-    : "";
-  const unitePharmacologique = pharmacologique?.[2]
-    ? uniteNormalisee(pharmacologique[2]).replace("μ", "µ")
-    : "";
-  return {
-    dosePratique: pratique ? doseDepuisMatch(pratique, unitePratique, texte) : null,
-    dosePharmacologique: pharmacologique ? doseDepuisMatch(pharmacologique, unitePharmacologique, texte) : null,
-  };
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    const debut = token.index ?? 0;
+    const finToken = debut + token[0].length;
+    // Une référence située après une autre valeur de dose appartient à cette
+    // dernière expression et ne peut jamais être rattachée à la précédente.
+    const finLocale = tokens[index + 1]?.index ?? texte.length;
+    const suiteLocale = texte.slice(finToken, finLocale);
+    const reference = suiteLocale.match(
+      /(?:^|\s)(?:pour|par|\/)\s*(?:(\d+(?:[.,]\d+)?)\s*)?(kg|animal(?:aux)?|bovin(?:s)?)\b(?:\s+de\s+poids\s+vif)?/iu,
+    );
+    if (!reference) continue;
+
+    const uniteBrute = token[2] ?? "";
+    const unite = /^(?:comprime|cp)/i.test(sansAccents(uniteBrute))
+      ? "comprimé"
+      : uniteNormalisee(uniteBrute).replace("μ", "µ");
+    const prefixe = texte.slice(0, debut).match(/soit\s*$/iu)?.[0] ?? "";
+    const sourceLocale = texte.slice(
+      debut - prefixe.length,
+      finToken + (reference.index ?? 0) + reference[0].length,
+    ).trim();
+    const matchLocal = [
+      token[0],
+      token[1],
+      uniteBrute,
+      reference[1],
+      reference[2],
+    ] as unknown as RegExpMatchArray;
+    const dose = doseDepuisMatch(matchLocal, unite, sourceLocale);
+
+    if (!dosePratique && estUniteDosePratique(unite)) dosePratique = dose;
+    if (!dosePharmacologique && estUniteDosePharmacologique(unite)) dosePharmacologique = dose;
+  }
+
+  return { dosePratique, dosePharmacologique };
 }
 
 function doseEntree(input: DoseStructureeEntree): DoseSourceStructuree | null {
