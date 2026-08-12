@@ -134,6 +134,9 @@ export function extraireDelaisAttente(sourceTexts: string[]): {
 
 function extraireConditionRenouvellement(value: unknown, sourceTexts: string[]): string | null {
   for (const candidate of [texte(value), ...sourceTexts]) {
+    if (!candidate) continue;
+    const source = candidate.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (!/\b(si|si necessaire|si besoin|en cas de)\b/.test(source)) continue;
     const condition = normaliserConditionRenouvellement(candidate);
     if (condition) return condition;
   }
@@ -462,6 +465,17 @@ export function normaliserAnalyseOrdonnance(
       ? m.withdrawalPeriods : m) as Record<string, unknown>;
     const evidenceMedicament = preuves(m.evidence);
     const textesSourcesMedicament = collecterTextesSources(m);
+    const transcriptionParBlocs = m.__transcriptionParBlocs === true;
+    const textesDose = transcriptionParBlocs
+      ? [evidenceMedicament.dose?.sourceText].filter((value): value is string => Boolean(value))
+      : textesSourcesMedicament;
+    const textesRenouvellement = transcriptionParBlocs
+      ? [evidenceMedicament.administrationProtocol?.sourceText]
+        .filter((value): value is string => Boolean(value))
+      : textesSourcesMedicament;
+    const textesDelais = transcriptionParBlocs
+      ? [evidenceMedicament.withdrawalPeriods?.sourceText].filter((value): value is string => Boolean(value))
+      : textesSourcesMedicament;
     const presentation = objet(m.presentation);
     const textesPresentation = [
       texte(m.medicamentNom),
@@ -474,9 +488,9 @@ export function normaliserAnalyseOrdonnance(
     const administrationIntervalHours = entier(protocole.administrationIntervalHours);
     const repeatCondition = extraireConditionRenouvellement(
       protocole.repeatCondition,
-      textesSourcesMedicament,
+      textesRenouvellement,
     );
-    const delaisSources = extraireDelaisAttente(textesSourcesMedicament);
+    const delaisSources = extraireDelaisAttente(textesDelais);
     const proposition: MedicamentPropose = {
       ...medicamentVide(),
       medicamentNom: texte(m.medicamentNom),
@@ -504,7 +518,7 @@ export function normaliserAnalyseOrdonnance(
         administrationCount: administrationCountBrut,
         administrationIntervalHours,
         repeatCondition,
-        sourceTexts: textesSourcesMedicament,
+        sourceTexts: textesRenouvellement,
       }),
       administrationIntervalHours,
       treatmentDurationDays: entier(protocole.treatmentDurationDays ?? m.dureeJours),
@@ -526,7 +540,7 @@ export function normaliserAnalyseOrdonnance(
       referenceUnit: proposition.referenceUnit ?? "",
       referenceType: proposition.referenceType ?? "",
       doseSourceText: proposition.evidence.dose?.sourceText,
-      doseSourceTexts: textesSourcesMedicament,
+      doseSourceTexts: textesDose,
       dosePratique: doseSource(m.dosePratique),
       dosePharmacologique: doseSource(m.dosePharmacologique),
     });

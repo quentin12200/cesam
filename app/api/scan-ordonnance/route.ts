@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 import type { PropositionOrdonnance } from "@/lib/ordonnance-types";
 import { normaliserAnalyseOrdonnance, type MedicamentCandidat } from "@/lib/ordonnance-extraction";
 import { chargerCandidatsOrdonnance } from "@/lib/ordonnance-medication-candidates";
+import { appliquerTranscriptionParBlocs } from "@/lib/ordonnance-transcription";
 
 export const maxDuration = 60;
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
-const PROMPT_VERSION = "ordonnance-v6-renouvellement-delais";
+const PROMPT_VERSION = "ordonnance-v7-transcription-par-blocs";
 
 interface OrdonnanceResult extends PropositionOrdonnance {
   raw: string;
@@ -22,6 +23,20 @@ const SYSTEM_PROMPT = `Tu analyses une ordonnance veterinaire francaise pour bov
 Les photos fournies forment une seule ordonnance. Combine toutes les pages.
 Reponds uniquement en JSON valide, sans markdown, avec cette structure :
 {
+  "transcription": {
+    "entete": {
+      "lignes": ["chaque ligne utile de l'en-tete, fidele et dans l'ordre"]
+    },
+    "medicaments": [{
+      "identification": ["nom commercial et identification, sans reformulation"],
+      "presentation": ["presentation, volume et quantite delivree, sans reformulation"],
+      "posologie": ["chaque expression de dose complete, sur une ligne separee"],
+      "renouvellement": ["seconde administration, intervalle et condition uniquement"],
+      "delaisAttente": ["viande, abats et lait, avec valeurs et unites exactes"],
+      "instructionsPrecautions": ["consignes pratiques et precautions"],
+      "autres": ["autres lignes utiles non classees"]
+    }]
+  },
   "dates": {
     "prescriptionDate": "YYYY-MM-DD ou null",
     "lastVisitDate": "YYYY-MM-DD ou null",
@@ -101,6 +116,12 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
 }
 
 Regles obligatoires :
+- Commence par transcrire les lignes utiles fidelement dans transcription, dans leur ordre de lecture.
+- Ne reformule, ne corrige et ne normalise aucune valeur, date ou unite dans transcription.
+- Une ligne appartient a un seul bloc metier. Ne place jamais un delai d'attente dans renouvellement,
+  ni une dose dans delaisAttente ou presentation.
+- Dans posologie, conserve chaque expression complete. Si une phrase contient 20 mg/kg et 1 ml/10 kg,
+  transcris les deux expressions sans en supprimer ni en recomposer une.
 - Associe chaque date a son libelle proche. La date pres de "derniere visite" est lastVisitDate et jamais prescriptionDate.
 - La date de l'ordonnance est exclusivement celle du bloc "ordonnance n ..." suivi de "le JJ/MM/AAAA".
   evidence.prescriptionDate.sourceText doit conserver ensemble le numero d'ordonnance et cette date.
@@ -148,7 +169,7 @@ function construireResultat(
   raw: string,
   candidats: MedicamentCandidat[],
 ): OrdonnanceResult {
-  const proposition = normaliserAnalyseOrdonnance(parsed, candidats);
+  const proposition = normaliserAnalyseOrdonnance(appliquerTranscriptionParBlocs(parsed), candidats);
   const premier = proposition.medicaments?.[0];
   return {
     ...proposition,
@@ -200,7 +221,7 @@ export async function POST(req: NextRequest) {
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 3000,
+      max_tokens: 5000,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },

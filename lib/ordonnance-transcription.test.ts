@@ -1,0 +1,94 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { formaterPresentationCompacte } from "./ordonnance-display.ts";
+import { formaterDoseSource } from "./ordonnance-dose-sources.ts";
+import { normaliserAnalyseOrdonnance } from "./ordonnance-extraction.ts";
+import { appliquerTranscriptionParBlocs } from "./ordonnance-transcription.ts";
+
+test("reconstruit le cas reel Tenaline uniquement depuis ses blocs transcrits", () => {
+  const analyseIA = {
+    transcription: {
+      entete: {
+        lignes: [
+          "Dernière visite : 14/04/2026",
+          "ordonnance n°26-06-0002[V] le 01/06/2026",
+        ],
+      },
+      medicaments: [{
+        identification: ["TENALINE LA CLAS SOL INJ"],
+        presentation: ["FL. 100 ML", "Qté : 1"],
+        posologie: [
+          "20 mg d’oxytétracycline par kg de poids vif",
+          "soit 1 ml de solution injectable pour 10 kg de poids vif",
+        ],
+        renouvellement: ["seconde administration après 72 heures si nécessaire"],
+        delaisAttente: ["Viande et abats : 21 jours", "Lait : 7 jours"],
+        instructionsPrecautions: [],
+        autres: [],
+      }],
+    },
+    // Propositions IA volontairement fausses : les blocs certains doivent primer.
+    dates: { prescriptionDate: "2026-01-01", lastVisitDate: "2023-04-14" },
+    ordonnanceNumero: "incorrect",
+    medicaments: [{
+      medicamentNom: "TENALINE",
+      conditionnement: "100 unités",
+      dose: {
+        doseValue: 20,
+        doseUnit: "mg",
+        referenceValue: 10,
+        referenceUnit: "kg",
+        referenceType: "live_weight",
+      },
+      administrationProtocol: {
+        administrationCount: 2,
+        administrationIntervalHours: 72,
+        repeatCondition: "Viande et abats : 21 jours, lait : 7 jours",
+      },
+      withdrawalPeriods: { meatDays: 1, offalDays: 1, milkDays: null },
+    }],
+  };
+
+  const proposition = normaliserAnalyseOrdonnance(appliquerTranscriptionParBlocs(analyseIA));
+  const medicament = proposition.medicaments![0];
+
+  assert.equal(proposition.prescriptionDate, "2026-06-01");
+  assert.equal(proposition.lastVisitDate, "2026-04-14");
+  assert.equal(proposition.ordonnanceNumero, "26-06-0002[V]");
+  assert.equal(formaterPresentationCompacte(medicament.conditionnement), "Flacon 100 ml · Qté 1");
+  assert.equal(formaterDoseSource(medicament.dosePratique ?? null), "1 ml / 10 kg");
+  assert.equal(formaterDoseSource(medicament.dosePharmacologique ?? null), "20 mg / 1 kg");
+  assert.notEqual(
+    `${medicament.doseValue} ${medicament.doseUnit} / ${medicament.referenceValue} ${medicament.referenceUnit}`,
+    "20 mg / 10 kg",
+  );
+  assert.notEqual(medicament.normalizedDoseValue, 2);
+  assert.equal(medicament.administrationCount, 1);
+  assert.equal(medicament.administrationIntervalHours, 72);
+  assert.equal(medicament.repeatCondition, "si nécessaire");
+  assert.deepEqual(medicament.withdrawalPeriods, { meatDays: 21, offalDays: 21, milkDays: 7 });
+  assert.doesNotMatch(medicament.repeatCondition ?? "", /viande|abats|lait/i);
+});
+
+test("ne recupere aucune donnee dans un bloc metier voisin", () => {
+  const analyse = appliquerTranscriptionParBlocs({
+    transcription: {
+      entete: { lignes: [] },
+      medicaments: [{
+        identification: ["PRODUIT"],
+        presentation: [],
+        posologie: ["20 mg par kg"],
+        renouvellement: ["Viande et abats : 21 jours"],
+        delaisAttente: ["seconde administration après 72 heures si nécessaire"],
+        instructionsPrecautions: [],
+        autres: ["1 ml pour 10 kg"],
+      }],
+    },
+    medicaments: [{ medicamentNom: "PRODUIT" }],
+  });
+  const medicament = normaliserAnalyseOrdonnance(analyse).medicaments![0];
+
+  assert.equal(medicament.dosePratique, null);
+  assert.equal(medicament.repeatCondition, null);
+  assert.deepEqual(medicament.withdrawalPeriods, { meatDays: null, offalDays: null, milkDays: null });
+});
