@@ -9,8 +9,21 @@ export interface MedicamentCandidateRecord {
   voie: string | null;
   delaiAttenteViandeJ: number | null;
   delaiAttenteLaitJ: number | null;
+  dosagePourKg?: number | null;
+  uniteDosage?: string | null;
   actif?: boolean;
   aliasesVocaux?: Array<{ alias: string; transcription: string }>;
+  preconisations?: Array<{
+    dose: number | null;
+    unite: string | null;
+    doseBase: string | null;
+    voie: string | null;
+    frequence: string | null;
+    delaiAttenteViandeJ: number | null;
+    delaiAttenteLaitTraites: number | null;
+    statut: string;
+  }>;
+  conditionnements?: Array<{ quantiteFlacon: number | null; uniteFlacon: string | null }>;
 }
 
 export const MEDICAMENTS_ORDONNANCE_QUERY = {
@@ -24,8 +37,28 @@ export const MEDICAMENTS_ORDONNANCE_QUERY = {
     voie: true,
     delaiAttenteViandeJ: true,
     delaiAttenteLaitJ: true,
+    dosagePourKg: true,
+    uniteDosage: true,
     actif: true,
     aliasesVocaux: { select: { alias: true, transcription: true } },
+    preconisations: {
+      select: {
+        dose: true,
+        unite: true,
+        doseBase: true,
+        voie: true,
+        frequence: true,
+        delaiAttenteViandeJ: true,
+        delaiAttenteLaitTraites: true,
+        statut: true,
+      },
+      orderBy: { createdAt: "asc" as const },
+    },
+    conditionnements: {
+      where: { actif: true },
+      select: { quantiteFlacon: true, uniteFlacon: true },
+      orderBy: { createdAt: "asc" as const },
+    },
   },
 };
 
@@ -48,6 +81,10 @@ export async function chargerCandidatsOrdonnance(
     voie: medicament.voie,
     delaiAttenteViandeJ: medicament.delaiAttenteViandeJ,
     delaiAttenteLaitJ: medicament.delaiAttenteLaitJ,
+    dosagePourKg: medicament.dosagePourKg,
+    uniteDosage: medicament.uniteDosage,
+    preconisations: medicament.preconisations ?? [],
+    conditionnements: medicament.conditionnements ?? [],
     actif: medicament.actif !== false,
     aliases: (medicament.aliasesVocaux ?? []).flatMap((alias) => [alias.alias, alias.transcription]),
   }));

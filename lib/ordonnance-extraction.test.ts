@@ -340,3 +340,56 @@ test("conserve le rapprochement des brouillons crees avant la liste de candidats
   assert.equal(medicament.medicationMatchStatus, "matched");
   assert.equal(medicament.medicationMatches[0]?.id, "med-tenaline");
 });
+
+test("normalise le cas Tenaline sans melanger dose pharmacologique et dose pratique", () => {
+  const proposition = normaliserAnalyseOrdonnance({
+    medicaments: [{
+      medicamentNom: "TENALINE LA CLAS SOL INJ FL. 100 ML",
+      dose: {
+        doseValue: 20,
+        doseUnit: "mg",
+        referenceValue: 10,
+        referenceUnit: "kg",
+        referenceType: "live_weight",
+      },
+      evidence: {
+        dose: {
+          value: "20 mg / 10 kg",
+          sourceText: "20 mg d’oxytétracycline par kg de poids vif, soit 1 ml de solution pour 10 kg de poids vif",
+          confidence: 0.92,
+        },
+      },
+    }],
+  }, [tenaline]);
+  const medicament = proposition.medicaments?.[0];
+  assert.equal(medicament?.doseValue, 1);
+  assert.equal(medicament?.doseUnit, "ml");
+  assert.equal(medicament?.referenceValue, 10);
+  assert.equal(medicament?.referenceUnit, "kg");
+  assert.equal(medicament?.dosePratique?.doseValue, "1");
+  assert.equal(medicament?.dosePharmacologique?.doseValue, "20");
+  assert.equal(medicament?.dosePharmacologique?.referenceValue, "1");
+  assert.equal(medicament?.doseSourceConflict, true);
+});
+
+test("enrichit une association existante avec le controle Pharmacie sans la remplacer", () => {
+  const proposition = reevaluerCorrespondancesOrdonnance(analyse, [{
+    ...tenaline,
+    dosagePourKg: 10,
+    uniteDosage: "ml",
+    preconisations: [{
+      dose: 10,
+      unite: "ml",
+      doseBase: "100KG",
+      voie: "IM",
+      frequence: "1 fois par jour",
+      delaiAttenteViandeJ: 21,
+      delaiAttenteLaitTraites: 14,
+      statut: "A_VERIFIER",
+    }],
+  }]);
+  const match = proposition.medicaments?.[0].medicationMatch;
+  assert.equal(match?.id, "med-tenaline");
+  assert.equal(match?.uniteDosage, "ml");
+  assert.equal(match?.preconisations?.[0].statut, "A_VERIFIER");
+});

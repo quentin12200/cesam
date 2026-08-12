@@ -9,7 +9,7 @@ export const maxDuration = 60;
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
-const PROMPT_VERSION = "ordonnance-v3-structuree";
+const PROMPT_VERSION = "ordonnance-v4-doses-separees";
 
 interface OrdonnanceResult extends PropositionOrdonnance {
   raw: string;
@@ -55,6 +55,22 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
       "normalizedDoseValue": "number ou null",
       "normalizedDoseUnit": "ml/kg, mg/kg ou null"
     },
+    "dosePratique": {
+      "doseValue": "number ou null",
+      "doseUnit": "ml, g, cp, bolus ou null",
+      "referenceValue": "number ou null",
+      "referenceUnit": "kg ou null",
+      "referenceType": "live_weight, animal ou null",
+      "sourceText": "expression exacte complète ou null"
+    },
+    "dosePharmacologique": {
+      "doseValue": "number ou null",
+      "doseUnit": "mg, mcg ou null",
+      "referenceValue": "number ou null",
+      "referenceUnit": "kg ou null",
+      "referenceType": "live_weight ou null",
+      "sourceText": "expression exacte complète ou null"
+    },
     "administrationProtocol": {
       "administrationCount": "number ou null",
       "administrationIntervalHours": "number ou null",
@@ -90,9 +106,10 @@ Regles obligatoires :
 - Pour le conditionnement, conserve distinctement dans la meme phrase le nombre d'unites delivrees et la
   presentation, par exemple "1 flacon de 100 ml". N'invente jamais une quantite absente du document.
 - Une dose "1 ml pour 10 kg" est ponderale : doseValue=1, referenceValue=10, referenceType=live_weight, normalizedDoseValue=0.1. Ce n'est pas une dose fixe de 1 ml.
-- Lorsqu'une dose pratique (ml, g, comprime ou bolus) et une dose de substance active en mg/kg sont toutes les deux lisibles,
-  renseigne doseValue/doseUnit/referenceValue/referenceUnit avec la dose pratique. Conserve le passage complet dans
-  evidence.dose.sourceText afin que la dose pharmacologique reste verifiable. N'invente aucune conversion entre mg et ml.
+- Conserve séparément dosePratique et dosePharmacologique. Chaque valeur, unité et référence doit provenir de la même
+  expression exacte conservée dans son sourceText. Ne combine jamais une valeur en mg avec la référence d'une expression en ml.
+- Le bloc dose principal reprend la dose pratique lorsqu'elle existe, sinon la dose pharmacologique. N'invente aucune conversion
+  entre mg et ml et conserve le passage complet dans evidence.dose.sourceText.
 - Accepte aussi les doses fixes par animal et les doses en mg/kg.
 - Separe une injection initiale, un rappel conditionnel et la duree du traitement.
 - administrationCount contient le nombre d'administrations. repeatCondition contient uniquement la condition

@@ -16,7 +16,7 @@ import {
   sourceJustifieDateDelivrance,
 } from "@/lib/ordonnance-dates";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
-import { resoudreDosePratique } from "@/lib/ordonnance-display";
+import { resoudreSourcesDose } from "@/lib/ordonnance-display";
 import MedicamentVerificationCard, { type MedicationFields } from "./MedicamentVerificationCard";
 
 interface ExtractionInfo {
@@ -45,12 +45,19 @@ function versChamps(m: MedicamentPropose): MedicationFields {
     referenceUnit: s(m.referenceUnit),
     referenceType: s(m.referenceType),
   };
-  const dosePratique = resoudreDosePratique({
+  const resolutionDose = resoudreSourcesDose({
     ...doseInitiale,
-    formePharmaceutique: s(m.formePharmaceutique),
-    conditionnement: s(m.conditionnement),
     doseSourceText: m.evidence.dose?.sourceText,
-  }) ?? doseInitiale;
+    dosePratique: m.dosePratique ?? null,
+    dosePharmacologique: m.dosePharmacologique ?? null,
+  });
+  const doseSources = {
+    ...resolutionDose,
+    sourceHybrideDetectee: resolutionDose.sourceHybrideDetectee || m.doseSourceConflict === true,
+  };
+  const doseRetenue = doseSources.doseAffichee ?? {
+    doseValue: "", doseUnit: "", referenceValue: "", referenceUnit: "", referenceType: "", sourceText: null,
+  };
   return {
     key: nouvelleCle(),
     ia: m,
@@ -65,11 +72,12 @@ function versChamps(m: MedicamentPropose): MedicationFields {
     familleTherapeutique: s(m.familleTherapeutique),
     formePharmaceutique: s(m.formePharmaceutique),
     conditionnement: s(m.conditionnement),
-    doseValue: dosePratique.doseValue,
-    doseUnit: dosePratique.doseUnit,
-    referenceValue: dosePratique.referenceValue,
-    referenceUnit: dosePratique.referenceUnit,
-    referenceType: dosePratique.referenceType,
+    doseValue: doseRetenue.doseValue,
+    doseUnit: doseRetenue.doseUnit,
+    referenceValue: doseRetenue.referenceValue,
+    referenceUnit: doseRetenue.referenceUnit,
+    referenceType: doseRetenue.referenceType,
+    doseSources,
     doseManuallyEdited: false,
     normalizedDoseValue: s(m.normalizedDoseValue),
     normalizedDoseUnit: s(m.normalizedDoseUnit),
@@ -92,7 +100,9 @@ function champsVides(): MedicationFields {
     medicamentNom: "", numeroLot: "", substanceActive: "", concentration: "", categorie: "",
     familleTherapeutique: "", formePharmaceutique: "", conditionnement: "", doseValue: "",
     doseUnit: "", referenceValue: "", referenceUnit: "", referenceType: "", normalizedDoseValue: "",
-    doseManuallyEdited: false, normalizedDoseUnit: "", voie: "", administrationCount: "", administrationIntervalHours: "",
+    doseManuallyEdited: false,
+    doseSources: { dosePratique: null, dosePharmacologique: null, doseAffichee: null, sourceHybrideDetectee: false },
+    normalizedDoseUnit: "", voie: "", administrationCount: "", administrationIntervalHours: "",
     treatmentDurationDays: "", repeatCondition: "", administrationInstructions: "", meatDays: "",
     offalDays: "", milkDays: "", precautions: "",
   };
@@ -223,7 +233,23 @@ export default function VerificationOrdonnanceClient({
             administrationInstructions: med.administrationInstructions,
             withdrawalPeriods: { meatDays: med.meatDays, offalDays: med.offalDays, milkDays: med.milkDays },
             precautions: med.precautions,
-            evidence: med.ia?.evidence ?? {},
+            evidence: {
+              ...(med.ia?.evidence ?? {}),
+              ...(med.doseSources.dosePratique ? {
+                dosePratique: {
+                  value: med.doseSources.dosePratique,
+                  sourceText: med.doseSources.dosePratique.sourceText,
+                  confidence: med.ia?.evidence.dose?.confidence ?? 0,
+                },
+              } : {}),
+              ...(med.doseSources.dosePharmacologique ? {
+                dosePharmacologique: {
+                  value: med.doseSources.dosePharmacologique,
+                  sourceText: med.doseSources.dosePharmacologique.sourceText,
+                  confidence: med.ia?.evidence.dose?.confidence ?? 0,
+                },
+              } : {}),
+            },
           })),
         }),
       });

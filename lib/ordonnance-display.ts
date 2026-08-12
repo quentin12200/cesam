@@ -1,3 +1,14 @@
+import {
+  formaterDoseSource,
+  resoudreSourcesDose,
+  type DoseSourceStructuree,
+  type ResolutionSourcesDose,
+} from "./ordonnance-dose-sources.ts";
+import type { MedicamentCorrespondant } from "./ordonnance-types.ts";
+
+export { resoudreSourcesDose } from "./ordonnance-dose-sources.ts";
+export type { DoseSourceStructuree, ResolutionSourcesDose } from "./ordonnance-dose-sources.ts";
+
 const VOIES: Record<string, string> = {
   IM: "Intramusculaire",
   INTRAMUSCULAIRE: "Intramusculaire",
@@ -72,12 +83,14 @@ export function formaterDoseCompacte(med: {
   conditionnement?: string;
   doseSourceText?: string | null;
   preferStructuredDose?: boolean;
+  dosePratique?: DoseSourceStructuree | null;
+  dosePharmacologique?: DoseSourceStructuree | null;
 }): string | null {
-  const doseStructuree = formaterDoseStructureeCompacte(med);
-  if (med.preferStructuredDose) return doseStructuree;
-  const dosePratique = resoudreDosePratique(med);
-  if (dosePratique) return formaterDoseStructureeCompacte(dosePratique);
-  return doseStructuree;
+  const resolution = resoudreSourcesDose({
+    ...med,
+    correctionManuelle: med.preferStructuredDose,
+  });
+  return formaterDoseSource(resolution.doseAffichee);
 }
 
 interface DoseStructuree {
@@ -93,68 +106,60 @@ export function resoudreDosePratique(med: DoseStructuree & {
   conditionnement?: string;
   doseSourceText?: string | null;
 }): DoseStructuree | null {
-  if (med.doseValue && med.doseUnit && estUniteDosePratique(med.doseUnit)) {
+  const dose = resoudreSourcesDose(med).dosePratique;
+  if (!dose) return null;
+  return {
+    doseValue: dose.doseValue,
+    doseUnit: dose.doseUnit,
+    referenceValue: dose.referenceValue,
+    referenceUnit: dose.referenceUnit,
+    referenceType: dose.referenceType,
+  };
+}
+
+export function controlerCoherenceDosePharmacie(
+  resolution: ResolutionSourcesDose,
+  match: MedicamentCorrespondant | null | undefined,
+): { avertissement: boolean; detail: string | null } {
+  const sourcesOcrSeparees = Boolean(
+    resolution.dosePratique?.sourceText && resolution.dosePharmacologique?.sourceText,
+  );
+  if (resolution.sourceHybrideDetectee && !sourcesOcrSeparees) {
     return {
-      doseValue: med.doseValue,
-      doseUnit: med.doseUnit,
-      referenceValue: med.referenceValue,
-      referenceUnit: med.referenceUnit,
-      referenceType: med.referenceType,
+      avertissement: true,
+      detail: "Les éléments de dose ne peuvent pas être rattachés avec certitude à une même expression OCR.",
     };
   }
-  return extraireDosePratique(
-    med.doseSourceText,
-    [med.formePharmaceutique, med.conditionnement].filter(Boolean).join(" "),
-  );
-}
 
-function formaterDoseStructureeCompacte(med: {
-  doseValue: string;
-  doseUnit: string;
-  referenceValue: string;
-  referenceUnit: string;
-  referenceType: string;
-}): string | null {
-  if (!med.doseValue || !med.doseUnit) return null;
-  const base = `${med.doseValue} ${med.doseUnit}`;
-  if (med.referenceType === "animal") return `${base} / animal`;
-  if (!med.referenceValue || !med.referenceUnit) return base;
-  return `${base} / ${med.referenceValue} ${med.referenceUnit}`;
-}
+  const pratique = resolution.dosePratique;
+  if (!pratique || !pratique.referenceValue || pratique.referenceUnit.toLowerCase() !== "kg") {
+    return { avertissement: false, detail: null };
+  }
+  const valeurOrdonnance = Number(pratique.doseValue.replace(",", "."));
+  const baseOrdonnance = Number(pratique.referenceValue.replace(",", "."));
+  if (!Number.isFinite(valeurOrdonnance) || !Number.isFinite(baseOrdonnance) || baseOrdonnance <= 0) {
+    return { avertissement: false, detail: null };
+  }
 
-function estUniteDosePratique(value: string): boolean {
-  const unite = sansAccents(value).toLowerCase().replace(/[^a-z]/g, "");
-  return /^(?:ml|cl|l|g|grammes?|comprimes?|cp|bolus|unites?)$/.test(unite);
-}
+  const preconisationsComparables = (match?.preconisations ?? []).flatMap((preconisation) => {
+    if (preconisation.statut !== "VALIDE" || preconisation.dose == null || !preconisation.unite) return [];
+    if (sansAccents(preconisation.unite).toLowerCase() !== sansAccents(pratique.doseUnit).toLowerCase()) return [];
+    const base = preconisation.doseBase?.match(/(\d+(?:[.,]\d+)?)\s*kg/i)?.[1];
+    const baseKg = base ? Number(base.replace(",", ".")) : null;
+    if (!baseKg || !Number.isFinite(baseKg)) return [];
+    return [{ dose: preconisation.dose, baseKg }];
+  });
+  if (preconisationsComparables.length !== 1) return { avertissement: false, detail: null };
 
-function extraireDosePratique(
-  doseSourceText: string | null | undefined,
-  presentation: string,
-): DoseStructuree | null {
-  const texte = doseSourceText?.trim() ?? "";
-  if (!texte) return null;
-  const contexte = sansAccents(`${presentation} ${texte}`).toLowerCase();
-  const estLiquide = /\b(solution|injectable|injection|flacon|liquide|aerosol)\b/.test(contexte);
-  const estPoudre = /\bpoudre\b/.test(contexte);
-  const estUnite = /\b(comprime|cp|bolus)\b/.test(contexte);
-  const unites = estLiquide ? "ml" : estPoudre ? "g" : estUnite ? "comprim(?:e|é)s?|cp|bolus" : "ml|g|comprim(?:e|é)s?|cp|bolus";
-  const pattern = new RegExp(
-    `\\b(\\d+(?:[.,]\\d+)?)\\s*(${unites})\\s*(?:pour|par|/)\\s*(?:(\\d+(?:[.,]\\d+)?)\\s*)?(kg|animal(?:aux)?|bovin(?:s)?)\\b`,
-    "i",
-  );
-  const match = texte.match(pattern);
-  if (!match) return null;
-  const valeur = match[1].replace(",", ".");
-  const uniteBrute = sansAccents(match[2]).toLowerCase();
-  const unite = /^(?:comprime|cp)/.test(uniteBrute) ? "comprimé" : uniteBrute;
-  const referenceKg = sansAccents(match[4]).toLowerCase() === "kg";
-  return {
-    doseValue: valeur,
-    doseUnit: unite,
-    referenceValue: referenceKg ? match[3]?.replace(",", ".") ?? "1" : "",
-    referenceUnit: referenceKg ? "kg" : "",
-    referenceType: referenceKg ? "live_weight" : "animal",
-  };
+  const ordonnanceParKg = valeurOrdonnance / baseOrdonnance;
+  const pharmacieParKg = preconisationsComparables[0].dose / preconisationsComparables[0].baseKg;
+  const equivalentes = Math.abs(ordonnanceParKg - pharmacieParKg) <= 1e-9;
+  return equivalentes
+    ? { avertissement: false, detail: null }
+    : {
+      avertissement: true,
+      detail: "La dose pratique de l’ordonnance diffère de la préconisation validée de la fiche Pharmacie. La prescription n’a pas été modifiée.",
+    };
 }
 
 export function estInstructionPratique(value: string | null | undefined): boolean {

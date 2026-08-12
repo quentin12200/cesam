@@ -12,6 +12,7 @@ import {
   extraireDateOrdonnance,
   sourceIndiqueDelivreCeJour,
 } from "./ordonnance-dates.ts";
+import { resoudreSourcesDose, type DoseSourceStructuree } from "./ordonnance-dose-sources.ts";
 
 export interface MedicamentCandidat {
   id: string;
@@ -22,6 +23,19 @@ export interface MedicamentCandidat {
   voie: string | null;
   delaiAttenteViandeJ: number | null;
   delaiAttenteLaitJ: number | null;
+  dosagePourKg?: number | null;
+  uniteDosage?: string | null;
+  preconisations?: Array<{
+    dose: number | null;
+    unite: string | null;
+    doseBase: string | null;
+    voie: string | null;
+    frequence: string | null;
+    delaiAttenteViandeJ: number | null;
+    delaiAttenteLaitTraites: number | null;
+    statut: string;
+  }>;
+  conditionnements?: Array<{ quantiteFlacon: number | null; uniteFlacon: string | null }>;
   actif?: boolean;
   aliases: string[];
 }
@@ -65,6 +79,25 @@ function preuves(value: unknown): Record<string, ChampExtrait<unknown>> {
       .map(([key, raw]) => [key, champ(raw)] as const)
       .filter((entry): entry is [string, ChampExtrait<unknown>] => entry[1] !== null),
   );
+}
+
+function doseSource(value: unknown): DoseSourceStructuree | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const doseValue = nombre(raw.doseValue);
+  const doseUnit = texte(raw.doseUnit);
+  if (doseValue === null || !doseUnit) return null;
+  const referenceValue = nombre(raw.referenceValue);
+  const referenceUnit = texte(raw.referenceUnit);
+  return {
+    doseValue: String(doseValue),
+    doseUnit,
+    referenceValue: referenceValue === null ? "" : String(referenceValue),
+    referenceUnit: referenceUnit ?? "",
+    referenceType: raw.referenceType === "live_weight" || raw.referenceType === "animal"
+      ? raw.referenceType : "",
+    sourceText: texte(raw.sourceText),
+  };
 }
 
 export function normaliserNomMedicament(value: string): string {
@@ -222,6 +255,10 @@ export function trouverCorrespondancesMedicaments(
       voie: candidat.voie,
       delaiAttenteViandeJ: candidat.delaiAttenteViandeJ,
       delaiAttenteLaitJ: candidat.delaiAttenteLaitJ,
+      dosagePourKg: candidat.dosagePourKg ?? null,
+      uniteDosage: candidat.uniteDosage ?? null,
+      preconisations: candidat.preconisations ?? [],
+      conditionnements: candidat.conditionnements ?? [],
       actif: candidat.actif !== false,
       score,
       concordances: [],
@@ -256,7 +293,23 @@ export function reevaluerCorrespondancesOrdonnance(
     ...proposition,
     medicaments: medicaments.map((medicament) => {
       if (medicament.medicationMatchStatus === "matched" || medicament.medicationMatchStatus === "manually_confirmed") {
-        return medicament;
+        const candidat = candidats.find((item) => item.id === medicament.medicationMatch?.id);
+        if (!candidat || !medicament.medicationMatch) return medicament;
+        const matchEnrichi = comparerAvecReference(medicament, {
+          ...medicament.medicationMatch,
+          dosagePourKg: candidat.dosagePourKg ?? null,
+          uniteDosage: candidat.uniteDosage ?? null,
+          preconisations: candidat.preconisations ?? [],
+          conditionnements: candidat.conditionnements ?? [],
+          actif: candidat.actif !== false,
+        });
+        return {
+          ...medicament,
+          medicationMatch: matchEnrichi,
+          medicationMatches: medicament.medicationMatches.map((match) => (
+            match.id === matchEnrichi.id ? matchEnrichi : match
+          )),
+        };
       }
       return evaluerCorrespondance(medicament, candidats);
     }),
@@ -331,7 +384,48 @@ export function normaliserAnalyseOrdonnance(
       medicationMatch: null,
       evidence: preuves(m.evidence),
     };
-    return evaluerCorrespondance(proposition, candidats);
+    const resolutionDose = resoudreSourcesDose({
+      doseValue: proposition.doseValue === null ? "" : String(proposition.doseValue),
+      doseUnit: proposition.doseUnit ?? "",
+      referenceValue: proposition.referenceValue === null ? "" : String(proposition.referenceValue),
+      referenceUnit: proposition.referenceUnit ?? "",
+      referenceType: proposition.referenceType ?? "",
+      doseSourceText: proposition.evidence.dose?.sourceText,
+      dosePratique: doseSource(m.dosePratique),
+      dosePharmacologique: doseSource(m.dosePharmacologique),
+    });
+    const doseRetenue = resolutionDose.doseAffichee;
+    const confianceDose = proposition.evidence.dose?.confidence ?? 0;
+    const evidence = {
+      ...proposition.evidence,
+      ...(resolutionDose.dosePratique ? {
+        dosePratique: {
+          value: resolutionDose.dosePratique,
+          sourceText: resolutionDose.dosePratique.sourceText,
+          confidence: confianceDose,
+        },
+      } : {}),
+      ...(resolutionDose.dosePharmacologique ? {
+        dosePharmacologique: {
+          value: resolutionDose.dosePharmacologique,
+          sourceText: resolutionDose.dosePharmacologique.sourceText,
+          confidence: confianceDose,
+        },
+      } : {}),
+    };
+    return evaluerCorrespondance({
+      ...proposition,
+      doseValue: doseRetenue ? nombre(doseRetenue.doseValue) : null,
+      doseUnit: doseRetenue?.doseUnit ?? null,
+      referenceValue: doseRetenue ? nombre(doseRetenue.referenceValue) : null,
+      referenceUnit: doseRetenue?.referenceUnit || null,
+      referenceType: doseRetenue?.referenceType === "live_weight" || doseRetenue?.referenceType === "animal"
+        ? doseRetenue.referenceType : null,
+      dosePratique: resolutionDose.dosePratique,
+      dosePharmacologique: resolutionDose.dosePharmacologique,
+      doseSourceConflict: resolutionDose.sourceHybrideDetectee,
+      evidence,
+    }, candidats);
   }).filter((m) => m.medicamentNom || m.doseValue || m.numeroLot);
 
   return {

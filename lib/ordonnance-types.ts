@@ -11,6 +11,26 @@ export interface PeriodesAttente {
   milkDays: number | null;
 }
 
+export interface DoseOrdonnanceSource {
+  doseValue: string;
+  doseUnit: string;
+  referenceValue: string;
+  referenceUnit: string;
+  referenceType: string;
+  sourceText: string | null;
+}
+
+export interface PreconisationPharmacieControle {
+  dose: number | null;
+  unite: string | null;
+  doseBase: string | null;
+  voie: string | null;
+  frequence: string | null;
+  delaiAttenteViandeJ: number | null;
+  delaiAttenteLaitTraites: number | null;
+  statut: string;
+}
+
 export interface MedicamentCorrespondant {
   id: string;
   nom: string;
@@ -21,6 +41,10 @@ export interface MedicamentCorrespondant {
   voie: string | null;
   delaiAttenteViandeJ: number | null;
   delaiAttenteLaitJ: number | null;
+  dosagePourKg?: number | null;
+  uniteDosage?: string | null;
+  preconisations?: PreconisationPharmacieControle[];
+  conditionnements?: Array<{ quantiteFlacon: number | null; uniteFlacon: string | null }>;
   actif?: boolean;
   score: number;
   concordances: string[];
@@ -44,6 +68,9 @@ export interface MedicamentPropose {
   referenceType: "live_weight" | "animal" | null;
   normalizedDoseValue: number | null;
   normalizedDoseUnit: string | null;
+  dosePratique?: DoseOrdonnanceSource | null;
+  dosePharmacologique?: DoseOrdonnanceSource | null;
+  doseSourceConflict?: boolean;
   administrationCount: number | null;
   administrationIntervalHours: number | null;
   treatmentDurationDays: number | null;

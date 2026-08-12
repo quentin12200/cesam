@@ -5,13 +5,17 @@ import { AlertTriangle, Beef, CalendarDays, ChevronDown, Milk, Pencil, RotateCcw
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import type { MedicamentCorrespondant, MedicamentPropose } from "@/lib/ordonnance-types";
 import {
+  controlerCoherenceDosePharmacie,
   formaterDose,
   formaterDoseCompacte,
   formaterPresentationCompacte,
   formaterRenouvellement,
   formaterRythme,
   formaterVoie,
+  resoudreSourcesDose,
+  type ResolutionSourcesDose,
 } from "@/lib/ordonnance-display";
+import { formaterDoseSource } from "@/lib/ordonnance-dose-sources";
 
 export interface MedicationFields {
   key: string;
@@ -33,6 +37,7 @@ export interface MedicationFields {
   referenceUnit: string;
   referenceType: string;
   doseManuallyEdited: boolean;
+  doseSources: ResolutionSourcesDose;
   normalizedDoseValue: string;
   normalizedDoseUnit: string;
   voie: string;
@@ -90,10 +95,24 @@ export default function MedicamentVerificationCard({
     ?? (med.medicationId ? med.ia?.medicationMatch : null)
     ?? pharmacyOptions.find((item) => item.id === med.medicationId);
   const presentationCompacte = formaterPresentationCompacte(med.conditionnement);
+  const resolutionCourante = resoudreSourcesDose({
+    ...med,
+    doseSourceText: med.ia?.evidence.dose?.sourceText,
+    dosePratique: med.doseSources.dosePratique,
+    dosePharmacologique: med.doseSources.dosePharmacologique,
+    correctionManuelle: med.doseManuallyEdited,
+  });
+  const resolutionDose = {
+    ...resolutionCourante,
+    sourceHybrideDetectee: !med.doseManuallyEdited
+      && (resolutionCourante.sourceHybrideDetectee || med.doseSources.sourceHybrideDetectee),
+  };
   const dose = formaterDoseCompacte({
     ...med,
     doseSourceText: med.ia?.evidence.dose?.sourceText,
     preferStructuredDose: med.doseManuallyEdited,
+    dosePratique: med.doseSources.dosePratique,
+    dosePharmacologique: med.doseSources.dosePharmacologique,
   });
   const doseDetaillee = formaterDose(med);
   const rythme = formaterRythme(med);
@@ -112,7 +131,9 @@ export default function MedicamentVerificationCard({
     const evidence = med.ia?.evidence[cle];
     return Boolean(evidence && (evidence.confidence < 0.7 || !evidence.sourceText));
   });
-  const doseAVerifier = !dose || preuveFaible(["dose"]);
+  const controleDosePharmacie = controlerCoherenceDosePharmacie(resolutionDose, match);
+  const doseAVerifier = !dose || preuveFaible(["dose"])
+    || (!med.doseManuallyEdited && controleDosePharmacie.avertissement);
   const dureeAVerifier = preuveFaible(["duration", "treatmentDurationDays", "administrationProtocol"]);
   const delaiAVerifier = !delaisComplets || preuveFaible(["withdrawalPeriods", "meatDays", "offalDays", "milkDays"]);
   const correspondancesAmbigues = !med.medicationId && correspondances.length > 0;
@@ -152,6 +173,9 @@ export default function MedicamentVerificationCard({
               {dureeAVerifier && <span className="rounded bg-amber-50 px-1.5 py-0.5">Durée à vérifier</span>}
               {delaiAVerifier && <span className="rounded bg-amber-50 px-1.5 py-0.5">Délai à vérifier</span>}
             </div>
+          )}
+          {!med.doseManuallyEdited && controleDosePharmacie.detail && (
+            <p className="mt-1 text-[11px] text-amber-800">{controleDosePharmacie.detail}</p>
           )}
         </div>
         {total > 1 && (
@@ -257,7 +281,9 @@ export default function MedicamentVerificationCard({
           <Ligne label="Forme pharmaceutique" value={med.formePharmaceutique || null} />
           <Ligne label="Conditionnement" value={med.conditionnement || null} />
           <Ligne label="Lot" value={med.numeroLot || null} />
-          <Ligne label="Dose brute" value={doseDetaillee} />
+          <Ligne label="Dose pratique détectée" value={formaterDoseSource(resolutionDose.dosePratique)} />
+          <Ligne label="Dose pharmacologique détectée" value={formaterDoseSource(resolutionDose.dosePharmacologique)} />
+          <Ligne label={med.doseManuallyEdited ? "Dose corrigée" : "Dose structurée"} value={doseDetaillee} />
           <Ligne label="Dose normalisée" value={med.normalizedDoseValue && med.normalizedDoseUnit ? `${med.normalizedDoseValue} ${med.normalizedDoseUnit}` : null} />
           <Ligne label="Protocole" value={rythme} />
           <Ligne label="Renouvellement" value={renouvellement} />
