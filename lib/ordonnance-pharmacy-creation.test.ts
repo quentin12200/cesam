@@ -11,14 +11,14 @@ import type { MedicamentCandidateRecord } from "./ordonnance-medication-candidat
 function input(overrides: Partial<CreationPharmacieInput> = {}): CreationPharmacieInput {
   return {
     confirmed: true,
-    categoryConfirmed: true,
     medicamentNom: "OXYTETRIN P 220 G AER. 320 ML",
     conditionnement: "1 aérosol de 320 ml",
     formePharmaceutique: "Aérosol",
     voie: "TOPIQUE",
     substanceActive: "Oxytétracycline",
     concentration: "220 g",
-    categorie: "Antibiotique",
+    categorieSelectionnee: "ANTIBIOTIQUE",
+    nouvelleCategorie: null,
     doseValue: 1,
     doseUnit: "ml",
     referenceValue: 10,
@@ -107,6 +107,36 @@ test("associe immediatement le resultat a la nouvelle fiche", async () => {
   assert.equal(result.medicament.id, "med-created");
   assert.equal(result.medicament.actif, true);
   assert.equal(result.medicament.categorieLabel, "Antibiotique");
+});
+
+test("enregistre exactement la categorie existante choisie", async () => {
+  const { tx, state } = persistence();
+  await creerMedicamentPharmacieDepuisOrdonnance(tx, input({ categorieSelectionnee: "VACCIN" }));
+  assert.equal(state.createdMedicament?.categorie, "VACCIN");
+});
+
+test("cree une categorie personnalisee sans migration", async () => {
+  const { tx, state } = persistence();
+  const result = await creerMedicamentPharmacieDepuisOrdonnance(tx, input({
+    categorieSelectionnee: null,
+    nouvelleCategorie: "Produit respiratoire",
+  }));
+  assert.equal(state.createdMedicament?.categorie, "Produit respiratoire");
+  assert.equal(result.medicament.categorieLabel, "Produit respiratoire");
+});
+
+test("propose une categorie existante au lieu d en creer un doublon", async () => {
+  const { tx, state } = persistence();
+  await assert.rejects(
+    () => creerMedicamentPharmacieDepuisOrdonnance(tx, input({
+      categorieSelectionnee: null,
+      nouvelleCategorie: "  àntibiotique  ",
+    })),
+    (error: unknown) => error instanceof CreationPharmacieError
+      && error.code === "CATEGORIE_EXISTANTE"
+      && error.categories[0]?.code === "ANTIBIOTIQUE",
+  );
+  assert.equal(state.createdMedicament, null);
 });
 
 for (const actif of [true, false]) {

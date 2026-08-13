@@ -21,14 +21,14 @@ function nullableText(value: unknown): string | null {
 function inputFromBody(body: Record<string, unknown>): CreationPharmacieInput {
   return {
     confirmed: body.confirmed === true,
-    categoryConfirmed: body.categoryConfirmed === true,
     medicamentNom: nullableText(body.medicamentNom) ?? "",
     conditionnement: nullableText(body.conditionnement),
     formePharmaceutique: nullableText(body.formePharmaceutique),
     voie: nullableText(body.voie),
     substanceActive: nullableText(body.substanceActive),
     concentration: nullableText(body.concentration),
-    categorie: nullableText(body.categorie),
+    categorieSelectionnee: nullableText(body.categorieSelectionnee),
+    nouvelleCategorie: nullableText(body.nouvelleCategorie),
     doseValue: nullableNumber(body.doseValue),
     doseUnit: nullableText(body.doseUnit),
     referenceValue: nullableNumber(body.referenceValue),
@@ -74,8 +74,8 @@ export async function POST(
   } catch (error) {
     if (error instanceof CreationPharmacieError) {
       return NextResponse.json(
-        { error: error.message, code: error.code, candidats: error.candidats },
-        { status: error.code === "DOUBLON_POSSIBLE" ? 409 : 400 },
+        { error: error.message, code: error.code, candidats: error.candidats, categories: error.categories },
+        { status: ["DOUBLON_POSSIBLE", "CATEGORIE_EXISTANTE"].includes(error.code) ? 409 : 400 },
       );
     }
     throw error;

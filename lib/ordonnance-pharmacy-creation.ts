@@ -1,4 +1,10 @@
-import { CATEGORIES_MEDICAMENT, getCategorieMedicament } from "./medicament-categories.ts";
+import {
+  valeurCategoriePersonnalisee,
+  getCategorieMedicament,
+  getCategoriesMedicamentUtilisees,
+  trouverCategorieProche,
+  type CategorieMedicament,
+} from "./medicament-categories.ts";
 import { analyserPresentation } from "./ordonnance-display.ts";
 import {
   normaliserNomMedicament,
@@ -12,14 +18,14 @@ import type { MedicamentCorrespondant } from "./ordonnance-types.ts";
 
 export interface CreationPharmacieInput {
   confirmed: boolean;
-  categoryConfirmed: boolean;
   medicamentNom: string;
   conditionnement: string | null;
   formePharmaceutique: string | null;
   voie: string | null;
   substanceActive: string | null;
   concentration: string | null;
-  categorie: string | null;
+  categorieSelectionnee: string | null;
+  nouvelleCategorie: string | null;
   doseValue: number | null;
   doseUnit: string | null;
   referenceValue: number | null;
@@ -49,27 +55,21 @@ export interface CreationPharmaciePersistence {
 }
 
 export class CreationPharmacieError extends Error {
-  readonly code: "CONFIRMATION_REQUISE" | "NOM_REQUIS" | "DOUBLON_POSSIBLE";
+  readonly code: "CONFIRMATION_REQUISE" | "NOM_REQUIS" | "CATEGORIE_REQUISE" | "CATEGORIE_EXISTANTE" | "DOUBLON_POSSIBLE";
   readonly candidats: MedicamentCorrespondant[];
+  readonly categories: CategorieMedicament[];
 
   constructor(
-    code: "CONFIRMATION_REQUISE" | "NOM_REQUIS" | "DOUBLON_POSSIBLE",
+    code: "CONFIRMATION_REQUISE" | "NOM_REQUIS" | "CATEGORIE_REQUISE" | "CATEGORIE_EXISTANTE" | "DOUBLON_POSSIBLE",
     message: string,
     candidats: MedicamentCorrespondant[] = [],
+    categories: CategorieMedicament[] = [],
   ) {
     super(message);
     this.code = code;
     this.candidats = candidats;
+    this.categories = categories;
   }
-}
-
-function categorie(value: string | null, confirmed: boolean): string {
-  if (!confirmed || !value) return "AUTRE";
-  const normalized = normaliserNomMedicament(value).replaceAll(" ", "_");
-  return CATEGORIES_MEDICAMENT.find((item) =>
-    item.code === normalized
-    || normaliserNomMedicament(item.label).replaceAll(" ", "_") === normalized
-  )?.code ?? "AUTRE";
 }
 
 function doseBase(input: CreationPharmacieInput): string | null {
@@ -141,9 +141,27 @@ export async function creerMedicamentPharmacieDepuisOrdonnance(
     );
   }
 
+  const categoriesDisponibles = getCategoriesMedicamentUtilisees(candidats.map((item) => item.categorie));
+  let categorieCode = input.categorieSelectionnee;
+  const nouvelleCategorie = input.nouvelleCategorie?.trim() ?? "";
+  if (nouvelleCategorie) {
+    const proche = trouverCategorieProche(nouvelleCategorie, categoriesDisponibles);
+    if (proche) {
+      throw new CreationPharmacieError(
+        "CATEGORIE_EXISTANTE",
+        `La catégorie « ${proche.label} » existe déjà. Sélectionnez-la dans la liste.`,
+        [],
+        [proche],
+      );
+    }
+    categorieCode = valeurCategoriePersonnalisee(nouvelleCategorie);
+  }
+  if (!categorieCode || (!nouvelleCategorie && !categoriesDisponibles.some((item) => item.code === categorieCode))) {
+    throw new CreationPharmacieError("CATEGORIE_REQUISE", "Choisissez une catégorie.");
+  }
+
   const presentation = analyserPresentation(input.conditionnement);
   const volume = presentation.presentation?.match(/\b(\d+(?:[.,]\d+)?)\s*(ml|cl|l)\b/i) ?? null;
-  const categorieCode = categorie(input.categorie, input.categoryConfirmed);
   const created = await tx.medicament.create({
     data: {
       nom,

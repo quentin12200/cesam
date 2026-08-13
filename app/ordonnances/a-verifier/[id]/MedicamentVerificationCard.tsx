@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, Beef, CalendarDays, ChevronDown, Milk, Pencil, RotateCcw, Syringe } from "lucide-react";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import type { MedicamentCorrespondant, MedicamentPropose } from "@/lib/ordonnance-types";
@@ -16,6 +16,10 @@ import {
   type ResolutionSourcesDose,
 } from "@/lib/ordonnance-display";
 import { formaterDoseSource } from "@/lib/ordonnance-dose-sources";
+import {
+  getCategoriesMedicamentUtilisees,
+  trouverCategorieProche,
+} from "@/lib/medicament-categories";
 
 export interface MedicationFields {
   key: string;
@@ -94,7 +98,14 @@ export default function MedicamentVerificationCard({
   const [creatingInPharmacy, setCreatingInPharmacy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [creationError, setCreationError] = useState("");
-  const [categoryConfirmedForCreation, setCategoryConfirmedForCreation] = useState(false);
+  const categoriesPharmacie = useMemo(
+    () => getCategoriesMedicamentUtilisees(pharmacyOptions.map((option) => option.categorie)),
+    [pharmacyOptions],
+  );
+  const categorieProposee = trouverCategorieProche(med.categorie, categoriesPharmacie);
+  const [categorieSelectionnee, setCategorieSelectionnee] = useState(categorieProposee?.code ?? "");
+  const [nouvelleCategorie, setNouvelleCategorie] = useState("");
+  const categorieProche = trouverCategorieProche(nouvelleCategorie, categoriesPharmacie);
   const correspondances = med.ia?.medicationMatches ?? [];
   const match = correspondances.find((item) => item.id === med.medicationId)
     ?? (med.medicationId ? med.ia?.medicationMatch : null)
@@ -166,14 +177,14 @@ export default function MedicamentVerificationCard({
     setCreationError("");
     try {
       await onCreateInPharmacy({
-        categoryConfirmed: categoryConfirmedForCreation,
         medicamentNom: med.medicamentNom,
         conditionnement: med.conditionnement,
         formePharmaceutique: med.formePharmaceutique,
         voie: med.voie,
         substanceActive: med.substanceActive,
         concentration: med.concentration,
-        categorie: med.categorie,
+        categorieSelectionnee: categorieSelectionnee === "__NEW__" ? null : categorieSelectionnee,
+        nouvelleCategorie: categorieSelectionnee === "__NEW__" ? nouvelleCategorie : null,
         doseValue: med.doseValue,
         doseUnit: med.doseUnit,
         referenceValue: med.referenceValue,
@@ -290,7 +301,7 @@ export default function MedicamentVerificationCard({
             <button type="button" onClick={() => setAssociating((value) => !value)} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
               Associer à une fiche existante
             </button>
-            <button type="button" onClick={() => { setCreatingInPharmacy(true); setEditing(true); }} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
+            <button type="button" onClick={() => setCreatingInPharmacy(true)} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
               Créer dans Pharmacie
             </button>
           </div>
@@ -304,7 +315,7 @@ export default function MedicamentVerificationCard({
                 <option value="">Choisir dans la pharmacie…</option>
                 {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}{option.actif === false ? " — inactive" : ""}</option>)}
               </select>
-              <button type="button" onClick={() => { setAssociating(false); setCreatingInPharmacy(true); setEditing(true); }} className="text-[11px] font-medium text-gray-500 underline-offset-2 hover:underline">
+              <button type="button" onClick={() => { setAssociating(false); setCreatingInPharmacy(true); }} className="text-[11px] font-medium text-gray-500 underline-offset-2 hover:underline">
                 Aucune fiche ne correspond
               </button>
             </div>
@@ -320,7 +331,35 @@ export default function MedicamentVerificationCard({
                 <Field label="Voie"><input value={med.voie} onChange={(e) => change("voie", e.target.value)} className={inputClass} /></Field>
                 <Field label="Substance active"><input value={med.substanceActive} onChange={(e) => change("substanceActive", e.target.value)} className={inputClass} /></Field>
                 <Field label="Concentration"><input value={med.concentration} onChange={(e) => change("concentration", e.target.value)} className={inputClass} /></Field>
-                <Field label="Catégorie"><input value={med.categorie} onChange={(e) => { change("categorie", e.target.value); setCategoryConfirmedForCreation(false); }} className={inputClass} /></Field>
+                <Field label="Catégorie">
+                  <select
+                    value={categorieSelectionnee}
+                    onChange={(event) => {
+                      setCategorieSelectionnee(event.target.value);
+                      setCreationError("");
+                      if (event.target.value !== "__NEW__") setNouvelleCategorie("");
+                    }}
+                    className={inputClass}
+                  >
+                    <option value="">Choisir une catégorie…</option>
+                    {categoriesPharmacie.map((category) => <option key={category.code} value={category.code}>{category.label}</option>)}
+                    <option value="__NEW__">+ Créer une nouvelle catégorie</option>
+                  </select>
+                </Field>
+                {categorieSelectionnee === "__NEW__" && (
+                  <Field label="Nom de la nouvelle catégorie">
+                    <input value={nouvelleCategorie} onChange={(event) => { setNouvelleCategorie(event.target.value); setCreationError(""); }} className={inputClass} />
+                    {categorieProche && (
+                      <button
+                        type="button"
+                        onClick={() => { setCategorieSelectionnee(categorieProche.code); setNouvelleCategorie(""); }}
+                        className="mt-1 text-left text-[11px] font-semibold text-green-700 underline-offset-2 hover:underline"
+                      >
+                        « {categorieProche.label} » existe déjà — utiliser cette catégorie
+                      </button>
+                    )}
+                  </Field>
+                )}
                 <div className="grid grid-cols-3 gap-2 sm:col-span-2">
                   <Field label="Viande (j)"><input type="number" min="0" value={med.meatDays} onChange={(e) => change("meatDays", e.target.value)} className={inputClass} /></Field>
                   <Field label="Abats (j)"><input type="number" min="0" value={med.offalDays} onChange={(e) => change("offalDays", e.target.value)} className={inputClass} /></Field>
@@ -328,16 +367,10 @@ export default function MedicamentVerificationCard({
                 </div>
               </div>
               {dose && <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-900">Préconisation proposée : {dose} — elle sera enregistrée « À vérifier ».</p>}
-              {med.categorie && (
-                <label className="mt-2 flex items-start gap-2 text-[11px] text-gray-700">
-                  <input type="checkbox" checked={categoryConfirmedForCreation} onChange={(e) => setCategoryConfirmedForCreation(e.target.checked)} className="mt-0.5" />
-                  J’ai vérifié la catégorie proposée : {med.categorie}
-                </label>
-              )}
               {creationError && <p className="mt-2 text-xs font-medium text-red-700">{creationError}</p>}
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={() => setCreatingInPharmacy(false)} disabled={creating} className="min-h-9 rounded-lg border border-gray-300 px-3 font-semibold">Annuler</button>
-                <button type="button" onClick={confirmerCreation} disabled={creating || !med.medicamentNom.trim() || Boolean(med.categorie && !categoryConfirmedForCreation)} className="min-h-9 rounded-lg bg-green-700 px-3 font-semibold text-white disabled:opacity-50">
+                <button type="button" onClick={confirmerCreation} disabled={creating || !med.medicamentNom.trim() || !categorieSelectionnee || (categorieSelectionnee === "__NEW__" && (!nouvelleCategorie.trim() || Boolean(categorieProche)))} className="min-h-9 rounded-lg bg-green-700 px-3 font-semibold text-white disabled:opacity-50">
                   {creating ? "Création…" : "Confirmer la création"}
                 </button>
               </div>

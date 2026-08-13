@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save, CheckCircle2, Plus, AlertTriangle, ShieldCheck } from "lucide-react";
-import { CATEGORIES_MEDICAMENT } from "@/lib/medicament-categories";
+import { getCategoriesMedicamentUtilisees } from "@/lib/medicament-categories";
 import PreconisationFields, { VoieSelect } from "./PreconisationFields";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 
@@ -74,6 +74,7 @@ const emptyPreco = {
 };
 
 export default function MedicamentDetailClient({ medicament, preconisations, ficheSeulement = false }: { medicament: MedicamentData; preconisations: PreconisationData[]; ficheSeulement?: boolean }) {
+  const categories = getCategoriesMedicamentUtilisees([medicament.categorie]);
   const router = useRouter();
 
   const [form, setForm] = useState({
@@ -205,7 +206,7 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
             <label className="text-xs text-gray-500 block mb-1">Catégorie</label>
             <select value={form.categorie} onChange={(e) => setForm((f) => ({ ...f, categorie: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-              {CATEGORIES_MEDICAMENT.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+              {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
             </select>
           </div>
           <VoieSelect

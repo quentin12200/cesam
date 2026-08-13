@@ -32,8 +32,87 @@ export const CATEGORIES_MEDICAMENT: CategorieMedicament[] = [
 
 const CATEGORIE_MAP = new Map(CATEGORIES_MEDICAMENT.map((c) => [c.code, c]));
 
+const CUSTOM_CATEGORY_STYLE = {
+  bg: "#f1f5f9",
+  text: "#475569",
+  border: "#e2e8f0",
+};
+
+export function normaliserLibelleCategorie(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export function valeurCategoriePersonnalisee(label: string): string {
+  return label.trim().replace(/\s+/g, " ");
+}
+
+function labelDepuisCode(code: string): string {
+  if (!/^[A-Z0-9_]+$/.test(code)) return code;
+  return code
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/^./, (letter) => letter.toUpperCase());
+}
+
 export function getCategorieMedicament(code: string | null | undefined): CategorieMedicament {
-  return CATEGORIE_MAP.get(code || "AUTRE") ?? CATEGORIE_MAP.get("AUTRE")!;
+  if (!code) return CATEGORIE_MAP.get("AUTRE")!;
+  return CATEGORIE_MAP.get(code) ?? {
+    code,
+    label: labelDepuisCode(code),
+    ...CUSTOM_CATEGORY_STYLE,
+  };
+}
+
+export function getCategoriesMedicamentUtilisees(codes: Array<string | null | undefined>): CategorieMedicament[] {
+  const categories = new Map(CATEGORIES_MEDICAMENT.map((category) => [category.code, category]));
+  for (const code of codes) {
+    if (code && !categories.has(code)) categories.set(code, getCategorieMedicament(code));
+  }
+  return [...categories.values()];
+}
+
+function distanceLevenshtein(a: string, b: string): number {
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    let diagonal = previous[0];
+    previous[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const above = previous[j];
+      previous[j] = Math.min(
+        previous[j] + 1,
+        previous[j - 1] + 1,
+        diagonal + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+      diagonal = above;
+    }
+  }
+  return previous[b.length];
+}
+
+export function trouverCategorieProche(
+  value: string | null | undefined,
+  categories: CategorieMedicament[],
+): CategorieMedicament | null {
+  const normalized = normaliserLibelleCategorie(value ?? "");
+  if (!normalized) return null;
+  const exact = categories.find((category) =>
+    normaliserLibelleCategorie(category.label) === normalized
+    || normaliserLibelleCategorie(category.code) === normalized
+  );
+  if (exact) return exact;
+
+  const proches = categories.filter((category) => {
+    const candidate = normaliserLibelleCategorie(category.label);
+    const maxDistance = normalized.length >= 8 ? 2 : 1;
+    return distanceLevenshtein(normalized, candidate) <= maxDistance;
+  });
+  return proches.length === 1 ? proches[0] : null;
 }
 
 const VOIE_LABELS: Record<string, string> = {

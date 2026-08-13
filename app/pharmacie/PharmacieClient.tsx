@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Star, ChevronDown, Search, Plus, Save, X, Stethoscope } from "lucide-react";
 import { normalizeSearch } from "@/lib/fuzzy-search";
-import { CATEGORIES_MEDICAMENT, getCategorieMedicament, formatVoie, formatDoseBase, formatStatutConsultation } from "@/lib/medicament-categories";
+import { CATEGORIES_MEDICAMENT, getCategorieMedicament, getCategoriesMedicamentUtilisees, formatVoie, formatDoseBase, formatStatutConsultation } from "@/lib/medicament-categories";
 import OrdonnancesClient, { type OrdonnanceItem } from "@/app/ordonnances/OrdonnancesClient";
 import SaisiePrixClient from "./SaisiePrixClient";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
@@ -287,6 +287,10 @@ function Repertoire({ medicaments, onSaisiePrix }: { medicaments: MedicamentItem
   const [catFilter, setCatFilter] = useState("");
   const [showAddMed, setShowAddMed] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const categories = useMemo(
+    () => getCategoriesMedicamentUtilisees(medicaments.map((medicament) => medicament.categorie)),
+    [medicaments],
+  );
 
   const filtered = useMemo(() => {
     const q = normalizeSearch(search.trim());
@@ -326,7 +330,7 @@ function Repertoire({ medicaments, onSaisiePrix }: { medicaments: MedicamentItem
           <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
             className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white text-gray-600">
             <option value="">Toutes catégories</option>
-            {CATEGORIES_MEDICAMENT.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+            {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
           </select>
 
           <button type="button" onClick={() => setShowAddMed((v) => !v)}
@@ -348,7 +352,7 @@ function Repertoire({ medicaments, onSaisiePrix }: { medicaments: MedicamentItem
 
       {mode === "categorie" ? (
         <div className="space-y-4">
-          {CATEGORIES_MEDICAMENT.filter((c) => !catFilter || c.code === catFilter).map((c) => {
+          {categories.filter((c) => !catFilter || c.code === catFilter).map((c) => {
             const meds = filtered.filter((m) => m.categorie === c.code).sort((a, b) => a.nom.localeCompare(b.nom));
             if (meds.length === 0) return null;
             return (
