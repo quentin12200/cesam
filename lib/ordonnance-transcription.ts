@@ -18,12 +18,26 @@ interface BlocMedicamentTranscrit {
   delaisAttente: string[];
   instructionsPrecautions: string[];
   autres: string[];
+  titreDetecte?: string;
+  issuDecoupage?: boolean;
 }
 
 interface TranscriptionOrdonnance {
   entete: { lignes: string[] };
   medicaments: BlocMedicamentTranscrit[];
 }
+
+const RUBRIQUES_MEDICAMENT = [
+  "identification",
+  "presentation",
+  "posologie",
+  "renouvellement",
+  "delaisAttente",
+  "instructionsPrecautions",
+  "autres",
+] as const;
+
+type RubriqueMedicament = typeof RUBRIQUES_MEDICAMENT[number];
 
 function objet(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? value as Record<string, unknown> : {};
@@ -35,10 +49,133 @@ function lignes(value: unknown): string[] {
     : [];
 }
 
+function blocVide(): BlocMedicamentTranscrit {
+  return {
+    identification: [],
+    presentation: [],
+    posologie: [],
+    renouvellement: [],
+    delaisAttente: [],
+    instructionsPrecautions: [],
+    autres: [],
+  };
+}
+
+function normaliserPourDetection(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function sembleTitreMedicament(value: string): boolean {
+  const titre = value.trim();
+  if (titre.length < 3 || titre.length > 180) return false;
+  const normalise = normaliserPourDetection(titre);
+  if (/^(?:viande|abats?|lait|derniere visite|ordonnance|administration|injection|dose)\b/i.test(normalise)) {
+    return false;
+  }
+  const lettres = titre.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g) ?? [];
+  const majuscules = titre.match(/[A-ZÀ-ÖØ-Þ]/g) ?? [];
+  const ressemblePresentation = /\b(?:FL|AER|SOL|INJ|ML|MG|BOLUS|CP)\b/i.test(normalise);
+  return lettres.length >= 3 && (majuscules.length / lettres.length >= 0.7 || ressemblePresentation);
+}
+
+function debutMedicament(value: string): { numero: number; titre: string } | null {
+  const match = value.match(/^\s*(\d{1,2})\s*(?:[-–—.)]|:\s)\s*(.+?)\s*$/);
+  if (!match || !sembleTitreMedicament(match[2])) return null;
+  return { numero: Number(match[1]), titre: match[2].trim() };
+}
+
+function rubriquePourLigne(value: string, rubriqueOrigine: RubriqueMedicament): RubriqueMedicament {
+  if (rubriqueOrigine !== "autres") return rubriqueOrigine;
+  const source = normaliserPourDetection(value).toLowerCase();
+  if (/\b(?:viande|abats?|lait)\b\s*[:=-]?\s*\d/.test(source)) return "delaisAttente";
+  if (/\b(?:deuxieme|seconde|2e|2eme)\s+(?:administration|injection)\b|\brenouvel/.test(source)) {
+    return "renouvellement";
+  }
+  if (/\b\d+(?:[.,]\d+)?\s*(?:ml|mg|mcg|g|cp|comprime|bolus)\b.*\b(?:par|pour)\b/.test(source)) {
+    return "posologie";
+  }
+  if (/\b(?:fl\.?|flacon|aer\.?|aerosol|ampoule|boite|qte|quantite)\b|\b\d+(?:[.,]\d+)?\s*(?:ml|cl|l)\b/.test(source)) {
+    return "presentation";
+  }
+  return rubriqueOrigine;
+}
+
+function decouperBlocNumerote(bloc: BlocMedicamentTranscrit): BlocMedicamentTranscrit[] {
+  const titres = new Map<number, string>();
+  for (const rubrique of RUBRIQUES_MEDICAMENT) {
+    for (const ligne of bloc[rubrique]) {
+      const debut = debutMedicament(ligne);
+      if (debut && !titres.has(debut.numero)) titres.set(debut.numero, debut.titre);
+    }
+  }
+  if (titres.size === 0) return [bloc];
+
+  const numeros = [...titres.keys()].sort((a, b) => a - b);
+  const resultats = new Map<number, BlocMedicamentTranscrit>();
+  for (const numero of numeros) {
+    const titre = titres.get(numero)!;
+    const resultat = blocVide();
+    resultat.titreDetecte = titre;
+    resultat.issuDecoupage = titres.size > 1;
+    resultat.identification.push(titre);
+    // Les titres reels contiennent souvent aussi la presentation (FL., AER., volume).
+    resultat.presentation.push(titre);
+    resultats.set(numero, resultat);
+  }
+
+  for (const rubrique of RUBRIQUES_MEDICAMENT) {
+    let numeroCourant: number | null = null;
+    for (const ligne of bloc[rubrique]) {
+      const debut = debutMedicament(ligne);
+      if (debut && resultats.has(debut.numero)) {
+        numeroCourant = debut.numero;
+        continue;
+      }
+      // Sans titre numerote dans cette rubrique, l'affectation serait arbitraire.
+      if (numeroCourant === null) continue;
+      const destination = resultats.get(numeroCourant)!;
+      destination[rubriquePourLigne(ligne, rubrique)].push(ligne);
+    }
+  }
+  return numeros.map((numero) => resultats.get(numero)!);
+}
+
+function decouperMedicaments(blocs: BlocMedicamentTranscrit[]): BlocMedicamentTranscrit[] {
+  return blocs.flatMap(decouperBlocNumerote);
+}
+
+function extraireVeterinaire(sourceTexts: string[]): string | null {
+  for (const sourceText of sourceTexts) {
+    const ligne = sourceText.trim();
+    const normalisee = normaliserPourDetection(ligne);
+    if (/\b(?:adresse|telephone|tel\.?|email|mail)\b/i.test(normalisee)) continue;
+    if (/^dr\s*\.?\s*v\b\s+\p{L}[\p{L}'’.-]*(?:\s+\p{L}[\p{L}'’.-]*)+/iu.test(ligne)) return ligne;
+    const libelle = ligne.match(/^\s*(?:veterinaire|prescripteur)\s*[:=-]\s*(.+)$/i);
+    if (libelle && /\p{L}{2,}/u.test(libelle[1])) return libelle[1].trim();
+  }
+  return null;
+}
+
+function nomDepuisBloc(bloc: BlocMedicamentTranscrit, propositionIA: unknown): string | null {
+  for (const ligne of bloc.identification) {
+    const debut = debutMedicament(ligne);
+    const candidat = debut?.titre ?? ligne.trim();
+    if (sembleTitreMedicament(candidat)) return candidat;
+  }
+  if (bloc.titreDetecte) return bloc.titreDetecte;
+  if (typeof propositionIA === "string" && propositionIA.trim()) return propositionIA.trim();
+  for (const ligne of bloc.autres) {
+    const debut = debutMedicament(ligne);
+    if (debut) return debut.titre;
+    if (sembleTitreMedicament(ligne)) return ligne.trim();
+  }
+  return null;
+}
+
 function lireTranscription(value: unknown): TranscriptionOrdonnance | null {
   const transcription = objet(value);
   const lignesEntete = lignes(objet(transcription.entete).lignes);
-  const medicaments = Array.isArray(transcription.medicaments)
+  const medicamentsBruts = Array.isArray(transcription.medicaments)
     ? transcription.medicaments.map((raw) => {
       const bloc = objet(raw);
       return {
@@ -52,6 +189,7 @@ function lireTranscription(value: unknown): TranscriptionOrdonnance | null {
       };
     })
     : [];
+  const medicaments = decouperMedicaments(medicamentsBruts);
   return lignesEntete.length > 0 || medicaments.length > 0
     ? { entete: { lignes: lignesEntete }, medicaments }
     : null;
@@ -151,17 +289,21 @@ export function appliquerTranscriptionParBlocs(
   const deliveryDateExplicite = entete.map(extraireDateDelivrance).find(Boolean) ?? null;
   const deliveryDate = deliveryDateExplicite
     ?? (prescriptionDate && entete.some(sourceIndiqueDelivreCeJour) ? prescriptionDate : null);
+  const veterinaireStructure = typeof source.veterinaire === "string" && source.veterinaire.trim()
+    ? source.veterinaire.trim() : null;
+  const veterinaire = extraireVeterinaire(entete) ?? veterinaireStructure;
   const evidenceEntete = objet(source.evidence);
   const medicamentsIA = Array.isArray(source.medicaments) ? source.medicaments : [];
   const nombreMedicaments = Math.max(medicamentsIA.length, transcription.medicaments.length);
   const medicaments = Array.from({ length: nombreMedicaments }, (_, index) => {
-    const ia = objet(medicamentsIA[index]);
     const bloc = transcription.medicaments[index];
+    const ia = bloc?.issuDecoupage && medicamentsIA.length !== transcription.medicaments.length
+      ? {} : objet(medicamentsIA[index]);
     if (!bloc) return ia;
     const evidenceIA = objet(ia.evidence);
     const patch: Record<string, unknown> = { ...ia, __transcriptionParBlocs: true };
 
-    if (bloc.identification.length > 0) patch.medicamentNom = bloc.identification[0];
+    patch.medicamentNom = nomDepuisBloc(bloc, ia.medicamentNom);
 
     if (bloc.presentation.length > 0) {
       const sourceText = bloc.presentation.join("\n");
@@ -240,6 +382,7 @@ export function appliquerTranscriptionParBlocs(
     ...source,
     dates: entete.length > 0 ? { prescriptionDate, lastVisitDate, deliveryDate } : source.dates,
     ordonnanceNumero: numeroOrdonnance(entete) ?? source.ordonnanceNumero ?? null,
+    veterinaire,
     evidence: {
       ...evidenceEntete,
       ...(prescriptionDate ? { prescriptionDate: preuve(prescriptionDate, texteEntete, "en-tete") } : {}),

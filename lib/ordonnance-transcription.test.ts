@@ -92,3 +92,60 @@ test("ne recupere aucune donnee dans un bloc metier voisin", () => {
   assert.equal(medicament.repeatCondition, null);
   assert.deepEqual(medicament.withdrawalPeriods, { meatDays: null, offalDays: null, milkDays: null });
 });
+
+test("retrouve le veterinaire et separe deux medicaments regroupes par l IA", () => {
+  const candidatTenaline = {
+    id: "med-tenaline",
+    nom: "Ténaline",
+    dci: "Oxytétracycline",
+    forme: "Solution injectable",
+    categorie: "ANTIBIOTIQUE",
+    voie: "IM",
+    delaiAttenteViandeJ: 21,
+    delaiAttenteLaitJ: 7,
+    actif: true,
+    aliases: [],
+  };
+  const analyseIA = {
+    transcription: {
+      entete: {
+        lignes: [
+          "DrV Gauthier LADANT",
+          "Dernière visite : 14/04/2026",
+          "ordonnance n°26-06-0002[V] le 01/06/2026",
+        ],
+      },
+      medicaments: [{
+        identification: [],
+        presentation: [],
+        posologie: [],
+        renouvellement: [],
+        delaisAttente: [],
+        instructionsPrecautions: [],
+        autres: [
+          "1 - TENALINE LA CLAS SOL INJ FL. 100 ML",
+          "Qté : 1",
+          "20 mg d’oxytétracycline par kg de poids vif",
+          "soit 1 ml de solution injectable pour 10 kg de poids vif",
+          "2 - OXYTERIN P 220 G AER. 320 ML",
+          "Qté : 1",
+        ],
+      }],
+    },
+    veterinaire: null,
+    medicaments: [{ medicamentNom: null }],
+  };
+
+  const proposition = normaliserAnalyseOrdonnance(
+    appliquerTranscriptionParBlocs(analyseIA),
+    [candidatTenaline],
+  );
+
+  assert.equal(proposition.veterinaire, "DrV Gauthier LADANT");
+  assert.equal(proposition.prescriptionDate, "2026-06-01");
+  assert.equal(proposition.lastVisitDate, "2026-04-14");
+  assert.equal(proposition.medicaments?.length, 2);
+  assert.equal(proposition.medicaments?.[0].medicamentNom, "TENALINE LA CLAS SOL INJ FL. 100 ML");
+  assert.equal(proposition.medicaments?.[0].medicationMatch?.id, "med-tenaline");
+  assert.equal(proposition.medicaments?.[1].medicamentNom, "OXYTERIN P 220 G AER. 320 ML");
+});
