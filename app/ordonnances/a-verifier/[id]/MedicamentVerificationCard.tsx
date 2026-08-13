@@ -75,6 +75,7 @@ export default function MedicamentVerificationCard({
   onChange,
   onDecision,
   onUseMatch,
+  onCreateInPharmacy,
   onRemove,
   pharmacyOptions,
 }: {
@@ -84,12 +85,16 @@ export default function MedicamentVerificationCard({
   onChange: (field: keyof MedicationFields, value: string) => void;
   onDecision: (values: Partial<Pick<MedicationFields, "medicationId" | "createMedication" | "categoryConfirmed">>) => void;
   onUseMatch: (matchId?: string) => void;
+  onCreateInPharmacy: (values: Record<string, unknown>) => Promise<void>;
   onRemove: () => void;
   pharmacyOptions: MedicamentCorrespondant[];
 }) {
   const [editing, setEditing] = useState(false);
   const [associating, setAssociating] = useState(false);
-  const [absenceConfirmee, setAbsenceConfirmee] = useState(false);
+  const [creatingInPharmacy, setCreatingInPharmacy] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [creationError, setCreationError] = useState("");
+  const [categoryConfirmedForCreation, setCategoryConfirmedForCreation] = useState(false);
   const correspondances = med.ia?.medicationMatches ?? [];
   const match = correspondances.find((item) => item.id === med.medicationId)
     ?? (med.medicationId ? med.ia?.medicationMatch : null)
@@ -152,8 +157,48 @@ export default function MedicamentVerificationCard({
 
   const choisirAssociation = (id: string) => {
     setAssociating(false);
-    setAbsenceConfirmee(false);
+    setCreatingInPharmacy(false);
     onUseMatch(id);
+  };
+
+  const confirmerCreation = async () => {
+    setCreating(true);
+    setCreationError("");
+    try {
+      await onCreateInPharmacy({
+        categoryConfirmed: categoryConfirmedForCreation,
+        medicamentNom: med.medicamentNom,
+        conditionnement: med.conditionnement,
+        formePharmaceutique: med.formePharmaceutique,
+        voie: med.voie,
+        substanceActive: med.substanceActive,
+        concentration: med.concentration,
+        categorie: med.categorie,
+        doseValue: med.doseValue,
+        doseUnit: med.doseUnit,
+        referenceValue: med.referenceValue,
+        referenceUnit: med.referenceUnit,
+        referenceType: med.referenceType,
+        administrationCount: med.administrationCount,
+        treatmentDurationDays: med.treatmentDurationDays,
+        administrationIntervalHours: med.administrationIntervalHours,
+        repeatCondition: med.repeatCondition,
+        meatDays: med.meatDays,
+        offalDays: med.offalDays,
+        milkDays: med.milkDays,
+        precautions: med.precautions,
+      });
+      setCreatingInPharmacy(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Création impossible.";
+      setCreationError(message);
+      if (/ressemblante existe/i.test(message)) {
+        setCreatingInPharmacy(false);
+        setAssociating(true);
+      }
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -245,11 +290,9 @@ export default function MedicamentVerificationCard({
             <button type="button" onClick={() => setAssociating((value) => !value)} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
               Associer à une fiche existante
             </button>
-            {absenceConfirmee && (
-              <button type="button" onClick={() => onDecision({ medicationId: "", createMedication: !med.createMedication })} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
-                {med.createMedication ? "Création confirmée" : "Créer une fiche"}
-              </button>
-            )}
+            <button type="button" onClick={() => { setCreatingInPharmacy(true); setEditing(true); }} className="min-h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold">
+              Créer dans Pharmacie
+            </button>
           </div>
           {associating && (
             <div className="mt-2 space-y-2">
@@ -261,10 +304,44 @@ export default function MedicamentVerificationCard({
                 <option value="">Choisir dans la pharmacie…</option>
                 {pharmacyOptions.map((option) => <option key={option.id} value={option.id}>{option.nom}{option.actif === false ? " — inactive" : ""}</option>)}
               </select>
-              <button type="button" onClick={() => { setAssociating(false); setAbsenceConfirmee(true); }} className="text-[11px] font-medium text-gray-500 underline-offset-2 hover:underline">
+              <button type="button" onClick={() => { setAssociating(false); setCreatingInPharmacy(true); setEditing(true); }} className="text-[11px] font-medium text-gray-500 underline-offset-2 hover:underline">
                 Aucune fiche ne correspond
               </button>
             </div>
+          )}
+          {creatingInPharmacy && (
+            <section className="mt-3 rounded-lg border border-green-200 bg-white p-3 text-gray-800">
+              <p className="font-semibold">Créer cette fiche dans Pharmacie ?</p>
+              <p className="mt-1 text-[11px] text-gray-600">Vérifiez et modifiez les informations avant de confirmer.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Field label="Nom *" wide><input required value={med.medicamentNom} onChange={(e) => change("medicamentNom", e.target.value)} className={inputClass} /></Field>
+                <Field label="Présentation / conditionnement"><input value={med.conditionnement} onChange={(e) => change("conditionnement", e.target.value)} className={inputClass} /></Field>
+                <Field label="Forme pharmaceutique"><input value={med.formePharmaceutique} onChange={(e) => change("formePharmaceutique", e.target.value)} className={inputClass} /></Field>
+                <Field label="Voie"><input value={med.voie} onChange={(e) => change("voie", e.target.value)} className={inputClass} /></Field>
+                <Field label="Substance active"><input value={med.substanceActive} onChange={(e) => change("substanceActive", e.target.value)} className={inputClass} /></Field>
+                <Field label="Concentration"><input value={med.concentration} onChange={(e) => change("concentration", e.target.value)} className={inputClass} /></Field>
+                <Field label="Catégorie"><input value={med.categorie} onChange={(e) => { change("categorie", e.target.value); setCategoryConfirmedForCreation(false); }} className={inputClass} /></Field>
+                <div className="grid grid-cols-3 gap-2 sm:col-span-2">
+                  <Field label="Viande (j)"><input type="number" min="0" value={med.meatDays} onChange={(e) => change("meatDays", e.target.value)} className={inputClass} /></Field>
+                  <Field label="Abats (j)"><input type="number" min="0" value={med.offalDays} onChange={(e) => change("offalDays", e.target.value)} className={inputClass} /></Field>
+                  <Field label="Lait (j)"><input type="number" min="0" value={med.milkDays} onChange={(e) => change("milkDays", e.target.value)} className={inputClass} /></Field>
+                </div>
+              </div>
+              {dose && <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-900">Préconisation proposée : {dose} — elle sera enregistrée « À vérifier ».</p>}
+              {med.categorie && (
+                <label className="mt-2 flex items-start gap-2 text-[11px] text-gray-700">
+                  <input type="checkbox" checked={categoryConfirmedForCreation} onChange={(e) => setCategoryConfirmedForCreation(e.target.checked)} className="mt-0.5" />
+                  J’ai vérifié la catégorie proposée : {med.categorie}
+                </label>
+              )}
+              {creationError && <p className="mt-2 text-xs font-medium text-red-700">{creationError}</p>}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => setCreatingInPharmacy(false)} disabled={creating} className="min-h-9 rounded-lg border border-gray-300 px-3 font-semibold">Annuler</button>
+                <button type="button" onClick={confirmerCreation} disabled={creating || !med.medicamentNom.trim() || Boolean(med.categorie && !categoryConfirmedForCreation)} className="min-h-9 rounded-lg bg-green-700 px-3 font-semibold text-white disabled:opacity-50">
+                  {creating ? "Création…" : "Confirmer la création"}
+                </button>
+              </div>
+            </section>
           )}
         </div>
       )}

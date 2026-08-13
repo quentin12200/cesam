@@ -122,7 +122,7 @@ function Field({ label, children, wide = false }: { label: string; children: Rea
 export default function VerificationOrdonnanceClient({
   extraction,
   propositionInitiale,
-  medicamentsPharmacie,
+  medicamentsPharmacie: medicamentsPharmacieInitiaux,
 }: {
   extraction: ExtractionInfo;
   propositionInitiale: PropositionOrdonnance;
@@ -145,6 +145,7 @@ export default function VerificationOrdonnanceClient({
   const [medicaments, setMedicaments] = useState<MedicationFields[]>(
     medicamentsDepuisProposition(propositionInitiale).map(versChamps),
   );
+  const [medicamentsPharmacie, setMedicamentsPharmacie] = useState(medicamentsPharmacieInitiaux);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const medicamentsRattaches = medicaments.filter((med) => med.medicationId).length;
@@ -187,6 +188,38 @@ export default function VerificationOrdonnanceClient({
         milkDays: med.milkDays || s(match.delaiAttenteLaitJ),
       };
     }));
+  }
+
+  async function creerDansPharmacie(index: number, values: Record<string, unknown>) {
+    const response = await fetch(`/api/extractions-ordonnance/${extraction.id}/medicaments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...values, confirmed: true }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const candidats = Array.isArray(data.candidats) ? data.candidats as MedicamentCorrespondant[] : [];
+      if (candidats.length > 0) {
+        setMedicamentsPharmacie((previous) => [
+          ...previous,
+          ...candidats.filter((candidate) => !previous.some((item) => item.id === candidate.id)),
+        ]);
+      }
+      throw new Error(data.error ?? "La fiche Pharmacie n’a pas pu être créée.");
+    }
+    const created = data.medicament as MedicamentCorrespondant;
+    setMedicamentsPharmacie((previous) => previous.some((item) => item.id === created.id)
+      ? previous : [...previous, created]);
+    setMedicaments((previous) => previous.map((med, i) => i === index ? {
+      ...med,
+      medicationId: created.id,
+      createMedication: false,
+      categoryConfirmed: true,
+      substanceActive: created.dci ?? med.substanceActive,
+      formePharmaceutique: created.forme ?? med.formePharmaceutique,
+      categorie: created.categorieLabel,
+      voie: created.voie ?? med.voie,
+    } : med));
   }
 
   async function valider(event: React.FormEvent) {
@@ -317,6 +350,7 @@ export default function VerificationOrdonnanceClient({
                 onChange={(field, value) => majMed(index, field, value)}
                 onDecision={(values) => majDecision(index, values)}
                 onUseMatch={(matchId) => utiliserFiche(index, matchId)}
+                onCreateInPharmacy={(values) => creerDansPharmacie(index, values)}
                 pharmacyOptions={medicamentsPharmacie}
                 onRemove={() => setMedicaments((previous) => previous.filter((_, i) => i !== index))}
               />
