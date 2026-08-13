@@ -164,6 +164,13 @@ test("evite de repeter l'intervalle de renouvellement", () => {
   assert.equal((result?.match(/72/g) ?? []).length, 1);
 });
 
+test("affiche clairement un renouvellement interdit", () => {
+  assert.equal(formaterRenouvellement({
+    administrationIntervalHours: "",
+    repeatCondition: "renouvellement interdit",
+  }), "Renouvellement interdit");
+});
+
 test("retire la dose pharmacologique du renouvellement", () => {
   assert.equal(formaterRenouvellement({
     administrationIntervalHours: "72",

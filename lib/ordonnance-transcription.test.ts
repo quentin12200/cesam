@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { formaterPresentationCompacte } from "./ordonnance-display.ts";
-import { formaterDoseSource } from "./ordonnance-dose-sources.ts";
+import { formaterDosePratiqueContextuelle, formaterDoseSource } from "./ordonnance-dose-sources.ts";
 import { normaliserAnalyseOrdonnance } from "./ordonnance-extraction.ts";
 import { appliquerTranscriptionParBlocs } from "./ordonnance-transcription.ts";
 
@@ -177,9 +177,9 @@ test("retrouve Diurizone depuis une identification de bloc transmise comme texte
         identification: "1 - DIURIZONE SOLUTION INJECTABLE FL. 50 ML",
         presentation: "Qté : 1\nLot : 15731B\nSolution injectable",
         posologie: [
-          "Dose pharmacologique : 5 mg par kg de poids vif",
-          "Adultes : 2 ml pour 50 kg de poids vif",
-          "Veaux : 1 ml pour 25 kg de poids vif",
+          "Dose pharmacologique : 0,5 mg par kg de poids vif",
+          "Bovins adultes : 10 ml maximum par jour",
+          "Veaux : 2 ml pour 40 à 50 kg par jour",
           "Administrer pendant 3 jours",
           "Voies : intraveineuse, intramusculaire ou sous-cutanée",
         ],
@@ -207,9 +207,13 @@ test("retrouve Diurizone depuis une identification de bloc transmise comme texte
   assert.equal(medicament?.medicationMatch?.id, "med-diurizone");
   assert.equal(formaterPresentationCompacte(medicament?.conditionnement ?? null), "Flacon 50 ml · Qté 1");
   assert.equal(medicament?.numeroLot, "15731B");
-  assert.equal(formaterDoseSource(medicament?.dosePharmacologique ?? null), "5 mg / 1 kg");
-  assert.equal(formaterDoseSource(medicament?.dosePratique ?? null), "2 ml / 50 kg");
-  assert.notEqual(formaterDoseSource(medicament?.dosePratique ?? null), "2 ml / 25 kg");
+  assert.equal(formaterDoseSource(medicament?.dosePharmacologique ?? null), "0.5 mg / 1 kg");
+  assert.equal(medicament?.dosesPratiques?.length, 2);
+  assert.deepEqual(medicament?.dosesPratiques?.map((dose) => formaterDosePratiqueContextuelle(dose)), [
+    "Adultes : 10 ml max / jour",
+    "Veaux : 2 ml / 40–50 kg / jour",
+  ]);
+  assert.doesNotMatch(medicament?.dosesPratiques?.map((dose) => formaterDosePratiqueContextuelle(dose)).join(" ") ?? "", /\bPV\b/i);
   assert.equal(medicament?.treatmentDurationDays, 3);
   assert.equal(medicament?.voie, "IV / IM / SC");
   assert.equal(medicament?.repeatCondition, "renouvellement interdit");

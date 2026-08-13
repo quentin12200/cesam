@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   creerOrdonnanceAvecMedicaments,
+  formatPosologieExtraite,
   OrdonnanceValidationError,
   type MedicamentValidationInput,
   type OrdonnancePersistence,
@@ -124,6 +125,40 @@ test("cree une seule ordonnance et une liaison pour un medicament", async () => 
   assert.equal(result.medicamentIds.length, 1);
   assert.equal(state.liens[0].posologieExtraite, "1 ml / 10 kg de poids vif");
   assert.equal(state.liens[0].numeroLot, "2111AA");
+});
+
+test("conserve plusieurs consignes pratiques dans la liaison ordonnance medicament", async () => {
+  const dosesPratiques = [{
+    categorieAnimaux: "Adultes",
+    doseValue: "10",
+    doseUnit: "ml",
+    poidsMinKg: null,
+    poidsMaxKg: null,
+    frequence: "par jour",
+    maximum: true,
+    origine: "ordonnance" as const,
+    sourceText: "Bovins adultes : 10 ml maximum par jour",
+    aVerifier: false,
+  }, {
+    categorieAnimaux: "Veaux",
+    doseValue: "2",
+    doseUnit: "ml",
+    poidsMinKg: "40",
+    poidsMaxKg: "50",
+    frequence: "par jour",
+    maximum: false,
+    origine: "ordonnance" as const,
+    sourceText: "Veaux : 2 ml pour 40 à 50 kg par jour",
+    aVerifier: false,
+  }];
+  const med = medicamentInput({ dosesPratiques });
+  const { state, tx } = creerMemoire();
+
+  await creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([med]), ["doc.jpg"]);
+
+  assert.equal(formatPosologieExtraite(med), "Adultes : 10 ml max / jour\nVeaux : 2 ml / 40–50 kg / jour");
+  assert.equal(state.liens[0].posologieExtraite, "Adultes : 10 ml max / jour\nVeaux : 2 ml / 40–50 kg / jour");
+  assert.deepEqual(JSON.parse(String(state.liens[0].evidenceJson)).dosesPratiques, dosesPratiques);
 });
 
 test("cree une seule ordonnance et plusieurs liaisons", async () => {

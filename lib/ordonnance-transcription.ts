@@ -4,7 +4,11 @@ import {
   extraireDateOrdonnance,
   sourceIndiqueDelivreCeJour,
 } from "./ordonnance-dates.ts";
-import { extraireSourcesDose, type DoseSourceStructuree } from "./ordonnance-dose-sources.ts";
+import {
+  extraireDosesPratiquesContextuelles,
+  extraireSourcesDose,
+  type DoseSourceStructuree,
+} from "./ordonnance-dose-sources.ts";
 import {
   normaliserConditionnementExtrait,
   normaliserConditionRenouvellement,
@@ -360,9 +364,20 @@ export function appliquerTranscriptionParBlocs(
     }
 
     if (bloc.posologie.length > 0) {
-      const dosePratique = premiereDose(bloc.posologie, "dosePratique");
+      const dosesPratiques = extraireDosesPratiquesContextuelles(bloc.posologie);
+      const premierePratique = dosesPratiques[0];
+      const dosePratique = premierePratique ? {
+        doseValue: premierePratique.doseValue,
+        doseUnit: premierePratique.doseUnit,
+        referenceValue: premierePratique.poidsMinKg && premierePratique.poidsMinKg === premierePratique.poidsMaxKg
+          ? premierePratique.poidsMinKg : "",
+        referenceUnit: premierePratique.poidsMinKg && premierePratique.poidsMinKg === premierePratique.poidsMaxKg ? "kg" : "",
+        referenceType: premierePratique.poidsMinKg ? "live_weight" : "animal",
+        sourceText: premierePratique.sourceText,
+      } : premiereDose(bloc.posologie, "dosePratique");
       const dosePharmacologique = premiereDose(bloc.posologie, "dosePharmacologique");
       const dosePrincipale = dosePratique ?? dosePharmacologique;
+      patch.dosesPratiques = dosesPratiques;
       patch.dosePratique = dosePratique;
       patch.dosePharmacologique = dosePharmacologique;
       patch.dose = dosePrincipale ? {

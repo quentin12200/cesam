@@ -4,6 +4,7 @@ import type {
   MedicamentCorrespondant,
   MedicamentPropose,
   PropositionOrdonnance,
+  DosePratiqueContextuelle,
 } from "./ordonnance-types.ts";
 import { medicamentVide, medicamentsDepuisProposition } from "./ordonnance-types.ts";
 import {
@@ -13,7 +14,11 @@ import {
   extraireDateOrdonnance,
   sourceIndiqueDelivreCeJour,
 } from "./ordonnance-dates.ts";
-import { resoudreSourcesDose, type DoseSourceStructuree } from "./ordonnance-dose-sources.ts";
+import {
+  calculerDoseVolumiqueSure,
+  resoudreSourcesDose,
+  type DoseSourceStructuree,
+} from "./ordonnance-dose-sources.ts";
 import {
   normaliserConditionnementExtrait,
   normaliserConditionRenouvellement,
@@ -161,6 +166,38 @@ function doseSource(value: unknown): DoseSourceStructuree | null {
       ? raw.referenceType : "",
     sourceText: texte(raw.sourceText),
   };
+}
+
+function dosesPratiques(value: unknown): DosePratiqueContextuelle[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const raw = objet(item);
+    const doseValue = texte(raw.doseValue);
+    const doseUnit = texte(raw.doseUnit);
+    if (!doseValue || !doseUnit) return [];
+    return [{
+      categorieAnimaux: texte(raw.categorieAnimaux),
+      doseValue,
+      doseUnit,
+      poidsMinKg: texte(raw.poidsMinKg),
+      poidsMaxKg: texte(raw.poidsMaxKg),
+      frequence: texte(raw.frequence),
+      maximum: raw.maximum === true,
+      origine: raw.origine === "calculee" || raw.origine === "manuelle" ? raw.origine : "ordonnance",
+      sourceText: texte(raw.sourceText),
+      aVerifier: raw.aVerifier === true,
+    } satisfies DosePratiqueContextuelle];
+  });
+}
+
+function doseCalculeeDepuisChamps(med: MedicamentPropose, pharmacologique: DoseSourceStructuree | null) {
+  if (!pharmacologique || !med.substanceActive || !med.concentration) return { dose: null, aVerifier: false };
+  const concentration = med.concentration.match(/\b(\d+(?:[.,]\d+)?)\s*mg\s*\/\s*ml\b/i);
+  if (!concentration) return { dose: null, aVerifier: false };
+  return calculerDoseVolumiqueSure(
+    [{ substance: med.substanceActive, mgParKg: Number(pharmacologique.doseValue.replace(",", ".")) }],
+    [{ substance: med.substanceActive, mgParMl: Number(concentration[1].replace(",", ".")), fiable: true }],
+  );
 }
 
 export function normaliserNomMedicament(value: string): string {
@@ -545,7 +582,20 @@ export function normaliserAnalyseOrdonnance(
       dosePratique: doseSource(m.dosePratique),
       dosePharmacologique: doseSource(m.dosePharmacologique),
     });
-    const doseRetenue = resolutionDose.doseAffichee;
+    const dosesPratiquesExtraites = dosesPratiques(m.dosesPratiques);
+    const calcul = dosesPratiquesExtraites.length === 0
+      ? doseCalculeeDepuisChamps(proposition, resolutionDose.dosePharmacologique)
+      : { dose: null, aVerifier: false };
+    const toutesDosesPratiques = calcul.dose ? [calcul.dose] : dosesPratiquesExtraites;
+    const doseCalculee = calcul.dose ? {
+      doseValue: calcul.dose.doseValue,
+      doseUnit: calcul.dose.doseUnit,
+      referenceValue: calcul.dose.poidsMinKg ?? "",
+      referenceUnit: calcul.dose.poidsMinKg ? "kg" : "",
+      referenceType: calcul.dose.poidsMinKg ? "live_weight" : "animal",
+      sourceText: null,
+    } : null;
+    const doseRetenue = resolutionDose.dosePratique ?? doseCalculee ?? resolutionDose.doseAffichee;
     const doseNormalisee = normaliserDoseSource(
       resolutionDose.dosePharmacologique ?? resolutionDose.dosePratique ?? doseRetenue,
     );
@@ -578,8 +628,9 @@ export function normaliserAnalyseOrdonnance(
       normalizedDoseValue: doseNormalisee?.value ?? null,
       normalizedDoseUnit: doseNormalisee?.unit ?? null,
       dosePratique: resolutionDose.dosePratique,
+      dosesPratiques: toutesDosesPratiques,
       dosePharmacologique: resolutionDose.dosePharmacologique,
-      doseSourceConflict: resolutionDose.sourceHybrideDetectee,
+      doseSourceConflict: resolutionDose.sourceHybrideDetectee || calcul.aVerifier,
       evidence,
     }, candidats);
   }).filter((m) => m.medicamentNom || m.doseValue || m.numeroLot);

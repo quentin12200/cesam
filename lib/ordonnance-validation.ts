@@ -8,6 +8,8 @@ import {
   chargerCandidatsOrdonnance,
   type MedicamentCandidateRecord,
 } from "./ordonnance-medication-candidates.ts";
+import { formaterDosePratiqueContextuelle } from "./ordonnance-dose-sources.ts";
+import type { DosePratiqueContextuelle } from "./ordonnance-types.ts";
 
 export type StatutCorrespondance = "matched" | "ambiguous" | "unmatched" | "manually_confirmed";
 
@@ -31,6 +33,7 @@ export interface MedicamentValidationInput {
   referenceType: string | null;
   normalizedDoseValue: number | null;
   normalizedDoseUnit: string | null;
+  dosesPratiques?: DosePratiqueContextuelle[];
   administrationCount: number | null;
   administrationIntervalHours: number | null;
   treatmentDurationDays: number | null;
@@ -88,6 +91,9 @@ function normaliserCategorie(value: string | null): string {
 }
 
 export function formatPosologieExtraite(med: MedicamentValidationInput): string | null {
+  if ((med.dosesPratiques ?? []).length > 0) {
+    return med.dosesPratiques!.map(formaterDosePratiqueContextuelle).join("\n");
+  }
   if (med.doseValue === null) return null;
   const dose = `${med.doseValue}${med.doseUnit ? ` ${med.doseUnit}` : ""}`;
   if (med.referenceValue === null) return dose;
@@ -242,7 +248,7 @@ export async function creerOrdonnanceAvecMedicaments(
         delaiAttenteLait: item.med.withdrawalPeriods.milkDays,
         precautions: item.med.precautions,
         texteSource: sourcesEvidence(item.med.evidence),
-        evidenceJson: JSON.stringify(item.med.evidence),
+        evidenceJson: JSON.stringify({ ...item.med.evidence, dosesPratiques: item.med.dosesPratiques ?? [] }),
         candidatsJson: JSON.stringify(item.candidats),
         scoreCorrespondance: item.score,
         statutCorrespondance: item.statut,

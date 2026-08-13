@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  calculerDoseVolumiqueSure,
+  choisirBaseAffichageDose,
+  extraireDosesPratiquesContextuelles,
+  formaterDosePratiqueContextuelle,
   formaterDoseSource,
   resoudreSourcesDose,
 } from "./ordonnance-dose-sources.ts";
@@ -13,6 +17,59 @@ const base = {
   referenceUnit: "",
   referenceType: "live_weight",
 };
+
+test("conserve deux doses pratiques adulte et veau sans les fusionner", () => {
+  const doses = extraireDosesPratiquesContextuelles([
+    "Bovins adultes : 10 ml maximum par jour",
+    "Veaux : 2 ml pour 40 à 50 kg par jour",
+  ]);
+  assert.deepEqual(doses.map(formaterDosePratiqueContextuelle), [
+    "Adultes : 10 ml max / jour",
+    "Veaux : 2 ml / 40–50 kg / jour",
+  ]);
+  assert.equal(doses[1].poidsMinKg, "40");
+  assert.equal(doses[1].poidsMaxKg, "50");
+  assert.doesNotMatch(doses.map(formaterDosePratiqueContextuelle).join(" "), /\bPV\b/i);
+});
+
+test("calcule une dose en ml uniquement avec une concentration fiable de la meme substance", () => {
+  const resultat = calculerDoseVolumiqueSure(
+    [{ substance: "molécule A", mgParKg: 2 }],
+    [{ substance: "Molécule A", mgParMl: 100, fiable: true }],
+  );
+  assert.equal(formaterDosePratiqueContextuelle(resultat.dose!), "2 ml / 100 kg");
+  assert.equal(resultat.aVerifier, false);
+});
+
+test("choisit 10 kg ou 100 kg sans modifier la proportion", () => {
+  assert.deepEqual(choisirBaseAffichageDose(0.1), { doseMl: 1, poidsKg: 10 });
+  assert.deepEqual(choisirBaseAffichageDose(0.02), { doseMl: 2, poidsKg: 100 });
+});
+
+test("accepte plusieurs substances seulement lorsque leurs calculs concordent", () => {
+  const coherent = calculerDoseVolumiqueSure(
+    [{ substance: "A", mgParKg: 2 }, { substance: "B", mgParKg: 4 }],
+    [{ substance: "A", mgParMl: 100, fiable: true }, { substance: "B", mgParMl: 200, fiable: true }],
+  );
+  assert.equal(coherent.dose?.doseValue, "2");
+  assert.equal(coherent.aVerifier, false);
+
+  const contradictoire = calculerDoseVolumiqueSure(
+    [{ substance: "A", mgParKg: 2 }, { substance: "B", mgParKg: 4 }],
+    [{ substance: "A", mgParMl: 100, fiable: true }, { substance: "B", mgParMl: 100, fiable: true }],
+  );
+  assert.equal(contradictoire.dose, null);
+  assert.equal(contradictoire.aVerifier, true);
+});
+
+test("n invente aucun calcul sans concentration fiable", () => {
+  const resultat = calculerDoseVolumiqueSure(
+    [{ substance: "A", mgParKg: 2 }],
+    [{ substance: "A", mgParMl: 100, fiable: false }],
+  );
+  assert.equal(resultat.dose, null);
+  assert.equal(resultat.aVerifier, true);
+});
 
 test("conserve 20 mg/kg comme dose pharmacologique indivisible", () => {
   const resolution = resoudreSourcesDose({

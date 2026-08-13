@@ -1,3 +1,5 @@
+import type { DosePratiqueContextuelle } from "./ordonnance-types.ts";
+
 export interface DoseSourceStructuree {
   doseValue: string;
   doseUnit: string;
@@ -5,6 +7,17 @@ export interface DoseSourceStructuree {
   referenceUnit: string;
   referenceType: string;
   sourceText: string | null;
+}
+
+export interface DosePharmacologiqueCalcul {
+  substance: string;
+  mgParKg: number;
+}
+
+export interface ConcentrationCalcul {
+  substance: string;
+  mgParMl: number;
+  fiable: boolean;
 }
 
 export interface ResolutionSourcesDose {
@@ -37,6 +50,95 @@ function nombre(value: string): string {
 
 function uniteNormalisee(value: string): string {
   return sansAccents(value).toLowerCase().replace(/[^a-zµμ]/g, "");
+}
+
+function categorieDepuisTexte(value: string): string | null {
+  const source = sansAccents(value).toLowerCase();
+  if (/\b(?:veaux|veau)\b/.test(source)) return "Veaux";
+  if (/\b(?:bovins?\s+adultes?|adultes?)\b/.test(source)) return "Adultes";
+  return null;
+}
+
+export function extraireDosesPratiquesContextuelles(sourceTexts: string[]): DosePratiqueContextuelle[] {
+  const resultats: DosePratiqueContextuelle[] = [];
+  for (const sourceText of sourceTexts) {
+    const texte = sourceText.trim();
+    const source = sansAccents(texte).toLowerCase();
+    for (const match of texte.matchAll(/\b(\d+(?:[.,]\d+)?)\s*(ml|cl|l|g|comprim(?:e|é)s?|cp|bolus)\b/giu)) {
+      const apres = texte.slice((match.index ?? 0) + match[0].length);
+      const poids = apres.match(/(?:pour|par|\/)\s*(\d+(?:[.,]\d+)?)\s*(?:a|à|-|–)?\s*(\d+(?:[.,]\d+)?)?\s*kg\b/iu);
+      const frequence = /\b(?:par|chaque)\s+jour\b|\/\s*jour\b|\bquotidien(?:ne)?\b/i.test(source)
+        ? "par jour" : null;
+      const unite = sansAccents(match[2]).toLowerCase().startsWith("comprim") || /^cp$/i.test(match[2])
+        ? "comprimé" : match[2].toLowerCase();
+      resultats.push({
+        categorieAnimaux: categorieDepuisTexte(texte),
+        doseValue: match[1].replace(",", "."),
+        doseUnit: unite,
+        poidsMinKg: poids?.[1]?.replace(",", ".") ?? null,
+        poidsMaxKg: (poids?.[2] ?? poids?.[1])?.replace(",", ".") ?? null,
+        frequence,
+        maximum: /\b(?:max|maxi|maximum|au plus)\b/i.test(source),
+        origine: "ordonnance",
+        sourceText: texte,
+        aVerifier: false,
+      });
+    }
+  }
+  return resultats;
+}
+
+function cleSubstance(value: string): string {
+  return sansAccents(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+export function choisirBaseAffichageDose(mlParKg: number): { doseMl: number; poidsKg: 1 | 10 | 100 } {
+  if (mlParKg * 10 >= 1) return { doseMl: mlParKg * 10, poidsKg: 10 };
+  return { doseMl: mlParKg * 100, poidsKg: 100 };
+}
+
+export function calculerDoseVolumiqueSure(
+  doses: DosePharmacologiqueCalcul[],
+  concentrations: ConcentrationCalcul[],
+): { dose: DosePratiqueContextuelle | null; aVerifier: boolean } {
+  if (doses.length === 0) return { dose: null, aVerifier: false };
+  const valeurs: number[] = [];
+  for (const dose of doses) {
+    const cle = cleSubstance(dose.substance);
+    const correspondances = concentrations.filter((item) => item.fiable && cleSubstance(item.substance) === cle);
+    if (correspondances.length !== 1 || correspondances[0].mgParMl <= 0) return { dose: null, aVerifier: true };
+    valeurs.push(dose.mgParKg / correspondances[0].mgParMl);
+  }
+  const premiere = valeurs[0];
+  if (!Number.isFinite(premiere) || valeurs.some((value) => Math.abs(value - premiere) > 1e-9)) {
+    return { dose: null, aVerifier: true };
+  }
+  const affichage = choisirBaseAffichageDose(premiere);
+  return {
+    dose: {
+      categorieAnimaux: null,
+      doseValue: String(Number(affichage.doseMl.toFixed(6))),
+      doseUnit: "ml",
+      poidsMinKg: String(affichage.poidsKg),
+      poidsMaxKg: String(affichage.poidsKg),
+      frequence: null,
+      maximum: false,
+      origine: "calculee",
+      sourceText: null,
+      aVerifier: false,
+    },
+    aVerifier: false,
+  };
+}
+
+export function formaterDosePratiqueContextuelle(dose: DosePratiqueContextuelle): string {
+  const categorie = dose.categorieAnimaux ? `${dose.categorieAnimaux} : ` : "";
+  const maximum = dose.maximum ? " max" : "";
+  const poids = dose.poidsMinKg
+    ? ` / ${dose.poidsMinKg}${dose.poidsMaxKg && dose.poidsMaxKg !== dose.poidsMinKg ? `–${dose.poidsMaxKg}` : ""} kg`
+    : "";
+  const frequence = dose.frequence ? ` / ${dose.frequence.replace(/^par\s+/i, "")}` : "";
+  return `${categorie}${dose.doseValue} ${dose.doseUnit}${maximum}${poids}${frequence}`;
 }
 
 export function estUniteDosePratique(value: string): boolean {

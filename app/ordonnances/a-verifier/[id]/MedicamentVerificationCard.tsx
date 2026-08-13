@@ -15,7 +15,7 @@ import {
   resoudreSourcesDose,
   type ResolutionSourcesDose,
 } from "@/lib/ordonnance-display";
-import { formaterDoseSource } from "@/lib/ordonnance-dose-sources";
+import { formaterDosePratiqueContextuelle, formaterDoseSource } from "@/lib/ordonnance-dose-sources";
 import {
   getCategoriesMedicamentUtilisees,
   trouverCategorieProche,
@@ -134,7 +134,8 @@ export default function MedicamentVerificationCard({
   const rythme = formaterRythme(med);
   const renouvellement = formaterRenouvellement(med);
   const voie = formaterVoie(med.voie);
-  const voieCompacte = /^[a-z]{2,3}$/i.test(med.voie.trim()) ? med.voie.toUpperCase() : voie;
+  const voieCompacte = (/^[a-z]{2,3}$/i.test(med.voie.trim()) ? med.voie.toUpperCase() : voie)
+    ?.replace(/\s*\/\s*/g, " · ");
   const rythmeEtDuree = [
     rythme,
     med.treatmentDurationDays
@@ -142,13 +143,33 @@ export default function MedicamentVerificationCard({
       : null,
   ].filter(Boolean).join(" • ");
   const nomAffiche = match?.nom ?? (med.medicamentNom || `Médicament ${index + 1}`);
+  const nomTerrain = /injectable/i.test(med.formePharmaceutique) && !/injectable/i.test(nomAffiche)
+    ? `${nomAffiche} INJECTABLE` : nomAffiche;
+  const dosesPratiques = med.doseManuallyEdited && med.doseValue && med.doseUnit
+    ? [{
+      categorieAnimaux: null,
+      doseValue: med.doseValue,
+      doseUnit: med.doseUnit,
+      poidsMinKg: med.referenceUnit.toLowerCase() === "kg" ? med.referenceValue || null : null,
+      poidsMaxKg: med.referenceUnit.toLowerCase() === "kg" ? med.referenceValue || null : null,
+      frequence: null,
+      maximum: false,
+      origine: "manuelle" as const,
+      sourceText: null,
+      aVerifier: false,
+    }]
+    : med.ia?.dosesPratiques ?? [];
+  const dureeTerrain = med.treatmentDurationDays
+    ? `Pendant ${med.treatmentDurationDays} jour${med.treatmentDurationDays === "1" ? "" : "s"}`
+    : null;
   const delaisComplets = med.meatDays || med.offalDays || med.milkDays;
   const preuveFaible = (cles: string[]) => cles.some((cle) => {
     const evidence = med.ia?.evidence[cle];
     return Boolean(evidence && (evidence.confidence < 0.7 || !evidence.sourceText));
   });
   const controleDosePharmacie = controlerCoherenceDosePharmacie(resolutionDose, match);
-  const doseAVerifier = !dose || preuveFaible(["dose"])
+  const doseAVerifier = dosesPratiques.some((item) => item.aVerifier)
+    || (dosesPratiques.length === 0 && (!dose || preuveFaible(["dose"])))
     || (!med.doseManuallyEdited && controleDosePharmacie.avertissement);
   const dureeAVerifier = preuveFaible(["duration", "treatmentDurationDays", "administrationProtocol"]);
   const delaiAVerifier = !delaisComplets || preuveFaible(["withdrawalPeriods", "meatDays", "offalDays", "milkDays"]);
@@ -217,7 +238,7 @@ export default function MedicamentVerificationCard({
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="min-w-0 truncate text-lg font-bold text-gray-950">{nomAffiche}</h3>
+            <h3 className="min-w-0 truncate text-lg font-bold text-gray-950">{nomTerrain}</h3>
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statutPharmacie.className}`}>{statutPharmacie.label}</span>
           </div>
           {match?.categorieLabel && <p className="mt-0.5 text-xs font-medium text-green-800">{match.categorieLabel}</p>}
@@ -245,11 +266,18 @@ export default function MedicamentVerificationCard({
       </header>
 
       <div className="mt-3 space-y-1.5 text-sm text-gray-800">
-        {(voieCompacte || dose) && (
-          <p className="flex items-center gap-2"><Syringe size={15} className="shrink-0 text-green-700" /> {[voieCompacte, dose].filter(Boolean).join(" • ")}</p>
+        {voieCompacte && (
+          <p className="flex items-center gap-2"><Syringe size={15} className="shrink-0 text-green-700" /> {voieCompacte}</p>
         )}
-        {rythmeEtDuree && (
-          <p className="flex items-start gap-2"><CalendarDays size={15} className="mt-0.5 shrink-0 text-blue-700" /> {rythmeEtDuree}</p>
+        {dosesPratiques.length > 0
+          ? dosesPratiques.map((dosePratique, doseIndex) => (
+            <p key={`${dosePratique.sourceText ?? dosePratique.doseValue}-${doseIndex}`} className="font-medium text-gray-900">
+              {formaterDosePratiqueContextuelle(dosePratique)}
+            </p>
+          ))
+          : dose && <p className="font-medium text-gray-900">{dose}</p>}
+        {(dosesPratiques.length > 0 ? dureeTerrain : rythmeEtDuree) && (
+          <p className="flex items-start gap-2"><CalendarDays size={15} className="mt-0.5 shrink-0 text-blue-700" /> {dosesPratiques.length > 0 ? dureeTerrain : rythmeEtDuree}</p>
         )}
         {renouvellement && (
           <p className="flex items-start gap-2"><RotateCcw size={15} className="mt-0.5 shrink-0 text-violet-700" /> {renouvellement}</p>
@@ -260,9 +288,11 @@ export default function MedicamentVerificationCard({
         <div className="mt-3 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-950">
           <p className="font-semibold">Délais d’attente</p>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-            {(med.meatDays || med.offalDays) && (
-              <span className="inline-flex items-center gap-1"><Beef size={13} /> {[med.meatDays && `Viande : ${med.meatDays} j`, med.offalDays && `Abats : ${med.offalDays} j`].filter(Boolean).join(" • ")}</span>
-            )}
+            {(med.meatDays || med.offalDays) && <span className="inline-flex items-center gap-1"><Beef size={13} /> {
+              med.meatDays && med.offalDays && med.meatDays === med.offalDays
+                ? `Viande/abats : ${med.meatDays} j`
+                : [med.meatDays && `Viande : ${med.meatDays} j`, med.offalDays && `Abats : ${med.offalDays} j`].filter(Boolean).join(" · ")
+            }</span>}
             {med.milkDays && <span className="inline-flex items-center gap-1"><Milk size={13} /> Lait : {med.milkDays} j</span>}
           </div>
         </div>

@@ -267,6 +267,9 @@ export function formaterRenouvellement(med: {
 }): string | null {
   if (!med.administrationIntervalHours && !med.repeatCondition) return null;
   const condition = normaliserConditionRenouvellement(med.repeatCondition);
+  if (sansAccents(condition).toLowerCase() === "renouvellement interdit") {
+    return "Renouvellement interdit";
+  }
   if (med.administrationIntervalHours) {
     const intervalleDejaPresent = new RegExp(`apres\\s+${med.administrationIntervalHours}\\s*(?:h|heure)`, "i")
       .test(sansAccents(condition));

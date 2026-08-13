@@ -20,6 +20,19 @@ export interface DoseOrdonnanceSource {
   sourceText: string | null;
 }
 
+export interface DosePratiqueContextuelle {
+  categorieAnimaux: string | null;
+  doseValue: string;
+  doseUnit: string;
+  poidsMinKg: string | null;
+  poidsMaxKg: string | null;
+  frequence: string | null;
+  maximum: boolean;
+  origine: "ordonnance" | "calculee" | "manuelle";
+  sourceText: string | null;
+  aVerifier: boolean;
+}
+
 export interface PreconisationPharmacieControle {
   dose: number | null;
   unite: string | null;
@@ -69,6 +82,7 @@ export interface MedicamentPropose {
   normalizedDoseValue: number | null;
   normalizedDoseUnit: string | null;
   dosePratique?: DoseOrdonnanceSource | null;
+  dosesPratiques?: DosePratiqueContextuelle[];
   dosePharmacologique?: DoseOrdonnanceSource | null;
   doseSourceConflict?: boolean;
   administrationCount: number | null;
@@ -135,6 +149,7 @@ export function medicamentVide(): MedicamentPropose {
     referenceType: null,
     normalizedDoseValue: null,
     normalizedDoseUnit: null,
+    dosesPratiques: [],
     administrationCount: null,
     administrationIntervalHours: null,
     treatmentDurationDays: null,

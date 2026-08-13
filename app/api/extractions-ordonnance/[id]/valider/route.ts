@@ -8,7 +8,7 @@ import {
   type OrdonnancePersistence,
 } from "@/lib/ordonnance-validation";
 import { securiserDateDelivrance } from "@/lib/ordonnance-dates";
-import type { ChampExtrait } from "@/lib/ordonnance-types";
+import type { ChampExtrait, DosePratiqueContextuelle } from "@/lib/ordonnance-types";
 
 type MedicamentFinal = {
   medicationId: string | null;
@@ -30,6 +30,7 @@ type MedicamentFinal = {
   referenceType: string | null;
   normalizedDoseValue: number | null;
   normalizedDoseUnit: string | null;
+  dosesPratiques: DosePratiqueContextuelle[];
   administrationCount: number | null;
   administrationIntervalHours: number | null;
   treatmentDurationDays: number | null;
@@ -71,6 +72,28 @@ function objet(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? value as Record<string, unknown> : {};
 }
 
+function normaliserDosesPratiques(value: unknown): DosePratiqueContextuelle[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const raw = objet(item);
+    const doseValue = texte(raw.doseValue);
+    const doseUnit = texte(raw.doseUnit);
+    if (!doseValue || !doseUnit) return [];
+    return [{
+      categorieAnimaux: texte(raw.categorieAnimaux),
+      doseValue,
+      doseUnit,
+      poidsMinKg: texte(raw.poidsMinKg),
+      poidsMaxKg: texte(raw.poidsMaxKg),
+      frequence: texte(raw.frequence),
+      maximum: raw.maximum === true,
+      origine: raw.origine === "calculee" || raw.origine === "manuelle" ? raw.origine : "ordonnance",
+      sourceText: texte(raw.sourceText),
+      aVerifier: raw.aVerifier === true,
+    }];
+  });
+}
+
 function dateOptionnelle(value: string | null): Date | null {
   if (!value) return null;
   const date = new Date(value);
@@ -99,6 +122,7 @@ function normaliserMedicament(brut: Record<string, unknown>): MedicamentFinal {
     referenceType: texte(brut.referenceType),
     normalizedDoseValue: nombre(brut.normalizedDoseValue),
     normalizedDoseUnit: texte(brut.normalizedDoseUnit),
+    dosesPratiques: normaliserDosesPratiques(brut.dosesPratiques),
     administrationCount: entier(brut.administrationCount),
     administrationIntervalHours: entier(brut.administrationIntervalHours),
     treatmentDurationDays: entier(brut.treatmentDurationDays),
