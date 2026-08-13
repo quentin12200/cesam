@@ -192,8 +192,17 @@ function dosesPratiques(value: unknown): DosePratiqueContextuelle[] {
 
 function doseCalculeeDepuisChamps(med: MedicamentPropose, pharmacologique: DoseSourceStructuree | null) {
   if (!pharmacologique || !med.substanceActive || !med.concentration) return { dose: null, aVerifier: false };
-  const concentration = med.concentration.match(/\b(\d+(?:[.,]\d+)?)\s*mg\s*\/\s*ml\b/i);
-  if (!concentration) return { dose: null, aVerifier: false };
+  const concentrations = [...med.concentration.matchAll(/\b(\d+(?:[.,]\d+)?)\s*mg\s*\/\s*ml\b/gi)];
+  const plusieursSubstances = /(?:\+|;|\s\/\s|\bet\b)/i.test(med.substanceActive);
+  if (concentrations.length !== 1 || plusieursSubstances) return { dose: null, aVerifier: true };
+  const preuve = med.evidence.concentration;
+  const source = typeof preuve?.sourceText === "string" ? preuve.sourceText : "";
+  const concentrationsSource = [...source.matchAll(/\b(\d+(?:[.,]\d+)?)\s*mg\s*\/\s*ml\b/gi)];
+  if ((preuve?.confidence ?? 0) < 0.8 || concentrationsSource.length !== 1) return { dose: null, aVerifier: true };
+  const concentration = concentrations[0];
+  if (Number(concentration[1].replace(",", ".")) !== Number(concentrationsSource[0][1].replace(",", "."))) {
+    return { dose: null, aVerifier: true };
+  }
   return calculerDoseVolumiqueSure(
     [{ substance: med.substanceActive, mgParKg: Number(pharmacologique.doseValue.replace(",", ".")) }],
     [{ substance: med.substanceActive, mgParMl: Number(concentration[1].replace(",", ".")), fiable: true }],

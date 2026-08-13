@@ -540,3 +540,59 @@ test("enrichit une association existante avec le controle Pharmacie sans la remp
   assert.equal(match?.uniteDosage, "ml");
   assert.equal(match?.preconisations?.[0].statut, "A_VERIFIER");
 });
+
+test("calcule une dose volumique seulement depuis une concentration OCR fiable et sourcee", () => {
+  const proposition = normaliserAnalyseOrdonnance({
+    medicaments: [{
+      medicamentNom: "PRODUIT SIMPLE",
+      substanceActive: "Molécule A",
+      concentration: "100 mg/ml",
+      dosePharmacologique: {
+        doseValue: "2", doseUnit: "mg", referenceValue: "1", referenceUnit: "kg",
+        referenceType: "live_weight", sourceText: "2 mg de Molécule A par kg",
+      },
+      evidence: {
+        concentration: { value: "100 mg/ml", sourceText: "Molécule A : 100 mg/ml", confidence: 0.95 },
+      },
+    }],
+  }, []);
+
+  assert.equal(proposition.medicaments?.[0].dosesPratiques?.[0].doseValue, "2");
+  assert.equal(proposition.medicaments?.[0].dosesPratiques?.[0].poidsMinKg, "100");
+});
+
+test("refuse le calcul si la concentration est incertaine ou si plusieurs substances sont melangees", () => {
+  const incertaine = normaliserAnalyseOrdonnance({
+    medicaments: [{
+      medicamentNom: "PRODUIT INCERTAIN",
+      substanceActive: "Molécule A",
+      concentration: "100 mg/ml",
+      dosePharmacologique: {
+        doseValue: "2", doseUnit: "mg", referenceValue: "1", referenceUnit: "kg",
+        referenceType: "live_weight", sourceText: "2 mg de Molécule A par kg",
+      },
+      evidence: {
+        concentration: { value: "100 mg/ml", sourceText: "Molécule A : 100 mg/ml", confidence: 0.5 },
+      },
+    }],
+  }, []);
+  const multiple = normaliserAnalyseOrdonnance({
+    medicaments: [{
+      medicamentNom: "PRODUIT MULTIPLE",
+      substanceActive: "Molécule A + Molécule B",
+      concentration: "100 mg/ml + 200 mg/ml",
+      dosePharmacologique: {
+        doseValue: "2", doseUnit: "mg", referenceValue: "1", referenceUnit: "kg",
+        referenceType: "live_weight", sourceText: "2 mg par kg",
+      },
+      evidence: {
+        concentration: { value: "100 + 200 mg/ml", sourceText: "100 mg/ml + 200 mg/ml", confidence: 0.95 },
+      },
+    }],
+  }, []);
+
+  assert.deepEqual(incertaine.medicaments?.[0].dosesPratiques, []);
+  assert.equal(incertaine.medicaments?.[0].doseSourceConflict, true);
+  assert.deepEqual(multiple.medicaments?.[0].dosesPratiques, []);
+  assert.equal(multiple.medicaments?.[0].doseSourceConflict, true);
+});
