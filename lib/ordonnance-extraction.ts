@@ -136,6 +136,7 @@ function extraireConditionRenouvellement(value: unknown, sourceTexts: string[]):
   for (const candidate of [texte(value), ...sourceTexts]) {
     if (!candidate) continue;
     const source = candidate.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (/\brenouvellement\s+interdit\b/.test(source)) return "renouvellement interdit";
     if (!/\b(si|si necessaire|si besoin|en cas de)\b/.test(source)) continue;
     const condition = normaliserConditionRenouvellement(candidate);
     if (condition) return condition;

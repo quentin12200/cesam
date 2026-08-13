@@ -44,9 +44,12 @@ function objet(value: unknown): Record<string, unknown> {
 }
 
 function lignes(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim())
-    : [];
+  const values = typeof value === "string" ? [value] : Array.isArray(value) ? value : [];
+  return values
+    .filter((item): item is string => typeof item === "string")
+    .flatMap((item) => item.split(/\r?\n/))
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function blocVide(): BlocMedicamentTranscrit {
@@ -124,7 +127,9 @@ function decouperBlocNumerote(bloc: BlocMedicamentTranscrit): BlocMedicamentTran
   }
 
   for (const rubrique of RUBRIQUES_MEDICAMENT) {
-    let numeroCourant: number | null = null;
+    // Avec un seul médicament numéroté, les autres rubriques n'ont pas besoin
+    // de répéter son numéro : toutes leurs lignes appartiennent à ce bloc.
+    let numeroCourant: number | null = numeros.length === 1 ? numeros[0] : null;
     for (const ligne of bloc[rubrique]) {
       const debut = debutMedicament(ligne);
       if (debut && resultats.has(debut.numero)) {
@@ -252,9 +257,40 @@ function intervalleRenouvellement(sourceTexts: string[]): number | null {
 function conditionRenouvellement(sourceTexts: string[]): string | null {
   for (const sourceText of sourceTexts) {
     const source = sourceText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (/\brenouvellement\s+interdit\b/.test(source)) return "renouvellement interdit";
     if (!/\b(si|si necessaire|si besoin|en cas de)\b/.test(source)) continue;
     const condition = normaliserConditionRenouvellement(sourceText);
     if (condition) return condition;
+  }
+  return null;
+}
+
+function dureeTraitement(sourceTexts: string[]): number | null {
+  for (const sourceText of sourceTexts) {
+    const source = normaliserPourDetection(sourceText).toLowerCase();
+    const match = source.match(/\b(?:pendant|durant|duree\s*[:=-]?)\s*(\d{1,3})\s*(?:j|jour|jours)\b/);
+    if (match) return Number(match[1]);
+  }
+  return null;
+}
+
+function voieDepuisBloc(sourceTexts: string[]): string | null {
+  const source = normaliserPourDetection(sourceTexts.join(" ")).toLowerCase();
+  const voies = [
+    ["IV", /\b(?:intraveineuse|intra\s*veineuse)\b/],
+    ["IM", /\b(?:intramusculaire|intra\s*musculaire)\b/],
+    ["SC", /\b(?:sous[- ]?cutanee)\b/],
+  ] as const;
+  const trouvees = voies.filter(([, expression]) => expression.test(source)).map(([code]) => code);
+  return trouvees.length > 0 ? trouvees.join(" / ") : null;
+}
+
+function numeroLotDepuisBloc(bloc: BlocMedicamentTranscrit): string | null {
+  for (const rubrique of RUBRIQUES_MEDICAMENT) {
+    for (const ligne of bloc[rubrique]) {
+      const match = ligne.match(/\blot\s*[:#=-]?\s*([A-Z0-9][A-Z0-9./_-]*)\b/i);
+      if (match) return match[1];
+    }
   }
   return null;
 }
@@ -304,6 +340,10 @@ export function appliquerTranscriptionParBlocs(
     const patch: Record<string, unknown> = { ...ia, __transcriptionParBlocs: true };
 
     patch.medicamentNom = nomDepuisBloc(bloc, ia.medicamentNom);
+    patch.numeroLot = numeroLotDepuisBloc(bloc) ?? ia.numeroLot ?? null;
+
+    const voieTranscrite = voieDepuisBloc([...bloc.posologie, ...bloc.instructionsPrecautions]);
+    if (voieTranscrite) patch.voie = voieTranscrite;
 
     if (bloc.presentation.length > 0) {
       const sourceText = bloc.presentation.join("\n");
@@ -334,10 +374,17 @@ export function appliquerTranscriptionParBlocs(
         ...objet(patch.evidence),
         dose: preuve(dosePrincipale, bloc.posologie.join("\n"), "posologie"),
       };
+      const duree = dureeTraitement(bloc.posologie);
+      if (duree !== null) {
+        patch.administrationProtocol = {
+          ...objet(ia.administrationProtocol),
+          treatmentDurationDays: duree,
+        };
+      }
     }
 
     if (bloc.renouvellement.length > 0) {
-      const protocoleIA = objet(ia.administrationProtocol);
+      const protocoleIA = objet(patch.administrationProtocol);
       const intervalle = intervalleRenouvellement(bloc.renouvellement);
       const condition = conditionRenouvellement(bloc.renouvellement);
       patch.administrationProtocol = {

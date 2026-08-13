@@ -149,3 +149,69 @@ test("retrouve le veterinaire et separe deux medicaments regroupes par l IA", ()
   assert.equal(proposition.medicaments?.[0].medicationMatch?.id, "med-tenaline");
   assert.equal(proposition.medicaments?.[1].medicamentNom, "OXYTERIN P 220 G AER. 320 ML");
 });
+
+test("retrouve Diurizone depuis une identification de bloc transmise comme texte", () => {
+  const candidatDiurizone = {
+    id: "med-diurizone",
+    nom: "DIURIZONE",
+    dci: null,
+    forme: "Solution injectable",
+    categorie: "DIURETIQUE_CORTISONE",
+    voie: "IV / IM / SC",
+    delaiAttenteViandeJ: 3,
+    delaiAttenteLaitJ: 2,
+    actif: true,
+    aliases: [],
+  };
+  const analyseIA = {
+    transcription: {
+      entete: {
+        lignes: [
+          "Dr Hélène Defrance",
+          "Dernière visite : 14/04/2026",
+          "ordonnance n°26-05-0764[V] le 26/05/2026",
+        ],
+      },
+      medicaments: [{
+        // Le service IA peut renvoyer une chaîne multiligne malgré le tableau demandé.
+        identification: "1 - DIURIZONE SOLUTION INJECTABLE FL. 50 ML",
+        presentation: "Qté : 1\nLot : 15731B\nSolution injectable",
+        posologie: [
+          "Dose pharmacologique : 5 mg par kg de poids vif",
+          "Adultes : 2 ml pour 50 kg de poids vif",
+          "Veaux : 1 ml pour 25 kg de poids vif",
+          "Administrer pendant 3 jours",
+          "Voies : intraveineuse, intramusculaire ou sous-cutanée",
+        ],
+        renouvellement: "Renouvellement interdit",
+        delaisAttente: "Viande et abats : 3 jours\nLait : 2 jours",
+        instructionsPrecautions: [],
+        autres: [],
+      }],
+    },
+    veterinaire: "Dr Hélène Defrance",
+    medicaments: [{ medicamentNom: null, voie: null, administrationProtocol: {} }],
+  };
+
+  const proposition = normaliserAnalyseOrdonnance(
+    appliquerTranscriptionParBlocs(analyseIA),
+    [candidatDiurizone],
+  );
+  const medicament = proposition.medicaments?.[0];
+
+  assert.equal(proposition.prescriptionDate, "2026-05-26");
+  assert.equal(proposition.lastVisitDate, "2026-04-14");
+  assert.equal(proposition.ordonnanceNumero, "26-05-0764[V]");
+  assert.equal(proposition.veterinaire, "Dr Hélène Defrance");
+  assert.equal(medicament?.medicamentNom, "DIURIZONE SOLUTION INJECTABLE FL. 50 ML");
+  assert.equal(medicament?.medicationMatch?.id, "med-diurizone");
+  assert.equal(formaterPresentationCompacte(medicament?.conditionnement ?? null), "Flacon 50 ml · Qté 1");
+  assert.equal(medicament?.numeroLot, "15731B");
+  assert.equal(formaterDoseSource(medicament?.dosePharmacologique ?? null), "5 mg / 1 kg");
+  assert.equal(formaterDoseSource(medicament?.dosePratique ?? null), "2 ml / 50 kg");
+  assert.notEqual(formaterDoseSource(medicament?.dosePratique ?? null), "2 ml / 25 kg");
+  assert.equal(medicament?.treatmentDurationDays, 3);
+  assert.equal(medicament?.voie, "IV / IM / SC");
+  assert.equal(medicament?.repeatCondition, "renouvellement interdit");
+  assert.deepEqual(medicament?.withdrawalPeriods, { meatDays: 3, offalDays: 3, milkDays: 2 });
+});
