@@ -51,6 +51,17 @@ test("ne transfere ni categorie ni poids ni maximum entre deux consignes Diurizo
   }]);
 });
 
+test("conserve la frequence quotidienne commune sur la consigne veau", () => {
+  const doses = extraireDosesPratiquesContextuelles([
+    "10 ml maximum par jour pour les bovins adultes ; 2 ml pour 40 à 50 kg pour les veaux",
+  ]);
+
+  assert.deepEqual(doses.map(formaterDosePratiqueContextuelle), [
+    "Max : 10 ml / jour",
+    "Veaux : 2 ml / 40–50 kg / jour",
+  ]);
+});
+
 test("signale deux posologies contradictoires attribuees aux veaux", () => {
   const doses = [{
     categorieAnimaux: "Veaux", doseValue: "10", doseUnit: "ml", poidsMinKg: "40", poidsMaxKg: "50",

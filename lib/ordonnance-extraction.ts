@@ -203,11 +203,17 @@ function doseCalculeeDepuisChamps(
   const fiable = (preuve?.confidence ?? 0) >= 0.8;
   const dosesSourcees = extraireDosesPharmacologiquesCalcul(sourceTexts);
   const concentrationsSourcees = extraireConcentrationsCalcul([sourceConcentration], fiable);
-  if (dosesSourcees.length > 0 || concentrationsSourcees.length > 0) {
-    if (dosesSourcees.length === 0 || concentrationsSourcees.length === 0) {
+  const concentrationsStructurees = med.concentration
+    ? extraireConcentrationsCalcul([med.concentration], true)
+    : [];
+  if (dosesSourcees.length > 0 || concentrationsSourcees.length > 0 || concentrationsStructurees.length > 0) {
+    const concentrationsRetenues = concentrationsSourcees.length > 0
+      ? concentrationsSourcees
+      : concentrationsStructurees;
+    if (dosesSourcees.length === 0 || concentrationsRetenues.length === 0) {
       return { dose: null, aVerifier: true };
     }
-    return calculerDoseVolumiqueSure(dosesSourcees, concentrationsSourcees);
+    return calculerDoseVolumiqueSure(dosesSourcees, concentrationsRetenues);
   }
 
   if (!pharmacologique || !med.substanceActive || !med.concentration) return { dose: null, aVerifier: false };

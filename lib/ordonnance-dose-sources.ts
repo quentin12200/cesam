@@ -111,6 +111,9 @@ export function extraireDosesPratiquesContextuelles(sourceTexts: string[]): Dose
   const resultats: DosePratiqueContextuelle[] = [];
   for (const sourceText of sourceTexts) {
     const texte = sourceText.trim();
+    const frequenceCommune = /\b(?:par|chaque)\s+jour\b|\/\s*jour\b|\bquotidien(?:ne)?\b/i.test(texte)
+      && !/\b(?:par|chaque)\s+(?:semaine|mois)\b|\btoutes?\s+les?\s+\d+\s*(?:h|heures?)\b/i.test(texte)
+      ? "par jour" : null;
     const matches = Array.from(texte.matchAll(
       /\b(\d+(?:[.,]\d+)?)\s*(ml|cl|l|g|comprim(?:e|é)s?|cp|bolus)\b/giu,
     ));
@@ -126,7 +129,7 @@ export function extraireDosesPratiquesContextuelles(sourceTexts: string[]): Dose
       const apres = texte.slice(finDose, finLocal);
       const poids = apres.match(/(?:pour|par|\/)\s*(\d+(?:[.,]\d+)?)\s*(?:a|à|-|–)?\s*(\d+(?:[.,]\d+)?)?\s*kg\b/iu);
       const frequence = /\b(?:par|chaque)\s+jour\b|\/\s*jour\b|\bquotidien(?:ne)?\b/i.test(apres)
-        ? "par jour" : null;
+        ? "par jour" : frequenceCommune;
       const unite = sansAccents(match[2]).toLowerCase().startsWith("comprim") || /^cp$/i.test(match[2])
         ? "comprimé" : match[2].toLowerCase();
       resultats.push({

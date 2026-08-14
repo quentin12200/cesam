@@ -234,3 +234,50 @@ test("retrouve Diurizone depuis une identification de bloc transmise comme texte
   assert.equal(medicament?.doseSourceConflict, false);
   assert.deepEqual(medicament?.withdrawalPeriods, { meatDays: 3, offalDays: 3, milkDays: 2 });
 });
+
+test("complete l affichage Diurizone quand le scan ne fournit pas de preuve concentration separee", () => {
+  const analyseIA = {
+    transcription: {
+      entete: { lignes: ["ordonnance n°26-05-0764[V] le 26/05/2026"] },
+      medicaments: [{
+        identification: ["1 - DIURIZONE SOLUTION INJECTABLE FL. 50 ML"],
+        presentation: ["Qté : 1", "Solution injectable"],
+        posologie: [
+          "Dexaméthasone : 0,01 à 0,02 mg/kg",
+          "Hydrochlorothiazide : 1 à 2 mg/kg",
+          "10 ml maximum par jour pour les bovins adultes ; 2 ml pour 40 à 50 kg pour les veaux",
+          "Administrer pendant 3 jours",
+          "Voies : intraveineuse, intramusculaire ou sous-cutanée",
+        ],
+        renouvellement: ["Renouvellement interdit"],
+        delaisAttente: ["Viande et abats : 3 jours", "Lait : 2 jours"],
+        instructionsPrecautions: [],
+        autres: [],
+      }],
+    },
+    medicaments: [{
+      medicamentNom: null,
+      substanceActive: "Dexaméthasone + Hydrochlorothiazide",
+      concentration: "Dexaméthasone : 0,5 mg/ml ; Hydrochlorothiazide : 50 mg/ml",
+      administrationProtocol: {},
+      evidence: {},
+    }],
+  };
+
+  const proposition = normaliserAnalyseOrdonnance(appliquerTranscriptionParBlocs(analyseIA), [{
+    id: "med-diurizone", nom: "DIURIZONE INJECTABLE", dci: null, forme: "Solution injectable",
+    categorie: "AUTRE", voie: "IV / IM / SC", delaiAttenteViandeJ: 3, delaiAttenteLaitJ: 2,
+    actif: true, aliases: [],
+  }]);
+  const medicament = proposition.medicaments?.[0];
+
+  assert.deepEqual(medicament?.dosesPratiques?.map(formaterDosePratiqueContextuelle), [
+    "Adultes : 2 à 4 ml / 100 kg / jour",
+    "Max : 10 ml / jour",
+    "Veaux : 2 ml / 40–50 kg / jour",
+  ]);
+  assert.equal(medicament?.voie, "IV / IM / SC");
+  assert.equal(medicament?.treatmentDurationDays, 3);
+  assert.equal(medicament?.repeatCondition, "renouvellement interdit");
+  assert.deepEqual(medicament?.withdrawalPeriods, { meatDays: 3, offalDays: 3, milkDays: 2 });
+});
