@@ -108,6 +108,7 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
     "precautions": "string ou null",
     "evidence": {
       "dose": { "value": "texte interprete", "sourceText": "texte exact complet", "confidence": 0.95, "zone": "prescription" },
+      "concentration": { "value": "concentrations interpretees", "sourceText": "chaque substance et sa concentration exacte en mg/ml", "confidence": 0.95, "zone": "composition" },
       "administrationProtocol": { "value": "texte interprete", "sourceText": "protocole exact complet", "confidence": 0.95, "zone": "prescription" },
       "withdrawalPeriods": { "value": "delais interpretes", "sourceText": "texte exact complet viande, abats et lait", "confidence": 0.95, "zone": "prescription" },
       "conditionnement": { "value": "texte interprete", "sourceText": "nom, presentation et quantite exacts", "confidence": 0.95, "zone": "delivrance" }
@@ -141,6 +142,8 @@ Regles obligatoires :
 - Une dose "1 ml pour 10 kg" est ponderale : doseValue=1, referenceValue=10, referenceType=live_weight, normalizedDoseValue=0.1. Ce n'est pas une dose fixe de 1 ml.
 - Conserve séparément dosePratique et dosePharmacologique. Chaque valeur, unité et référence doit provenir de la même
   expression exacte conservée dans son sourceText. Ne combine jamais une valeur en mg avec la référence d'une expression en ml.
+- Pour chaque substance active, conserve sa concentration en mg/ml dans evidence.concentration.sourceText.
+  Ne regroupe jamais la concentration d'une substance avec la dose pharmacologique d'une autre.
 - Le bloc dose principal reprend la dose pratique lorsqu'elle existe, sinon la dose pharmacologique. N'invente aucune conversion
   entre mg et ml et conserve le passage complet dans evidence.dose.sourceText.
 - Si dose pratique et dose pharmacologique figurent dans une meme phrase, evidence.dose.sourceText doit conserver la phrase

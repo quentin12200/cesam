@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   calculerDoseVolumiqueSure,
   choisirBaseAffichageDose,
+  extraireConcentrationsCalcul,
+  extraireDosesPharmacologiquesCalcul,
   extraireDosesPratiquesContextuelles,
   formaterDosePratiqueContextuelle,
   formaterDoseSource,
@@ -24,12 +26,35 @@ test("conserve deux doses pratiques adulte et veau sans les fusionner", () => {
     "Veaux : 2 ml pour 40 à 50 kg par jour",
   ]);
   assert.deepEqual(doses.map(formaterDosePratiqueContextuelle), [
-    "Adultes : 10 ml max / jour",
+    "Max : 10 ml / jour",
     "Veaux : 2 ml / 40–50 kg / jour",
   ]);
   assert.equal(doses[1].poidsMinKg, "40");
   assert.equal(doses[1].poidsMaxKg, "50");
   assert.doesNotMatch(doses.map(formaterDosePratiqueContextuelle).join(" "), /\bPV\b/i);
+});
+
+test("traite une mention maximum comme un plafond distinct de la dose principale", () => {
+  const [plafond] = extraireDosesPratiquesContextuelles(["Bovins adultes : 10 ml maximum par jour"]);
+  assert.equal(plafond.maximum, true);
+  assert.equal(plafond.poidsMinKg, null);
+  assert.equal(formaterDosePratiqueContextuelle(plafond), "Max : 10 ml / jour");
+});
+
+test("calcule la fourchette adulte Diurizone quand les deux substances concordent", () => {
+  const doses = extraireDosesPharmacologiquesCalcul([
+    "Dexaméthasone : 0,01 à 0,02 mg/kg",
+    "Hydrochlorothiazide : 1 à 2 mg/kg",
+  ]);
+  const concentrations = extraireConcentrationsCalcul([
+    "Dexaméthasone : 0,5 mg/ml ; Hydrochlorothiazide : 50 mg/ml",
+  ], true);
+  const resultat = calculerDoseVolumiqueSure(doses, concentrations);
+
+  assert.equal(resultat.aVerifier, false);
+  assert.equal(formaterDosePratiqueContextuelle({
+    ...resultat.dose!, categorieAnimaux: "Adultes", frequence: "par jour",
+  }), "Adultes : 2 à 4 ml / 100 kg / jour");
 });
 
 test("calcule une dose en ml uniquement avec une concentration fiable de la meme substance", () => {

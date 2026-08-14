@@ -16,6 +16,8 @@ import {
 } from "./ordonnance-dates.ts";
 import {
   calculerDoseVolumiqueSure,
+  extraireConcentrationsCalcul,
+  extraireDosesPharmacologiquesCalcul,
   resoudreSourcesDose,
   type DoseSourceStructuree,
 } from "./ordonnance-dose-sources.ts";
@@ -190,14 +192,28 @@ function dosesPratiques(value: unknown): DosePratiqueContextuelle[] {
   });
 }
 
-function doseCalculeeDepuisChamps(med: MedicamentPropose, pharmacologique: DoseSourceStructuree | null) {
+function doseCalculeeDepuisChamps(
+  med: MedicamentPropose,
+  pharmacologique: DoseSourceStructuree | null,
+  sourceTexts: string[],
+) {
+  const preuve = med.evidence.concentration;
+  const sourceConcentration = typeof preuve?.sourceText === "string" ? preuve.sourceText : "";
+  const fiable = (preuve?.confidence ?? 0) >= 0.8;
+  const dosesSourcees = extraireDosesPharmacologiquesCalcul(sourceTexts);
+  const concentrationsSourcees = extraireConcentrationsCalcul([sourceConcentration], fiable);
+  if (dosesSourcees.length > 0 || concentrationsSourcees.length > 0) {
+    if (dosesSourcees.length === 0 || concentrationsSourcees.length === 0) {
+      return { dose: null, aVerifier: true };
+    }
+    return calculerDoseVolumiqueSure(dosesSourcees, concentrationsSourcees);
+  }
+
   if (!pharmacologique || !med.substanceActive || !med.concentration) return { dose: null, aVerifier: false };
   const concentrations = [...med.concentration.matchAll(/\b(\d+(?:[.,]\d+)?)\s*mg\s*\/\s*ml\b/gi)];
   const plusieursSubstances = /(?:\+|;|\s\/\s|\bet\b)/i.test(med.substanceActive);
   if (concentrations.length !== 1 || plusieursSubstances) return { dose: null, aVerifier: true };
-  const preuve = med.evidence.concentration;
-  const source = typeof preuve?.sourceText === "string" ? preuve.sourceText : "";
-  const concentrationsSource = [...source.matchAll(/\b(\d+(?:[.,]\d+)?)\s*mg\s*\/\s*ml\b/gi)];
+  const concentrationsSource = [...sourceConcentration.matchAll(/\b(\d+(?:[.,]\d+)?)\s*mg\s*\/\s*ml\b/gi)];
   if ((preuve?.confidence ?? 0) < 0.8 || concentrationsSource.length !== 1) return { dose: null, aVerifier: true };
   const concentration = concentrations[0];
   if (Number(concentration[1].replace(",", ".")) !== Number(concentrationsSource[0][1].replace(",", "."))) {
@@ -592,19 +608,40 @@ export function normaliserAnalyseOrdonnance(
       dosePharmacologique: doseSource(m.dosePharmacologique),
     });
     const dosesPratiquesExtraites = dosesPratiques(m.dosesPratiques);
-    const calcul = dosesPratiquesExtraites.length === 0
-      ? doseCalculeeDepuisChamps(proposition, resolutionDose.dosePharmacologique)
+    const plafonds = dosesPratiquesExtraites.filter((dosePratique) => dosePratique.maximum && !dosePratique.poidsMinKg);
+    const dosesCompletes = dosesPratiquesExtraites.filter((dosePratique) => !dosePratique.maximum || Boolean(dosePratique.poidsMinKg));
+    const plafondSansDoseComplete = plafonds.find((plafond) => !dosesCompletes.some(
+      (doseComplete) => doseComplete.categorieAnimaux === plafond.categorieAnimaux,
+    ));
+    const calcul = dosesPratiquesExtraites.length === 0 || plafondSansDoseComplete
+      ? doseCalculeeDepuisChamps(proposition, resolutionDose.dosePharmacologique, textesDose)
       : { dose: null, aVerifier: false };
-    const toutesDosesPratiques = calcul.dose ? [calcul.dose] : dosesPratiquesExtraites;
-    const doseCalculee = calcul.dose ? {
-      doseValue: calcul.dose.doseValue,
-      doseUnit: calcul.dose.doseUnit,
-      referenceValue: calcul.dose.poidsMinKg ?? "",
-      referenceUnit: calcul.dose.poidsMinKg ? "kg" : "",
-      referenceType: calcul.dose.poidsMinKg ? "live_weight" : "animal",
+    const doseCalculeeContextuelle = calcul.dose ? {
+      ...calcul.dose,
+      categorieAnimaux: plafondSansDoseComplete?.categorieAnimaux ?? null,
+      frequence: plafondSansDoseComplete?.frequence ?? null,
+    } : null;
+    const toutesDosesPratiques = doseCalculeeContextuelle
+      ? dosesPratiquesExtraites.flatMap((dosePratique) => (
+        dosePratique === plafondSansDoseComplete ? [doseCalculeeContextuelle, dosePratique] : [dosePratique]
+      ))
+      : dosesPratiquesExtraites.map((dosePratique) => (
+        dosePratique === plafondSansDoseComplete && calcul.aVerifier
+          ? { ...dosePratique, aVerifier: true }
+          : dosePratique
+      ));
+    if (doseCalculeeContextuelle && dosesPratiquesExtraites.length === 0) {
+      toutesDosesPratiques.push(doseCalculeeContextuelle);
+    }
+    const doseCalculee = doseCalculeeContextuelle ? {
+      doseValue: doseCalculeeContextuelle.doseValue,
+      doseUnit: doseCalculeeContextuelle.doseUnit,
+      referenceValue: doseCalculeeContextuelle.poidsMinKg ?? "",
+      referenceUnit: doseCalculeeContextuelle.poidsMinKg ? "kg" : "",
+      referenceType: doseCalculeeContextuelle.poidsMinKg ? "live_weight" : "animal",
       sourceText: null,
     } : null;
-    const doseRetenue = resolutionDose.dosePratique ?? doseCalculee ?? resolutionDose.doseAffichee;
+    const doseRetenue = doseCalculee ?? resolutionDose.dosePratique ?? resolutionDose.doseAffichee;
     const doseNormalisee = normaliserDoseSource(
       resolutionDose.dosePharmacologique ?? resolutionDose.dosePratique ?? doseRetenue,
     );

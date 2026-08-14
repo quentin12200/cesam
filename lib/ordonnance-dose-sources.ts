@@ -12,6 +12,7 @@ export interface DoseSourceStructuree {
 export interface DosePharmacologiqueCalcul {
   substance: string;
   mgParKg: number;
+  mgParKgMax?: number;
 }
 
 export interface ConcentrationCalcul {
@@ -89,7 +90,69 @@ export function extraireDosesPratiquesContextuelles(sourceTexts: string[]): Dose
 }
 
 function cleSubstance(value: string): string {
-  return sansAccents(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return sansAccents(value).toLowerCase()
+    .replace(/\b(?:dose|concentration|substance|active)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function decimal(value: string): number {
+  return Number(value.replace(",", "."));
+}
+
+function segmentsSources(sourceTexts: string[]): string[] {
+  return sourceTexts.flatMap((sourceText) => sourceText.split(/[\n;+]/g))
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+export function extraireDosesPharmacologiquesCalcul(sourceTexts: string[]): DosePharmacologiqueCalcul[] {
+  const resultats: DosePharmacologiqueCalcul[] = [];
+  for (const segment of segmentsSources(sourceTexts)) {
+    const normalise = sansAccents(segment);
+    const substanceAvant = normalise.match(
+      /^\s*(?:dose\s+pharmacologique\s*[:=-]?\s*)?([a-z][a-z' -]{2,50}?)\s*[:=-]?\s*(\d+(?:[.,]\d+)?)\s*(?:a|-|–)?\s*(\d+(?:[.,]\d+)?)?\s*mg\s*(?:\/|par)\s*kg\b/i,
+    );
+    const doseAvant = normalise.match(
+      /\b(\d+(?:[.,]\d+)?)\s*(?:a|-|–)?\s*(\d+(?:[.,]\d+)?)?\s*mg\s+(?:de|d')\s*([a-z][a-z' -]{2,50}?)\s+(?:par|\/)\s*kg\b/i,
+    );
+    if (substanceAvant) {
+      resultats.push({
+        substance: substanceAvant[1].trim(),
+        mgParKg: decimal(substanceAvant[2]),
+        mgParKgMax: substanceAvant[3] ? decimal(substanceAvant[3]) : undefined,
+      });
+    } else if (doseAvant) {
+      resultats.push({
+        substance: doseAvant[3].trim(),
+        mgParKg: decimal(doseAvant[1]),
+        mgParKgMax: doseAvant[2] ? decimal(doseAvant[2]) : undefined,
+      });
+    }
+  }
+  return resultats.filter((dose) => Number.isFinite(dose.mgParKg)
+    && (dose.mgParKgMax === undefined || Number.isFinite(dose.mgParKgMax)));
+}
+
+export function extraireConcentrationsCalcul(
+  sourceTexts: string[],
+  fiable: boolean,
+): ConcentrationCalcul[] {
+  const resultats: ConcentrationCalcul[] = [];
+  for (const segment of segmentsSources(sourceTexts)) {
+    const normalise = sansAccents(segment);
+    const substanceAvant = normalise.match(
+      /^\s*(?:concentration\s*[:=-]?\s*)?([a-z][a-z' -]{2,50}?)\s*[:=-]?\s*(\d+(?:[.,]\d+)?)\s*mg\s*\/\s*ml\b/i,
+    );
+    const concentrationAvant = normalise.match(
+      /\b(\d+(?:[.,]\d+)?)\s*mg\s*\/\s*ml\s+(?:de|d')\s*([a-z][a-z' -]{2,50})\b/i,
+    );
+    if (substanceAvant) {
+      resultats.push({ substance: substanceAvant[1].trim(), mgParMl: decimal(substanceAvant[2]), fiable });
+    } else if (concentrationAvant) {
+      resultats.push({ substance: concentrationAvant[2].trim(), mgParMl: decimal(concentrationAvant[1]), fiable });
+    }
+  }
+  return resultats.filter((concentration) => Number.isFinite(concentration.mgParMl));
 }
 
 export function choisirBaseAffichageDose(mlParKg: number): { doseMl: number; poidsKg: 1 | 10 | 100 } {
@@ -102,22 +165,30 @@ export function calculerDoseVolumiqueSure(
   concentrations: ConcentrationCalcul[],
 ): { dose: DosePratiqueContextuelle | null; aVerifier: boolean } {
   if (doses.length === 0) return { dose: null, aVerifier: false };
-  const valeurs: number[] = [];
+  const valeurs: Array<{ min: number; max: number }> = [];
   for (const dose of doses) {
     const cle = cleSubstance(dose.substance);
     const correspondances = concentrations.filter((item) => item.fiable && cleSubstance(item.substance) === cle);
     if (correspondances.length !== 1 || correspondances[0].mgParMl <= 0) return { dose: null, aVerifier: true };
-    valeurs.push(dose.mgParKg / correspondances[0].mgParMl);
+    valeurs.push({
+      min: dose.mgParKg / correspondances[0].mgParMl,
+      max: (dose.mgParKgMax ?? dose.mgParKg) / correspondances[0].mgParMl,
+    });
   }
   const premiere = valeurs[0];
-  if (!Number.isFinite(premiere) || valeurs.some((value) => Math.abs(value - premiere) > 1e-9)) {
+  if (!Number.isFinite(premiere.min) || !Number.isFinite(premiere.max)
+    || valeurs.some((value) => Math.abs(value.min - premiere.min) > 1e-9
+      || Math.abs(value.max - premiere.max) > 1e-9)) {
     return { dose: null, aVerifier: true };
   }
-  const affichage = choisirBaseAffichageDose(premiere);
+  const affichage = choisirBaseAffichageDose(premiere.max);
+  const facteur = affichage.poidsKg;
+  const minAffiche = Number((premiere.min * facteur).toFixed(6));
+  const maxAffiche = Number((premiere.max * facteur).toFixed(6));
   return {
     dose: {
       categorieAnimaux: null,
-      doseValue: String(Number(affichage.doseMl.toFixed(6))),
+      doseValue: minAffiche === maxAffiche ? String(minAffiche) : `${minAffiche} à ${maxAffiche}`,
       doseUnit: "ml",
       poidsMinKg: String(affichage.poidsKg),
       poidsMaxKg: String(affichage.poidsKg),
@@ -132,6 +203,10 @@ export function calculerDoseVolumiqueSure(
 }
 
 export function formaterDosePratiqueContextuelle(dose: DosePratiqueContextuelle): string {
+  if (dose.maximum && !dose.poidsMinKg) {
+    const frequencePlafond = dose.frequence ? ` / ${dose.frequence.replace(/^par\s+/i, "")}` : "";
+    return `Max : ${dose.doseValue} ${dose.doseUnit}${frequencePlafond}`;
+  }
   const categorie = dose.categorieAnimaux ? `${dose.categorieAnimaux} : ` : "";
   const maximum = dose.maximum ? " max" : "";
   const poids = dose.poidsMinKg

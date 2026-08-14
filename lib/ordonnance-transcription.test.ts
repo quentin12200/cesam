@@ -177,7 +177,8 @@ test("retrouve Diurizone depuis une identification de bloc transmise comme texte
         identification: "1 - DIURIZONE SOLUTION INJECTABLE FL. 50 ML",
         presentation: "Qté : 1\nLot : 15731B\nSolution injectable",
         posologie: [
-          "Dose pharmacologique : 0,5 mg par kg de poids vif",
+          "Dexaméthasone : 0,01 à 0,02 mg/kg",
+          "Hydrochlorothiazide : 1 à 2 mg/kg",
           "Bovins adultes : 10 ml maximum par jour",
           "Veaux : 2 ml pour 40 à 50 kg par jour",
           "Administrer pendant 3 jours",
@@ -190,7 +191,20 @@ test("retrouve Diurizone depuis une identification de bloc transmise comme texte
       }],
     },
     veterinaire: "Dr Hélène Defrance",
-    medicaments: [{ medicamentNom: null, voie: null, administrationProtocol: {} }],
+    medicaments: [{
+      medicamentNom: null,
+      voie: null,
+      substanceActive: "Dexaméthasone + Hydrochlorothiazide",
+      concentration: "Dexaméthasone : 0,5 mg/ml ; Hydrochlorothiazide : 50 mg/ml",
+      administrationProtocol: {},
+      evidence: {
+        concentration: {
+          value: "Dexaméthasone : 0,5 mg/ml ; Hydrochlorothiazide : 50 mg/ml",
+          sourceText: "Dexaméthasone : 0,5 mg/ml ; Hydrochlorothiazide : 50 mg/ml",
+          confidence: 0.99,
+        },
+      },
+    }],
   };
 
   const proposition = normaliserAnalyseOrdonnance(
@@ -207,10 +221,11 @@ test("retrouve Diurizone depuis une identification de bloc transmise comme texte
   assert.equal(medicament?.medicationMatch?.id, "med-diurizone");
   assert.equal(formaterPresentationCompacte(medicament?.conditionnement ?? null), "Flacon 50 ml · Qté 1");
   assert.equal(medicament?.numeroLot, "15731B");
-  assert.equal(formaterDoseSource(medicament?.dosePharmacologique ?? null), "0.5 mg / 1 kg");
-  assert.equal(medicament?.dosesPratiques?.length, 2);
+  assert.equal(formaterDoseSource(medicament?.dosePharmacologique ?? null), "0.02 mg / 1 kg");
+  assert.equal(medicament?.dosesPratiques?.length, 3);
   assert.deepEqual(medicament?.dosesPratiques?.map((dose) => formaterDosePratiqueContextuelle(dose)), [
-    "Adultes : 10 ml max / jour",
+    "Adultes : 2 à 4 ml / 100 kg / jour",
+    "Max : 10 ml / jour",
     "Veaux : 2 ml / 40–50 kg / jour",
   ]);
   assert.doesNotMatch(medicament?.dosesPratiques?.map((dose) => formaterDosePratiqueContextuelle(dose)).join(" ") ?? "", /\bPV\b/i);

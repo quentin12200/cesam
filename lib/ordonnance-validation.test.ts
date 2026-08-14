@@ -156,8 +156,8 @@ test("conserve plusieurs consignes pratiques dans la liaison ordonnance medicame
 
   await creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([med]), ["doc.jpg"]);
 
-  assert.equal(formatPosologieExtraite(med), "Adultes : 10 ml max / jour\nVeaux : 2 ml / 40–50 kg / jour");
-  assert.equal(state.liens[0].posologieExtraite, "Adultes : 10 ml max / jour\nVeaux : 2 ml / 40–50 kg / jour");
+  assert.equal(formatPosologieExtraite(med), "Max : 10 ml / jour\nVeaux : 2 ml / 40–50 kg / jour");
+  assert.equal(state.liens[0].posologieExtraite, "Max : 10 ml / jour\nVeaux : 2 ml / 40–50 kg / jour");
   assert.deepEqual(JSON.parse(String(state.liens[0].evidenceJson)).dosesPratiques, dosesPratiques);
 });
 
