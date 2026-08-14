@@ -179,8 +179,7 @@ test("retrouve Diurizone depuis une identification de bloc transmise comme texte
         posologie: [
           "Dexaméthasone : 0,01 à 0,02 mg/kg",
           "Hydrochlorothiazide : 1 à 2 mg/kg",
-          "Bovins adultes : 10 ml maximum par jour",
-          "Veaux : 2 ml pour 40 à 50 kg par jour",
+          "10 ml maximum par jour pour les bovins adultes ; 2 ml pour 40 à 50 kg par jour pour les veaux",
           "Administrer pendant 3 jours",
           "Voies : intraveineuse, intramusculaire ou sous-cutanée",
         ],
@@ -232,5 +231,6 @@ test("retrouve Diurizone depuis une identification de bloc transmise comme texte
   assert.equal(medicament?.treatmentDurationDays, 3);
   assert.equal(medicament?.voie, "IV / IM / SC");
   assert.equal(medicament?.repeatCondition, "renouvellement interdit");
+  assert.equal(medicament?.doseSourceConflict, false);
   assert.deepEqual(medicament?.withdrawalPeriods, { meatDays: 3, offalDays: 3, milkDays: 2 });
 });

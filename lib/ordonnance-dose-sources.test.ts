@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   calculerDoseVolumiqueSure,
   choisirBaseAffichageDose,
+  dosesPratiquesIncoherentes,
   extraireConcentrationsCalcul,
   extraireDosesPharmacologiquesCalcul,
   extraireDosesPratiquesContextuelles,
@@ -22,8 +23,7 @@ const base = {
 
 test("conserve deux doses pratiques adulte et veau sans les fusionner", () => {
   const doses = extraireDosesPratiquesContextuelles([
-    "Bovins adultes : 10 ml maximum par jour",
-    "Veaux : 2 ml pour 40 à 50 kg par jour",
+    "10 ml maximum par jour pour les bovins adultes ; 2 ml pour 40 à 50 kg par jour pour les veaux",
   ]);
   assert.deepEqual(doses.map(formaterDosePratiqueContextuelle), [
     "Max : 10 ml / jour",
@@ -32,6 +32,35 @@ test("conserve deux doses pratiques adulte et veau sans les fusionner", () => {
   assert.equal(doses[1].poidsMinKg, "40");
   assert.equal(doses[1].poidsMaxKg, "50");
   assert.doesNotMatch(doses.map(formaterDosePratiqueContextuelle).join(" "), /\bPV\b/i);
+});
+
+test("ne transfere ni categorie ni poids ni maximum entre deux consignes Diurizone", () => {
+  const doses = extraireDosesPratiquesContextuelles([
+    "10 ml maximum par jour pour les bovins adultes ; 2 ml pour 40 à 50 kg par jour pour les veaux",
+  ]);
+
+  assert.deepEqual(doses.map((dose) => ({
+    categorie: dose.categorieAnimaux,
+    poidsMinKg: dose.poidsMinKg,
+    poidsMaxKg: dose.poidsMaxKg,
+    maximum: dose.maximum,
+  })), [{
+    categorie: "Adultes", poidsMinKg: null, poidsMaxKg: null, maximum: true,
+  }, {
+    categorie: "Veaux", poidsMinKg: "40", poidsMaxKg: "50", maximum: false,
+  }]);
+});
+
+test("signale deux posologies contradictoires attribuees aux veaux", () => {
+  const doses = [{
+    categorieAnimaux: "Veaux", doseValue: "10", doseUnit: "ml", poidsMinKg: "40", poidsMaxKg: "50",
+    frequence: "par jour", maximum: true, origine: "ordonnance" as const, sourceText: "bloc OCR", aVerifier: false,
+  }, {
+    categorieAnimaux: "Veaux", doseValue: "2", doseUnit: "ml", poidsMinKg: "40", poidsMaxKg: "50",
+    frequence: "par jour", maximum: true, origine: "ordonnance" as const, sourceText: "bloc OCR", aVerifier: false,
+  }];
+
+  assert.equal(dosesPratiquesIncoherentes(doses), true);
 });
 
 test("traite une mention maximum comme un plafond distinct de la dose principale", () => {

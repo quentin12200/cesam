@@ -18,6 +18,7 @@ import {
   calculerDoseVolumiqueSure,
   extraireConcentrationsCalcul,
   extraireDosesPharmacologiquesCalcul,
+  marquerDosesPratiquesIncoherentes,
   resoudreSourcesDose,
   type DoseSourceStructuree,
 } from "./ordonnance-dose-sources.ts";
@@ -621,7 +622,7 @@ export function normaliserAnalyseOrdonnance(
       categorieAnimaux: plafondSansDoseComplete?.categorieAnimaux ?? null,
       frequence: plafondSansDoseComplete?.frequence ?? null,
     } : null;
-    const toutesDosesPratiques = doseCalculeeContextuelle
+    const toutesDosesPratiquesBrutes = doseCalculeeContextuelle
       ? dosesPratiquesExtraites.flatMap((dosePratique) => (
         dosePratique === plafondSansDoseComplete ? [doseCalculeeContextuelle, dosePratique] : [dosePratique]
       ))
@@ -631,8 +632,10 @@ export function normaliserAnalyseOrdonnance(
           : dosePratique
       ));
     if (doseCalculeeContextuelle && dosesPratiquesExtraites.length === 0) {
-      toutesDosesPratiques.push(doseCalculeeContextuelle);
+      toutesDosesPratiquesBrutes.push(doseCalculeeContextuelle);
     }
+    const toutesDosesPratiques = marquerDosesPratiquesIncoherentes(toutesDosesPratiquesBrutes);
+    const dosePratiqueIncoherente = toutesDosesPratiques.some((dosePratique) => dosePratique.aVerifier);
     const doseCalculee = doseCalculeeContextuelle ? {
       doseValue: doseCalculeeContextuelle.doseValue,
       doseUnit: doseCalculeeContextuelle.doseUnit,
@@ -676,7 +679,7 @@ export function normaliserAnalyseOrdonnance(
       dosePratique: resolutionDose.dosePratique,
       dosesPratiques: toutesDosesPratiques,
       dosePharmacologique: resolutionDose.dosePharmacologique,
-      doseSourceConflict: resolutionDose.sourceHybrideDetectee || calcul.aVerifier,
+      doseSourceConflict: resolutionDose.sourceHybrideDetectee || calcul.aVerifier || dosePratiqueIncoherente,
       evidence,
     }, candidats);
   }).filter((m) => m.medicamentNom || m.doseValue || m.numeroLot);

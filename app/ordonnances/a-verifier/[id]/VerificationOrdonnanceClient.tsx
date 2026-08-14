@@ -149,8 +149,14 @@ export default function VerificationOrdonnanceClient({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const medicamentsRattaches = medicaments.filter((med) => med.medicationId).length;
-  const medicamentsACreer = medicaments.filter((med) => med.createMedication).length;
-  const medicamentsAConfirmer = medicaments.length - medicamentsRattaches - medicamentsACreer;
+  const medicamentsAConfirmer = medicaments.filter((med) => {
+    const associationAConfirmer = !med.medicationId && !med.createMedication;
+    const doseAConfirmer = !med.doseManuallyEdited && (
+      med.doseSources.sourceHybrideDetectee
+      || (med.ia?.dosesPratiques ?? []).some((dose) => dose.aVerifier)
+    );
+    return associationAConfirmer || doseAConfirmer;
+  }).length;
   const delivreCeJour = sourceIndiqueDelivreCeJour(deliveryEvidence?.sourceText);
   const masquerDateDelivrance = delivreCeJour
     || Boolean(deliveryDate && prescriptionDate && deliveryDate === prescriptionDate);

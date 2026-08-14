@@ -60,33 +60,91 @@ function categorieDepuisTexte(value: string): string | null {
   return null;
 }
 
+function categorieLocale(avantDose: string, apresDose: string): string | null {
+  const suffixe = sansAccents(apresDose).toLowerCase().match(
+    /\b(?:pour|chez)\s+(?:les?\s+)?(bovins?\s+adultes?|adultes?|veaux|veau)\b/,
+  );
+  if (suffixe) return categorieDepuisTexte(suffixe[1]);
+
+  const categoriesAvant = Array.from(sansAccents(avantDose).toLowerCase().matchAll(
+    /\b(bovins?\s+adultes?|adultes?|veaux|veau)\b/g,
+  ));
+  return categoriesAvant.length > 0
+    ? categorieDepuisTexte(categoriesAvant.at(-1)?.[1] ?? "")
+    : null;
+}
+
+function cleDosePratique(dose: DosePratiqueContextuelle): string {
+  return [
+    nombre(dose.doseValue),
+    uniteNormalisee(dose.doseUnit),
+    dose.poidsMinKg ? nombre(dose.poidsMinKg) : "",
+    dose.poidsMaxKg ? nombre(dose.poidsMaxKg) : "",
+    dose.frequence?.toLowerCase() ?? "",
+  ].join("|");
+}
+
+export function dosesPratiquesIncoherentes(doses: DosePratiqueContextuelle[]): boolean {
+  const groupes = new Map<string, DosePratiqueContextuelle[]>();
+  for (const dose of doses) {
+    const categorie = sansAccents(dose.categorieAnimaux ?? "sans categorie").toLowerCase();
+    groupes.set(categorie, [...(groupes.get(categorie) ?? []), dose]);
+  }
+
+  return Array.from(groupes.values()).some((groupe) => {
+    const dosesPrincipales = new Set(groupe.filter((dose) => !dose.maximum).map(cleDosePratique));
+    const plafonds = new Set(groupe.filter((dose) => dose.maximum).map(cleDosePratique));
+    const plafondAvecPoidsEtAutreDose = groupe.some((dose) => dose.maximum && Boolean(dose.poidsMinKg))
+      && groupe.some((dose) => !dose.maximum);
+    return dosesPrincipales.size > 1 || plafonds.size > 1 || plafondAvecPoidsEtAutreDose;
+  });
+}
+
+export function marquerDosesPratiquesIncoherentes(
+  doses: DosePratiqueContextuelle[],
+): DosePratiqueContextuelle[] {
+  if (!dosesPratiquesIncoherentes(doses)) return doses;
+  return doses.map((dose) => ({ ...dose, aVerifier: true }));
+}
+
 export function extraireDosesPratiquesContextuelles(sourceTexts: string[]): DosePratiqueContextuelle[] {
   const resultats: DosePratiqueContextuelle[] = [];
   for (const sourceText of sourceTexts) {
     const texte = sourceText.trim();
-    const source = sansAccents(texte).toLowerCase();
-    for (const match of texte.matchAll(/\b(\d+(?:[.,]\d+)?)\s*(ml|cl|l|g|comprim(?:e|é)s?|cp|bolus)\b/giu)) {
-      const apres = texte.slice((match.index ?? 0) + match[0].length);
+    const matches = Array.from(texte.matchAll(
+      /\b(\d+(?:[.,]\d+)?)\s*(ml|cl|l|g|comprim(?:e|é)s?|cp|bolus)\b/giu,
+    ));
+    for (let index = 0; index < matches.length; index += 1) {
+      const match = matches[index];
+      const debutDose = match.index ?? 0;
+      const finDose = debutDose + match[0].length;
+      const debutLocal = matches[index - 1]
+        ? (matches[index - 1].index ?? 0) + matches[index - 1][0].length
+        : 0;
+      const finLocal = matches[index + 1]?.index ?? texte.length;
+      const avant = texte.slice(debutLocal, debutDose);
+      const apres = texte.slice(finDose, finLocal);
       const poids = apres.match(/(?:pour|par|\/)\s*(\d+(?:[.,]\d+)?)\s*(?:a|à|-|–)?\s*(\d+(?:[.,]\d+)?)?\s*kg\b/iu);
-      const frequence = /\b(?:par|chaque)\s+jour\b|\/\s*jour\b|\bquotidien(?:ne)?\b/i.test(source)
+      const frequence = /\b(?:par|chaque)\s+jour\b|\/\s*jour\b|\bquotidien(?:ne)?\b/i.test(apres)
         ? "par jour" : null;
       const unite = sansAccents(match[2]).toLowerCase().startsWith("comprim") || /^cp$/i.test(match[2])
         ? "comprimé" : match[2].toLowerCase();
       resultats.push({
-        categorieAnimaux: categorieDepuisTexte(texte),
+        categorieAnimaux: categorieLocale(avant, apres),
         doseValue: match[1].replace(",", "."),
         doseUnit: unite,
         poidsMinKg: poids?.[1]?.replace(",", ".") ?? null,
         poidsMaxKg: (poids?.[2] ?? poids?.[1])?.replace(",", ".") ?? null,
         frequence,
-        maximum: /\b(?:max|maxi|maximum|au plus)\b/i.test(source),
+        maximum: /\b(?:max|maxi|maximum|au plus)\b/i.test(apres)
+          || /\b(?:max|maxi|maximum|au plus)\s*$/i.test(avant),
         origine: "ordonnance",
         sourceText: texte,
         aVerifier: false,
       });
     }
   }
-  return resultats;
+  return marquerDosesPratiquesIncoherentes(resultats);
 }
 
 function cleSubstance(value: string): string {

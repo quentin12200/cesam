@@ -166,6 +166,12 @@ export async function creerOrdonnanceAvecMedicaments(
   finale: OrdonnanceValidationInput,
   pages: string[],
 ): Promise<{ ordonnanceId: string; medicamentIds: string[] }> {
+  if (finale.medicaments.some((med) => med.dosesPratiques?.some((dose) => dose.aVerifier))) {
+    throw new OrdonnanceValidationError(
+      "DOSE_A_VERIFIER",
+      "Corrigez la posologie signalée avant de valider l'ordonnance.",
+    );
+  }
   const resolus = [];
   for (const med of finale.medicaments) {
     resolus.push({ med, ...(await resoudreMedicament(tx, med)) });

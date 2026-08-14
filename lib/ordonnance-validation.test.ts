@@ -161,6 +161,31 @@ test("conserve plusieurs consignes pratiques dans la liaison ordonnance medicame
   assert.deepEqual(JSON.parse(String(state.liens[0].evidenceJson)).dosesPratiques, dosesPratiques);
 });
 
+test("refuse la validation tant qu une posologie pratique est a verifier", async () => {
+  const { state, tx } = creerMemoire();
+  const med = medicamentInput({
+    dosesPratiques: [{
+      categorieAnimaux: "Veaux",
+      doseValue: "10",
+      doseUnit: "ml",
+      poidsMinKg: "40",
+      poidsMaxKg: "50",
+      frequence: "par jour",
+      maximum: true,
+      origine: "ordonnance",
+      sourceText: "10 ml maximum pour adultes ; 2 ml pour 40 à 50 kg pour veaux",
+      aVerifier: true,
+    }],
+  });
+
+  await assert.rejects(
+    creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([med]), ["doc.jpg"]),
+    (error: unknown) => error instanceof OrdonnanceValidationError && error.code === "DOSE_A_VERIFIER",
+  );
+  assert.equal(state.ordonnances.length, 0);
+  assert.equal(state.liens.length, 0);
+});
+
 test("cree une seule ordonnance et plusieurs liaisons", async () => {
   const { state, tx } = creerMemoire();
   const second = medicamentInput({
