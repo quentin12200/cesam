@@ -79,6 +79,7 @@ async function fieldEntriesForSession(
     });
     return {
       id: pesee.id,
+      animalId: pesee.animalId,
       nutrav: pesee.animal.nutrav,
       mereNutrav: pesee.animal.mere?.nutrav ?? null,
       birthDate: pesee.animal.danais.toISOString(),

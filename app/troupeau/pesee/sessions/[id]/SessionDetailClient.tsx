@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Scale } from "lucide-react";
+import { ArrowLeft, Check, LogOut, Scale } from "lucide-react";
 import type { WeighingSessionHistoryDetail } from "@/lib/weighing-session-history";
 import { statusLabel } from "@/lib/weighing-session-history";
 import { isHistorySessionReadOnly } from "@/lib/weighing-session-history";
@@ -80,6 +80,15 @@ export default function SessionDetailClient({ initialSession }: { initialSession
       <button type="button" onClick={() => setSimulationOpen(true)} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-md border-2 border-black bg-white px-4 font-bold">
         <Scale size={20} /> {groups.length > 0 ? "Ouvrir la simulation enregistrée" : "Créer une simulation à partir de cette séance"}
       </button>
+
+      {entries.length > 0 && (
+        <Link
+          href={`/troupeau/pesee/sessions/${initialSession.id}/vente`}
+          className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-green-700 px-4 font-bold text-white"
+        >
+          <LogOut size={20} /> Vendre / sortir des animaux
+        </Link>
+      )}
 
       <section className="mt-6">
         <h2 className="border-b-2 border-black pb-2 text-xl font-bold">Animaux pesés</h2>

@@ -3,6 +3,7 @@ import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { uniqueAnimalIds } from "@/lib/grouped-sale";
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,7 +62,96 @@ export async function POST(request: NextRequest) {
       prixKgVif,
       poidsCarcasse,
       prixKgCarcasse,
+      animalIds,
+      animalWeights,
     } = body;
+
+    const groupedAnimalIds = uniqueAnimalIds(animalIds);
+
+    if (groupedAnimalIds.length > 0) {
+      if (!date || !type || !["ELEVAGE", "BOUCHERIE"].includes(type)) {
+        return NextResponse.json({ error: "Date et type de vente requis" }, { status: 400 });
+      }
+
+      const animals = await prisma.animal.findMany({
+        where: { id: { in: groupedAnimalIds }, statut: "ACTIF" },
+        select: { id: true, nutrav: true, nobovi: true, sexbov: true, categorie: true },
+      });
+      if (animals.length !== groupedAnimalIds.length) {
+        return NextResponse.json({ error: "Un animal sélectionné est introuvable ou déjà sorti" }, { status: 409 });
+      }
+
+      if (type === "BOUCHERIE" && !confirmeAttente) {
+        const traitementsRecents = await prisma.traitement.findMany({
+          where: { animalId: { in: groupedAnimalIds }, dateDebut: { gte: subDays(new Date(), 90) } },
+          include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
+        });
+        if (traitementsRecents.some((traitement) => getAttenteInfoForTraitement(traitement).enAttenteViande)) {
+          return NextResponse.json(
+            { error: "Au moins un animal est encore en délai d'attente viande." },
+            { status: 409 },
+          );
+        }
+      }
+
+      const weightByAnimal = animalWeights && typeof animalWeights === "object"
+        ? animalWeights as Record<string, unknown>
+        : {};
+      const prixKiloCommun = prixKilo != null ? Number(prixKilo) : null;
+      const sorties = await prisma.$transaction(async (tx) => Promise.all(animals.map(async (animal) => {
+        const poidsAnimalValue = weightByAnimal[animal.id];
+        const poidsAnimal = poidsAnimalValue !== null && poidsAnimalValue !== undefined && poidsAnimalValue !== ""
+          ? Number(poidsAnimalValue)
+          : null;
+        if (poidsAnimal !== null && !Number.isFinite(poidsAnimal)) throw new Error("Poids invalide");
+        const prixPrevuAnimal = prixKiloCommun !== null && poidsAnimal !== null
+          ? Math.round(prixKiloCommun * poidsAnimal * 100) / 100
+          : null;
+        const categorie = (animal.categorie ?? "").toUpperCase();
+        const categorieAnimal = categorie.includes("GENISSE")
+          ? "GENISSE"
+          : categorie.includes("VELLE") || categorie.includes("VEAU")
+            ? "VEAU"
+            : categorie.includes("TAUREAU")
+              ? "TAUREAU"
+              : categorie.includes("VACHE")
+                ? "VACHE"
+                : animal.sexbov === "F" ? "VACHE" : "VEAU";
+        const sortie = await tx.sortie.create({
+          data: {
+            animalId: animal.id,
+            date: new Date(date),
+            type,
+            categorieSortie: categorieAnimal,
+            sexeSortie: animal.sexbov === "M" ? "M" : "F",
+            modeVente: modeVente ?? null,
+            acheteur: acheteur ?? null,
+            prixKilo: prixKiloCommun,
+            poids: poidsAnimal,
+            poidsVifVente: modeVente === "VIF" ? poidsAnimal : null,
+            prixKgVif: modeVente === "VIF" ? prixKiloCommun : null,
+            poidsCarcasse: modeVente === "CARCASSE" ? poidsAnimal : null,
+            prixKgCarcasse: modeVente === "CARCASSE" ? prixKiloCommun : null,
+            prixPrevuHT: prixPrevuAnimal,
+            notes: notes ?? null,
+            updatedAt: new Date(),
+          },
+        });
+        await tx.animal.update({ where: { id: animal.id }, data: { statut: "SORTI", updatedAt: new Date() } });
+        return sortie;
+      })));
+
+      const desc = `Vente groupée : ${sorties.length} animaux`;
+      let undoId = "";
+      try {
+        undoId = await logAction("CREATE_SORTIE", desc, [
+          ...sorties.map((sortie) => ({ op: "delete" as const, model: "sortie", id: sortie.id })),
+          ...animals.map((animal) => ({ op: "update" as const, model: "animal", where: { id: animal.id }, data: { statut: "ACTIF" } })),
+        ]);
+      } catch {}
+
+      return NextResponse.json({ sorties, _undoId: undoId, _undoDesc: desc }, { status: 201 });
+    }
 
     if (!animalId || !date || !type) {
       return NextResponse.json(

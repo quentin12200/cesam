@@ -7,6 +7,7 @@ export type PreviousWeight = {
 
 export type FieldSessionEntry = {
   id: string;
+  animalId?: string;
   nutrav: string;
   mereNutrav?: string | null;
   birthDate?: string | null;

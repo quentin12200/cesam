@@ -9,19 +9,22 @@ interface Animal {
   nobovi: string | null;
   sexbov: string;
   categorie: string | null;
+  poidsVif?: number | null;
 }
 
 interface Props {
   animaux: Animal[];
   annee: number;
   initialAnimalId?: string;
+  initialAnimalIds?: string[];
+  returnTo?: string;
 }
 
-export default function SortieForm({ animaux, annee, initialAnimalId }: Props) {
+export default function SortieForm({ animaux, annee, initialAnimalId, initialAnimalIds, returnTo }: Props) {
   const router = useRouter();
 
   function fermer() {
-    router.push(`/finances?annee=${annee}`);
+    router.push(returnTo ?? `/finances?annee=${annee}`);
   }
 
   async function enregistrer(values: SortieEditorValues) {
@@ -42,9 +45,11 @@ export default function SortieForm({ animaux, annee, initialAnimalId }: Props) {
 
   return (
     <SortieEditorModal
-      title="Enregistrer une sortie"
+      title={initialAnimalIds ? "Vendre / sortir des animaux" : "Enregistrer une sortie"}
       animalLabel={animalSelectionne ? `${animalSelectionne.nutrav} — ${animalSelectionne.nobovi ?? "Sans nom"}` : undefined}
       animals={animaux}
+      initialAnimalIds={initialAnimalIds}
+      submitLabel={initialAnimalIds ? "Enregistrer la vente groupée" : undefined}
       initial={{
         animalId: initialAnimalId,
         date: new Date().toISOString().slice(0, 10),
