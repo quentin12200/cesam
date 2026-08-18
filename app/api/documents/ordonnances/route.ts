@@ -2,6 +2,10 @@ import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedEmail } from "@/lib/cesam-auth";
 import { getAdminStorageBucket } from "@/lib/firebase-admin";
+import {
+  logOrdonnanceScanFailure,
+  ordonnanceScanUserMessage,
+} from "@/lib/ordonnance-scan-diagnostics";
 
 const EXTRACTIONS_PREFIX = "ordonnances/extractions/";
 const ALLOWED_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
@@ -56,8 +60,11 @@ export async function POST(request: NextRequest) {
     const documentUrl = `/api/documents/ordonnances?path=${encodeURIComponent(path)}`;
     return NextResponse.json({ documentUrl }, { status: 201 });
   } catch (error) {
-    console.error("Upload ordonnance:", error);
-    return NextResponse.json({ error: "Le document n'a pas pu Ãªtre enregistrÃ©" }, { status: 500 });
+    logOrdonnanceScanFailure("document", error);
+    return NextResponse.json(
+      { error: ordonnanceScanUserMessage("document"), stage: "document" },
+      { status: 500 },
+    );
   }
 }
 

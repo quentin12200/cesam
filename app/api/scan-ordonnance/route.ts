@@ -5,6 +5,11 @@ import type { PropositionOrdonnance } from "@/lib/ordonnance-types";
 import { normaliserAnalyseOrdonnance, type MedicamentCandidat } from "@/lib/ordonnance-extraction";
 import { chargerCandidatsOrdonnance } from "@/lib/ordonnance-medication-candidates";
 import { appliquerTranscriptionParBlocs } from "@/lib/ordonnance-transcription";
+import {
+  logOrdonnanceScanFailure,
+  ordonnanceScanUserMessage,
+  type OrdonnanceScanStage,
+} from "@/lib/ordonnance-scan-diagnostics";
 
 export const maxDuration = 60;
 
@@ -167,6 +172,13 @@ interface ImageEntree {
   mimeType: string;
 }
 
+function failureResponse(stage: OrdonnanceScanStage, status = 500) {
+  return NextResponse.json(
+    { error: ordonnanceScanUserMessage(stage), stage },
+    { status },
+  );
+}
+
 function construireResultat(
   parsed: Record<string, unknown> | null | undefined,
   raw: string,
@@ -207,8 +219,9 @@ export async function POST(req: NextRequest) {
   let body: { images?: ImageEntree[]; image?: string; mimeType?: string };
   try {
     body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Corps de requete invalide" }, { status: 400 });
+  } catch (error) {
+    logOrdonnanceScanFailure("document", error);
+    return failureResponse("document", 400);
   }
   const images: ImageEntree[] = Array.isArray(body.images) && body.images.length > 0
     ? body.images.filter((image) => image && typeof image.data === "string" && image.data.length > 0)
@@ -216,45 +229,83 @@ export async function POST(req: NextRequest) {
       ? [{ data: body.image, mimeType: body.mimeType ?? "image/jpeg" }]
       : [];
   if (images.length === 0) {
-    return NextResponse.json({ error: "Aucune image fournie" }, { status: 400 });
+    logOrdonnanceScanFailure("document", new Error("Aucune image fournie"));
+    return failureResponse("document", 400);
   }
 
-  const response = await fetch(OPENAI_API_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 5000,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: [
-            ...images.map((image) => ({
-              type: "image_url" as const,
-              image_url: { url: `data:${image.mimeType};base64,${image.data}`, detail: "auto" as const },
-            })),
-            { type: "text", text: "Analyse toutes les pages de cette ordonnance." },
-          ],
-        },
-      ],
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(OPENAI_API_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 5000,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: [
+              ...images.map((image) => ({
+                type: "image_url" as const,
+                image_url: { url: `data:${image.mimeType};base64,${image.data}`, detail: "auto" as const },
+              })),
+              { type: "text", text: "Analyse toutes les pages de cette ordonnance." },
+            ],
+          },
+        ],
+      }),
+    });
+  } catch (error) {
+    logOrdonnanceScanFailure("openai_call", error);
+    return failureResponse("openai_call", 502);
+  }
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error("OpenAI API error:", response.status, errorText);
-    return NextResponse.json({ error: `Erreur d'analyse (${response.status})` }, { status: 502 });
+    logOrdonnanceScanFailure("openai_response", new Error(`Réponse HTTP ${response.status}`), {
+      httpStatus: response.status,
+    });
+    return failureResponse("openai_response", 502);
   }
 
-  const data = await response.json();
-  const raw: string = data.choices?.[0]?.message?.content ?? "";
-  const candidats = await chargerCandidatsOrdonnance((args) => prisma.medicament.findMany(args));
+  let data: Record<string, unknown>;
   try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return NextResponse.json(construireResultat(parsed, raw, candidats));
+    data = await response.json() as Record<string, unknown>;
+  } catch (error) {
+    logOrdonnanceScanFailure("openai_response", error);
+    return failureResponse("openai_response", 502);
+  }
+  const choices = Array.isArray(data.choices) ? data.choices : [];
+  const premierChoix = choices[0] && typeof choices[0] === "object"
+    ? choices[0] as Record<string, unknown> : {};
+  const message = premierChoix.message && typeof premierChoix.message === "object"
+    ? premierChoix.message as Record<string, unknown> : {};
+  const raw = typeof message.content === "string" ? message.content : "";
+  if (!raw) {
+    logOrdonnanceScanFailure("openai_response", new Error("Réponse OpenAI sans contenu"));
+    return failureResponse("openai_response", 502);
+  }
+
+  let candidats: MedicamentCandidat[];
+  try {
+    candidats = await chargerCandidatsOrdonnance((args) => prisma.medicament.findMany(args));
+  } catch (error) {
+    logOrdonnanceScanFailure("pharmacy_candidates", error);
+    return failureResponse("pharmacy_candidates");
+  }
+
+  let parsed: Record<string, unknown> = {};
+  let jsonParseFailed = false;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    return NextResponse.json(construireResultat({}, raw, candidats));
+    jsonParseFailed = true;
+  }
+  try {
+    return NextResponse.json(construireResultat(parsed, raw, candidats));
+  } catch (error) {
+    logOrdonnanceScanFailure("transcription", error, { jsonParseFailed });
+    return failureResponse("transcription");
   }
 }
