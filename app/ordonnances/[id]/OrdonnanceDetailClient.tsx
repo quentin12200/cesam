@@ -3,12 +3,21 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Save, ScanLine, Loader2, RefreshCw, Camera, CheckCircle2, AlertCircle, FileText } from "lucide-react";
+import { Save, ScanLine, Loader2, RefreshCw, Camera, CheckCircle2, AlertCircle, FileText, ExternalLink, Pencil } from "lucide-react";
 import { fileToDocumentDataUrl } from "@/lib/image-client";
 import { uploadDataUrlToStorage } from "@/lib/firebase-client";
 import { formatDate } from "@/lib/utils";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
+import {
+  formaterPresentationCompacte,
+  formaterRenouvellementUtile,
+  formaterRythme,
+} from "@/lib/ordonnance-display";
+import {
+  formaterVoiesConsultation,
+  lignesDosePratiqueConsultation,
+} from "@/lib/ordonnance-consultation";
 
 interface OrdonnanceData {
   id: string;
@@ -35,6 +44,7 @@ interface OrdonnanceData {
   statut: string;
   notes: string | null;
   photoUrl: string | null;
+  photoUrls: string[];
 }
 
 interface LinkedTraitement {
@@ -58,11 +68,27 @@ interface LinkedMedication {
   nomExtrait: string;
   nomPharmacie: string;
   categorie: string;
+  substanceActive: string | null;
+  concentration: string | null;
+  formePharmaceutique: string | null;
+  conditionnement: string | null;
   posologieExtraite: string | null;
+  dose: number | null;
+  uniteDosage: string | null;
+  referenceValue: number | null;
+  referenceUnit: string | null;
+  normalizedDoseValue: number | null;
+  normalizedDoseUnit: string | null;
   voieExtraite: string | null;
   dureeExtraite: number | null;
+  administrationCount: number | null;
+  administrationIntervalHours: number | null;
+  repeatCondition: string | null;
+  administrationInstructions: string | null;
   delaiAttenteViande: number | null;
+  delaiAttenteAbats: number | null;
   delaiAttenteLait: number | null;
+  precautions: string | null;
   statutCorrespondance: string;
 }
 
@@ -107,12 +133,14 @@ export default function OrdonnanceDetailClient({
   const [photoUrl, setPhotoUrl] = useState(ordonnance.photoUrl);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [replacing, setReplacing] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeResult, setReanalyzeResult] = useState<Extracted | null>(null);
   const [error, setError] = useState("");
-
-  const isPdf = photoUrl?.includes(".pdf");
+  const documentUrlsAffiches = photoUrl && !ordonnance.photoUrls.includes(photoUrl)
+    ? [photoUrl]
+    : ordonnance.photoUrls;
 
   async function save() {
     setSaving(true);
@@ -130,6 +158,7 @@ export default function OrdonnanceDetailClient({
       });
       if (completeToOrigin("✓ Ordonnance enregistrée !")) return;
       setSaved(true);
+      setEditing(false);
       router.refresh();
     } finally {
       setSaving(false);
@@ -229,47 +258,62 @@ export default function OrdonnanceDetailClient({
 
   return (
     <div className="space-y-4">
-      {/* Document */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">Document original</h3>
-        {photoUrl ? (
-          isPdf ? (
-            <a href={photoUrl} target="_blank" rel="noreferrer"
-              className="flex items-center gap-2 text-blue-600 text-sm bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 hover:bg-blue-100">
-              <FileText size={16} /> Ouvrir le PDF
-            </a>
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photoUrl} alt="Ordonnance" className="max-h-80 rounded-lg border border-gray-200 mx-auto" />
-          )
-        ) : (
-          <div className="text-center py-6 text-gray-400 text-sm">Aucun document conservé</div>
-        )}
-
-        <div className="flex flex-wrap gap-2 mt-3">
+      <section className="rounded-xl bg-white p-4 shadow">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-lg font-bold text-gray-900">Ordonnance du {formatDate(new Date(ordonnance.date))}</p>
+            {ordonnance.numero && <p className="mt-0.5 text-sm text-gray-600">n°{ordonnance.numero}</p>}
+            {ordonnance.veterinaireNom && <p className="mt-1 text-sm text-gray-600">{ordonnance.veterinaireNom}</p>}
+          </div>
           <button
             type="button"
-            onClick={() => replaceRef.current?.click()}
-            disabled={replacing}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+            onClick={() => setEditing((value) => !value)}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
-            {replacing ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
-            {photoUrl ? "Remplacer le document" : "Ajouter un document"}
+            <Pencil size={14} /> {editing ? "Fermer" : "Modifier"}
           </button>
-          <input ref={replaceRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleReplace} />
+        </div>
 
-          {photoUrl && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {documentUrlsAffiches.length > 0 ? documentUrlsAffiches.map((url, index) => (
+            <a
+              key={url}
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700 hover:bg-blue-100"
+            >
+              <FileText size={15} /> Document original{documentUrlsAffiches.length > 1 ? ` · page ${index + 1}` : ""}
+              <ExternalLink size={13} />
+            </a>
+          )) : <p className="text-sm text-gray-400">Aucun document conservé</p>}
+        </div>
+
+        {editing && (
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
             <button
               type="button"
-              onClick={reanalyser}
-              disabled={reanalyzing}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              onClick={() => replaceRef.current?.click()}
+              disabled={replacing}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-50"
             >
-              {reanalyzing ? <Loader2 size={13} className="animate-spin" /> : <ScanLine size={13} />}
-              Réanalyser
+              {replacing ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+              {photoUrl ? "Remplacer le document" : "Ajouter un document"}
             </button>
-          )}
-        </div>
+            <input ref={replaceRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleReplace} />
+            {photoUrl && (
+              <button
+                type="button"
+                onClick={reanalyser}
+                disabled={reanalyzing}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                {reanalyzing ? <Loader2 size={13} className="animate-spin" /> : <ScanLine size={13} />}
+                Réanalyser
+              </button>
+            )}
+          </div>
+        )}
 
         {reanalyzeResult && (
           <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
@@ -283,47 +327,95 @@ export default function OrdonnanceDetailClient({
             </div>
           </div>
         )}
-      </div>
+      </section>
 
       {medicaments.length > 0 && (
         <section className="rounded-xl bg-white p-4 shadow">
           <h3 className="font-semibold text-gray-800">
             {medicaments.length} médicament{medicaments.length > 1 ? "s" : ""}
           </h3>
-          <div className="mt-3 space-y-2">
-            {medicaments.map((medicament) => (
-              <article key={medicament.id} className="rounded-lg border border-gray-200 p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-gray-900">{medicament.nomPharmacie}</p>
-                    {medicament.nomExtrait !== medicament.nomPharmacie && (
-                      <p className="text-xs text-gray-500">Lu sur le document : {medicament.nomExtrait}</p>
-                    )}
-                  </div>
-                  <span className="rounded-full bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-800">
-                    {medicament.statutCorrespondance === "matched" ? "Retrouvé" : "Confirmé manuellement"}
-                  </span>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
-                  {medicament.posologieExtraite && <span>{medicament.posologieExtraite}</span>}
-                  {medicament.voieExtraite && <span>Voie : {medicament.voieExtraite}</span>}
-                  {medicament.dureeExtraite != null && <span>{medicament.dureeExtraite} j</span>}
-                </div>
-                {(medicament.delaiAttenteViande != null || medicament.delaiAttenteLait != null) && (
-                  <p className="mt-2 text-xs text-orange-800">
-                    {medicament.delaiAttenteViande != null && `Viande : ${medicament.delaiAttenteViande} j`}
-                    {medicament.delaiAttenteViande != null && medicament.delaiAttenteLait != null && " · "}
-                    {medicament.delaiAttenteLait != null && `Lait : ${medicament.delaiAttenteLait} j`}
-                  </p>
-                )}
-              </article>
-            ))}
+          <div className="mt-3 space-y-3">
+            {medicaments.map((medicament) => {
+              const presentation = formaterPresentationCompacte(medicament.conditionnement);
+              const dosesPratiques = lignesDosePratiqueConsultation(medicament.posologieExtraite);
+              const voie = formaterVoiesConsultation(medicament.voieExtraite);
+              const rythme = formaterRythme({
+                administrationCount: medicament.administrationCount?.toString() ?? "",
+                administrationInstructions: medicament.administrationInstructions ?? "",
+              });
+              const renouvellement = formaterRenouvellementUtile({
+                administrationIntervalHours: medicament.administrationIntervalHours?.toString() ?? "",
+                repeatCondition: medicament.repeatCondition ?? "",
+              });
+              const delaisViandeAbats = medicament.delaiAttenteViande != null
+                && medicament.delaiAttenteViande === medicament.delaiAttenteAbats;
+
+              return (
+                <article key={medicament.id} className="rounded-lg border border-gray-200 p-3">
+                  <p className="font-bold text-gray-950">{medicament.nomPharmacie}</p>
+                  {presentation && <p className="mt-1 text-sm font-medium text-gray-700">{presentation}</p>}
+                  {voie && <p className="mt-2 text-sm font-semibold text-blue-800">{voie}</p>}
+
+                  {dosesPratiques.length > 0 && (
+                    <div className="mt-2 space-y-1 text-sm font-semibold text-gray-900">
+                      {dosesPratiques.map((dose) => <p key={dose}>{dose}</p>)}
+                    </div>
+                  )}
+
+                  {(rythme || medicament.dureeExtraite != null || renouvellement) && (
+                    <div className="mt-2 space-y-1 text-sm text-gray-700">
+                      {rythme && <p>{rythme}</p>}
+                      {medicament.dureeExtraite != null && (
+                        <p>Pendant {medicament.dureeExtraite} jour{medicament.dureeExtraite > 1 ? "s" : ""}</p>
+                      )}
+                      {renouvellement && <p>{renouvellement}</p>}
+                    </div>
+                  )}
+
+                  {(medicament.delaiAttenteViande != null || medicament.delaiAttenteAbats != null || medicament.delaiAttenteLait != null) && (
+                    <p className="mt-2 text-xs font-medium text-orange-800">
+                      {delaisViandeAbats
+                        ? `Viande/abats : ${medicament.delaiAttenteViande} j`
+                        : [
+                          medicament.delaiAttenteViande != null ? `Viande : ${medicament.delaiAttenteViande} j` : null,
+                          medicament.delaiAttenteAbats != null ? `Abats : ${medicament.delaiAttenteAbats} j` : null,
+                        ].filter(Boolean).join(" · ")}
+                      {(medicament.delaiAttenteViande != null || medicament.delaiAttenteAbats != null)
+                        && medicament.delaiAttenteLait != null && " · "}
+                      {medicament.delaiAttenteLait != null && `Lait : ${medicament.delaiAttenteLait} j`}
+                    </p>
+                  )}
+
+                  <details className="mt-3 border-t border-gray-100 pt-2 text-xs text-gray-600">
+                    <summary className="cursor-pointer font-medium text-gray-600">Voir les détails</summary>
+                    <div className="mt-2 space-y-1">
+                      {medicament.nomExtrait !== medicament.nomPharmacie && <p>Lu sur le document : {medicament.nomExtrait}</p>}
+                      {medicament.categorie && <p>Catégorie : {medicament.categorie}</p>}
+                      {medicament.substanceActive && <p>Substance active : {medicament.substanceActive}</p>}
+                      {medicament.concentration && <p>Concentration : {medicament.concentration}</p>}
+                      {medicament.formePharmaceutique && <p>Forme : {medicament.formePharmaceutique}</p>}
+                      {medicament.dose != null && medicament.uniteDosage && (
+                        <p>Dose enregistrée : {medicament.dose} {medicament.uniteDosage}
+                          {medicament.referenceValue != null && ` / ${medicament.referenceValue} ${medicament.referenceUnit ?? "kg"}`}
+                        </p>
+                      )}
+                      {medicament.normalizedDoseValue != null && medicament.normalizedDoseUnit && (
+                        <p>Dose normalisée : {medicament.normalizedDoseValue} {medicament.normalizedDoseUnit}</p>
+                      )}
+                      {medicament.repeatCondition && !renouvellement && <p>{medicament.repeatCondition}</p>}
+                      {medicament.administrationInstructions && <p>Instructions : {medicament.administrationInstructions}</p>}
+                      {medicament.precautions && <p>Précautions : {medicament.precautions}</p>}
+                    </div>
+                  </details>
+                </article>
+              );
+            })}
           </div>
         </section>
       )}
 
       {/* Champs éditables historiques, conservés pour compatibilité */}
-      <div className="bg-white rounded-xl shadow p-4 space-y-3">
+      {editing && <div className="bg-white rounded-xl shadow p-4 space-y-3">
         <h3 className="font-semibold text-gray-800">Informations</h3>
 
         <div className="grid grid-cols-2 gap-3">
@@ -442,7 +534,7 @@ export default function OrdonnanceDetailClient({
             },
           ]} />
         </div>
-      </div>
+      </div>}
 
       {/* Traitements / vaccinations liés */}
       <div className="bg-white rounded-xl shadow p-4">

@@ -7,6 +7,7 @@ import {
   formaterDoseCompacte,
   formaterPresentationCompacte,
   formaterRenouvellement,
+  formaterRenouvellementUtile,
   formaterRythme,
   formaterVoie,
   normaliserConditionnementExtrait,
@@ -30,6 +31,12 @@ test("conserve une presentation sans inventer de quantite", () => {
 test("affiche la presentation et la quantite sans doublon", () => {
   assert.equal(formaterPresentationCompacte("1 flacon de 100 ml"), "Flacon 100 ml · Qté 1");
   assert.equal(formaterPresentationCompacte("Flacon 250 ml"), "Flacon 250 ml");
+});
+
+test("interprete BT 5 D comme un conditionnement sans inventer de volume", () => {
+  assert.equal(formaterPresentationCompacte("BT 5 D."), "Boîte de 5 doses");
+  assert.equal(formaterPresentationCompacte("BT 5 D. de 2 ml"), "Boîte de 5 doses de 2 ml");
+  assert.doesNotMatch(formaterPresentationCompacte("BT 5 D.") ?? "", /5 ml/i);
 });
 
 test("ne transforme jamais un volume initial en quantite delivree", () => {
@@ -169,6 +176,17 @@ test("affiche clairement un renouvellement interdit", () => {
     administrationIntervalHours: "",
     repeatCondition: "renouvellement interdit",
   }), "Renouvellement interdit");
+});
+
+test("masque un renouvellement interdit uniquement dans la consultation compacte", () => {
+  assert.equal(formaterRenouvellementUtile({
+    administrationIntervalHours: "",
+    repeatCondition: "renouvellement interdit",
+  }), null);
+  assert.equal(formaterRenouvellementUtile({
+    administrationIntervalHours: "72",
+    repeatCondition: "si nécessaire",
+  }), "Renouvelable après 72 h si nécessaire");
 });
 
 test("retire la dose pharmacologique du renouvellement", () => {

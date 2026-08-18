@@ -135,6 +135,16 @@ export function analyserPresentation(value: string | null | undefined): Presenta
 }
 
 export function formaterPresentationCompacte(value: string | null | undefined): string | null {
+  const boiteDoses = value?.trim().match(
+    /^(?:bt|bo[iî]te)\.?\s+(\d+)\s*d(?:\.|oses?)?(?:\s+de\s+(\d+(?:[.,]\d+)?)\s*(ml|cl|l))?\.?$/i,
+  );
+  if (boiteDoses) {
+    const volumeDose = boiteDoses[2]
+      ? ` de ${boiteDoses[2].replace(",", ".")} ${boiteDoses[3].toLowerCase()}`
+      : "";
+    return `Boîte de ${boiteDoses[1]} doses${volumeDose}`;
+  }
+
   const { presentation, quantite } = analyserPresentation(value);
   const libelle = presentation
     ?.replace(/^(flacons?|a[ée]rosols?|ampoules?|bo[iî]tes?)\s+de\s+(?=\d)/i, "$1 ")
@@ -279,6 +289,16 @@ export function formaterRenouvellement(med: {
       : `Renouvelable après ${med.administrationIntervalHours} h`;
   }
   return condition || null;
+}
+
+export function formaterRenouvellementUtile(med: {
+  administrationIntervalHours: string;
+  repeatCondition: string;
+}): string | null {
+  const renouvellement = formaterRenouvellement(med);
+  return renouvellement && sansAccents(renouvellement).toLowerCase() !== "renouvellement interdit"
+    ? renouvellement
+    : null;
 }
 
 export function normaliserConditionRenouvellement(value: string | null | undefined): string {
