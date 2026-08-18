@@ -3,15 +3,19 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { FileText } from "lucide-react";
 import OrdonnancesClient, { type ExtractionAVerifierItem, type OrdonnanceItem } from "./OrdonnancesClient";
+import { ordonnanceSourceKey, regrouperOrdonnancesPourListe } from "@/lib/ordonnance-list";
 
 import BackButton from "@/app/components/BackButton";
 async function getOrdonnances(): Promise<OrdonnanceItem[]> {
   const rows = await prisma.ordonnance.findMany({
     orderBy: { date: "desc" },
     take: 200,
-    include: { medicaments: { select: { nomExtrait: true }, orderBy: { createdAt: "asc" } } },
+    include: {
+      extraction: { select: { id: true } },
+      medicaments: { select: { nomExtrait: true }, orderBy: { createdAt: "asc" } },
+    },
   });
-  return rows.map((o) => ({
+  return regrouperOrdonnancesPourListe(rows.map((o) => ({
     id: o.id,
     date: o.date.toISOString(),
     numero: o.numero,
@@ -29,8 +33,15 @@ async function getOrdonnances(): Promise<OrdonnanceItem[]> {
     statut: o.statut,
     notes: o.notes,
     photoUrl: o.photoUrl,
+    extractionId: o.extraction?.id,
+    sourceKey: ordonnanceSourceKey({
+      id: o.id,
+      extractionId: o.extraction?.id,
+      photoUrl: o.photoUrl,
+      photoUrls: o.photoUrls,
+    }),
     medicaments: o.medicaments,
-  }));
+  })));
 }
 
 async function getExtractionsAVerifier(): Promise<ExtractionAVerifierItem[]> {

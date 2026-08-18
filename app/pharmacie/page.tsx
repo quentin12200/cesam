@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Pill, Printer } from "lucide-react";
 import PharmacieClient, { type MedicamentItem } from "./PharmacieClient";
 import { type OrdonnanceItem } from "@/app/ordonnances/OrdonnancesClient";
+import { ordonnanceSourceKey, regrouperOrdonnancesPourListe } from "@/lib/ordonnance-list";
 
 import BackButton from "@/app/components/BackButton";
 import SanitaireTabs from "@/components/SanitaireTabs";
@@ -39,7 +40,10 @@ async function getData() {
     prisma.ordonnance.findMany({
       orderBy: { date: "desc" },
       take: 200,
-      include: { medicaments: { select: { nomExtrait: true }, orderBy: { createdAt: "asc" } } },
+      include: {
+        extraction: { select: { id: true } },
+        medicaments: { select: { nomExtrait: true }, orderBy: { createdAt: "asc" } },
+      },
     }),
   ]);
 
@@ -64,7 +68,7 @@ async function getData() {
     preconisations: m.preconisations,
   }));
 
-  const ordonnanceItems: OrdonnanceItem[] = ordonnancesRaw.map((o) => ({
+  const ordonnanceItems: OrdonnanceItem[] = regrouperOrdonnancesPourListe(ordonnancesRaw.map((o) => ({
     id: o.id,
     date: o.date.toISOString(),
     numero: o.numero,
@@ -82,8 +86,15 @@ async function getData() {
     statut: o.statut,
     notes: o.notes,
     photoUrl: o.photoUrl,
+    extractionId: o.extraction?.id,
+    sourceKey: ordonnanceSourceKey({
+      id: o.id,
+      extractionId: o.extraction?.id,
+      photoUrl: o.photoUrl,
+      photoUrls: o.photoUrls,
+    }),
     medicaments: o.medicaments,
-  }));
+  })));
 
   return { medicamentItems, ordonnanceItems };
 }

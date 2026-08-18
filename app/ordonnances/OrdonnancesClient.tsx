@@ -222,33 +222,35 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
             )}
           </div>
 
-          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+          <div className="mt-1.5">
             {ord.medicaments && ord.medicaments.length > 0 ? (
-              <>
-                <span className="text-xs font-semibold text-gray-500">
+              <div>
+                <div className="text-xs font-semibold text-gray-500">
                   {ord.medicaments.length} médicament{ord.medicaments.length > 1 ? "s" : ""}
-                </span>
-                {ord.medicaments.map((medicament, index) => (
-                  <span key={`${medicament.nomExtrait}-${index}`} className="rounded bg-gray-100 px-1.5 py-0.5 text-sm font-semibold text-gray-900">
-                    {medicament.nomExtrait}
-                  </span>
-                ))}
-              </>
+                </div>
+                <div className="mt-1 space-y-0.5">
+                  {ord.medicaments.map((medicament, index) => (
+                    <div key={`${medicament.nomExtrait}-${index}`} className="text-sm font-semibold text-gray-900">
+                      {medicament.nomExtrait}
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
               <span className="text-sm font-semibold text-gray-900">{ord.medicamentNom || "—"}</span>
             )}
-            {(!ord.medicaments || ord.medicaments.length <= 1) && ord.voie && (
-              <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{ord.voie}</span>
-            )}
-            {(!ord.medicaments || ord.medicaments.length <= 1) && ord.dose != null && (
-              <span className="text-xs text-gray-500">
-                {ord.dose} {ord.uniteDosage ?? "ml"}
-                {ord.referenceValue != null && ` / ${ord.referenceValue} ${ord.referenceUnit ?? "kg"}`}
-                {ord.referenceType === "live_weight" && " de poids vif"}
-              </span>
-            )}
-            {(!ord.medicaments || ord.medicaments.length <= 1) && ord.dureeJours && (
-              <span className="text-xs text-gray-400">{ord.dureeJours}j</span>
+            {(!ord.medicaments || ord.medicaments.length <= 1) && (ord.voie || ord.dose != null || ord.dureeJours) && (
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                {ord.voie && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{ord.voie}</span>}
+                {ord.dose != null && (
+                  <span className="text-xs text-gray-500">
+                    {ord.dose} {ord.uniteDosage ?? "ml"}
+                    {ord.referenceValue != null && ` / ${ord.referenceValue} ${ord.referenceUnit ?? "kg"}`}
+                    {ord.referenceType === "live_weight" && " de poids vif"}
+                  </span>
+                )}
+                {ord.dureeJours && <span className="text-xs text-gray-400">{ord.dureeJours}j</span>}
+              </div>
             )}
           </div>
 
