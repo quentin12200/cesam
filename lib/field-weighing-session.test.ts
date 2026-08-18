@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createFieldSession,
   addPendingWeight,
+  canResumeFieldSession,
   canStartNewFieldSession,
   mergeServerEntries,
   parseStoredFieldSession,
@@ -37,6 +38,12 @@ test("interdit une nouvelle séance tant que la séance courante est active", ()
   assert.equal(canStartNewFieldSession("ACTIVE"), false);
   assert.equal(canStartNewFieldSession("FINISHED"), true);
   assert.equal(canStartNewFieldSession("ABANDONED"), true);
+});
+
+test("reprend uniquement une véritable séance active", () => {
+  assert.equal(canResumeFieldSession("ACTIVE"), true);
+  assert.equal(canResumeFieldSession("FINISHED"), false);
+  assert.equal(canResumeFieldSession("ABANDONED"), false);
 });
 
 test("restaure une ancienne structure sans identifiant de séance", () => {

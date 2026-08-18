@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   FormEvent,
   type RefObject,
@@ -29,6 +30,7 @@ import type { FieldAnimalDetails, FieldSessionEntry } from "@/lib/field-weighing
 import { createFieldWeight, deleteFieldWeight, FieldWeightApiError, updateFieldWeight } from "@/lib/field-weighing-api";
 import {
   addPendingWeight,
+  canResumeFieldSession,
   canStartNewFieldSession,
   FIELD_SESSION_STORAGE_KEY,
   parseStoredFieldSession,
@@ -70,6 +72,7 @@ function todayLocal() {
 }
 
 export default function FieldWeighingSession() {
+  const router = useRouter();
   const [session, setSession] = useState<StoredFieldSession | null>(null);
   const [nutrav, setNutrav] = useState("");
   const [poids, setPoids] = useState("");
@@ -100,11 +103,11 @@ export default function FieldWeighingSession() {
           try {
             const known = await getFieldSession(cached.weighingSessionId);
             if (cancelled) return;
-            setSession(sessionFromServer(known, cached));
-            if (known.status !== "ACTIVE") {
-              setSessionMessage("Cette séance a été terminée depuis un autre appareil.");
+            if (canResumeFieldSession(known.status)) {
+              setSession(sessionFromServer(known, cached));
+              return;
             }
-            return;
+            setSessionMessage("La séance précédente est terminée. Une nouvelle séance est prête.");
           } catch (caught) {
             if (cached.entries.length > 0 || cached.pendingWeights.length > 0) {
               setSessionMessage("La référence serveur de cette séance est devenue invalide. Le cache local est conservé sans être écrasé.");
@@ -123,11 +126,12 @@ export default function FieldWeighingSession() {
           }
         }
         const canonical = await getFieldSession(active.id);
-        if (!cancelled) setSession(sessionFromServer(canonical, {
-          ...cached,
-          weighingSessionId: active.id,
-          startedAt: active.startedAt,
-        }));
+        if (!cancelled) {
+          const localSessionForActive = !cached.weighingSessionId
+            ? { ...cached, weighingSessionId: active.id, startedAt: active.startedAt }
+            : undefined;
+          setSession(sessionFromServer(canonical, localSessionForActive));
+        }
       } catch {
         if (!cancelled) {
           setSessionMessage("Mode hors connexion : la séance reste conservée sur cet appareil.");
@@ -472,6 +476,27 @@ export default function FieldWeighingSession() {
     }
   }
 
+  async function sellSession() {
+    const activeSession = session;
+    if (!activeSession?.weighingSessionId || activeSession.entries.length === 0) return;
+    if (activeSession.pendingWeights.length > 0) {
+      setError("Attendez la synchronisation des pesées avant de vendre les animaux.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await saveFieldSessionMetadata(activeSession);
+      if (canResumeFieldSession(activeSession.status)) {
+        await transitionFieldSession(activeSession.weighingSessionId, "finish");
+      }
+      router.push(`/troupeau/pesee/sessions/${activeSession.weighingSessionId}/vente`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "La vente groupée ne peut pas être ouverte.");
+      setSaving(false);
+    }
+  }
+
   async function startNewSession() {
     if (!session || !canStartNewFieldSession(session.status)) {
       setError("Terminez ou abandonnez la séance active avant d’en démarrer une nouvelle.");
@@ -673,6 +698,24 @@ export default function FieldWeighingSession() {
           >
             VOIR LE RÉCAPITULATIF · {session.entries.length} PESÉ{session.entries.length > 1 ? "ES" : "E"}
           </button>
+          {session.entries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void sellSession()}
+              disabled={saving || session.pendingWeights.length > 0}
+              className="mt-3 min-h-16 w-full border-4 border-black bg-green-600 px-4 text-xl font-black disabled:bg-neutral-400"
+            >
+              VENDRE / SORTIR DES ANIMAUX
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void finishSession()}
+            disabled={saving || session.status !== "ACTIVE" || session.pendingWeights.length > 0}
+            className="mt-3 min-h-12 w-full border-2 border-black bg-white px-4 text-base font-black disabled:bg-neutral-300"
+          >
+            TERMINER LA SÉANCE
+          </button>
         </main>
       ) : (
         <main className="mx-auto max-w-3xl px-3 py-5 pb-24">
@@ -698,6 +741,17 @@ export default function FieldWeighingSession() {
           >
             SIMULER UN PRIX DE VENTE
           </button>
+
+          {session.entries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void sellSession()}
+              disabled={saving || session.pendingWeights.length > 0}
+              className="mt-3 min-h-16 w-full border-4 border-black bg-black px-4 text-xl font-black text-white disabled:bg-neutral-400"
+            >
+              VENDRE / SORTIR DES ANIMAUX
+            </button>
+          )}
 
           {error && !editingInSummary && (
             <div role="alert" className="mt-4 border-4 border-red-700 bg-red-100 p-4 text-lg font-black text-red-900">

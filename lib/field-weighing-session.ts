@@ -41,6 +41,10 @@ export function canStartNewFieldSession(status: StoredFieldSession["status"]): b
   return status === "FINISHED" || status === "ABANDONED";
 }
 
+export function canResumeFieldSession(status: StoredFieldSession["status"]): boolean {
+  return status === "ACTIVE";
+}
+
 function parsePendingWeight(value: unknown): PendingFieldWeight | null {
   if (!value || typeof value !== "object") return null;
   const pending = value as Partial<PendingFieldWeight>;
