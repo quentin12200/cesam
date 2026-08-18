@@ -8,6 +8,7 @@ import BackButton from "@/app/components/BackButton";
 import WeaningDryOffPanel from "@/app/components/WeaningDryOffPanel";
 import { getWeaningDryOffCandidates } from "@/lib/weaning-dry-off-data";
 import { resolveCalfMother } from "@/lib/weaning-dry-off";
+import { formatWeaningAgeDays } from "@/lib/weaning-age-display";
 // Page sans segment dynamique ni searchParams : sans cette directive, Next.js
 // la fige en HTML statique au moment du build et ne reflète plus les
 // évolutions de la base tant qu'un nouveau déploiement n'a pas lieu.
@@ -148,7 +149,7 @@ export default async function SevragePage() {
         </div>
         <div className="bg-white rounded-xl shadow p-4 text-center">
           <div className="text-2xl font-bold text-orange-700">
-            {ageMoyenJours !== null ? `${ageMoyenJours} j` : "—"}
+            {ageMoyenJours !== null ? formatWeaningAgeDays(ageMoyenJours) : "—"}
           </div>
           <div className="text-xs text-gray-500 mt-1">âge moyen au sevrage</div>
         </div>
