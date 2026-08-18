@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, ScanLine, Loader2, Archive, FileText, Save, X, Camera, ClipboardCheck } from "lucide-react";
 import { scanAndCreateExtraction, type OrdonnanceExtracted } from "@/lib/scan-ordonnance-client";
+import { ajouterPagesOrdonnance, supprimerPageOrdonnance } from "@/lib/ordonnance-scan-pages";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
@@ -286,6 +287,7 @@ export default function OrdonnancesClient({
   const [scanError, setScanError] = useState("");
   const [showArchives, setShowArchives] = useState(false);
   const [deletingExtractionId, setDeletingExtractionId] = useState<string | null>(null);
+  const [scanPages, setScanPages] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function supprimerExtraction(id: string) {
@@ -303,14 +305,21 @@ export default function OrdonnancesClient({
     }
   }
 
-  async function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
     e.target.value = "";
+    setScanPages((pages) => ajouterPagesOrdonnance(pages, files));
+    setScanError("");
+  }
+
+  async function analyserPages() {
+    if (scanPages.length === 0) return;
     setScanning(true);
     setScanError("");
     try {
-      const { extractionId } = await scanAndCreateExtraction(files);
+      const { extractionId } = await scanAndCreateExtraction(scanPages);
+      setScanPages([]);
       router.push(hrefWithOrigin(`/ordonnances/a-verifier/${extractionId}`));
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "L’analyse du document a échoué");
@@ -326,15 +335,15 @@ export default function OrdonnancesClient({
     <div>
       {/* Action bar */}
       <div className="flex items-center gap-2 mb-4">
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={scanning}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border border-blue-200 text-blue-600 rounded-xl hover:bg-blue-50 disabled:opacity-50 shadow-sm"
-        >
-          {scanning ? <Loader2 size={15} className="animate-spin" /> : <ScanLine size={15} />}
-          {scanning ? "Scan…" : "Scanner ordonnance"}
-        </button>
-        <span className="text-[11px] text-gray-400 hidden sm:inline">Plusieurs photos possibles</span>
+        {scanPages.length === 0 && (
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={scanning}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border border-blue-200 text-blue-600 rounded-xl hover:bg-blue-50 disabled:opacity-50 shadow-sm"
+          >
+            <ScanLine size={15} /> Ajouter une première page
+          </button>
+        )}
         <button
           onClick={() => setShowForm((v) => !v)}
           className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-sm"
@@ -348,6 +357,67 @@ export default function OrdonnancesClient({
         <OrdonnanceForm
           onClose={() => setShowForm(false)}
         />
+      )}
+
+      {scanPages.length > 0 && (
+        <section className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3" aria-label="Pages de l’ordonnance">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-blue-900">
+                {scanPages.length} page{scanPages.length > 1 ? "s" : ""} sélectionnée{scanPages.length > 1 ? "s" : ""}
+              </h3>
+              <p className="text-xs text-blue-700">Les pages seront analysées ensemble, dans cet ordre.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setScanPages([])}
+              disabled={scanning}
+              className="shrink-0 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
+            >
+              Annuler
+            </button>
+          </div>
+
+          <ol className="space-y-2">
+            {scanPages.map((file, index) => (
+              <li key={`${file.name}-${file.lastModified}-${index}`} className="flex min-w-0 items-center gap-3 rounded-lg border border-blue-100 bg-white px-3 py-2">
+                <span className="shrink-0 rounded-md bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">
+                  Page {index + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setScanPages((pages) => supprimerPageOrdonnance(pages, index))}
+                  disabled={scanning}
+                  aria-label={`Supprimer la page ${index + 1}`}
+                  className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                >
+                  <X size={16} />
+                </button>
+              </li>
+            ))}
+          </ol>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={scanning}
+              className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+            >
+              <Plus size={15} /> Ajouter une page
+            </button>
+            <button
+              type="button"
+              onClick={analyserPages}
+              disabled={scanning || scanPages.length === 0}
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {scanning ? <Loader2 size={15} className="animate-spin" /> : <ScanLine size={15} />}
+              {scanning ? "Analyse…" : "Analyser l’ordonnance"}
+            </button>
+          </div>
+        </section>
       )}
 
       {scanError && (
