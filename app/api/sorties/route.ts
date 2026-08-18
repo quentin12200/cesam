@@ -64,6 +64,8 @@ export async function POST(request: NextRequest) {
       prixKgCarcasse,
       animalIds,
       animalWeights,
+      animalPrices,
+      simulationId,
     } = body;
 
     const groupedAnimalIds = uniqueAnimalIds(animalIds);
@@ -97,15 +99,24 @@ export async function POST(request: NextRequest) {
       const weightByAnimal = animalWeights && typeof animalWeights === "object"
         ? animalWeights as Record<string, unknown>
         : {};
+      const priceByAnimal = animalPrices && typeof animalPrices === "object"
+        ? animalPrices as Record<string, unknown>
+        : {};
       const prixKiloCommun = prixKilo != null ? Number(prixKilo) : null;
-      const sorties = await prisma.$transaction(async (tx) => Promise.all(animals.map(async (animal) => {
+      const sorties = await prisma.$transaction(async (tx) => {
+        const created = await Promise.all(animals.map(async (animal) => {
         const poidsAnimalValue = weightByAnimal[animal.id];
         const poidsAnimal = poidsAnimalValue !== null && poidsAnimalValue !== undefined && poidsAnimalValue !== ""
           ? Number(poidsAnimalValue)
           : null;
         if (poidsAnimal !== null && !Number.isFinite(poidsAnimal)) throw new Error("Poids invalide");
-        const prixPrevuAnimal = prixKiloCommun !== null && poidsAnimal !== null
-          ? Math.round(prixKiloCommun * poidsAnimal * 100) / 100
+        const prixAnimalValue = priceByAnimal[animal.id];
+        const prixAnimal = prixAnimalValue !== null && prixAnimalValue !== undefined && prixAnimalValue !== ""
+          ? Number(prixAnimalValue)
+          : prixKiloCommun;
+        if (prixAnimal !== null && !Number.isFinite(prixAnimal)) throw new Error("Prix invalide");
+        const prixPrevuAnimal = prixAnimal !== null && poidsAnimal !== null
+          ? Math.round(prixAnimal * poidsAnimal * 100) / 100
           : null;
         const categorie = (animal.categorie ?? "").toUpperCase();
         const categorieAnimal = categorie.includes("GENISSE")
@@ -126,12 +137,12 @@ export async function POST(request: NextRequest) {
             sexeSortie: animal.sexbov === "M" ? "M" : "F",
             modeVente: modeVente ?? null,
             acheteur: acheteur ?? null,
-            prixKilo: prixKiloCommun,
+            prixKilo: prixAnimal,
             poids: poidsAnimal,
             poidsVifVente: modeVente === "VIF" ? poidsAnimal : null,
-            prixKgVif: modeVente === "VIF" ? prixKiloCommun : null,
+            prixKgVif: modeVente === "VIF" ? prixAnimal : null,
             poidsCarcasse: modeVente === "CARCASSE" ? poidsAnimal : null,
-            prixKgCarcasse: modeVente === "CARCASSE" ? prixKiloCommun : null,
+            prixKgCarcasse: modeVente === "CARCASSE" ? prixAnimal : null,
             prixPrevuHT: prixPrevuAnimal,
             notes: notes ?? null,
             updatedAt: new Date(),
@@ -139,7 +150,12 @@ export async function POST(request: NextRequest) {
         });
         await tx.animal.update({ where: { id: animal.id }, data: { statut: "SORTI", updatedAt: new Date() } });
         return sortie;
-      })));
+        }));
+        if (typeof simulationId === "string" && simulationId) {
+          await tx.saleSimulation.update({ where: { id: simulationId }, data: { statut: "CONFIRMED" } });
+        }
+        return created;
+      });
 
       const desc = `Vente groupée : ${sorties.length} animaux`;
       let undoId = "";

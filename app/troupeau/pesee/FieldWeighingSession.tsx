@@ -735,11 +735,12 @@ export default function FieldWeighingSession() {
             type="button"
             onClick={() => {
               setOpenSummaryRowId(null);
-              setSession({ ...session, simulationOpen: true });
+              if (session.weighingSessionId) router.push(`/troupeau/simulations-vente/nouvelle?sessionId=${session.weighingSessionId}`);
             }}
-            className="mt-4 min-h-16 w-full border-4 border-black bg-green-600 px-4 text-xl font-black"
+            disabled={!session.weighingSessionId || session.pendingWeights.length > 0}
+            className="mt-4 min-h-16 w-full border-4 border-black bg-green-600 px-4 text-xl font-black disabled:bg-neutral-400"
           >
-            SIMULER UN PRIX DE VENTE
+            PRÉPARER UNE SIMULATION DE VENTE
           </button>
 
           {session.entries.length > 0 && (

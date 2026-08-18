@@ -60,6 +60,7 @@ model Animal {
   veauxVelage     VeauVelage[]
   declarationsAdministratives DeclarationAdministrative[]
   pesees          Pesee[]
+  saleSimulationLines SaleSimulationAnimal[]
   vaccinations    Vaccination[]
   evenements      EvenementSanitaire[]
   parages         Parage[]
@@ -305,11 +306,50 @@ model WeighingSession {
   selectionData   Json?
   simulationData  Json?
   pesees          Pesee[]
+  saleSimulations SaleSimulation[]
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   @@index([startedAt])
   @@index([status, startedAt])
+}
+
+model SaleSimulation {
+  id                String   @id @default(cuid())
+  weighingSessionId String?
+  weighingSession   WeighingSession? @relation(fields: [weighingSessionId], references: [id], onDelete: SetNull)
+  statut            String   @default("DRAFT")
+  refactionGlobale  Float    @default(0)
+  prixKgGlobal      Float?
+  lignes            SaleSimulationAnimal[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([weighingSessionId])
+  @@index([statut, updatedAt])
+}
+
+model SaleSimulationAnimal {
+  id                    String   @id @default(cuid())
+  simulationId          String
+  simulation            SaleSimulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+  animalId              String
+  animal                Animal   @relation(fields: [animalId], references: [id])
+  dernierePeseePoids    Float?
+  dernierePeseeDate     DateTime?
+  gmqUtilise            Float?
+  poidsPredit           Float?
+  poidsMarchand         Float?
+  poidsManuel           Float?
+  sourcePoids           String
+  poidsUtilise          Float
+  refactionIndividuelle Float?
+  prixKgIndividuel      Float?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([simulationId, animalId])
+  @@index([animalId])
 }
 
 model Parage {

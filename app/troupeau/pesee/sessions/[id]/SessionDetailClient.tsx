@@ -82,6 +82,12 @@ export default function SessionDetailClient({ initialSession }: { initialSession
       </button>
 
       {entries.length > 0 && (
+        <Link href={`/troupeau/simulations-vente/nouvelle?sessionId=${initialSession.id}`} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-md border-2 border-green-700 bg-green-50 px-4 font-bold text-green-800">
+          <Scale size={20} /> Préparer une simulation détaillée
+        </Link>
+      )}
+
+      {entries.length > 0 && (
         <Link
           href={`/troupeau/pesee/sessions/${initialSession.id}/vente`}
           className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-green-700 px-4 font-bold text-white"
