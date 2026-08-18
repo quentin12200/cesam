@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { FileText } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { ordonnanceSourceKey } from "@/lib/ordonnance-list";
+import { ordonnanceMedicationSources } from "@/lib/ordonnance-detail";
 import OrdonnanceDetailClient from "./OrdonnanceDetailClient";
 
 import BackButton from "@/app/components/BackButton";
@@ -14,6 +15,7 @@ interface PageProps {
 
 const ordonnanceInclude = {
   extraction: { select: { id: true } },
+  medicament: { select: { nom: true, categorie: true } },
   medicaments: {
     include: { medicament: { select: { nom: true, categorie: true } } },
     orderBy: { createdAt: "asc" as const },
@@ -60,16 +62,22 @@ export default async function OrdonnanceDetailPage({ params, searchParams }: Pag
   });
   const sourceValide = source === sourceAttendue;
   const ordonnancesDuDocument = sourceValide && ordonnance.photoUrls
-    ? await prisma.ordonnance.findMany({ where: { photoUrls: ordonnance.photoUrls }, include: ordonnanceInclude })
+    ? await prisma.ordonnance.findMany({
+      where: { photoUrls: ordonnance.photoUrls },
+      include: ordonnanceInclude,
+      orderBy: { createdAt: "asc" },
+    })
     : sourceValide && ordonnance.photoUrl
-      ? await prisma.ordonnance.findMany({ where: { photoUrl: ordonnance.photoUrl }, include: ordonnanceInclude })
+      ? await prisma.ordonnance.findMany({
+        where: { photoUrl: ordonnance.photoUrl },
+        include: ordonnanceInclude,
+        orderBy: { createdAt: "asc" },
+      })
       : [ordonnance];
   const ordonnanceComplete = [...ordonnancesDuDocument].sort(
     (left, right) => right.medicaments.length - left.medicaments.length,
   )[0] ?? ordonnance;
-  const medicaments = ordonnanceComplete.medicaments.length > 1
-    ? ordonnanceComplete.medicaments
-    : ordonnancesDuDocument.flatMap((item) => item.medicaments);
+  const medicaments = ordonnanceMedicationSources(ordonnancesDuDocument);
   const traitements = Array.from(new Map(
     ordonnancesDuDocument.flatMap((item) => item.traitements).map((item) => [item.id, item]),
   ).values());
@@ -115,34 +123,78 @@ export default async function OrdonnanceDetailPage({ params, searchParams }: Pag
           photoUrl: ordonnanceComplete.photoUrl,
           photoUrls: documentUrls(ordonnanceComplete.photoUrls, ordonnanceComplete.photoUrl),
         }}
-        medicaments={medicaments.map((item) => ({
-          id: item.id,
-          nomExtrait: item.nomExtrait,
-          nomPharmacie: item.medicament.nom,
-          categorie: item.medicament.categorie,
-          substanceActive: item.substanceActive,
-          concentration: item.concentration,
-          formePharmaceutique: item.formePharmaceutique,
-          conditionnement: item.conditionnement,
-          posologieExtraite: item.posologieExtraite,
-          dose: item.dose,
-          uniteDosage: item.uniteDosage,
-          referenceValue: item.referenceValue,
-          referenceUnit: item.referenceUnit,
-          normalizedDoseValue: item.normalizedDoseValue,
-          normalizedDoseUnit: item.normalizedDoseUnit,
-          voieExtraite: item.voieExtraite,
-          dureeExtraite: item.dureeExtraite,
-          administrationCount: item.administrationCount,
-          administrationIntervalHours: item.administrationIntervalHours,
-          repeatCondition: item.repeatCondition,
-          administrationInstructions: item.administrationInstructions,
-          delaiAttenteViande: item.delaiAttenteViande,
-          delaiAttenteAbats: item.delaiAttenteAbats,
-          delaiAttenteLait: item.delaiAttenteLait,
-          precautions: item.precautions,
-          statutCorrespondance: item.statutCorrespondance,
-        }))}
+        medicaments={medicaments.map((source) => {
+          if (source.kind === "relation") {
+            const item = source.medication;
+            return {
+              id: item.id,
+              storageType: "relation" as const,
+              ordonnanceId: source.ordonnanceId,
+              nomExtrait: item.nomExtrait,
+              nomPharmacie: item.medicament.nom,
+              categorie: item.medicament.categorie,
+              substanceActive: item.substanceActive,
+              concentration: item.concentration,
+              formePharmaceutique: item.formePharmaceutique,
+              conditionnement: item.conditionnement,
+              posologieExtraite: item.posologieExtraite,
+              dose: item.dose,
+              uniteDosage: item.uniteDosage,
+              referenceValue: item.referenceValue,
+              referenceUnit: item.referenceUnit,
+              normalizedDoseValue: item.normalizedDoseValue,
+              normalizedDoseUnit: item.normalizedDoseUnit,
+              voieExtraite: item.voieExtraite,
+              dureeExtraite: item.dureeExtraite,
+              administrationCount: item.administrationCount,
+              administrationIntervalHours: item.administrationIntervalHours,
+              repeatCondition: item.repeatCondition,
+              administrationInstructions: item.administrationInstructions,
+              delaiAttenteViande: item.delaiAttenteViande,
+              delaiAttenteAbats: item.delaiAttenteAbats,
+              delaiAttenteLait: item.delaiAttenteLait,
+              precautions: item.precautions,
+              statutCorrespondance: item.statutCorrespondance,
+            };
+          }
+
+          const item = source.row;
+          const posologie = item.dose != null
+            ? `${item.dose} ${item.uniteDosage ?? ""}${item.referenceValue != null
+              ? ` / ${item.referenceValue} ${item.referenceUnit ?? "kg"}`
+              : ""}`.trim()
+            : null;
+          return {
+            id: item.id,
+            storageType: "legacy" as const,
+            ordonnanceId: item.id,
+            nomExtrait: item.medicamentNom,
+            nomPharmacie: item.medicament?.nom ?? item.medicamentNom,
+            categorie: item.medicament?.categorie ?? item.categorieMedicament ?? "",
+            substanceActive: item.substanceActive,
+            concentration: item.concentration,
+            formePharmaceutique: item.formePharmaceutique,
+            conditionnement: item.conditionnement,
+            posologieExtraite: posologie,
+            dose: item.dose,
+            uniteDosage: item.uniteDosage,
+            referenceValue: item.referenceValue,
+            referenceUnit: item.referenceUnit,
+            normalizedDoseValue: item.normalizedDoseValue,
+            normalizedDoseUnit: item.normalizedDoseUnit,
+            voieExtraite: item.voie,
+            dureeExtraite: item.dureeJours,
+            administrationCount: item.administrationCount,
+            administrationIntervalHours: item.administrationIntervalHours,
+            repeatCondition: item.repeatCondition,
+            administrationInstructions: item.administrationInstructions,
+            delaiAttenteViande: item.delaiAttenteViandeJ,
+            delaiAttenteAbats: item.delaiAttenteAbatsJ,
+            delaiAttenteLait: item.delaiAttenteLaitJ,
+            precautions: item.precautions,
+            statutCorrespondance: item.medicamentId ? "matched" : "legacy",
+          };
+        })}
         traitements={traitements.map((t) => ({
           id: t.id,
           medicamentNom: t.medicamentNom,

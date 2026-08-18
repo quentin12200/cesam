@@ -89,6 +89,33 @@ export async function PATCH(
 
       for (const medicament of medicaments ?? []) {
         if (!medicament || typeof medicament.id !== "string") throw new Error("Médicament invalide");
+        if (medicament.storageType === "legacy") {
+          if (typeof medicament.ordonnanceId !== "string") throw new Error("Ordonnance médicament invalide");
+          if (!ordonnanceIdsAutorises.includes(medicament.ordonnanceId)) {
+            throw new Error("Médicament historique hors ordonnance");
+          }
+          const legacyResult = await tx.ordonnance.updateMany({
+            where: { id: medicament.ordonnanceId },
+            data: {
+              medicamentNom: nullableText(medicament.nomExtrait) ?? "",
+              conditionnement: nullableText(medicament.conditionnement),
+              voie: nullableText(medicament.voieExtraite),
+              dose: nullableNumber(medicament.dose),
+              uniteDosage: nullableText(medicament.uniteDosage),
+              referenceValue: nullableNumber(medicament.referenceValue),
+              referenceUnit: nullableText(medicament.referenceUnit),
+              dureeJours: nullableNumber(medicament.dureeExtraite),
+              administrationCount: nullableNumber(medicament.administrationCount),
+              administrationIntervalHours: nullableNumber(medicament.administrationIntervalHours),
+              repeatCondition: nullableText(medicament.repeatCondition),
+              delaiAttenteViandeJ: nullableNumber(medicament.delaiAttenteViande),
+              delaiAttenteAbatsJ: nullableNumber(medicament.delaiAttenteAbats),
+              delaiAttenteLaitJ: nullableNumber(medicament.delaiAttenteLait),
+            },
+          });
+          if (legacyResult.count !== 1) throw new Error("Médicament historique hors ordonnance");
+          continue;
+        }
         const result = await tx.ordonnanceMedicament.updateMany({
           where: { id: medicament.id, ordonnanceId: { in: ordonnanceIdsAutorises } },
           data: {
@@ -96,6 +123,10 @@ export async function PATCH(
             conditionnement: nullableText(medicament.conditionnement),
             voieExtraite: nullableText(medicament.voieExtraite),
             posologieExtraite: nullableText(medicament.posologieExtraite),
+            dose: nullableNumber(medicament.dose),
+            uniteDosage: nullableText(medicament.uniteDosage),
+            referenceValue: nullableNumber(medicament.referenceValue),
+            referenceUnit: nullableText(medicament.referenceUnit),
             dureeExtraite: nullableNumber(medicament.dureeExtraite),
             administrationCount: nullableNumber(medicament.administrationCount),
             administrationIntervalHours: nullableNumber(medicament.administrationIntervalHours),

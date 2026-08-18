@@ -65,6 +65,8 @@ interface LinkedVaccination {
 
 interface LinkedMedication {
   id: string;
+  storageType: "relation" | "legacy";
+  ordonnanceId: string;
   nomExtrait: string;
   nomPharmacie: string;
   categorie: string;
@@ -94,10 +96,16 @@ interface LinkedMedication {
 
 interface MedicationDraft {
   id: string;
+  storageType: "relation" | "legacy";
+  ordonnanceId: string;
   nomExtrait: string;
   conditionnement: string;
   voieExtraite: string;
   posologieExtraite: string;
+  dose: string;
+  uniteDosage: string;
+  referenceValue: string;
+  referenceUnit: string;
   dureeExtraite: string;
   administrationCount: string;
   administrationIntervalHours: string;
@@ -155,10 +163,16 @@ export default function OrdonnanceDetailClient({
   const [error, setError] = useState("");
   const [medicationDrafts, setMedicationDrafts] = useState<MedicationDraft[]>(() => medicaments.map((medicament) => ({
     id: medicament.id,
+    storageType: medicament.storageType,
+    ordonnanceId: medicament.ordonnanceId,
     nomExtrait: medicament.nomExtrait,
     conditionnement: medicament.conditionnement ?? "",
     voieExtraite: medicament.voieExtraite ?? "",
     posologieExtraite: medicament.posologieExtraite ?? "",
+    dose: medicament.dose?.toString() ?? "",
+    uniteDosage: medicament.uniteDosage ?? "",
+    referenceValue: medicament.referenceValue?.toString() ?? "",
+    referenceUnit: medicament.referenceUnit ?? "",
     dureeExtraite: medicament.dureeExtraite?.toString() ?? "",
     administrationCount: medicament.administrationCount?.toString() ?? "",
     administrationIntervalHours: medicament.administrationIntervalHours?.toString() ?? "",
@@ -171,7 +185,11 @@ export default function OrdonnanceDetailClient({
     ? [photoUrl]
     : ordonnance.photoUrls;
 
-  function updateMedication(id: string, field: keyof Omit<MedicationDraft, "id">, value: string) {
+  function updateMedication(
+    id: string,
+    field: keyof Omit<MedicationDraft, "id" | "storageType" | "ordonnanceId">,
+    value: string,
+  ) {
     setMedicationDrafts((current) => current.map((medicament) => (
       medicament.id === id ? { ...medicament, [field]: value } : medicament
     )));
@@ -510,15 +528,39 @@ export default function OrdonnanceDetailClient({
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">Quantité à administrer</label>
-                  <textarea
-                    value={medicament.posologieExtraite}
-                    onChange={(event) => updateMedication(medicament.id, "posologieExtraite", event.target.value)}
-                    rows={3}
-                    className="w-full resize-y rounded-lg border px-3 py-2 text-sm"
-                  />
-                </div>
+                {medicament.storageType === "relation" ? (
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Quantité à administrer</label>
+                    <textarea
+                      value={medicament.posologieExtraite}
+                      onChange={(event) => updateMedication(medicament.id, "posologieExtraite", event.target.value)}
+                      rows={3}
+                      className="w-full resize-y rounded-lg border px-3 py-2 text-sm"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <p className="mb-1 text-xs text-gray-500">Quantité à administrer</p>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {([
+                        ["Valeur", "dose"],
+                        ["Unité", "uniteDosage"],
+                        ["Pour", "referenceValue"],
+                        ["Référence", "referenceUnit"],
+                      ] as const).map(([label, field]) => (
+                        <label key={field} className="text-xs text-gray-500">
+                          {label}
+                          <input
+                            value={medicament[field]}
+                            onChange={(event) => updateMedication(medicament.id, field, event.target.value)}
+                            inputMode={field === "dose" || field === "referenceValue" ? "decimal" : undefined}
+                            className="mt-1 w-full min-w-0 rounded-lg border px-2 py-2 text-sm text-gray-900"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div>
                     <label className="mb-1 block text-xs text-gray-500">Durée (j)</label>

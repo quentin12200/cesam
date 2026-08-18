@@ -18,10 +18,13 @@ test("ouvre une consultation complète avant le formulaire de modification", () 
 });
 
 test("une ordonnance de trois médicaments garde le regroupement pendant la consultation et l’édition", () => {
-  assert.match(page, /ordonnanceComplete\.medicaments/);
+  assert.match(page, /ordonnanceMedicationSources\(ordonnancesDuDocument\)/);
+  assert.match(page, /storageType: "legacy"/);
   assert.match(client, /medicationDrafts\.map/);
   assert.match(client, /medicaments: medicationDrafts/);
   assert.match(route, /ordonnanceMedicament\.updateMany/);
+  assert.match(route, /medicament\.storageType === "legacy"/);
+  assert.match(route, /tx\.ordonnance\.updateMany/);
   assert.match(route, /ordonnanceId: \{ in: ordonnanceIdsAutorises \}/);
   assert.doesNotMatch(client, /router\.push\([^)]*medicament/);
 });
