@@ -3,14 +3,17 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { FileText } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { ordonnanceSourceKey } from "@/lib/ordonnance-list";
 import OrdonnanceDetailClient from "./OrdonnanceDetailClient";
 
 import BackButton from "@/app/components/BackButton";
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ source?: string }>;
 }
 
 const ordonnanceInclude = {
+  extraction: { select: { id: true } },
   medicaments: {
     include: { medicament: { select: { nom: true, categorie: true } } },
     orderBy: { createdAt: "asc" as const },
@@ -38,8 +41,9 @@ function documentUrls(photoUrls: string | null, photoUrl: string | null): string
   return photoUrl ? [photoUrl] : [];
 }
 
-export default async function OrdonnanceDetailPage({ params }: PageProps) {
+export default async function OrdonnanceDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
+  const { source } = await searchParams;
 
   const ordonnance = await prisma.ordonnance.findUnique({
     where: { id },
@@ -48,9 +52,16 @@ export default async function OrdonnanceDetailPage({ params }: PageProps) {
 
   if (!ordonnance) notFound();
 
-  const ordonnancesDuDocument = ordonnance.photoUrls
+  const sourceAttendue = ordonnanceSourceKey({
+    id: ordonnance.id,
+    extractionId: ordonnance.extraction?.id,
+    photoUrl: ordonnance.photoUrl,
+    photoUrls: ordonnance.photoUrls,
+  });
+  const sourceValide = source === sourceAttendue;
+  const ordonnancesDuDocument = sourceValide && ordonnance.photoUrls
     ? await prisma.ordonnance.findMany({ where: { photoUrls: ordonnance.photoUrls }, include: ordonnanceInclude })
-    : ordonnance.photoUrl
+    : sourceValide && ordonnance.photoUrl
       ? await prisma.ordonnance.findMany({ where: { photoUrl: ordonnance.photoUrl }, include: ordonnanceInclude })
       : [ordonnance];
   const ordonnanceComplete = [...ordonnancesDuDocument].sort(
@@ -78,31 +89,31 @@ export default async function OrdonnanceDetailPage({ params }: PageProps) {
 
       <OrdonnanceDetailClient
         ordonnance={{
-          id: ordonnance.id,
-          date: ordonnance.date.toISOString(),
-          numero: ordonnance.numero,
-          veterinaireNom: ordonnance.veterinaireNom,
-          medicamentNom: ordonnance.medicamentNom,
-          dose: ordonnance.dose,
-          uniteDosage: ordonnance.uniteDosage,
-          referenceValue: ordonnance.referenceValue,
-          referenceUnit: ordonnance.referenceUnit,
-          referenceType: ordonnance.referenceType,
-          administrationCount: ordonnance.administrationCount,
-          administrationIntervalHours: ordonnance.administrationIntervalHours,
-          repeatCondition: ordonnance.repeatCondition,
-          administrationInstructions: ordonnance.administrationInstructions,
-          delaiAttenteViandeJ: ordonnance.delaiAttenteViandeJ,
-          delaiAttenteAbatsJ: ordonnance.delaiAttenteAbatsJ,
-          delaiAttenteLaitJ: ordonnance.delaiAttenteLaitJ,
-          voie: ordonnance.voie,
-          dureeJours: ordonnance.dureeJours,
-          motif: ordonnance.motif,
-          animaux: ordonnance.animaux,
-          statut: ordonnance.statut,
-          notes: ordonnance.notes,
-          photoUrl: ordonnance.photoUrl,
-          photoUrls: documentUrls(ordonnance.photoUrls, ordonnance.photoUrl),
+          id: ordonnanceComplete.id,
+          date: ordonnanceComplete.date.toISOString(),
+          numero: ordonnanceComplete.numero,
+          veterinaireNom: ordonnanceComplete.veterinaireNom,
+          medicamentNom: ordonnanceComplete.medicamentNom,
+          dose: ordonnanceComplete.dose,
+          uniteDosage: ordonnanceComplete.uniteDosage,
+          referenceValue: ordonnanceComplete.referenceValue,
+          referenceUnit: ordonnanceComplete.referenceUnit,
+          referenceType: ordonnanceComplete.referenceType,
+          administrationCount: ordonnanceComplete.administrationCount,
+          administrationIntervalHours: ordonnanceComplete.administrationIntervalHours,
+          repeatCondition: ordonnanceComplete.repeatCondition,
+          administrationInstructions: ordonnanceComplete.administrationInstructions,
+          delaiAttenteViandeJ: ordonnanceComplete.delaiAttenteViandeJ,
+          delaiAttenteAbatsJ: ordonnanceComplete.delaiAttenteAbatsJ,
+          delaiAttenteLaitJ: ordonnanceComplete.delaiAttenteLaitJ,
+          voie: ordonnanceComplete.voie,
+          dureeJours: ordonnanceComplete.dureeJours,
+          motif: ordonnanceComplete.motif,
+          animaux: ordonnanceComplete.animaux,
+          statut: ordonnanceComplete.statut,
+          notes: ordonnanceComplete.notes,
+          photoUrl: ordonnanceComplete.photoUrl,
+          photoUrls: documentUrls(ordonnanceComplete.photoUrls, ordonnanceComplete.photoUrl),
         }}
         medicaments={medicaments.map((item) => ({
           id: item.id,

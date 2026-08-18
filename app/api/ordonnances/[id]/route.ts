@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 
+function nullableText(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (value === null || value === "" || value === undefined) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new Error("Valeur numérique invalide");
+  return parsed;
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -27,11 +38,23 @@ export async function PATCH(
   const {
     statut, notes, date, numero, veterinaireNom, medicamentNom,
     dose, uniteDosage, voie, frequence, dureeJours, motif, animaux, photoUrl,
-    delaiAttenteViandeJ, delaiAttenteLaitJ, precautions, rappels,
+    delaiAttenteViandeJ, delaiAttenteLaitJ, precautions, rappels, medicaments,
   } = body;
+
+  if (medicaments !== undefined && !Array.isArray(medicaments)) {
+    return NextResponse.json({ error: "Liste de médicaments invalide" }, { status: 400 });
+  }
 
   const prev = await prisma.ordonnance.findUnique({ where: { id } });
   if (!prev) return NextResponse.json({ error: "Ordonnance non trouvée" }, { status: 404 });
+
+  const ordonnanceIdsAutorises = medicaments?.length
+    ? (prev.photoUrls
+      ? await prisma.ordonnance.findMany({ where: { photoUrls: prev.photoUrls }, select: { id: true } })
+      : prev.photoUrl
+        ? await prisma.ordonnance.findMany({ where: { photoUrl: prev.photoUrl }, select: { id: true } })
+        : [{ id }]).map((item) => item.id)
+    : [id];
 
   const prevFields: Record<string, unknown> = {};
   for (const [key, val] of Object.entries({ statut, notes, date, numero, veterinaireNom, medicamentNom, dose, uniteDosage, voie, frequence, dureeJours, motif, animaux, photoUrl, delaiAttenteViandeJ, delaiAttenteLaitJ, precautions, rappels })) {
@@ -39,28 +62,53 @@ export async function PATCH(
   }
 
   try {
-    const ordonnance = await prisma.ordonnance.update({
-      where: { id },
-      data: {
-        ...(statut !== undefined && { statut }),
-        ...(notes !== undefined && { notes: notes?.trim() || null }),
-        ...(date !== undefined && { date: new Date(date) }),
-        ...(numero !== undefined && { numero: numero?.trim() || null }),
-        ...(veterinaireNom !== undefined && { veterinaireNom: veterinaireNom?.trim() || null }),
-        ...(medicamentNom !== undefined && { medicamentNom: medicamentNom?.trim() ?? "" }),
-        ...(dose !== undefined && { dose: dose != null ? Number(dose) : null }),
-        ...(uniteDosage !== undefined && { uniteDosage: uniteDosage?.trim() || null }),
-        ...(voie !== undefined && { voie: voie?.trim() || null }),
-        ...(frequence !== undefined && { frequence: frequence?.trim() || null }),
-        ...(dureeJours !== undefined && { dureeJours: dureeJours != null ? Number(dureeJours) : null }),
-        ...(motif !== undefined && { motif: motif?.trim() || null }),
-        ...(animaux !== undefined && { animaux: animaux?.trim() || null }),
-        ...(photoUrl !== undefined && { photoUrl }),
-        ...(delaiAttenteViandeJ !== undefined && { delaiAttenteViandeJ: delaiAttenteViandeJ != null ? Number(delaiAttenteViandeJ) : null }),
-        ...(delaiAttenteLaitJ !== undefined && { delaiAttenteLaitJ: delaiAttenteLaitJ != null ? Number(delaiAttenteLaitJ) : null }),
-        ...(precautions !== undefined && { precautions: precautions?.trim() || null }),
-        ...(rappels !== undefined && { rappels: rappels?.trim() || null }),
-      },
+    const ordonnance = await prisma.$transaction(async (tx) => {
+      const updated = await tx.ordonnance.update({
+        where: { id },
+        data: {
+          ...(statut !== undefined && { statut }),
+          ...(notes !== undefined && { notes: notes?.trim() || null }),
+          ...(date !== undefined && { date: new Date(date) }),
+          ...(numero !== undefined && { numero: numero?.trim() || null }),
+          ...(veterinaireNom !== undefined && { veterinaireNom: veterinaireNom?.trim() || null }),
+          ...(medicamentNom !== undefined && { medicamentNom: medicamentNom?.trim() ?? "" }),
+          ...(dose !== undefined && { dose: dose != null ? Number(dose) : null }),
+          ...(uniteDosage !== undefined && { uniteDosage: uniteDosage?.trim() || null }),
+          ...(voie !== undefined && { voie: voie?.trim() || null }),
+          ...(frequence !== undefined && { frequence: frequence?.trim() || null }),
+          ...(dureeJours !== undefined && { dureeJours: dureeJours != null ? Number(dureeJours) : null }),
+          ...(motif !== undefined && { motif: motif?.trim() || null }),
+          ...(animaux !== undefined && { animaux: animaux?.trim() || null }),
+          ...(photoUrl !== undefined && { photoUrl }),
+          ...(delaiAttenteViandeJ !== undefined && { delaiAttenteViandeJ: delaiAttenteViandeJ != null ? Number(delaiAttenteViandeJ) : null }),
+          ...(delaiAttenteLaitJ !== undefined && { delaiAttenteLaitJ: delaiAttenteLaitJ != null ? Number(delaiAttenteLaitJ) : null }),
+          ...(precautions !== undefined && { precautions: precautions?.trim() || null }),
+          ...(rappels !== undefined && { rappels: rappels?.trim() || null }),
+        },
+      });
+
+      for (const medicament of medicaments ?? []) {
+        if (!medicament || typeof medicament.id !== "string") throw new Error("Médicament invalide");
+        const result = await tx.ordonnanceMedicament.updateMany({
+          where: { id: medicament.id, ordonnanceId: { in: ordonnanceIdsAutorises } },
+          data: {
+            nomExtrait: nullableText(medicament.nomExtrait) ?? "",
+            conditionnement: nullableText(medicament.conditionnement),
+            voieExtraite: nullableText(medicament.voieExtraite),
+            posologieExtraite: nullableText(medicament.posologieExtraite),
+            dureeExtraite: nullableNumber(medicament.dureeExtraite),
+            administrationCount: nullableNumber(medicament.administrationCount),
+            administrationIntervalHours: nullableNumber(medicament.administrationIntervalHours),
+            repeatCondition: nullableText(medicament.repeatCondition),
+            delaiAttenteViande: nullableNumber(medicament.delaiAttenteViande),
+            delaiAttenteAbats: nullableNumber(medicament.delaiAttenteAbats),
+            delaiAttenteLait: nullableNumber(medicament.delaiAttenteLait),
+          },
+        });
+        if (result.count !== 1) throw new Error("Médicament hors ordonnance");
+      }
+
+      return updated;
     });
 
     const desc = "Ordonnance mise à jour";

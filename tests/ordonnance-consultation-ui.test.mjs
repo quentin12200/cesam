@@ -2,17 +2,28 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [page, client] = await Promise.all([
+const [page, client, route] = await Promise.all([
   readFile(new URL("../app/ordonnances/[id]/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/ordonnances/[id]/OrdonnanceDetailClient.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/api/ordonnances/[id]/route.ts", import.meta.url), "utf8"),
 ]);
 
 test("ouvre une consultation complète avant le formulaire de modification", () => {
   assert.match(client, /useState\(false\)/);
-  assert.match(client, /editing \? "Fermer" : "Modifier"/);
+  assert.match(client, /editing \? "Fermer" : "Modifier l’ordonnance"/);
   assert.match(client, /editing && <div className="bg-white/);
   assert.match(client, /medicaments\.map/);
   assert.match(page, /ordonnancesDuDocument/);
+  assert.match(page, /source === sourceAttendue/);
+});
+
+test("une ordonnance de trois médicaments garde le regroupement pendant la consultation et l’édition", () => {
+  assert.match(page, /ordonnanceComplete\.medicaments/);
+  assert.match(client, /medicationDrafts\.map/);
+  assert.match(client, /medicaments: medicationDrafts/);
+  assert.match(route, /ordonnanceMedicament\.updateMany/);
+  assert.match(route, /ordonnanceId: \{ in: ordonnanceIdsAutorises \}/);
+  assert.doesNotMatch(client, /router\.push\([^)]*medicament/);
 });
 
 test("affiche séparément conditionnement et quantité à administrer", () => {

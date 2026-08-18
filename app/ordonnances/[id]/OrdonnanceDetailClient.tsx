@@ -92,6 +92,21 @@ interface LinkedMedication {
   statutCorrespondance: string;
 }
 
+interface MedicationDraft {
+  id: string;
+  nomExtrait: string;
+  conditionnement: string;
+  voieExtraite: string;
+  posologieExtraite: string;
+  dureeExtraite: string;
+  administrationCount: string;
+  administrationIntervalHours: string;
+  repeatCondition: string;
+  delaiAttenteViande: string;
+  delaiAttenteAbats: string;
+  delaiAttenteLait: string;
+}
+
 interface Extracted {
   medicamentNom: string | null;
   voie: string | null;
@@ -138,24 +153,48 @@ export default function OrdonnanceDetailClient({
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeResult, setReanalyzeResult] = useState<Extracted | null>(null);
   const [error, setError] = useState("");
+  const [medicationDrafts, setMedicationDrafts] = useState<MedicationDraft[]>(() => medicaments.map((medicament) => ({
+    id: medicament.id,
+    nomExtrait: medicament.nomExtrait,
+    conditionnement: medicament.conditionnement ?? "",
+    voieExtraite: medicament.voieExtraite ?? "",
+    posologieExtraite: medicament.posologieExtraite ?? "",
+    dureeExtraite: medicament.dureeExtraite?.toString() ?? "",
+    administrationCount: medicament.administrationCount?.toString() ?? "",
+    administrationIntervalHours: medicament.administrationIntervalHours?.toString() ?? "",
+    repeatCondition: medicament.repeatCondition ?? "",
+    delaiAttenteViande: medicament.delaiAttenteViande?.toString() ?? "",
+    delaiAttenteAbats: medicament.delaiAttenteAbats?.toString() ?? "",
+    delaiAttenteLait: medicament.delaiAttenteLait?.toString() ?? "",
+  })));
   const documentUrlsAffiches = photoUrl && !ordonnance.photoUrls.includes(photoUrl)
     ? [photoUrl]
     : ordonnance.photoUrls;
+
+  function updateMedication(id: string, field: keyof Omit<MedicationDraft, "id">, value: string) {
+    setMedicationDrafts((current) => current.map((medicament) => (
+      medicament.id === id ? { ...medicament, [field]: value } : medicament
+    )));
+  }
 
   async function save() {
     setSaving(true);
     setSaved(false);
     try {
-      await fetch(`/api/ordonnances/${ordonnance.id}`, {
+      const response = await fetch(`/api/ordonnances/${ordonnance.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date, numero: numero || null, veterinaireNom: veterinaireNom || null,
-          medicamentNom, dose: dose !== "" ? Number(dose) : null, uniteDosage: uniteDosage || null,
-          voie: voie || null, dureeJours: dureeJours !== "" ? Number(dureeJours) : null,
+          ...(medicationDrafts.length === 0 && {
+            medicamentNom, dose: dose !== "" ? Number(dose) : null, uniteDosage: uniteDosage || null,
+            voie: voie || null, dureeJours: dureeJours !== "" ? Number(dureeJours) : null,
+          }),
+          medicaments: medicationDrafts,
           motif: motif || null, animaux: animaux || null,
         }),
       });
+      if (!response.ok) throw new Error("Enregistrement impossible");
       if (completeToOrigin("✓ Ordonnance enregistrée !")) return;
       setSaved(true);
       setEditing(false);
@@ -264,13 +303,15 @@ export default function OrdonnanceDetailClient({
             <p className="text-lg font-bold text-gray-900">Ordonnance du {formatDate(new Date(ordonnance.date))}</p>
             {ordonnance.numero && <p className="mt-0.5 text-sm text-gray-600">n°{ordonnance.numero}</p>}
             {ordonnance.veterinaireNom && <p className="mt-1 text-sm text-gray-600">{ordonnance.veterinaireNom}</p>}
+            {ordonnance.motif && <p className="mt-1 text-sm text-gray-600">Motif : {ordonnance.motif}</p>}
+            {ordonnance.animaux && <p className="mt-1 text-sm text-gray-500">Animaux : {ordonnance.animaux}</p>}
           </div>
           <button
             type="button"
             onClick={() => setEditing((value) => !value)}
             className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
-            <Pencil size={14} /> {editing ? "Fermer" : "Modifier"}
+            <Pencil size={14} /> {editing ? "Fermer" : "Modifier l’ordonnance"}
           </button>
         </div>
 
@@ -437,6 +478,93 @@ export default function OrdonnanceDetailClient({
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Dr Dupont" />
         </div>
 
+        {medicationDrafts.length > 0 && (
+          <div className="space-y-3 border-t border-gray-100 pt-3">
+            <h4 className="text-sm font-semibold text-gray-800">Médicaments de l’ordonnance</h4>
+            {medicationDrafts.map((medicament, index) => (
+              <fieldset key={medicament.id} className="space-y-3 rounded-lg border border-gray-200 p-3">
+                <legend className="px-1 text-xs font-semibold text-gray-500">Médicament {index + 1}</legend>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">Nom lu sur l’ordonnance</label>
+                  <input
+                    value={medicament.nomExtrait}
+                    onChange={(event) => updateMedication(medicament.id, "nomExtrait", event.target.value)}
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Conditionnement / quantité délivrée</label>
+                    <input
+                      value={medicament.conditionnement}
+                      onChange={(event) => updateMedication(medicament.id, "conditionnement", event.target.value)}
+                      className="w-full rounded-lg border px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Voie</label>
+                    <input
+                      value={medicament.voieExtraite}
+                      onChange={(event) => updateMedication(medicament.id, "voieExtraite", event.target.value)}
+                      className="w-full rounded-lg border px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">Quantité à administrer</label>
+                  <textarea
+                    value={medicament.posologieExtraite}
+                    onChange={(event) => updateMedication(medicament.id, "posologieExtraite", event.target.value)}
+                    rows={3}
+                    className="w-full resize-y rounded-lg border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Durée (j)</label>
+                    <input type="number" min={0} value={medicament.dureeExtraite}
+                      onChange={(event) => updateMedication(medicament.id, "dureeExtraite", event.target.value)}
+                      className="w-full rounded-lg border px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Administrations</label>
+                    <input type="number" min={0} value={medicament.administrationCount}
+                      onChange={(event) => updateMedication(medicament.id, "administrationCount", event.target.value)}
+                      className="w-full rounded-lg border px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Intervalle (h)</label>
+                    <input type="number" min={0} value={medicament.administrationIntervalHours}
+                      onChange={(event) => updateMedication(medicament.id, "administrationIntervalHours", event.target.value)}
+                      className="w-full rounded-lg border px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Renouvellement</label>
+                    <input value={medicament.repeatCondition}
+                      onChange={(event) => updateMedication(medicament.id, "repeatCondition", event.target.value)}
+                      className="w-full rounded-lg border px-3 py-2 text-sm" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    ["Viande (j)", "delaiAttenteViande"],
+                    ["Abats (j)", "delaiAttenteAbats"],
+                    ["Lait (j)", "delaiAttenteLait"],
+                  ] as const).map(([label, field]) => (
+                    <div key={field}>
+                      <label className="mb-1 block text-xs text-gray-500">{label}</label>
+                      <input type="number" min={0} value={medicament[field]}
+                        onChange={(event) => updateMedication(medicament.id, field, event.target.value)}
+                        className="w-full min-w-0 rounded-lg border px-2 py-2 text-sm" />
+                    </div>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+          </div>
+        )}
+
+        {medicationDrafts.length === 0 && <div className="contents">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Médicament</label>
           <input value={medicamentNom} onChange={(e) => setMedicamentNom(e.target.value)}
@@ -488,13 +616,14 @@ export default function OrdonnanceDetailClient({
             </div>
           </div>
         )}
+        </div>}
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
+        <div className={`grid gap-3 ${medicationDrafts.length === 0 ? "grid-cols-2" : "grid-cols-1"}`}>
+          {medicationDrafts.length === 0 && <div>
             <label className="text-xs text-gray-500 block mb-1">Durée (jours)</label>
             <input type="number" min={1} value={dureeJours} onChange={(e) => setDureeJours(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 text-sm" />
-          </div>
+          </div>}
           <div>
             <label className="text-xs text-gray-500 block mb-1">Animaux (N° travail)</label>
             <input value={animaux} onChange={(e) => setAnimaux(e.target.value)}

@@ -13,5 +13,5 @@ test("la liste construit une seule carte avec le nombre et les noms des médicam
   assert.match(pharmaciePage, /regrouperOrdonnancesPourListe/);
   assert.match(client, /ord\.medicaments\.length} médicament/);
   assert.match(client, /ord\.medicaments\.map/);
-  assert.match(client, /hrefWithOrigin\(`\/ordonnances\/\$\{ord\.id}`\)/);
+  assert.match(client, /source=\$\{encodeURIComponent\(ord\.sourceKey\)\}/);
 });

@@ -27,6 +27,7 @@ export interface OrdonnanceItem {
   statut: string;
   notes: string | null;
   photoUrl: string | null;
+  sourceKey: string;
   medicaments?: Array<{ nomExtrait: string }>;
 }
 
@@ -202,7 +203,10 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
   return (
     <div className={`bg-white rounded-xl shadow border p-4 ${ord.statut === "ARCHIVE" ? "opacity-60" : ""}`}>
       <div className="flex items-start justify-between gap-3">
-        <Link href={hrefWithOrigin(`/ordonnances/${ord.id}`)} className="flex-1 min-w-0">
+        <Link
+          href={hrefWithOrigin(`/ordonnances/${ord.id}?source=${encodeURIComponent(ord.sourceKey)}`)}
+          className="flex-1 min-w-0"
+        >
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded font-bold text-gray-700">
               {dateStr}
