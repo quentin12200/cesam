@@ -564,3 +564,18 @@ test("les accès existent pour l’historique, la mère et le deuxième jumeau",
   assert.match(form, /Vêlage modifié/);
   assert.equal(existsSync(new URL("../app/troupeau/[nutrav]/LierVeauButton.tsx", import.meta.url)), false);
 });
+
+test("changer le vêlage à modifier remonte le formulaire prérempli et conserve le PATCH", () => {
+  const page = readFileSync(new URL("../app/velage/page.tsx", import.meta.url), "utf8");
+  const form = readFileSync(new URL("../app/velage/VelageFormWrapper.tsx", import.meta.url), "utf8");
+
+  assert.match(page, /key=\{params\.modifier \?\? "nouveau"\}/);
+  assert.match(page, /initialVelage=\{initialVelage\}/);
+  assert.match(form, /useState\(initialVelage\?\.vacheNutrav \?\? initialMere\)/);
+  assert.match(form, /useState\(initialVelage\?\.date\.slice\(0, 10\)/);
+  assert.match(form, /useState<Veau\[\]>\(initialVelage\?\.veaux \?\?/);
+  assert.match(form, /useState<Qualificatif>\(initialVelage\?\.qualificatif \?\?/);
+  assert.match(form, /method: editing \? "PATCH" : "POST"/);
+  assert.match(form, /`\/api\/velages\/\$\{initialVelage\.id\}`/);
+  assert.match(form, /closeToOrigin\("\/velage"\)/);
+});

@@ -81,6 +81,7 @@ export default async function VelagePage({ searchParams }: { searchParams: Promi
 
       {/* Action principale */}
       <VelageFormWrapper
+        key={params.modifier ?? "nouveau"}
         initialOpen={params.nouveau === "1"}
         initialMere={params.mere ?? ""}
         initialDate={params.date}
