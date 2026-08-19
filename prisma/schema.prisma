@@ -841,6 +841,14 @@ model Intervenant {
   createdAt DateTime @default(now())
 }
 
+/// Référentiel des marchands proposés lors d'une vente.
+/// Le nom reste copié dans Sortie.acheteur et VenteHistorique.acheteur.
+model Marchand {
+  id        String   @id @default(cuid())
+  nom       String   @unique
+  createdAt DateTime @default(now())
+}
+
 model Ordonnance {
   id             String   @id @default(cuid())
   date           DateTime @default(now())
