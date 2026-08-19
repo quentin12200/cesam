@@ -8,6 +8,7 @@ import { scanAndCreateExtraction, type OrdonnanceExtracted } from "@/lib/scan-or
 import { ajouterPagesOrdonnance, supprimerPageOrdonnance } from "@/lib/ordonnance-scan-pages";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
+import { formaterMedicamentPourListe } from "@/lib/ordonnance-display";
 
 export interface OrdonnanceItem {
   id: string;
@@ -28,7 +29,7 @@ export interface OrdonnanceItem {
   notes: string | null;
   photoUrl: string | null;
   sourceKey: string;
-  medicaments?: Array<{ nomExtrait: string }>;
+  medicaments?: Array<{ nomExtrait: string; conditionnement?: string | null }>;
 }
 
 export interface ExtractionAVerifierItem {
@@ -233,11 +234,28 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
                   {ord.medicaments.length} médicament{ord.medicaments.length > 1 ? "s" : ""}
                 </div>
                 <div className="mt-1 space-y-0.5">
-                  {ord.medicaments.map((medicament, index) => (
-                    <div key={`${medicament.nomExtrait}-${index}`} className="text-sm font-semibold text-gray-900">
-                      {medicament.nomExtrait}
-                    </div>
-                  ))}
+                  {ord.medicaments.map((medicament, index) => {
+                    const affichage = formaterMedicamentPourListe(medicament);
+                    return (
+                      <div key={`${medicament.nomExtrait}-${index}`} className="min-w-0 py-0.5">
+                        <div className="flex min-w-0 items-start justify-between gap-2">
+                          <span className="min-w-0 line-clamp-2 text-sm font-semibold leading-tight text-gray-900">
+                            {affichage.nom}
+                          </span>
+                          {affichage.quantite !== null && (
+                            <span className="shrink-0 text-xs font-semibold text-gray-600">
+                              Qté {affichage.quantite}
+                            </span>
+                          )}
+                        </div>
+                        {affichage.presentation && (
+                          <div className="mt-0.5 truncate text-xs text-gray-500">
+                            {affichage.presentation}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
@@ -258,12 +276,6 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
             )}
           </div>
 
-          {ord.veterinaireNom && (
-            <div className="text-xs text-gray-500 mt-1">Vét. : {ord.veterinaireNom}</div>
-          )}
-          {ord.motif && (
-            <div className="text-xs text-gray-500 mt-0.5">Motif : {ord.motif}</div>
-          )}
           {ord.animaux && (
             <div className="text-xs text-gray-400 mt-0.5">Animaux : {ord.animaux}</div>
           )}

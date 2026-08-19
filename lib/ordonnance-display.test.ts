@@ -5,6 +5,7 @@ import {
   estInstructionPratique,
   formaterDose,
   formaterDoseCompacte,
+  formaterMedicamentPourListe,
   formaterPresentationCompacte,
   formaterRenouvellement,
   formaterRenouvellementUtile,
@@ -31,6 +32,24 @@ test("conserve une presentation sans inventer de quantite", () => {
 test("affiche la presentation et la quantite sans doublon", () => {
   assert.equal(formaterPresentationCompacte("1 flacon de 100 ml"), "Flacon 100 ml · Qté 1");
   assert.equal(formaterPresentationCompacte("Flacon 250 ml"), "Flacon 250 ml");
+});
+
+test("prepare les medicaments de l'ordonnance pour une liste compacte", () => {
+  const cas = [
+    ["IPALIGO VEAU PÂTE INJ. PRESENTOIR 15 ML", "3 présentoirs de 15 ml", "IPALIGO VEAU PÂTE INJ.", "Présentoir 15 ml", 3],
+    ["BOOSTY’VO 1 SER. 15 ML", "5 seringues de 15 ml", "BOOSTY’VO", "Seringue 15 ml", 5],
+    ["DOPRAM V 2% INTRANASALE FL. 10 ML", "1 flacon de 10 ml", "DOPRAM V 2% INTRANASALE", "Flacon 10 ml", 1],
+    ["HIPRABOVIS SOMNI LKT FL. 10 D.", "4 flacons de 10 doses", "HIPRABOVIS SOMNI LKT", "Flacon 10 doses", 4],
+    ["BOVILIS BOVIGRIP FL. 50 ML 10 D.", "4 flacons de 50 ml · 10 doses", "BOVILIS BOVIGRIP", "Flacon 50 ml · 10 doses", 4],
+  ] as const;
+
+  for (const [nomExtrait, conditionnement, nom, presentation, quantite] of cas) {
+    assert.deepEqual(formaterMedicamentPourListe({ nomExtrait, conditionnement }), {
+      nom,
+      presentation,
+      quantite,
+    });
+  }
 });
 
 test("interprete BT 5 D comme un conditionnement sans inventer de volume", () => {

@@ -120,7 +120,7 @@ export function analyserPresentation(value: string | null | undefined): Presenta
   if (!value?.trim()) return { presentation: null, quantite: null };
   const nettoye = value.trim().replace(/\s+/g, " ");
   const quantiteSuffixe = quantiteExplicite(nettoye);
-  const match = nettoye.match(/^(\d+)\s*[x×]?\s*((?:fl\.?|flacons?|aer\.?|a[ée]rosols?|amp\.?|ampoules?|bt\.?|bo[iî]tes?)\b.*)$/i);
+  const match = nettoye.match(/^(\d+)\s*[x×]?\s*((?:fl\.?|flacons?|aer\.?|a[ée]rosols?|amp\.?|ampoules?|bt\.?|bo[iî]tes?|ser\.?|seringues?|pr[ée]sentoirs?)\b.*)$/i);
   const quantite = quantiteSuffixe ?? (match ? Number(match[1]) : null);
   let presentation = (match?.[2] ?? nettoye)
     .replace(/\s*[·-]?\s*(?:qt[eé]|quantit[eé])\s*[:=]?\s*\d+\s*$/i, "")
@@ -128,10 +128,41 @@ export function analyserPresentation(value: string | null | undefined): Presenta
   presentation = presentation
     .replace(/^fl\.?(?:\s+|$)/i, "flacon ")
     .replace(/^aer\.?(?:\s+|$)/i, "aérosol ")
-    .replace(/^(flacons?|a[ée]rosols?|ampoules?|bo[iî]tes?)\s+(?=\d)/i, "$1 de ")
+    .replace(/^ser\.?(?:\s+|$)/i, "seringue ")
+    .replace(/^presentoir\.?(?:\s+|$)/i, "présentoir ")
+    .replace(/^(flacons?|a[ée]rosols?|ampoules?|bo[iî]tes?|seringues?|pr[ée]sentoirs?)\s+(?=\d)/i, "$1 de ")
     .replace(/\s+/g, " ")
     .trim();
   return { presentation: presentation || null, quantite: Number.isFinite(quantite) ? quantite : null };
+}
+
+export function formaterMedicamentPourListe({
+  nomExtrait,
+  conditionnement,
+}: {
+  nomExtrait: string;
+  conditionnement?: string | null;
+}): { nom: string; presentation: string | null; quantite: number | null } {
+  const { presentation, quantite } = analyserPresentation(conditionnement);
+  const nom = nomExtrait
+    .trim()
+    .replace(
+      /\s+(?:(?:\d+\s*)?(?:fl(?:acon)?|ser(?:ingue)?|pr[ée]sentoir|bt|bo[iî]te|aer|a[ée]rosol|amp(?:oule)?)\.?\s*(?:de\s*)?\d+(?:[.,]\d+)?\s*(?:ml|cl|l|d(?:\.|oses?)?)(?:\s*[·-]?\s*\d+\s*d(?:\.|oses?)?)?)(?:\s*[·-]?\s*(?:qt[ée]|quantit[ée])\s*:?\s*\d+)?\s*$/i,
+      "",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+  const presentationLisible = presentation
+    ?.replace(/^flacons?\s+de\s+(?=\d)/i, "flacon ")
+    .replace(/^a[ée]rosols?\s+de\s+(?=\d)/i, "aérosol ")
+    .replace(/^ampoules?\s+de\s+(?=\d)/i, "ampoule ")
+    .replace(/^bo[iî]tes?\s+de\s+(?=\d)/i, "boîte ")
+    .replace(/^seringues?\s+de\s+(?=\d)/i, "seringue ")
+    .replace(/^pr[ée]sentoirs?\s+de\s+(?=\d)/i, "présentoir ")
+    .replace(/^./, (premiereLettre) => premiereLettre.toUpperCase())
+    ?? null;
+
+  return { nom: nom || nomExtrait.trim(), presentation: presentationLisible, quantite };
 }
 
 export function formaterPresentationCompacte(value: string | null | undefined): string | null {

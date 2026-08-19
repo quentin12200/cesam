@@ -7,6 +7,7 @@ interface OrdonnanceSourceIdentity {
 
 interface OrdonnanceListMedication {
   nomExtrait: string;
+  conditionnement?: string | null;
 }
 
 interface OrdonnanceListRow {
@@ -41,7 +42,9 @@ export function ordonnanceSourceKey(source: OrdonnanceSourceIdentity): string {
 
 function medicationNames(row: OrdonnanceListRow): OrdonnanceListMedication[] {
   if (row.medicaments && row.medicaments.length > 0) return row.medicaments;
-  return row.medicamentNom.trim() ? [{ nomExtrait: row.medicamentNom.trim() }] : [];
+  return row.medicamentNom.trim()
+    ? [{ nomExtrait: row.medicamentNom.trim(), conditionnement: null }]
+    : [];
 }
 
 export function regrouperOrdonnancesPourListe<T extends OrdonnanceListRow>(rows: readonly T[]): T[] {

@@ -12,7 +12,10 @@ async function getOrdonnances(): Promise<OrdonnanceItem[]> {
     take: 200,
     include: {
       extraction: { select: { id: true } },
-      medicaments: { select: { nomExtrait: true }, orderBy: { createdAt: "asc" } },
+      medicaments: {
+        select: { nomExtrait: true, conditionnement: true },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
   return regrouperOrdonnancesPourListe(rows.map((o) => ({

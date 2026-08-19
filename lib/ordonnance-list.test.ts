@@ -8,7 +8,7 @@ function row(id: string, sourceKey: string, medicaments: string[] = []) {
     sourceKey,
     statut: "VALIDE",
     medicamentNom: medicaments[0] ?? "",
-    medicaments: medicaments.map((nomExtrait) => ({ nomExtrait })),
+    medicaments: medicaments.map((nomExtrait) => ({ nomExtrait, conditionnement: null })),
   };
 }
 
@@ -21,9 +21,9 @@ test("regroupe les médicaments provenant du même document dans une seule ordon
 
   assert.equal(groupes.length, 1);
   assert.deepEqual(groupes[0].medicaments, [
-    { nomExtrait: "BOOST’VO" },
-    { nomExtrait: "RISPOVAL" },
-    { nomExtrait: "CANDILAT" },
+    { nomExtrait: "BOOST’VO", conditionnement: null },
+    { nomExtrait: "RISPOVAL", conditionnement: null },
+    { nomExtrait: "CANDILAT", conditionnement: null },
   ]);
 });
 

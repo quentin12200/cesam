@@ -10,8 +10,13 @@ test("la liste construit une seule carte avec le nombre et les noms des médicam
   ]);
 
   assert.match(ordonnancesPage, /regrouperOrdonnancesPourListe/);
+  assert.match(ordonnancesPage, /nomExtrait: true, conditionnement: true/);
   assert.match(pharmaciePage, /regrouperOrdonnancesPourListe/);
   assert.match(client, /ord\.medicaments\.length} médicament/);
   assert.match(client, /ord\.medicaments\.map/);
+  assert.match(client, /formaterMedicamentPourListe/);
+  assert.match(client, /Qté \{affichage\.quantite\}/);
+  assert.doesNotMatch(client, /Vét\. : \{ord\.veterinaireNom\}/);
+  assert.doesNotMatch(client, /Motif : \{ord\.motif\}/);
   assert.match(client, /source=\$\{encodeURIComponent\(ord\.sourceKey\)\}/);
 });
