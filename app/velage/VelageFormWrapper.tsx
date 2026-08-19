@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { getMomentActuel } from "@/lib/evenements-sanitaires";
 import { normaliserNutrav } from "@/lib/identification";
@@ -10,6 +10,7 @@ import { useOriginNavigation } from "@/lib/use-origin-navigation";
 type Qualificatif = "NORMAL" | "DIFFICILE" | "AVORTEMENT" | "MORT_NEE";
 type Veau = { detailId?: string | null; animalId?: string | null; nutrav: string; nunati: string; sexe: "M" | "F" | ""; nom: string; statut: "VIVANT" | "MORT_NE" };
 type Capteur = { numero: number; actif: boolean; animalNutrav: string | null };
+type ProchaineAVeler = { nutrav: string; nobovi: string | null; dateVelagePrevue: string };
 const vide = (statut: Veau["statut"] = "VIVANT"): Veau => ({ nutrav: "", nunati: "", sexe: "", nom: "", statut });
 const COMPLICATIONS = ["Non-délivrance", "Rétention placentaire", "Retournement de matrice", "Prolapsus vaginal"];
 const QUALIFICATIFS: { value: Qualificatif; label: string; color: string }[] = [
@@ -37,9 +38,9 @@ export interface EditableVelage {
   veaux: Veau[];
 }
 
-interface Props { initialOpen?: boolean; initialMere?: string; initialDate?: string; initialSexe?: "M" | "F" | ""; initialVelage?: EditableVelage | null; capteurs?: Capteur[]; numeroVeauPropose: string; numeroNationalPropose: string; identificationsProposees: Array<{ nutrav: string; nunati: string }>; numerosUtilises: string[]; numerosNationauxUtilises: string[]; lotBoucles: { quantite: number; restantes: number } | null }
+interface Props { initialOpen?: boolean; initialMere?: string; initialDate?: string; initialSexe?: "M" | "F" | ""; initialVelage?: EditableVelage | null; prochainesAVeler?: ProchaineAVeler[]; capteurs?: Capteur[]; numeroVeauPropose: string; numeroNationalPropose: string; identificationsProposees: Array<{ nutrav: string; nunati: string }>; numerosUtilises: string[]; numerosNationauxUtilises: string[]; lotBoucles: { quantite: number; restantes: number } | null }
 
-export default function VelageFormWrapper({ initialOpen = false, initialMere = "", initialDate, initialSexe = "", initialVelage = null, capteurs = [], numeroVeauPropose, numeroNationalPropose, identificationsProposees, numerosUtilises, numerosNationauxUtilises, lotBoucles }: Props) {
+export default function VelageFormWrapper({ initialOpen = false, initialMere = "", initialDate, initialSexe = "", initialVelage = null, prochainesAVeler = [], capteurs = [], numeroVeauPropose, numeroNationalPropose, identificationsProposees, numerosUtilises, numerosNationauxUtilises, lotBoucles }: Props) {
   const router = useRouter();
   const { closeToOrigin, completeToOrigin } = useOriginNavigation();
   const today = new Date().toISOString().split("T")[0];
@@ -52,10 +53,21 @@ export default function VelageFormWrapper({ initialOpen = false, initialMere = "
   const [moment, setMoment] = useState(initialVelage?.moment ?? ""), [notes, setNotes] = useState(initialVelage?.notes ?? "");
   const [complications, setComplications] = useState<Set<string>>(new Set()), [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const numerosInitiaux = new Set(initialVelage?.veaux.map((veau) => veau.nutrav).filter(Boolean) ?? []);
   const nationauxInitiaux = new Set(initialVelage?.veaux.map((veau) => veau.nunati).filter(Boolean) ?? []);
   const numerosPris = new Set(numerosUtilises.filter((numero) => !numerosInitiaux.has(numero)));
+  const suggestionsMere = useMemo(() => {
+    const filtre = mere.trim().toLocaleLowerCase("fr-FR").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return prochainesAVeler
+      .filter((suggestion) => !filtre || `${suggestion.nutrav} ${suggestion.nobovi ?? ""}`
+        .toLocaleLowerCase("fr-FR")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .includes(filtre))
+      .slice(0, 10);
+  }, [mere, prochainesAVeler]);
 
   const chargerMere = useCallback(async (nutrav: string) => {
     if (nutrav.length < 3) return setMereNom(null);
@@ -71,6 +83,13 @@ export default function VelageFormWrapper({ initialOpen = false, initialMere = "
   useEffect(() => { if (!editing && initialOpen && initialMere) void chargerMere(initialMere); }, [chargerMere, editing, initialMere, initialOpen]);
 
   function changerMere(value: string) { const n = value.toUpperCase(); setMere(n); setMereNom(null); if (debounce.current) clearTimeout(debounce.current); debounce.current = setTimeout(() => void chargerMere(n), 500); }
+  function selectionnerMere(suggestion: ProchaineAVeler) {
+    if (debounce.current) clearTimeout(debounce.current);
+    setMere(suggestion.nutrav);
+    setMereNom(suggestion.nobovi);
+    setSuggestionsOpen(false);
+    void chargerMere(suggestion.nutrav);
+  }
   function prochaineIdentification(existants: Veau[]) { return identificationsProposees.find((numero) => !numerosUtilises.includes(numero.nutrav) && !numerosNationauxUtilises.includes(numero.nunati) && !existants.some((veau) => veau.nutrav === numero.nutrav || veau.nunati === numero.nunati)) ?? { nutrav: "", nunati: "" }; }
   function ajouterVeau() {
     setVeaux((v) => qualificatif === "MORT_NEE"
@@ -152,7 +171,7 @@ export default function VelageFormWrapper({ initialOpen = false, initialMere = "
     {open && <div className="fixed inset-0 bg-black/50 z-50 flex items-end"><div className="bg-white rounded-t-2xl w-full p-4 max-h-[92vh] overflow-y-auto"><div className="flex justify-between mb-3"><h3 className="text-lg font-bold">{editing ? "Modifier le vêlage" : "Enregistrer un vêlage"}</h3><button onClick={fermer} className="text-2xl text-gray-400 px-2">×</button></div>
       <form onSubmit={enregistrer} className="space-y-3">
         {lotBoucles && lotBoucles.restantes <= Math.ceil(lotBoucles.quantite * 0.25) && <div className={`rounded-lg border px-3 py-2 text-sm ${lotBoucles.restantes === 0 ? "border-red-300 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>{lotBoucles.restantes === 0 ? "Lot de boucles épuisé. Ajoutez un nouveau lot dans les Paramètres." : "Le lot de boucles arrive bientôt à sa fin. Pensez à commander un nouveau lot."}</div>}
-        <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium mb-1">NUTRAV de la vache</label><input value={mere} onChange={(e) => changerMere(e.target.value)} readOnly={editing} required className={`w-full border rounded-lg px-3 py-2.5 font-mono ${editing ? "bg-gray-100 text-gray-700" : ""}`} />{mereNom && <p className="text-xs text-emerald-600 mt-1">{mereNom}</p>}</div><div><label className="block text-sm font-medium mb-1">Date du vêlage</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full border rounded-lg px-3 py-2.5" /></div></div>
+        <div className="grid grid-cols-2 gap-3"><div className="relative"><label className="block text-sm font-medium mb-1">NUTRAV de la vache</label><input value={mere} onFocus={() => { if (!editing) setSuggestionsOpen(true); }} onKeyDown={(e) => { if (e.key === "Escape") setSuggestionsOpen(false); }} onChange={(e) => { changerMere(e.target.value); setSuggestionsOpen(true); }} readOnly={editing} required role="combobox" aria-autocomplete="list" aria-expanded={!editing && suggestionsOpen} aria-controls="prochaines-a-veler" autoComplete="off" className={`w-full border rounded-lg px-3 py-2.5 font-mono ${editing ? "bg-gray-100 text-gray-700" : ""}`} />{mereNom && <p className="text-xs text-emerald-600 mt-1">{mereNom}</p>}{!editing && suggestionsOpen && <div id="prochaines-a-veler" className="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"><div className="flex items-center justify-between border-b border-gray-100 px-3 py-2"><p className="text-xs font-semibold text-gray-700">Prochaines à vêler</p><button type="button" onClick={() => setSuggestionsOpen(false)} className="min-h-8 px-2 text-xs font-medium text-gray-500">Fermer</button></div><div className="max-h-64 overflow-y-auto">{suggestionsMere.length > 0 ? suggestionsMere.map((suggestion) => <button key={suggestion.nutrav} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => selectionnerMere(suggestion)} className="flex min-h-12 w-full items-center justify-between gap-2 border-b border-gray-50 px-3 py-2 text-left last:border-0"><span className="min-w-0"><span className="block font-mono text-sm font-semibold text-gray-900">{suggestion.nutrav}</span>{suggestion.nobovi && <span className="block truncate text-xs text-gray-600">{suggestion.nobovi}</span>}</span><span className="shrink-0 text-xs text-gray-500">{new Date(suggestion.dateVelagePrevue).toLocaleDateString("fr-FR")}</span></button>) : <p className="px-3 py-3 text-xs text-gray-500">Aucune vache trouvée</p>}</div></div>}</div><div><label className="block text-sm font-medium mb-1">Date du vêlage</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full border rounded-lg px-3 py-2.5" /></div></div>
         {editing && <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-600">La mère ne peut pas encore être modifiée sur un vêlage déjà enregistré, afin d’éviter des incohérences dans la reproduction, le tarissement et les événements associés.</p>}
         <div><label className="block text-sm font-medium mb-1.5">Déroulement</label><div className="grid grid-cols-2 gap-2">{QUALIFICATIFS.map((q) => <button key={q.value} type="button" onClick={() => changerQualificatif(q.value)} className={`py-2.5 rounded-lg text-sm font-semibold border ${qualificatif === q.value ? `${q.color} text-white` : "border-gray-200 bg-white"}`}>{q.label}</button>)}</div></div>
         {!!PRECISIONS[qualificatif].length && <div><label className="block text-xs text-gray-500 mb-1.5">Précision</label><div className="grid grid-cols-2 gap-2">{PRECISIONS[qualificatif].map((p) => <button key={p.value} type="button" onClick={() => setPrecision(p.value)} className={`py-2 rounded-lg text-sm border ${precision === p.value ? "border-gray-500 bg-gray-100 font-semibold" : "border-gray-200"}`}>{p.label}</button>)}</div></div>}

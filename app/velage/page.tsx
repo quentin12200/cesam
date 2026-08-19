@@ -87,6 +87,11 @@ export default async function VelagePage({ searchParams }: { searchParams: Promi
         initialDate={params.date}
         initialSexe={params.sexe === "M" || params.sexe === "F" ? params.sexe : ""}
         initialVelage={initialVelage}
+        prochainesAVeler={gestationCalendar.map((row) => ({
+          nutrav: row.nutrav,
+          nobovi: row.nobovi,
+          dateVelagePrevue: row.dateVelagePrevue.toISOString(),
+        }))}
         capteurs={capteurs.map((c) => ({ numero: c.numero, actif: c.actif, animalNutrav: c.animalNutrav }))}
         numeroVeauPropose={proposition.nutrav}
         numeroNationalPropose={proposition.nunati}

@@ -579,3 +579,19 @@ test("changer le vêlage à modifier remonte le formulaire prérempli et conserv
   assert.match(form, /`\/api\/velages\/\$\{initialVelage\.id\}`/);
   assert.match(form, /closeToOrigin\("\/velage"\)/);
 });
+
+test("le formulaire propose les prochaines vaches à vêler sans remplacer la saisie libre", () => {
+  const page = readFileSync(new URL("../app/velage/page.tsx", import.meta.url), "utf8");
+  const form = readFileSync(new URL("../app/velage/VelageFormWrapper.tsx", import.meta.url), "utf8");
+
+  assert.match(page, /prochainesAVeler=\{gestationCalendar\.map/);
+  assert.match(page, /dateVelagePrevue: row\.dateVelagePrevue\.toISOString\(\)/);
+  assert.match(form, /Prochaines à vêler/);
+  assert.match(form, /\.includes\(filtre\)/);
+  assert.match(form, /\.slice\(0, 10\)/);
+  assert.match(form, /onChange=\{\(e\) => \{ changerMere\(e\.target\.value\); setSuggestionsOpen\(true\); \}\}/);
+  assert.match(form, /void chargerMere\(suggestion\.nutrav\)/);
+  assert.match(form, /suggestion\.nobovi/);
+  assert.match(form, /suggestion\.dateVelagePrevue/);
+  assert.match(form, /setSuggestionsOpen\(false\)/);
+});
