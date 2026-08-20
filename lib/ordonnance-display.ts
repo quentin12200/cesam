@@ -109,6 +109,42 @@ function quantiteStructuree(presentation: Record<string, unknown> | null | undef
   return parsed !== null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function collecterValeursParCle(value: unknown, cleRecherchee: string, resultat: unknown[] = []): unknown[] {
+  if (!value || typeof value !== "object") return resultat;
+  if (Array.isArray(value)) {
+    for (const item of value) collecterValeursParCle(item, cleRecherchee, resultat);
+    return resultat;
+  }
+  for (const [cle, enfant] of Object.entries(value as Record<string, unknown>)) {
+    if (cle === cleRecherchee) resultat.push(enfant);
+    collecterValeursParCle(enfant, cleRecherchee, resultat);
+  }
+  return resultat;
+}
+
+function collecterTextesSources(value: unknown): string[] {
+  return collecterValeursParCle(value, "sourceText")
+    .filter((sourceText): sourceText is string => typeof sourceText === "string" && sourceText.trim().length > 0);
+}
+
+function objetStructure(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const objet = value as Record<string, unknown>;
+  return objet.value && typeof objet.value === "object" && !Array.isArray(objet.value)
+    ? objet.value as Record<string, unknown>
+    : objet;
+}
+
+function quantiteDepuisValeur(value: unknown): number | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return quantiteDepuisValeur((value as Record<string, unknown>).value);
+  }
+  const parsed = typeof value === "number"
+    ? value
+    : typeof value === "string" && /^\d+$/.test(value.trim()) ? Number(value) : null;
+  return parsed !== null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function normaliserConditionnementExtrait({
   conditionnement,
   presentation,
@@ -168,29 +204,28 @@ export function normaliserConditionnementEnregistre({
 }): string | null {
   if (!evidenceJson) return normaliserConditionnementExtrait({ conditionnement });
   try {
-    const evidence = JSON.parse(evidenceJson) as Record<string, unknown>;
-    const presentationBrute = evidence.presentation;
-    const presentationChamp = presentationBrute && typeof presentationBrute === "object"
-      ? presentationBrute as Record<string, unknown>
-      : {};
-    const presentationValue = presentationChamp.value && typeof presentationChamp.value === "object"
-      ? presentationChamp.value as Record<string, unknown>
-      : presentationChamp;
-    const quantiteChamp = evidence.deliveredQuantity && typeof evidence.deliveredQuantity === "object"
-      ? evidence.deliveredQuantity as Record<string, unknown>
-      : {};
+    const evidence = JSON.parse(evidenceJson) as unknown;
+    const presentations = collecterValeursParCle(evidence, "presentation")
+      .map(objetStructure)
+      .filter((value): value is Record<string, unknown> => value !== null);
+    const presentationValue = presentations.find((value) => quantiteStructuree(value) !== null)
+      ?? presentations[0]
+      ?? {};
+    const quantitePresentation = presentations
+      .map(quantiteStructuree)
+      .find((value) => value !== null) ?? null;
+    const quantiteChamp = collecterValeursParCle(evidence, "deliveredQuantity")
+      .map(quantiteDepuisValeur)
+      .find((value) => value !== null) ?? null;
     const presentation = {
       ...presentationValue,
-      ...(presentationValue.deliveredQuantity == null && quantiteChamp.value != null
-        ? { deliveredQuantity: quantiteChamp.value }
-        : {}),
+      ...(quantitePresentation !== null
+        ? { deliveredQuantity: quantitePresentation }
+        : quantiteChamp !== null
+          ? { deliveredQuantity: quantiteChamp }
+          : {}),
     };
-    const sourceTexts = [evidence.conditionnement, evidence.presentation, evidence.deliveredQuantity]
-      .flatMap((champ) => {
-        if (!champ || typeof champ !== "object") return [];
-        const sourceText = (champ as Record<string, unknown>).sourceText;
-        return typeof sourceText === "string" ? [sourceText] : [];
-      });
+    const sourceTexts = collecterTextesSources(evidence);
     return normaliserConditionnementExtrait({ conditionnement, presentation, sourceTexts });
   } catch {
     return normaliserConditionnementExtrait({ conditionnement });
@@ -304,7 +339,7 @@ export function formaterConditionnementVisuel(value: string | null | undefined):
     : "";
   const ligne = `${quantite} × ${nomContenant}${suite ? ` ${suite}` : ""}${suffixeChacun}`;
   const totalDoses = doses && quantite > 1
-    ? `Total : ${quantite * Number(doses[1])} doses`
+    ? `${quantite * Number(doses[1])} doses au total`
     : null;
 
   return { ligne, totalDoses };

@@ -4,6 +4,7 @@ import { formaterVoiesConsultation, lignesDosePratiqueConsultation } from "./ord
 
 test("sépare la dose pratique du conditionnement", () => {
   assert.deepEqual(lignesDosePratiqueConsultation("2 ml"), ["À administrer : 2 ml"]);
+  assert.deepEqual(lignesDosePratiqueConsultation("À administrer : 2 ml"), ["À administrer : 2 ml"]);
 });
 
 test("conserve séparément les posologies pratiques DIURIZONE", () => {

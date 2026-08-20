@@ -424,25 +424,26 @@ export default function OrdonnanceDetailClient({
                       </span>
                     )}
                   </div>
-                  {conditionnementVisuel.ligne && (
-                    <div className="mt-1.5 flex items-start gap-1.5 text-sm text-gray-700">
-                      <Package size={14} className="mt-0.5 shrink-0 text-gray-500" />
-                      <div>
-                        <p className="font-medium">{conditionnementVisuel.ligne}</p>
-                        {conditionnementVisuel.totalDoses && <p className="text-[11px] text-gray-500">{conditionnementVisuel.totalDoses}</p>}
-                      </div>
-                    </div>
-                  )}
-                  {voie && <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800"><Syringe size={13} /> {voie}</p>}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                    {conditionnementVisuel.ligne && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">
+                        <Package size={13} className="shrink-0 text-gray-500" />{conditionnementVisuel.ligne}
+                      </span>
+                    )}
+                    {conditionnementVisuel.totalDoses && (
+                      <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-600">{conditionnementVisuel.totalDoses}</span>
+                    )}
+                    {voie && <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-800"><Syringe size={13} /> {voie}</span>}
+                  </div>
 
                   {dosesPratiques.length > 0 && (
-                    <div className="mt-1.5 space-y-1 text-sm font-semibold text-gray-900">
-                      {dosesPratiques.map((dose) => <p key={dose}>{/^(Adultes|Veaux|Max)\s*:/i.test(dose) ? dose : `À administrer : ${dose}`}</p>)}
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm font-semibold text-gray-900">
+                      {dosesPratiques.map((dose) => <p key={dose}>{dose}</p>)}
                     </div>
                   )}
 
                   {(rythme || medicament.dureeExtraite != null || renouvellement) && (
-                    <div className="mt-1.5 space-y-1 text-sm text-gray-700">
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm text-gray-700">
                       {rythme && <p className="flex items-start gap-1.5"><CalendarDays size={14} className="mt-0.5 shrink-0 text-blue-700" />{rythme}</p>}
                       {medicament.dureeExtraite != null && (
                         <p className="flex items-start gap-1.5"><CalendarDays size={14} className="mt-0.5 shrink-0 text-blue-700" />Pendant {medicament.dureeExtraite} jour{medicament.dureeExtraite > 1 ? "s" : ""}</p>
@@ -452,18 +453,21 @@ export default function OrdonnanceDetailClient({
                   )}
 
                   {(medicament.delaiAttenteViande != null || medicament.delaiAttenteAbats != null || medicament.delaiAttenteLait != null) && (
-                    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 rounded-md bg-orange-50 px-2 py-1.5 text-[11px] font-medium text-orange-900">
-                      <Beef size={12} className="shrink-0" />
-                      {delaisViandeAbats
-                        ? `Viande/abats : ${medicament.delaiAttenteViande} j`
-                        : [
-                          medicament.delaiAttenteViande != null ? `Viande : ${medicament.delaiAttenteViande} j` : null,
-                          medicament.delaiAttenteAbats != null ? `Abats : ${medicament.delaiAttenteAbats} j` : null,
-                        ].filter(Boolean).join(" · ")}
-                      {(medicament.delaiAttenteViande != null || medicament.delaiAttenteAbats != null)
-                        && medicament.delaiAttenteLait != null && " · "}
-                      {medicament.delaiAttenteLait != null && <><Milk size={12} className="shrink-0" />{`Lait : ${medicament.delaiAttenteLait} j`}</>}
-                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-orange-900">
+                      {(medicament.delaiAttenteViande != null || medicament.delaiAttenteAbats != null) && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1"><Beef size={12} />{
+                          delaisViandeAbats
+                            ? `Viande/abats ${medicament.delaiAttenteViande} j`
+                            : [
+                              medicament.delaiAttenteViande != null ? `Viande ${medicament.delaiAttenteViande} j` : null,
+                              medicament.delaiAttenteAbats != null ? `Abats ${medicament.delaiAttenteAbats} j` : null,
+                            ].filter(Boolean).join(" · ")
+                        }</span>
+                      )}
+                      {medicament.delaiAttenteLait != null && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1"><Milk size={12} />Lait {medicament.delaiAttenteLait} j</span>
+                      )}
+                    </div>
                   )}
 
                   <details className="mt-3 border-t border-gray-100 pt-2 text-xs text-gray-600">

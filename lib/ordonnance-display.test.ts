@@ -51,7 +51,7 @@ test("affiche un conditionnement visuel avec quantite et total de doses", () => 
   });
   assert.deepEqual(formaterConditionnementVisuel("3 flacons de 50 ml · 10 doses"), {
     ligne: "3 × flacons 50 ml · 10 doses chacun",
-    totalDoses: "Total : 30 doses",
+    totalDoses: "30 doses au total",
   });
   assert.deepEqual(formaterConditionnementVisuel("1 boîte de 5 doses"), {
     ligne: "1 × boîte de 5 doses",
@@ -156,6 +156,41 @@ test("retrouve une quantite historique depuis les preuves enregistrees", () => {
     }),
   });
   assert.equal(formaterPresentationCompacte(conditionnement), "Flacon 50 ml · Qté 1");
+});
+
+test("retrouve recursivement le conditionnement HIPRABOVIS sans utiliser sa dose", () => {
+  const conditionnement = normaliserConditionnementEnregistre({
+    conditionnement: "Flacon 2 ml",
+    evidenceJson: JSON.stringify({
+      lectureAncienne: {
+        posologie: { sourceText: "À administrer : 2 ml" },
+        blocProduit: { sourceText: "HIPRABOVIS SOMNI — FL.50ML(10D.)" },
+        quantite: { deliveredQuantity: { value: 3, sourceText: "Délivré ce jour Qté : 3" } },
+      },
+    }),
+  });
+  assert.equal(conditionnement, "3 flacon de 50 ml · 10 doses");
+  assert.deepEqual(formaterConditionnementVisuel(conditionnement), {
+    ligne: "3 × flacons 50 ml · 10 doses chacun",
+    totalDoses: "30 doses au total",
+  });
+  assert.doesNotMatch(conditionnement ?? "", /2 ml/);
+});
+
+test("conserve un vrai flacon historique de 2 ml et sa dose unitaire", () => {
+  const conditionnement = normaliserConditionnementEnregistre({
+    conditionnement: "Flacon 2 ml",
+    evidenceJson: JSON.stringify({
+      lecture: { sourceText: "HIPRABOVIS — FL.2ML(1D.)" },
+      dose: { sourceText: "Administrer 2 ml" },
+      deliveredQuantity: { value: 1, sourceText: "Qté : 1" },
+    }),
+  });
+  assert.equal(conditionnement, "1 flacon de 2 ml · 1 dose");
+  assert.deepEqual(formaterConditionnementVisuel(conditionnement), {
+    ligne: "1 × flacon 2 ml · 1 dose",
+    totalDoses: null,
+  });
 });
 
 test("separe conditionnement compact, quantite livree et dose d'administration", () => {

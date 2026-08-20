@@ -36,8 +36,11 @@ test("affiche séparément conditionnement et quantité à administrer", () => {
   assert.match(client, /conditionnementVisuel\.totalDoses/);
   assert.match(client, /lignesDosePratiqueConsultation\(medicament\.posologieExtraite\)/);
   assert.match(client, /dosesPratiques\.map/);
-  assert.match(client, /À administrer/);
   assert.match(client, /getCategorieMedicament/);
+  assert.match(page, /categorie: item\.medicament\.categorie/);
+  assert.doesNotMatch(client, /`À administrer : \$\{dose\}`/);
+  assert.match(client, /rounded-full bg-gray-100/);
+  assert.match(client, /rounded-full bg-orange-50/);
 });
 
 test("conserve le document original et masque le renouvellement interdit de la carte", () => {
