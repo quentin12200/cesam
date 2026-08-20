@@ -99,6 +99,17 @@ test("conserve la quantite structuree pendant la transcription par blocs", () =>
     formaterPresentationCompacte(proposition.medicaments?.[0].conditionnement ?? null),
     "Flacon 50 ml · 10 doses · Qté 1",
   );
+  assert.deepEqual(
+    proposition.medicaments?.[0].evidence.presentation?.value,
+    {
+      containerType: "flacon",
+      volumeValue: 50,
+      volumeUnit: "ml",
+      deliveredQuantity: 1,
+      sourceText: "FL.50ML(10D.)",
+    },
+  );
+  assert.equal(proposition.medicaments?.[0].evidence.deliveredQuantity?.value, 1);
 });
 
 test("ne recupere aucune donnee dans un bloc metier voisin", () => {

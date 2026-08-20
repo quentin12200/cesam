@@ -9,6 +9,7 @@ import {
   type MedicamentCandidateRecord,
 } from "./ordonnance-medication-candidates.ts";
 import { formaterDosePratiqueContextuelle } from "./ordonnance-dose-sources.ts";
+import { normaliserConditionnementEnregistre } from "./ordonnance-display.ts";
 import type { DosePratiqueContextuelle } from "./ordonnance-types.ts";
 
 export type StatutCorrespondance = "matched" | "ambiguous" | "unmatched" | "manually_confirmed";
@@ -174,7 +175,14 @@ export async function creerOrdonnanceAvecMedicaments(
   }
   const resolus = [];
   for (const med of finale.medicaments) {
-    resolus.push({ med, ...(await resoudreMedicament(tx, med)) });
+    const medSecurise = {
+      ...med,
+      conditionnement: normaliserConditionnementEnregistre({
+        conditionnement: med.conditionnement,
+        evidenceJson: JSON.stringify(med.evidence),
+      }),
+    };
+    resolus.push({ med: medSecurise, ...(await resoudreMedicament(tx, medSecurise)) });
   }
   const premier = resolus[0];
   if (!premier) throw new OrdonnanceValidationError("MEDICAMENT_REQUIS", "Au moins un médicament est requis.");

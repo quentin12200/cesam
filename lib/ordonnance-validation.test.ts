@@ -8,6 +8,9 @@ import {
   type OrdonnancePersistence,
   type OrdonnanceValidationInput,
 } from "./ordonnance-validation.ts";
+import { formaterConditionnementVisuel } from "./ordonnance-display.ts";
+import { normaliserAnalyseOrdonnance } from "./ordonnance-extraction.ts";
+import { appliquerTranscriptionParBlocs } from "./ordonnance-transcription.ts";
 
 function medicamentInput(overrides: Partial<MedicamentValidationInput> = {}): MedicamentValidationInput {
   return {
@@ -132,6 +135,95 @@ test("cree une seule ordonnance et une liaison pour un medicament", async () => 
   assert.equal(state.liens[0].numeroLot, "2111AA");
   assert.equal(state.liens[0].conditionnement, conditionnement);
   assert.equal(state.ordonnances[0].conditionnement, conditionnement);
+});
+
+test("conserve HIPRABOVIS de la proposition structuree jusqu a la liaison en base", async () => {
+  const proposition = normaliserAnalyseOrdonnance(appliquerTranscriptionParBlocs({
+    transcription: {
+      entete: { lignes: ["ordonnance n°26-08-0694[V] le 19/08/2026"] },
+      medicaments: [{
+        identification: ["HIPRABOVIS SOMNI LKT"],
+        presentation: ["FL.50ML(10D.)", "Qté : 3"],
+        posologie: ["Administrer 2 ml par animal"],
+        renouvellement: [],
+        delaisAttente: [],
+        instructionsPrecautions: [],
+        autres: [],
+      }],
+    },
+    medicaments: [{
+      medicamentNom: "HIPRABOVIS SOMNI LKT",
+      presentation: {
+        containerType: "flacon",
+        volumeValue: 50,
+        volumeUnit: "ml",
+        deliveredQuantity: 3,
+        sourceText: "FL.50ML(10D.)\nQté : 3",
+      },
+      conditionnement: "Flacon 2 ml",
+      dose: {
+        doseValue: 2,
+        doseUnit: "ml",
+        referenceValue: null,
+        referenceUnit: null,
+        referenceType: "animal",
+      },
+      evidence: {
+        conditionnement: { value: "FL.50ML(10D.)", sourceText: "FL.50ML(10D.)", confidence: 0.98 },
+        deliveredQuantity: { value: 3, sourceText: "Qté : 3", confidence: 0.98 },
+        dose: { value: "2 ml", sourceText: "Administrer 2 ml par animal", confidence: 0.98 },
+      },
+    }],
+  }));
+  const extrait = proposition.medicaments?.[0];
+  assert.ok(extrait);
+  const { state, tx } = creerMemoire();
+  await creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([medicamentInput({
+    medicamentNom: extrait.medicamentNom ?? "",
+    conditionnement: "Flacon 2 ml",
+    doseValue: extrait.doseValue,
+    doseUnit: extrait.doseUnit,
+    referenceValue: extrait.referenceValue,
+    referenceUnit: extrait.referenceUnit,
+    referenceType: extrait.referenceType,
+    evidence: extrait.evidence,
+  })]), ["hiprabovis.jpg"]);
+
+  assert.equal(state.liens[0].conditionnement, "3 flacon de 50 ml · 10 doses");
+  assert.equal(state.liens[0].posologieExtraite, "2 ml");
+  assert.deepEqual(formaterConditionnementVisuel(String(state.liens[0].conditionnement)), {
+    ligne: "3 × flacons 50 ml · 10 doses chacun",
+    totalDoses: "30 doses au total",
+  });
+  const evidenceEnregistree = JSON.parse(String(state.liens[0].evidenceJson));
+  assert.equal(evidenceEnregistree.presentation.value.deliveredQuantity, 3);
+  assert.match(evidenceEnregistree.presentation.sourceText, /FL\.50ML\(10D\.\)/);
+  assert.equal(evidenceEnregistree.deliveredQuantity.value, 3);
+  assert.match(evidenceEnregistree.dose.sourceText, /2 ml/);
+});
+
+test("conserve un vrai flacon HIPRABOVIS de 2 ml distinct de sa dose de 2 ml", async () => {
+  const { state, tx } = creerMemoire();
+  await creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([medicamentInput({
+    conditionnement: "Flacon 2 ml",
+    doseValue: 2,
+    doseUnit: "ml",
+    referenceValue: null,
+    referenceUnit: null,
+    referenceType: "animal",
+    evidence: {
+      presentation: {
+        value: { deliveredQuantity: 1 },
+        sourceText: "FL.2ML(1D.)",
+        confidence: 0.98,
+      },
+      deliveredQuantity: { value: 1, sourceText: "Qté : 1", confidence: 0.98 },
+      dose: { value: "2 ml", sourceText: "Administrer 2 ml", confidence: 0.98 },
+    },
+  })]), ["flacon-2ml.jpg"]);
+
+  assert.equal(state.liens[0].conditionnement, "1 flacon de 2 ml · 1 dose");
+  assert.equal(state.liens[0].posologieExtraite, "2 ml");
 });
 
 test("conserve plusieurs consignes pratiques dans la liaison ordonnance medicament", async () => {

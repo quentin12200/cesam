@@ -23,6 +23,7 @@ import {
   type DoseSourceStructuree,
 } from "./ordonnance-dose-sources.ts";
 import {
+  analyserPresentation,
   normaliserConditionnementExtrait,
   normaliserConditionRenouvellement,
 } from "./ordonnance-display.ts";
@@ -554,6 +555,39 @@ export function normaliserAnalyseOrdonnance(
       evidenceMedicament.deliveredQuantity?.sourceText,
       typeof presentation.sourceText === "string" ? presentation.sourceText : null,
     ].filter((value): value is string => Boolean(value));
+    const conditionnement = normaliserConditionnementExtrait({
+      conditionnement: texte(m.conditionnement),
+      presentation,
+      sourceTexts: textesPresentation,
+    });
+    const presentationNormalisee = analyserPresentation(conditionnement);
+    const quantiteLivree = nombre(presentation.deliveredQuantity)
+      ?? nombre(evidenceMedicament.deliveredQuantity?.value)
+      ?? presentationNormalisee.quantite;
+    const sourcePresentation = textesPresentation.join("\n") || null;
+    const evidencePresentation = Object.keys(presentation).length > 0 || presentationNormalisee.presentation
+      ? {
+        value: {
+          ...presentation,
+          ...(quantiteLivree !== null ? { deliveredQuantity: quantiteLivree } : {}),
+        },
+        sourceText: evidenceMedicament.presentation?.sourceText ?? sourcePresentation,
+        confidence: evidenceMedicament.presentation?.confidence ?? 0,
+        zone: evidenceMedicament.presentation?.zone ?? "presentation",
+      }
+      : null;
+    const evidenceConditionnement = {
+      ...evidenceMedicament,
+      ...(evidencePresentation ? { presentation: evidencePresentation } : {}),
+      ...(quantiteLivree !== null ? {
+        deliveredQuantity: {
+          value: quantiteLivree,
+          sourceText: evidenceMedicament.deliveredQuantity?.sourceText ?? sourcePresentation,
+          confidence: evidenceMedicament.deliveredQuantity?.confidence ?? 0,
+          zone: evidenceMedicament.deliveredQuantity?.zone ?? "presentation",
+        },
+      } : {}),
+    };
     const administrationCountBrut = entier(protocole.administrationCount);
     const administrationIntervalHours = entier(protocole.administrationIntervalHours);
     const repeatCondition = extraireConditionRenouvellement(
@@ -570,11 +604,7 @@ export function normaliserAnalyseOrdonnance(
       categorie: texte(m.categorie),
       familleTherapeutique: texte(m.familleTherapeutique),
       formePharmaceutique: texte(m.formePharmaceutique),
-      conditionnement: normaliserConditionnementExtrait({
-        conditionnement: texte(m.conditionnement),
-        presentation,
-        sourceTexts: textesPresentation,
-      }),
+      conditionnement,
       voie: texte(m.voie),
       doseValue: nombre(dose.doseValue ?? m.dose),
       doseUnit: texte(dose.doseUnit ?? m.uniteDosage),
@@ -601,7 +631,7 @@ export function normaliserAnalyseOrdonnance(
       },
       precautions: texte(m.precautions),
       medicationMatch: null,
-      evidence: evidenceMedicament,
+      evidence: evidenceConditionnement,
     };
     const resolutionDose = resoudreSourcesDose({
       doseValue: proposition.doseValue === null ? "" : String(proposition.doseValue),
