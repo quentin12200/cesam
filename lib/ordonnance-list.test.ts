@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ordonnanceSourceKey, regrouperOrdonnancesPourListe } from "./ordonnance-list.ts";
+import { formaterConditionnementVisuel, normaliserConditionnementEnregistre } from "./ordonnance-display.ts";
 
 function row(id: string, sourceKey: string, medicaments: string[] = []) {
   return {
@@ -56,4 +57,39 @@ test("conserve comme lien la ligne qui contient déjà l'ordonnance complète", 
 
   assert.equal(groupes[0].id, "ord-complete");
   assert.equal(groupes[0].medicaments?.length, 3);
+});
+
+test("choisit pour la liste la version riche de chaque médicament du même document", () => {
+  const evidenceRiche = JSON.stringify({
+    presentation: { deliveredQuantity: { value: 3, sourceText: "Qté : 3" } },
+    lecture: { sourceText: "3 FL.50ML(10D.)" },
+  });
+  const groupes = regrouperOrdonnancesPourListe([{
+    ...row("ord-complete", "document:scan-hiprabovis", []),
+    medicaments: [
+      { id: "med-a", medicamentId: "pharma-hipra", nomExtrait: "HIPRABOVIS SOMNI", conditionnement: "Flacon 2 ml", evidenceJson: null },
+      { id: "med-b", medicamentId: "pharma-bovilis", nomExtrait: "BOVILIS BOVIGRIP", conditionnement: "Flacon 50 ml", evidenceJson: null },
+      { id: "med-c", medicamentId: "pharma-3", nomExtrait: "MÉDICAMENT 3", conditionnement: null, evidenceJson: null },
+      { id: "med-d", medicamentId: "pharma-4", nomExtrait: "MÉDICAMENT 4", conditionnement: null, evidenceJson: null },
+      { id: "med-e", medicamentId: "pharma-5", nomExtrait: "MÉDICAMENT 5", conditionnement: null, evidenceJson: null },
+    ],
+  }, {
+    ...row("ord-hipra-riche", "document:scan-hiprabovis", []),
+    medicaments: [
+      { id: "med-hipra-riche", medicamentId: "pharma-hipra", nomExtrait: "HIPRABOVIS SOMNI", conditionnement: "Flacon 2 ml", evidenceJson: evidenceRiche },
+    ],
+  }]);
+
+  assert.equal(groupes.length, 1);
+  assert.equal(groupes[0].medicaments?.length, 5);
+  assert.equal((groupes[0].medicaments?.[0] as { id?: string }).id, "med-hipra-riche");
+  const conditionnement = normaliserConditionnementEnregistre({
+    conditionnement: groupes[0].medicaments?.[0].conditionnement ?? null,
+    evidenceJson: groupes[0].medicaments?.[0].evidenceJson ?? null,
+  });
+  assert.equal(conditionnement, "3 flacon de 50 ml · 10 doses");
+  assert.deepEqual(formaterConditionnementVisuel(conditionnement), {
+    ligne: "3 × flacons 50 ml · 10 doses chacun",
+    totalDoses: "30 doses au total",
+  });
 });

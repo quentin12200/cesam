@@ -1,3 +1,5 @@
+import { selectionnerVersionsMedicaments, type MedicationSelectionCandidate } from "./ordonnance-medication-selection.ts";
+
 interface OrdonnanceSourceIdentity {
   id: string;
   extractionId?: string | null;
@@ -5,7 +7,7 @@ interface OrdonnanceSourceIdentity {
   photoUrls?: string | null;
 }
 
-interface OrdonnanceListMedication {
+interface OrdonnanceListMedication extends MedicationSelectionCandidate {
   nomExtrait: string;
   conditionnement?: string | null;
 }
@@ -64,13 +66,7 @@ export function regrouperOrdonnancesPourListe<T extends OrdonnanceListRow>(rows:
       return medicationNames(right).length - medicationNames(left).length;
     })[0];
 
-    const seen = new Set<string>();
-    const medicaments = group.flatMap(medicationNames).filter((medicament) => {
-      const key = medicament.nomExtrait.trim().toLocaleLowerCase("fr");
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    const medicaments = selectionnerVersionsMedicaments(group.flatMap(medicationNames));
 
     return { ...representative, medicaments };
   });

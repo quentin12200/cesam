@@ -14,7 +14,7 @@ async function getOrdonnances(): Promise<OrdonnanceItem[]> {
     include: {
       extraction: { select: { id: true } },
       medicaments: {
-        select: { nomExtrait: true, conditionnement: true, evidenceJson: true },
+        select: { id: true, medicamentId: true, nomExtrait: true, conditionnement: true, evidenceJson: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -45,13 +45,22 @@ async function getOrdonnances(): Promise<OrdonnanceItem[]> {
       photoUrls: o.photoUrls,
     }),
     medicaments: o.medicaments.map((medicament) => ({
+      id: medicament.id,
+      medicamentId: medicament.medicamentId,
+      nomExtrait: medicament.nomExtrait,
+      conditionnement: medicament.conditionnement,
+      evidenceJson: medicament.evidenceJson,
+    })),
+  }))).map((ordonnance) => ({
+    ...ordonnance,
+    medicaments: ordonnance.medicaments?.map((medicament) => ({
       nomExtrait: medicament.nomExtrait,
       conditionnement: normaliserConditionnementEnregistre({
-        conditionnement: medicament.conditionnement,
-        evidenceJson: medicament.evidenceJson,
+        conditionnement: medicament.conditionnement ?? null,
+        evidenceJson: medicament.evidenceJson ?? null,
       }),
     })),
-  })));
+  }));
 }
 
 async function getExtractionsAVerifier(): Promise<ExtractionAVerifierItem[]> {
