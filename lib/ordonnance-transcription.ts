@@ -351,12 +351,21 @@ export function appliquerTranscriptionParBlocs(
 
     if (bloc.presentation.length > 0) {
       const sourceText = bloc.presentation.join("\n");
+      const presentationIA = objet(ia.presentation);
+      const quantitePreuve = objet(evidenceIA.deliveredQuantity).value;
+      const presentation = {
+        ...presentationIA,
+        sourceText,
+        ...(presentationIA.deliveredQuantity == null && quantitePreuve != null
+          ? { deliveredQuantity: quantitePreuve }
+          : {}),
+      };
       patch.conditionnement = normaliserConditionnementExtrait({
         conditionnement: null,
-        presentation: { sourceText },
+        presentation,
         sourceTexts: bloc.presentation,
       });
-      patch.presentation = { sourceText };
+      patch.presentation = presentation;
       patch.evidence = {
         ...evidenceIA,
         conditionnement: preuve(patch.conditionnement, sourceText, "presentation"),

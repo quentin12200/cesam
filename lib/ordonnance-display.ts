@@ -42,23 +42,66 @@ function uniteVolume(value: string): string {
   return /^m(?:l|i|1)$/.test(unite) ? "ml" : unite;
 }
 
-function contenant(value: string): string | null {
-  const normalized = sansAccents(value).toLowerCase();
-  if (/\b(?:fl|flacon)s?\b\.?/.test(normalized)) return "flacon";
-  if (/\b(?:aer|aerosol)s?\b\.?/.test(normalized)) return "aérosol";
-  if (/\b(?:amp|ampoule)s?\b\.?/.test(normalized)) return "ampoule";
-  if (/\b(?:bt|boite)s?\b\.?/.test(normalized)) return "boîte";
-  return null;
+interface PresentationVeterinaire {
+  libelle: string;
+  quantitePrefixe: number | null;
+  score: number;
 }
 
-function volume(value: string): { valeur: string; unite: string } | null {
-  const match = value.match(/\b(\d+(?:[.,]\d+)?)\s*(m(?:l|i|1)|cl|l)\b/i);
-  return match ? { valeur: match[1].replace(",", "."), unite: uniteVolume(match[2]) } : null;
+function libelleDoses(value: string): string {
+  return `${value} dose${Number(value) > 1 ? "s" : ""}`;
+}
+
+function extrairePresentationVeterinaire(value: string): PresentationVeterinaire | null {
+  const texte = sansAccents(value).replace(/\s+/g, " ").trim();
+  if (!texte) return null;
+  const quantitePrefixeMatch = texte.match(
+    /^\s*(\d+)\s*[x×]?\s*(?=(?:fl(?:acon)?|ser(?:ingue)?|amp(?:oule)?|aer(?:osol)?|presentoir|bt|boite)s?\b)/i,
+  );
+  const quantitePrefixe = quantitePrefixeMatch ? Number(quantitePrefixeMatch[1]) : null;
+  const boite = texte.match(/\b(?:bt|boite)s?\.?\s*(?:de\s*)?(\d+)\s*d(?:\.|oses?)?\b/i);
+  const contenantVolume = texte.match(
+    /\b(fl(?:acon)?|ser(?:ingue)?|amp(?:oule)?|aer(?:osol)?|presentoir)s?\.?\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(m(?:l|i|1)|cl|l)\b(?:\s*[·-]?\s*\(?\s*(\d+)\s*d(?:\.|oses?)?\s*\)?)?/i,
+  );
+
+  const parties: string[] = [];
+  if (boite) parties.push(`boîte de ${libelleDoses(boite[1])}`);
+  if (contenantVolume) {
+    const noms: Record<string, string> = {
+      fl: "flacon",
+      flacon: "flacon",
+      ser: "seringue",
+      seringue: "seringue",
+      amp: "ampoule",
+      ampoule: "ampoule",
+      aer: "aérosol",
+      aerosol: "aérosol",
+      presentoir: "présentoir",
+    };
+    const contenant = noms[contenantVolume[1].toLowerCase()];
+    const volume = `${contenantVolume[2].replace(",", ".")} ${uniteVolume(contenantVolume[3])}`;
+    parties.push(`${contenant} de ${volume}${contenantVolume[4] ? ` · ${libelleDoses(contenantVolume[4])}` : ""}`);
+  }
+
+  if (parties.length === 0) return null;
+  return {
+    libelle: parties.join(" · "),
+    quantitePrefixe,
+    score: (boite ? 1 : 0) + (contenantVolume ? 2 : 0) + (contenantVolume?.[4] ? 1 : 0),
+  };
 }
 
 function quantiteExplicite(value: string): number | null {
   const match = value.match(/\b(?:qt[eé]|quantit[eé])\s*[:=]?\s*(\d+)\b/i);
   return match ? Number(match[1]) : null;
+}
+
+function quantiteStructuree(presentation: Record<string, unknown> | null | undefined): number | null {
+  const value = presentation?.deliveredQuantity;
+  const parsed = typeof value === "number"
+    ? value
+    : typeof value === "string" && /^\d+$/.test(value.trim()) ? Number(value) : null;
+  return parsed !== null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 export function normaliserConditionnementExtrait({
@@ -75,45 +118,78 @@ export function normaliserConditionnementExtrait({
     typeof presentation?.sourceText === "string" ? presentation.sourceText : null,
     ...sourceTexts,
   ].filter((value): value is string => Boolean(value?.trim()));
-  const volumeStructure = typeof presentation?.volumeValue === "number"
+  const presentationStructuree = typeof presentation?.containerType === "string"
+    && typeof presentation?.volumeValue === "number"
     && typeof presentation?.volumeUnit === "string"
-    ? { valeur: String(presentation.volumeValue), unite: uniteVolume(presentation.volumeUnit) }
+    ? extrairePresentationVeterinaire(
+      `${presentation.containerType} ${presentation.volumeValue} ${presentation.volumeUnit}`,
+    )
     : null;
-  const volumeTrouve = volumeStructure ?? textes.map(volume).find(Boolean) ?? null;
-  const contenantStructure = typeof presentation?.containerType === "string"
-    ? contenant(presentation.containerType)
-    : null;
-  const contenantTrouve = contenantStructure ?? textes.map(contenant).find(Boolean) ?? null;
-  const quantiteStructure = typeof presentation?.deliveredQuantity === "number"
-    ? presentation.deliveredQuantity
-    : null;
+  const presentationsTexte = textes
+    .map(extrairePresentationVeterinaire)
+    .filter((value): value is PresentationVeterinaire => value !== null);
+  const presentationTrouvee = [presentationStructuree, ...presentationsTexte]
+    .filter((value): value is PresentationVeterinaire => value !== null)
+    .sort((left, right) => right.score - left.score)[0] ?? null;
+  const quantiteStructure = quantiteStructuree(presentation);
   const quantiteHorsConditionnement = sourceTexts
     .map(quantiteExplicite)
     .find((value) => value !== null) ?? null;
   const quantiteTrouvee = quantiteStructure
     ?? textes.map(quantiteExplicite).find((value) => value !== null)
     ?? (() => {
-      const match = conditionnement?.match(/^\s*(\d+)\s*[x×]?\s*(?:fl\.?|flacons?|aer\.?|a[ée]rosols?|amp\.?|ampoules?|bt\.?|bo[iî]tes?)\b/i);
-      return match ? Number(match[1]) : null;
+      return presentationsTexte.map((value) => value.quantitePrefixe).find((value) => value !== null) ?? null;
     })();
 
-  if (!volumeTrouve) return conditionnement?.trim() || null;
+  if (!presentationTrouvee) return conditionnement?.trim() || null;
   if (
     conditionnement
-    && volume(conditionnement)
-    && contenant(conditionnement)
-    && quantiteStructure === null
-    && quantiteHorsConditionnement === null
+    && quantiteTrouvee === null
+    && /^(?:flacon|a[ée]rosol|ampoule|bo[iî]te|seringue|pr[ée]sentoir)\s+\d/i.test(conditionnement.trim())
   ) {
     return conditionnement.trim();
   }
-  const volumeLibelle = `${volumeTrouve.valeur} ${volumeTrouve.unite}`;
-  if (contenantTrouve) {
-    return quantiteTrouvee !== null
-      ? `${quantiteTrouvee} ${contenantTrouve} de ${volumeLibelle}`
-      : `${contenantTrouve} de ${volumeLibelle}`;
+  return quantiteTrouvee !== null
+    ? `${quantiteTrouvee} ${presentationTrouvee.libelle}`
+    : presentationTrouvee.libelle;
+}
+
+export function normaliserConditionnementEnregistre({
+  conditionnement,
+  evidenceJson,
+}: {
+  conditionnement: string | null;
+  evidenceJson: string | null;
+}): string | null {
+  if (!evidenceJson) return normaliserConditionnementExtrait({ conditionnement });
+  try {
+    const evidence = JSON.parse(evidenceJson) as Record<string, unknown>;
+    const presentationBrute = evidence.presentation;
+    const presentationChamp = presentationBrute && typeof presentationBrute === "object"
+      ? presentationBrute as Record<string, unknown>
+      : {};
+    const presentationValue = presentationChamp.value && typeof presentationChamp.value === "object"
+      ? presentationChamp.value as Record<string, unknown>
+      : presentationChamp;
+    const quantiteChamp = evidence.deliveredQuantity && typeof evidence.deliveredQuantity === "object"
+      ? evidence.deliveredQuantity as Record<string, unknown>
+      : {};
+    const presentation = {
+      ...presentationValue,
+      ...(presentationValue.deliveredQuantity == null && quantiteChamp.value != null
+        ? { deliveredQuantity: quantiteChamp.value }
+        : {}),
+    };
+    const sourceTexts = [evidence.conditionnement, evidence.presentation, evidence.deliveredQuantity]
+      .flatMap((champ) => {
+        if (!champ || typeof champ !== "object") return [];
+        const sourceText = (champ as Record<string, unknown>).sourceText;
+        return typeof sourceText === "string" ? [sourceText] : [];
+      });
+    return normaliserConditionnementExtrait({ conditionnement, presentation, sourceTexts });
+  } catch {
+    return normaliserConditionnementExtrait({ conditionnement });
   }
-  return quantiteTrouvee !== null ? `${volumeLibelle} · Qté ${quantiteTrouvee}` : volumeLibelle;
 }
 
 export function analyserPresentation(value: string | null | undefined): PresentationDelivree {
@@ -147,7 +223,7 @@ export function formaterMedicamentPourListe({
   const nom = nomExtrait
     .trim()
     .replace(
-      /\s+(?:(?:\d+\s*)?(?:fl(?:acon)?|ser(?:ingue)?|pr[ée]sentoir|bt|bo[iî]te|aer|a[ée]rosol|amp(?:oule)?)\.?\s*(?:de\s*)?\d+(?:[.,]\d+)?\s*(?:ml|cl|l|d(?:\.|oses?)?)(?:\s*[·-]?\s*\d+\s*d(?:\.|oses?)?)?)(?:\s*[·-]?\s*(?:qt[ée]|quantit[ée])\s*:?\s*\d+)?\s*$/i,
+      /\s+(?:(?:\d+\s*)?(?:fl(?:acon)?|ser(?:ingue)?|pr[ée]sentoir|bt|bo[iî]te|aer|a[ée]rosol|amp(?:oule)?)\.?\s*(?:de\s*)?\d+(?:[.,]\d+)?\s*(?:ml|cl|l|d(?:\.|oses?)?)(?:\s*[·-]?\s*\(?\s*\d+\s*d(?:\.|oses?)?\s*\)?)?)(?:\s*[·-]?\s*(?:qt[ée]|quantit[ée])\s*:?\s*\d+)?\s*$/i,
       "",
     )
     .replace(/\s+/g, " ")
@@ -156,7 +232,8 @@ export function formaterMedicamentPourListe({
     ?.replace(/^flacons?\s+de\s+(?=\d)/i, "flacon ")
     .replace(/^a[ée]rosols?\s+de\s+(?=\d)/i, "aérosol ")
     .replace(/^ampoules?\s+de\s+(?=\d)/i, "ampoule ")
-    .replace(/^bo[iî]tes?\s+de\s+(?=\d)/i, "boîte ")
+    .replace(/^bo[iî]tes?\s+de\s+(?=\d+\s*(?:ml|cl|l)\b)/i, "boîte ")
+    .replace(/^bo[iî]tes?\s+de\s+/i, "boîte de ")
     .replace(/^seringues?\s+de\s+(?=\d)/i, "seringue ")
     .replace(/^pr[ée]sentoirs?\s+de\s+(?=\d)/i, "présentoir ")
     .replace(/^./, (premiereLettre) => premiereLettre.toUpperCase())
@@ -178,7 +255,9 @@ export function formaterPresentationCompacte(value: string | null | undefined): 
 
   const { presentation, quantite } = analyserPresentation(value);
   const libelle = presentation
-    ?.replace(/^(flacons?|a[ée]rosols?|ampoules?|bo[iî]tes?)\s+de\s+(?=\d)/i, "$1 ")
+    ?.replace(/^(flacons?|a[ée]rosols?|ampoules?)\s+de\s+(?=\d)/i, "$1 ")
+    .replace(/^bo[iî]tes?\s+de\s+(?=\d+\s*(?:ml|cl|l)\b)/i, "boîte ")
+    .replace(/^bo[iî]tes?\s+de\s+/i, "boîte de ")
     .replace(/^./, (premiereLettre) => premiereLettre.toUpperCase());
   return [libelle, quantite !== null ? `Qté ${quantite}` : null].filter(Boolean).join(" · ") || null;
 }

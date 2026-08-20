@@ -119,12 +119,19 @@ function creerMemoire(options: { failLinkAt?: number; medicamentActif?: boolean 
 
 test("cree une seule ordonnance et une liaison pour un medicament", async () => {
   const { state, tx } = creerMemoire();
-  const result = await creerOrdonnanceAvecMedicaments(tx, ordonnanceInput([medicamentInput()]), ["doc.jpg"]);
+  const conditionnement = "1 flacon de 50 ml · 10 doses";
+  const result = await creerOrdonnanceAvecMedicaments(
+    tx,
+    ordonnanceInput([medicamentInput({ conditionnement })]),
+    ["doc.jpg"],
+  );
   assert.equal(state.ordonnances.length, 1);
   assert.equal(state.liens.length, 1);
   assert.equal(result.medicamentIds.length, 1);
   assert.equal(state.liens[0].posologieExtraite, "1 ml / 10 kg de poids vif");
   assert.equal(state.liens[0].numeroLot, "2111AA");
+  assert.equal(state.liens[0].conditionnement, conditionnement);
+  assert.equal(state.ordonnances[0].conditionnement, conditionnement);
 });
 
 test("conserve plusieurs consignes pratiques dans la liaison ordonnance medicament", async () => {

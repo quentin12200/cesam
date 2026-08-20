@@ -10,7 +10,8 @@ test("la liste construit une seule carte avec le nombre et les noms des médicam
   ]);
 
   assert.match(ordonnancesPage, /regrouperOrdonnancesPourListe/);
-  assert.match(ordonnancesPage, /nomExtrait: true, conditionnement: true/);
+  assert.match(ordonnancesPage, /nomExtrait: true, conditionnement: true, evidenceJson: true/);
+  assert.match(ordonnancesPage, /normaliserConditionnementEnregistre/);
   assert.match(pharmaciePage, /regrouperOrdonnancesPourListe/);
   assert.match(client, /ord\.medicaments\.length} médicament/);
   assert.match(client, /ord\.medicaments\.map/);

@@ -12,6 +12,7 @@ import {
   formaterRythme,
   formaterVoie,
   normaliserConditionnementExtrait,
+  normaliserConditionnementEnregistre,
   resoudreDosePratique,
 } from "./ordonnance-display.ts";
 
@@ -74,6 +75,81 @@ test("reconstruit le flacon et la quantite depuis des preuves explicites", () =>
   });
   assert.equal(conditionnement, "1 flacon de 100 ml");
   assert.equal(formaterPresentationCompacte(conditionnement), "Flacon 100 ml · Qté 1");
+});
+
+test("normalise les variantes compactes d'un flacon de 50 ml et 10 doses", () => {
+  for (const conditionnement of [
+    "FL.50ML(10D.)",
+    "FL. 50 ML (10 D.)",
+    "FL 50ML 10D",
+    "FL.50 ML 10 D.",
+  ]) {
+    const normalise = normaliserConditionnementExtrait({ conditionnement });
+    assert.equal(formaterPresentationCompacte(normalise), "Flacon 50 ml · 10 doses");
+  }
+});
+
+test("conserve un vrai flacon de 2 ml sans le confondre avec une dose", () => {
+  assert.equal(
+    formaterPresentationCompacte(normaliserConditionnementExtrait({ conditionnement: "FL. 2 ML" })),
+    "Flacon 2 ml",
+  );
+  assert.equal(
+    formaterPresentationCompacte(normaliserConditionnementExtrait({ conditionnement: "FL.2ML(1D.)" })),
+    "Flacon 2 ml · 1 dose",
+  );
+  assert.match(
+    formaterPresentationCompacte(normaliserConditionnementExtrait({ conditionnement: "BT 1 D. FL. 2 ML" })) ?? "",
+    /Flacon de 2 ml/i,
+  );
+  assert.equal(normaliserConditionnementExtrait({ conditionnement: null, sourceTexts: ["Dose : 2 ml"] }), null);
+  assert.equal(normaliserConditionnementExtrait({ conditionnement: null, sourceTexts: ["Administrer 2 ml"] }), null);
+});
+
+test("priorise la quantite delivree structuree sans confondre volume et nombre de doses", () => {
+  const flacon = normaliserConditionnementExtrait({
+    conditionnement: "4 FL. 50 ML",
+    presentation: { deliveredQuantity: 1 },
+  });
+  assert.equal(formaterPresentationCompacte(flacon), "Flacon 50 ml · Qté 1");
+
+  const boite = normaliserConditionnementExtrait({
+    conditionnement: "BT 5 D.",
+    presentation: { deliveredQuantity: 1 },
+  });
+  assert.equal(formaterPresentationCompacte(boite), "Boîte de 5 doses · Qté 1");
+  assert.doesNotMatch(formaterPresentationCompacte(boite) ?? "", /Qté 5/);
+});
+
+test("retrouve une quantite historique depuis les preuves enregistrees", () => {
+  const conditionnement = normaliserConditionnementEnregistre({
+    conditionnement: "Flacon 50 ml",
+    evidenceJson: JSON.stringify({
+      conditionnement: {
+        value: "Flacon 50 ml",
+        sourceText: "FL. 50 ML — Délivré ce jour Qté : 1",
+      },
+    }),
+  });
+  assert.equal(formaterPresentationCompacte(conditionnement), "Flacon 50 ml · Qté 1");
+});
+
+test("separe conditionnement compact, quantite livree et dose d'administration", () => {
+  const conditionnement = normaliserConditionnementExtrait({
+    conditionnement: "FL.50ML(10D.)",
+    presentation: { deliveredQuantity: 1 },
+    sourceTexts: ["Administrer 2 ml"],
+  });
+  assert.equal(formaterPresentationCompacte(conditionnement), "Flacon 50 ml · 10 doses · Qté 1");
+  assert.doesNotMatch(conditionnement ?? "", /2 ml/);
+  assert.deepEqual(formaterMedicamentPourListe({
+    nomExtrait: "HIPRABOVIS SOMNI LKT FL.50ML(10D.)",
+    conditionnement,
+  }), {
+    nom: "HIPRABOVIS SOMNI LKT",
+    presentation: "Flacon 50 ml · 10 doses",
+    quantite: 1,
+  });
 });
 
 test("formate la posologie ponderale en une phrase compacte", () => {

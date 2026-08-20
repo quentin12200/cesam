@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { FileText } from "lucide-react";
 import OrdonnancesClient, { type ExtractionAVerifierItem, type OrdonnanceItem } from "./OrdonnancesClient";
 import { ordonnanceSourceKey, regrouperOrdonnancesPourListe } from "@/lib/ordonnance-list";
+import { normaliserConditionnementEnregistre } from "@/lib/ordonnance-display";
 
 import BackButton from "@/app/components/BackButton";
 async function getOrdonnances(): Promise<OrdonnanceItem[]> {
@@ -13,7 +14,7 @@ async function getOrdonnances(): Promise<OrdonnanceItem[]> {
     include: {
       extraction: { select: { id: true } },
       medicaments: {
-        select: { nomExtrait: true, conditionnement: true },
+        select: { nomExtrait: true, conditionnement: true, evidenceJson: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -43,7 +44,13 @@ async function getOrdonnances(): Promise<OrdonnanceItem[]> {
       photoUrl: o.photoUrl,
       photoUrls: o.photoUrls,
     }),
-    medicaments: o.medicaments,
+    medicaments: o.medicaments.map((medicament) => ({
+      nomExtrait: medicament.nomExtrait,
+      conditionnement: normaliserConditionnementEnregistre({
+        conditionnement: medicament.conditionnement,
+        evidenceJson: medicament.evidenceJson,
+      }),
+    })),
   })));
 }
 

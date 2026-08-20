@@ -70,6 +70,37 @@ test("reconstruit le cas reel Tenaline uniquement depuis ses blocs transcrits", 
   assert.doesNotMatch(medicament.repeatCondition ?? "", /viande|abats|lait/i);
 });
 
+test("conserve la quantite structuree pendant la transcription par blocs", () => {
+  const proposition = normaliserAnalyseOrdonnance(appliquerTranscriptionParBlocs({
+    transcription: {
+      entete: { lignes: ["ordonnance n°26-08-0694[V] le 19/08/2026"] },
+      medicaments: [{
+        identification: ["HIPRABOVIS SOMNI LKT"],
+        presentation: ["FL.50ML(10D.)"],
+        posologie: ["Administrer 2 ml"],
+        renouvellement: [],
+        delaisAttente: [],
+        instructionsPrecautions: [],
+        autres: [],
+      }],
+    },
+    medicaments: [{
+      medicamentNom: "HIPRABOVIS SOMNI LKT",
+      presentation: {
+        containerType: "flacon",
+        volumeValue: 50,
+        volumeUnit: "ml",
+        deliveredQuantity: 1,
+      },
+    }],
+  }));
+
+  assert.equal(
+    formaterPresentationCompacte(proposition.medicaments?.[0].conditionnement ?? null),
+    "Flacon 50 ml · 10 doses · Qté 1",
+  );
+});
+
 test("ne recupere aucune donnee dans un bloc metier voisin", () => {
   const analyse = appliquerTranscriptionParBlocs({
     transcription: {
