@@ -5,6 +5,7 @@ import {
   estInstructionPratique,
   formaterDose,
   formaterDoseCompacte,
+  formaterConditionnementVisuel,
   formaterMedicamentPourListe,
   formaterPresentationCompacte,
   formaterRenouvellement,
@@ -33,6 +34,29 @@ test("conserve une presentation sans inventer de quantite", () => {
 test("affiche la presentation et la quantite sans doublon", () => {
   assert.equal(formaterPresentationCompacte("1 flacon de 100 ml"), "Flacon 100 ml · Qté 1");
   assert.equal(formaterPresentationCompacte("Flacon 250 ml"), "Flacon 250 ml");
+});
+
+test("affiche un conditionnement visuel avec quantite et total de doses", () => {
+  assert.deepEqual(formaterConditionnementVisuel("1 seringue"), {
+    ligne: "1 × seringue",
+    totalDoses: null,
+  });
+  assert.deepEqual(formaterConditionnementVisuel("2 flacons de 50 ml"), {
+    ligne: "2 × flacons 50 ml",
+    totalDoses: null,
+  });
+  assert.deepEqual(formaterConditionnementVisuel("1 flacon de 50 ml · 10 doses"), {
+    ligne: "1 × flacon 50 ml · 10 doses",
+    totalDoses: null,
+  });
+  assert.deepEqual(formaterConditionnementVisuel("3 flacons de 50 ml · 10 doses"), {
+    ligne: "3 × flacons 50 ml · 10 doses chacun",
+    totalDoses: "Total : 30 doses",
+  });
+  assert.deepEqual(formaterConditionnementVisuel("1 boîte de 5 doses"), {
+    ligne: "1 × boîte de 5 doses",
+    totalDoses: null,
+  });
 });
 
 test("prepare les medicaments de l'ordonnance pour une liste compacte", () => {

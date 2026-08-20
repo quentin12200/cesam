@@ -37,6 +37,11 @@ export interface PresentationDelivree {
   quantite: number | null;
 }
 
+export interface ConditionnementVisuel {
+  ligne: string | null;
+  totalDoses: string | null;
+}
+
 function uniteVolume(value: string): string {
   const unite = sansAccents(value).toLowerCase();
   return /^m(?:l|i|1)$/.test(unite) ? "ml" : unite;
@@ -260,6 +265,49 @@ export function formaterPresentationCompacte(value: string | null | undefined): 
     .replace(/^bo[iî]tes?\s+de\s+/i, "boîte de ")
     .replace(/^./, (premiereLettre) => premiereLettre.toUpperCase());
   return [libelle, quantite !== null ? `Qté ${quantite}` : null].filter(Boolean).join(" · ") || null;
+}
+
+export function formaterConditionnementVisuel(value: string | null | undefined): ConditionnementVisuel {
+  const { presentation, quantite } = analyserPresentation(value);
+  if (!presentation) {
+    return { ligne: quantite !== null ? `Qté ${quantite}` : null, totalDoses: null };
+  }
+  if (quantite === null) {
+    return { ligne: formaterPresentationCompacte(value), totalDoses: null };
+  }
+
+  const contenant = presentation.match(/^(flacon|a[ée]rosol|ampoule|bo[iî]te|seringue|pr[ée]sentoir)s?\b/i);
+  if (!contenant) {
+    return {
+      ligne: `${quantite} × ${presentation.replace(/^./, (lettre) => lettre.toLowerCase())}`,
+      totalDoses: null,
+    };
+  }
+  const singulier = contenant[1].toLowerCase()
+    .replace("aerosol", "aérosol")
+    .replace("boite", "boîte")
+    .replace("presentoir", "présentoir");
+  const pluriels: Record<string, string> = {
+    flacon: "flacons",
+    aérosol: "aérosols",
+    ampoule: "ampoules",
+    boîte: "boîtes",
+    seringue: "seringues",
+    présentoir: "présentoirs",
+  };
+  const nomContenant = quantite > 1 ? pluriels[singulier] : singulier;
+  const suiteBrute = presentation.slice(contenant[0].length).trim();
+  const suite = singulier === "boîte" ? suiteBrute : suiteBrute.replace(/^de\s+/i, "");
+  const doses = presentation.match(/\b(\d+)\s*doses?\b/i);
+  const suffixeChacun = doses && quantite > 1
+    ? ` ${singulier === "boîte" || singulier === "seringue" || singulier === "ampoule" ? "chacune" : "chacun"}`
+    : "";
+  const ligne = `${quantite} × ${nomContenant}${suite ? ` ${suite}` : ""}${suffixeChacun}`;
+  const totalDoses = doses && quantite > 1
+    ? `Total : ${quantite * Number(doses[1])} doses`
+    : null;
+
+  return { ligne, totalDoses };
 }
 
 export function formaterDose(med: {

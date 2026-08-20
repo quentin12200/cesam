@@ -30,9 +30,14 @@ test("une ordonnance de trois médicaments garde le regroupement pendant la cons
 });
 
 test("affiche séparément conditionnement et quantité à administrer", () => {
-  assert.match(client, /formaterPresentationCompacte\(medicament\.conditionnement\)/);
+  assert.match(page, /normaliserConditionnementEnregistre/);
+  assert.match(page, /evidenceJson: item\.evidenceJson/);
+  assert.match(client, /formaterConditionnementVisuel\(medicament\.conditionnement\)/);
+  assert.match(client, /conditionnementVisuel\.totalDoses/);
   assert.match(client, /lignesDosePratiqueConsultation\(medicament\.posologieExtraite\)/);
   assert.match(client, /dosesPratiques\.map/);
+  assert.match(client, /À administrer/);
+  assert.match(client, /getCategorieMedicament/);
 });
 
 test("conserve le document original et masque le renouvellement interdit de la carte", () => {

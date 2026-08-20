@@ -3,14 +3,14 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Save, ScanLine, Loader2, RefreshCw, Camera, CheckCircle2, AlertCircle, FileText, ExternalLink, Pencil } from "lucide-react";
+import { Save, ScanLine, Loader2, RefreshCw, Camera, CheckCircle2, AlertCircle, Beef, CalendarDays, FileText, ExternalLink, Milk, Package, Pencil, RotateCcw, Syringe } from "lucide-react";
 import { fileToDocumentDataUrl } from "@/lib/image-client";
 import { uploadDataUrlToStorage } from "@/lib/firebase-client";
 import { formatDate } from "@/lib/utils";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
 import {
-  formaterPresentationCompacte,
+  formaterConditionnementVisuel,
   formaterRenouvellementUtile,
   formaterRythme,
 } from "@/lib/ordonnance-display";
@@ -18,6 +18,7 @@ import {
   formaterVoiesConsultation,
   lignesDosePratiqueConsultation,
 } from "@/lib/ordonnance-consultation";
+import { getCategorieMedicament } from "@/lib/medicament-categories";
 
 interface OrdonnanceData {
   id: string;
@@ -395,7 +396,7 @@ export default function OrdonnanceDetailClient({
           </h3>
           <div className="mt-3 space-y-3">
             {medicaments.map((medicament) => {
-              const presentation = formaterPresentationCompacte(medicament.conditionnement);
+              const conditionnementVisuel = formaterConditionnementVisuel(medicament.conditionnement);
               const dosesPratiques = lignesDosePratiqueConsultation(medicament.posologieExtraite);
               const voie = formaterVoiesConsultation(medicament.voieExtraite);
               const rythme = formaterRythme({
@@ -408,31 +409,51 @@ export default function OrdonnanceDetailClient({
               });
               const delaisViandeAbats = medicament.delaiAttenteViande != null
                 && medicament.delaiAttenteViande === medicament.delaiAttenteAbats;
+              const categorie = medicament.categorie ? getCategorieMedicament(medicament.categorie) : null;
 
               return (
                 <article key={medicament.id} className="rounded-lg border border-gray-200 p-3">
-                  <p className="font-bold text-gray-950">{medicament.nomPharmacie}</p>
-                  {presentation && <p className="mt-1 text-sm font-medium text-gray-700">{presentation}</p>}
-                  {voie && <p className="mt-2 text-sm font-semibold text-blue-800">{voie}</p>}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-bold text-gray-950">{medicament.nomPharmacie}</p>
+                    {categorie && (
+                      <span
+                        className="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                        style={{ backgroundColor: categorie.bg, borderColor: categorie.border, color: categorie.text }}
+                      >
+                        {categorie.label}
+                      </span>
+                    )}
+                  </div>
+                  {conditionnementVisuel.ligne && (
+                    <div className="mt-1.5 flex items-start gap-1.5 text-sm text-gray-700">
+                      <Package size={14} className="mt-0.5 shrink-0 text-gray-500" />
+                      <div>
+                        <p className="font-medium">{conditionnementVisuel.ligne}</p>
+                        {conditionnementVisuel.totalDoses && <p className="text-[11px] text-gray-500">{conditionnementVisuel.totalDoses}</p>}
+                      </div>
+                    </div>
+                  )}
+                  {voie && <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800"><Syringe size={13} /> {voie}</p>}
 
                   {dosesPratiques.length > 0 && (
-                    <div className="mt-2 space-y-1 text-sm font-semibold text-gray-900">
-                      {dosesPratiques.map((dose) => <p key={dose}>{dose}</p>)}
+                    <div className="mt-1.5 space-y-1 text-sm font-semibold text-gray-900">
+                      {dosesPratiques.map((dose) => <p key={dose}>{/^(Adultes|Veaux|Max)\s*:/i.test(dose) ? dose : `À administrer : ${dose}`}</p>)}
                     </div>
                   )}
 
                   {(rythme || medicament.dureeExtraite != null || renouvellement) && (
-                    <div className="mt-2 space-y-1 text-sm text-gray-700">
-                      {rythme && <p>{rythme}</p>}
+                    <div className="mt-1.5 space-y-1 text-sm text-gray-700">
+                      {rythme && <p className="flex items-start gap-1.5"><CalendarDays size={14} className="mt-0.5 shrink-0 text-blue-700" />{rythme}</p>}
                       {medicament.dureeExtraite != null && (
-                        <p>Pendant {medicament.dureeExtraite} jour{medicament.dureeExtraite > 1 ? "s" : ""}</p>
+                        <p className="flex items-start gap-1.5"><CalendarDays size={14} className="mt-0.5 shrink-0 text-blue-700" />Pendant {medicament.dureeExtraite} jour{medicament.dureeExtraite > 1 ? "s" : ""}</p>
                       )}
-                      {renouvellement && <p>{renouvellement}</p>}
+                      {renouvellement && <p className="flex items-start gap-1.5"><RotateCcw size={14} className="mt-0.5 shrink-0 text-violet-700" />{renouvellement}</p>}
                     </div>
                   )}
 
                   {(medicament.delaiAttenteViande != null || medicament.delaiAttenteAbats != null || medicament.delaiAttenteLait != null) && (
-                    <p className="mt-2 text-xs font-medium text-orange-800">
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 rounded-md bg-orange-50 px-2 py-1.5 text-[11px] font-medium text-orange-900">
+                      <Beef size={12} className="shrink-0" />
                       {delaisViandeAbats
                         ? `Viande/abats : ${medicament.delaiAttenteViande} j`
                         : [
@@ -441,7 +462,7 @@ export default function OrdonnanceDetailClient({
                         ].filter(Boolean).join(" · ")}
                       {(medicament.delaiAttenteViande != null || medicament.delaiAttenteAbats != null)
                         && medicament.delaiAttenteLait != null && " · "}
-                      {medicament.delaiAttenteLait != null && `Lait : ${medicament.delaiAttenteLait} j`}
+                      {medicament.delaiAttenteLait != null && <><Milk size={12} className="shrink-0" />{`Lait : ${medicament.delaiAttenteLait} j`}</>}
                     </p>
                   )}
 

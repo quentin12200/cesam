@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Beef, CalendarDays, ChevronDown, Milk, Pencil, RotateCcw, Syringe } from "lucide-react";
+import { AlertTriangle, Beef, CalendarDays, ChevronDown, Milk, Package, Pencil, RotateCcw, Syringe } from "lucide-react";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import type { MedicamentCorrespondant, MedicamentPropose } from "@/lib/ordonnance-types";
 import {
   controlerCoherenceDosePharmacie,
   formaterDose,
   formaterDoseCompacte,
-  formaterPresentationCompacte,
+  formaterConditionnementVisuel,
   formaterRenouvellement,
   formaterRythme,
   formaterVoie,
@@ -17,6 +17,7 @@ import {
 } from "@/lib/ordonnance-display";
 import { formaterDosePratiqueContextuelle, formaterDoseSource } from "@/lib/ordonnance-dose-sources";
 import {
+  getCategorieMedicament,
   getCategoriesMedicamentUtilisees,
   trouverCategorieProche,
 } from "@/lib/medicament-categories";
@@ -110,7 +111,7 @@ export default function MedicamentVerificationCard({
   const match = correspondances.find((item) => item.id === med.medicationId)
     ?? (med.medicationId ? med.ia?.medicationMatch : null)
     ?? pharmacyOptions.find((item) => item.id === med.medicationId);
-  const presentationCompacte = formaterPresentationCompacte(med.conditionnement);
+  const conditionnementVisuel = formaterConditionnementVisuel(med.conditionnement);
   const resolutionCourante = resoudreSourcesDose({
     ...med,
     doseSourceText: med.ia?.evidence.dose?.sourceText,
@@ -182,6 +183,9 @@ export default function MedicamentVerificationCard({
     : correspondancesAmbigues
       ? { label: "À associer", className: "bg-amber-100 text-amber-800" }
       : { label: "Non reconnu", className: "bg-gray-100 text-gray-700" };
+  const categorie = match?.categorie ?? med.categorie;
+  const categorieVisuelle = categorie ? getCategorieMedicament(categorie) : null;
+  const categorieLabel = match?.categorieLabel ?? categorieVisuelle?.label;
 
   const change = (field: keyof MedicationFields, value: string) => {
     onChange(field, value);
@@ -241,9 +245,28 @@ export default function MedicamentVerificationCard({
             <h3 className="min-w-0 truncate text-lg font-bold text-gray-950">{nomTerrain}</h3>
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statutPharmacie.className}`}>{statutPharmacie.label}</span>
           </div>
-          {match?.categorieLabel && <p className="mt-0.5 text-xs font-medium text-green-800">{match.categorieLabel}</p>}
+          {categorieLabel && categorieVisuelle && (
+            <span
+              className="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+              style={{
+                backgroundColor: categorieVisuelle.bg,
+                borderColor: categorieVisuelle.border,
+                color: categorieVisuelle.text,
+              }}
+            >
+              {categorieLabel}
+            </span>
+          )}
           {matchInactif && <p className="mt-0.5 text-[11px] font-medium text-amber-800">Fiche inactive — conservée pour éviter un doublon.</p>}
-          {presentationCompacte && <p className="mt-1 text-sm text-gray-600">{presentationCompacte}</p>}
+          {conditionnementVisuel.ligne && (
+            <div className="mt-1.5 flex items-start gap-1.5 text-sm text-gray-700">
+              <Package size={14} className="mt-0.5 shrink-0 text-gray-500" />
+              <div className="min-w-0">
+                <p className="font-medium">{conditionnementVisuel.ligne}</p>
+                {conditionnementVisuel.totalDoses && <p className="text-[11px] text-gray-500">{conditionnementVisuel.totalDoses}</p>}
+              </div>
+            </div>
+          )}
           {(doseAVerifier || dureeAVerifier || delaiAVerifier) && (
             <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-amber-800">
               {doseAVerifier && <span className="rounded bg-amber-50 px-1.5 py-0.5">Dose à vérifier</span>}
@@ -265,9 +288,9 @@ export default function MedicamentVerificationCard({
         )}
       </header>
 
-      <div className="mt-3 space-y-1.5 text-sm text-gray-800">
+      <div className="mt-2 space-y-1.5 text-sm text-gray-800">
         {voieCompacte && (
-          <p className="flex items-center gap-2"><Syringe size={15} className="shrink-0 text-green-700" /> {voieCompacte}</p>
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800"><Syringe size={13} className="shrink-0" /> {voieCompacte}</p>
         )}
         {dosesPratiques.length > 0
           ? dosesPratiques.map((dosePratique, doseIndex) => (
@@ -275,7 +298,7 @@ export default function MedicamentVerificationCard({
               {formaterDosePratiqueContextuelle(dosePratique)}
             </p>
           ))
-          : dose && <p className="font-medium text-gray-900">{dose}</p>}
+          : dose && <p className="font-medium text-gray-900"><span className="text-gray-600">À administrer :</span> {dose}</p>}
         {(dosesPratiques.length > 0 ? dureeTerrain : rythmeEtDuree) && (
           <p className="flex items-start gap-2"><CalendarDays size={15} className="mt-0.5 shrink-0 text-blue-700" /> {dosesPratiques.length > 0 ? dureeTerrain : rythmeEtDuree}</p>
         )}
@@ -285,16 +308,13 @@ export default function MedicamentVerificationCard({
       </div>
 
       {delaisComplets && (
-        <div className="mt-3 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-950">
-          <p className="font-semibold">Délais d’attente</p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-orange-50 px-2 py-1.5 text-[11px] font-medium text-orange-950">
             {(med.meatDays || med.offalDays) && <span className="inline-flex items-center gap-1"><Beef size={13} /> {
               med.meatDays && med.offalDays && med.meatDays === med.offalDays
                 ? `Viande/abats : ${med.meatDays} j`
                 : [med.meatDays && `Viande : ${med.meatDays} j`, med.offalDays && `Abats : ${med.offalDays} j`].filter(Boolean).join(" · ")
             }</span>}
             {med.milkDays && <span className="inline-flex items-center gap-1"><Milk size={13} /> Lait : {med.milkDays} j</span>}
-          </div>
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { FileText } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { ordonnanceSourceKey } from "@/lib/ordonnance-list";
 import { ordonnanceMedicationSources } from "@/lib/ordonnance-detail";
+import { normaliserConditionnementEnregistre } from "@/lib/ordonnance-display";
 import OrdonnanceDetailClient from "./OrdonnanceDetailClient";
 
 import BackButton from "@/app/components/BackButton";
@@ -136,7 +137,10 @@ export default async function OrdonnanceDetailPage({ params, searchParams }: Pag
               substanceActive: item.substanceActive,
               concentration: item.concentration,
               formePharmaceutique: item.formePharmaceutique,
-              conditionnement: item.conditionnement,
+              conditionnement: normaliserConditionnementEnregistre({
+                conditionnement: item.conditionnement,
+                evidenceJson: item.evidenceJson,
+              }),
               posologieExtraite: item.posologieExtraite,
               dose: item.dose,
               uniteDosage: item.uniteDosage,

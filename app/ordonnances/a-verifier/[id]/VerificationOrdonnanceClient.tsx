@@ -16,7 +16,7 @@ import {
   sourceJustifieDateDelivrance,
 } from "@/lib/ordonnance-dates";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
-import { resoudreSourcesDose } from "@/lib/ordonnance-display";
+import { normaliserConditionnementExtrait, resoudreSourcesDose } from "@/lib/ordonnance-display";
 import MedicamentVerificationCard, { type MedicationFields } from "./MedicamentVerificationCard";
 
 interface ExtractionInfo {
@@ -38,6 +38,18 @@ function s(value: string | number | null | undefined): string {
 }
 
 function versChamps(m: MedicamentPropose): MedicationFields {
+  const presentationValue = m.evidence.presentation?.value;
+  const presentation = presentationValue && typeof presentationValue === "object"
+    ? presentationValue as Record<string, unknown>
+    : null;
+  const sourcesConditionnement = ["conditionnement", "presentation", "deliveredQuantity"]
+    .map((cle) => m.evidence[cle]?.sourceText)
+    .filter((value): value is string => Boolean(value));
+  const conditionnement = normaliserConditionnementExtrait({
+    conditionnement: s(m.conditionnement),
+    presentation,
+    sourceTexts: sourcesConditionnement,
+  });
   const doseInitiale = {
     doseValue: s(m.doseValue),
     doseUnit: s(m.doseUnit),
@@ -71,7 +83,7 @@ function versChamps(m: MedicamentPropose): MedicationFields {
     categorie: s(m.categorie),
     familleTherapeutique: s(m.familleTherapeutique),
     formePharmaceutique: s(m.formePharmaceutique),
-    conditionnement: s(m.conditionnement),
+    conditionnement: conditionnement ?? "",
     doseValue: doseRetenue.doseValue,
     doseUnit: doseRetenue.doseUnit,
     referenceValue: doseRetenue.referenceValue,

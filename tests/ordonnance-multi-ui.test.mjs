@@ -19,7 +19,8 @@ test("scan verification et validation partagent les memes candidats pharmacie", 
   assert.match(verificationPage, /chargerCandidatsOrdonnance/);
   assert.match(validationService, /chargerCandidatsOrdonnance/);
   assert.match(candidatesSource, /actif:\s*true/);
-  assert.doesNotMatch(candidatesSource, /where:\s*\{\s*actif:\s*true\s*\}/);
+  const requeteMedicaments = candidatesSource.slice(0, candidatesSource.indexOf("conditionnements:"));
+  assert.doesNotMatch(requeteMedicaments, /where:\s*\{\s*actif:\s*true\s*\}/);
   assert.match(verificationPage, /reevaluerCorrespondancesOrdonnance/);
 });
 
@@ -39,19 +40,21 @@ test("l'ecran annonce le nombre de medicaments sans multiplier les ordonnances",
 test("les correspondances ambigues exigent un choix explicite", () => {
   assert.match(medicationCard, /Plusieurs correspondances possibles — à confirmer/);
   assert.match(medicationCard, /Utiliser cette fiche/);
-  assert.match(medicationCard, /Créer une fiche/);
+  assert.match(medicationCard, /Créer dans Pharmacie/);
   assert.match(verification, /medicamentsAConfirmer > 0/);
 });
 
 test("la carte principale est compacte et les donnees techniques sont repliees", () => {
-  const avantDetails = medicationCard.slice(0, medicationCard.indexOf("<details"));
-  assert.match(avantDetails, /Présentation|presentation/);
-  assert.match(avantDetails, /presentationCompacte/);
+  const avantDetails = medicationCard.slice(0, medicationCard.indexOf("{med.medicationId ? ("));
+  assert.match(avantDetails, /conditionnementVisuel/);
+  assert.match(avantDetails, /conditionnementVisuel\.totalDoses/);
+  assert.match(avantDetails, /getCategorieMedicament/);
+  assert.match(avantDetails, /À administrer/);
   assert.match(avantDetails, /Dose à vérifier/);
   assert.match(avantDetails, /Durée à vérifier/);
   assert.match(avantDetails, /Délai à vérifier/);
   assert.match(avantDetails, /Dose/);
-  assert.match(avantDetails, /Délais d’attente/);
+  assert.match(avantDetails, /Viande\/abats/);
   assert.doesNotMatch(avantDetails, /Substance active/);
   assert.doesNotMatch(avantDetails, /Dose normalisée/);
   assert.doesNotMatch(avantDetails, /Instructions pratiques/);
@@ -61,13 +64,19 @@ test("la carte principale est compacte et les donnees techniques sont repliees",
   assert.doesNotMatch(medicationCard, /IA :/);
 });
 
+test("la verification relit le vrai conditionnement depuis sa preuve sans toucher a la dose", () => {
+  assert.match(verification, /normaliserConditionnementExtrait/);
+  assert.match(verification, /"conditionnement", "presentation", "deliveredQuantity"/);
+  assert.doesNotMatch(verification, /m\.evidence\.dose\?\.sourceText[\s\S]{0,120}conditionnement/);
+});
+
 test("la carte separe pharmacie, dose, rythme et instructions", () => {
   assert.match(medicationCard, /✓ Pharmacie/);
   assert.match(medicationCard, /Non reconnu/);
   assert.match(medicationCard, /Associer à une fiche existante/);
-  assert.match(medicationCard, /Créer une fiche/);
+  assert.match(medicationCard, /Créer dans Pharmacie/);
   assert.match(medicationCard, /Changer d’association/);
-  assert.match(medicationCard, /absenceConfirmee &&/);
+  assert.match(medicationCard, /Aucune fiche ne correspond/);
   assert.match(medicationCard, /formaterDoseCompacte/);
   assert.match(medicationCard, /med\.ia\?\.evidence\.dose\?\.sourceText/);
   const calculDose = medicationCard.slice(
@@ -81,8 +90,8 @@ test("la carte separe pharmacie, dose, rythme et instructions", () => {
 });
 
 test("la carte abandonne la preuve OCR des qu'une dose est corrigee manuellement", () => {
-  assert.match(verification, /resoudreDosePratique/);
-  assert.match(verification, /doseValue:\s*dosePratique\.doseValue/);
+  assert.match(verification, /resoudreSourcesDose/);
+  assert.match(verification, /doseValue:\s*doseRetenue\.doseValue/);
   assert.match(verification, /doseManuallyEdited:\s*med\.doseManuallyEdited \|\| champDose/);
   assert.match(medicationCard, /preferStructuredDose:\s*med\.doseManuallyEdited/);
   assert.match(verification, /doseValue:\s*med\.doseValue/);
