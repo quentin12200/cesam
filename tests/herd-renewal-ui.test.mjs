@@ -4,27 +4,31 @@ import test from "node:test";
 
 const dashboard = readFileSync(new URL("../app/troupeau/renouvellement/RenewalDashboard.tsx", import.meta.url), "utf8");
 const page = readFileSync(new URL("../app/troupeau/renouvellement/page.tsx", import.meta.url), "utf8");
+const calvingRoute = readFileSync(new URL("../app/api/velages/route.ts", import.meta.url), "utf8");
 
-test("la vue mobile expose les chiffres, la projection et la comparaison", () => {
-  for (const text of ["mères actuelles", "besoin / an", "candidates", "sorties prévues", "Projection :", "Comparer les candidates"]) assert.match(dashboard, new RegExp(text));
-  assert.match(dashboard, /grid-cols-2[^\n]*sm:grid-cols-4/);
-  assert.match(dashboard, /rounded-xl/);
+test("affiche la moyenne réelle, la sélection des petites et la projection annuelle", () => {
+  for (const text of ["1er vêlage moyen", "Sélection en cours — Petites génisses", "Projection multi-années", "Mères au début", "Sorties nécessaires"]) assert.match(dashboard, new RegExp(text));
+  assert.doesNotMatch(dashboard, /1er vêlage \(mois\)/);
 });
 
-test("les décisions restent temporaires et couvrent les trois états", () => {
-  assert.match(dashboard, /GARDER/);
-  assert.match(dashboard, /A_REVOIR/);
-  assert.match(dashboard, /SORTIR/);
-  assert.match(dashboard, /aucun animal n’est modifié/);
+test("compare uniquement les petites génisses", () => {
+  assert.match(dashboard, /pipelineCandidates\.filter\(\(candidate\) => candidate\.category === "PETITE_GENISSE"\)/);
+  assert.match(dashboard, /Comparer les candidates/);
+  for (const text of ["Par père", "Par mère", "GARDER", "A_REVOIR", "SORTIR"]) assert.match(dashboard, new RegExp(text));
 });
 
-test("les candidates viennent seulement des catégories de renouvellement et réutilisent la généalogie", () => {
-  assert.match(page, /RENEWAL_CANDIDATE_CATEGORIES/);
-  assert.match(page, /resolveCandidateParents/);
-  assert.match(page, /directMother: identity\(animal\.mere\)/);
-  assert.match(page, /breedingBull: identity/);
+test("sépare le pipeline petite, moyenne, grande et les présélections", () => {
+  for (const value of ["PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "Présélections à venir"]) assert.match(dashboard, new RegExp(value));
+  assert.match(page, /PRESELECTION_GENISSE/);
 });
 
-test("le regroupement père et mère ainsi que les tris demandés sont présents", () => {
-  for (const text of ["Par père", "Par mère", "Date de naissance", "Poids", "Âge"]) assert.match(dashboard, new RegExp(text));
+test("reconnaît les anciennes mères par leurs vêlages et les sorties commerciales", () => {
+  assert.match(page, /isCurrentMother\(animal\.velagesVache\.length\)/);
+  assert.match(page, /isAutomaticPlannedExit\(animal\.velagesVache\.length, animal\.categorie\)/);
+});
+
+test("la création du premier vêlage applique la transition vers vache", () => {
+  assert.match(calvingRoute, /isFirstCalving = vache\._count\.velagesVache === 0/);
+  assert.match(calvingRoute, /motherUpdateAfterCalving\(isFirstCalving\)/);
+  assert.match(calvingRoute, /categorie: prevCategorie, estGenisse: prevEstGenisse/);
 });

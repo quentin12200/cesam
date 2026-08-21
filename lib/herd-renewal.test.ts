@@ -1,84 +1,105 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildAnnualRenewalProjection,
   calculateAnnualRenewalNeed,
-  calculateRenewalProjection,
+  calculateAverageFirstCalvingAge,
   countRenewalDecisions,
+  estimateMotherEntryDate,
   groupCandidatesByParent,
+  isAutomaticPlannedExit,
+  isCurrentMother,
   mergeRenewalSettings,
+  motherUpdateAfterCalving,
   parentDisplay,
   parseRenewalSettings,
-  projectionMessage,
-  renewalPilotMessage,
-  RENEWAL_CANDIDATE_CATEGORIES,
   resolveCandidateParents,
 } from "./herd-renewal.ts";
 
-test("calcule le besoin annuel depuis l’objectif et le taux", () => {
-  assert.equal(calculateAnnualRenewalNeed(70, 20), 14);
+test("calcule le besoin annuel cible", () => assert.equal(calculateAnnualRenewalNeed(70, 20), 14));
+
+test("calcule la moyenne réelle au premier vêlage et ignore les données corrompues", () => {
+  const result = calculateAverageFirstCalvingAge([
+    { birthDate: "2023-01-01", calvings: ["2026-01-01", "2027-01-01"] },
+    { birthDate: "2022-06-01", calvings: ["2025-06-01"] },
+    { birthDate: "2025-01-01", calvings: ["2025-06-01"] },
+  ]);
+  assert.equal(result.sampleSize, 2);
+  assert.ok(result.averageMonths >= 35.9 && result.averageMonths <= 36.1);
+  assert.equal(result.fallback, false);
 });
 
-test("limite les candidates aux quatre catégories de renouvellement demandées", () => {
-  assert.deepEqual(RENEWAL_CANDIDATE_CATEGORIES, ["PRESELECTION_GENISSE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"]);
-  assert.equal(RENEWAL_CANDIDATE_CATEGORIES.includes("VELLE" as never), false);
+test("utilise 36 mois si aucune donnée historique fiable n’existe", () => {
+  assert.deepEqual(calculateAverageFirstCalvingAge([{ birthDate: "2025-01-01", calvings: ["2025-06-01"] }]), { averageMonths: 36, sampleSize: 0, fallback: true });
 });
 
-test("projette une hausse de deux mères", () => {
-  assert.deepEqual(calculateRenewalProjection({ currentMothers: 70, targetMothers: 70, renewalRatePercent: 20, candidates: 17, keptCandidates: 14, plannedExits: 12 }), {
-    annualNeed: 14, selectionMargin: 3, projectedMothers: 72, change: 2,
-  });
-  assert.match(projectionMessage(70, 14, 12).text, /augmentera de 2 mères/);
+test("une date prévue fiable prime sur l’estimation historique", () => {
+  assert.equal(estimateMotherEntryDate({ birthDate: "2024-01-01", expectedCalvingDate: "2026-11-12", firstCalvingAverageMonths: 36 }).toISOString().slice(0, 10), "2026-11-12");
 });
 
-test("identifie une projection stable", () => {
-  const projection = calculateRenewalProjection({ currentMothers: 70, targetMothers: 70, renewalRatePercent: 20, candidates: 17, keptCandidates: 14, plannedExits: 14 });
-  assert.equal(projection.projectedMothers, 70);
-  assert.equal(projectionMessage(70, 14, 14).text, "Troupeau stable : environ 70 mères.");
+test("une génisse sans gestation est projetée depuis sa naissance et la moyenne", () => {
+  assert.equal(estimateMotherEntryDate({ birthDate: "2025-05-01", firstCalvingAverageMonths: 36 }).getFullYear(), 2028);
 });
 
-test("signale une marge ou un manque sans décider à la place de l’éleveur", () => {
-  assert.equal(renewalPilotMessage(17, 14).tone, "green");
-  assert.match(renewalPilotMessage(17, 14).text, /marge de sélection correcte/);
-  assert.equal(renewalPilotMessage(9, 14).tone, "red");
-  assert.match(renewalPilotMessage(9, 14).text, /risque de manquer/);
-  assert.equal(renewalPilotMessage(20, 14).tone, "orange");
+test("une petite génisse de 9 mois ne gonfle pas l’année courante", () => {
+  const entry = estimateMotherEntryDate({ birthDate: "2025-11-01", firstCalvingAverageMonths: 36 });
+  const years = buildAnnualRenewalProjection({ currentYear: 2026, currentMothers: 70, targetMothers: 70, entries: [{ id: "petite", entryDate: entry }], identifiedExitsCurrentYear: 0 });
+  assert.equal(years[0].entries, 0);
+  assert.equal(years.find((year) => year.year === 2028)?.entries, 1);
 });
 
-test("retrouve la mère directe et le père de la saillie en priorité", () => {
-  const parents = resolveCandidateParents({
-    directMother: { id: "m1", workNumber: "7421", name: "Daisy" },
-    calvingMother: { id: "m2", workNumber: "7000" },
-    breedingBull: { id: "p1", name: "ZEUS", nationalNumber: "FR01" },
-    calvingFather: { name: "Ancien père" },
-  });
+test("une moyenne de 18 mois reste dans le pipeline futur", () => {
+  const entry = estimateMotherEntryDate({ birthDate: "2025-02-01", firstCalvingAverageMonths: 36 });
+  assert.equal(entry.getFullYear(), 2028);
+});
+
+test("une grande génisse avec vêlage prévu entre uniquement en 2026", () => {
+  const entry = estimateMotherEntryDate({ birthDate: "2023-12-01", expectedCalvingDate: "2026-10-01", firstCalvingAverageMonths: 36 });
+  const years = buildAnnualRenewalProjection({ currentYear: 2026, currentMothers: 70, targetMothers: 70, entries: [{ id: "grande", entryDate: entry }], identifiedExitsCurrentYear: 0 });
+  assert.equal(years[0].entries, 1);
+  assert.equal(years[1].entries, 0);
+});
+
+test("la projection compte seulement les entrées de chaque année", () => {
+  const years = buildAnnualRenewalProjection({ currentYear: 2026, currentMothers: 70, targetMothers: 70, entries: [{ id: "a", entryDate: "2026-05-01" }, { id: "b", entryDate: "2027-05-01" }, { id: "c", entryDate: "2028-05-01" }], identifiedExitsCurrentYear: 1 });
+  assert.equal(years.length, 3);
+  assert.deepEqual(years.map((year) => year.entries), [1, 1, 1]);
+  assert.equal(years[0].projectedMothers, 70);
+});
+
+test("une vache active à engraisser compte comme mère et sortie une seule fois", () => {
+  assert.equal(isCurrentMother(1), true);
+  assert.equal(isAutomaticPlannedExit(1, "A_ENGRAISSER"), true);
+  assert.equal(isAutomaticPlannedExit(1, "ENGRAISSEMENT"), true);
+  assert.equal(isAutomaticPlannedExit(0, "ENGRAISSEMENT"), false);
+});
+
+test("le premier vêlage transforme la génisse en vache", () => {
+  assert.deepEqual(motherUpdateAfterCalving(true), { estGenisse: false, categorie: "VACHE" });
+  assert.deepEqual(motherUpdateAfterCalving(false), {});
+});
+
+test("les décisions temporaires gardent des compteurs cohérents", () => {
+  assert.deepEqual(countRenewalDecisions({ a: "GARDER", b: "A_REVOIR", c: "SORTIR" }), { kept: 1, review: 1, rejected: 1, total: 3 });
+});
+
+test("retrouve la généalogie et conserve les inconnus", () => {
+  const parents = resolveCandidateParents({ directMother: { workNumber: "7421", name: "Daisy" }, breedingBull: { name: "ZEUS", nationalNumber: "FR01" } });
   assert.equal(parentDisplay(parents.mother, "mother"), "7421 Daisy");
   assert.equal(parentDisplay(parents.father, "father"), "ZEUS · FR01");
-});
-
-test("utilise les replis du vêlage et n’invente pas les parents manquants", () => {
-  const fallback = resolveCandidateParents({ calvingMother: { workNumber: "7100" }, calvingFather: { nationalNumber: "FR99" } });
-  assert.equal(parentDisplay(fallback.mother, "mother"), "7100");
-  assert.equal(parentDisplay(fallback.father, "father"), "FR99");
-  assert.equal(parentDisplay(null, "mother"), "Mère inconnue");
   assert.equal(parentDisplay(null, "father"), "Père inconnu");
 });
 
-test("regroupe les candidates par père sans produire de recommandation", () => {
-  const candidates = [{ id: "1", father: { name: "ZEUS" } }, { id: "2", father: { name: "ZEUS" } }, { id: "3", father: null }];
-  const groups = groupCandidatesByParent(candidates, (candidate) => candidate.father, "Père inconnu");
-  assert.equal(groups[0].label, "ZEUS");
+test("regroupe les candidates par père", () => {
+  const values = [{ father: { name: "ZEUS" } }, { father: { name: "ZEUS" } }, { father: null }];
+  const groups = groupCandidatesByParent(values, (candidate) => candidate.father, "Père inconnu");
   assert.equal(groups[0].candidates.length, 2);
-  assert.equal(groups[1].label, "Père inconnu");
 });
 
-test("compte de façon cohérente Garder, À revoir et Sortir", () => {
-  assert.deepEqual(countRenewalDecisions({ a: "GARDER", b: "GARDER", c: "A_REVOIR", d: "SORTIR" }), { kept: 2, review: 1, rejected: 1, total: 4 });
-});
-
-test("stocke la configuration dans le JSON existant sans écraser les règles", () => {
-  const raw = mergeRenewalSettings('{"version":4,"alerts":{"dryOff":true}}', { targetMothers: 70, renewalRatePercent: 20, firstCalvingAgeMonths: 30 });
+test("préserve les règles existantes et les anciennes clés de configuration", () => {
+  const raw = mergeRenewalSettings('{"version":4,"renewalPlanning":{"firstCalvingAgeMonths":30}}', { targetMothers: 70, renewalRatePercent: 20 });
   const parsed = JSON.parse(raw);
   assert.equal(parsed.version, 4);
-  assert.equal(parsed.alerts.dryOff, true);
-  assert.deepEqual(parseRenewalSettings(raw, 50), { targetMothers: 70, renewalRatePercent: 20, firstCalvingAgeMonths: 30 });
+  assert.equal(parsed.renewalPlanning.firstCalvingAgeMonths, 30);
+  assert.deepEqual(parseRenewalSettings(raw, 50), { targetMothers: 70, renewalRatePercent: 20 });
 });

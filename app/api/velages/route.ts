@@ -7,6 +7,7 @@ import {
   obtenirNumerosIdentificationUtilises,
 } from "@/lib/lot-boucles";
 import { consumesLoopNumber } from "@/lib/velage-safety";
+import { motherUpdateAfterCalving } from "@/lib/herd-renewal";
 
 type VeauSaisi = { nutrav?: string; nunati?: string; sexe?: "M" | "F"; nom?: string; statut?: "VIVANT" | "MORT_NE" };
 
@@ -17,10 +18,13 @@ export async function POST(request: NextRequest) {
     const qualificatif = ["NORMAL", "DIFFICILE", "AVORTEMENT", "MORT_NEE"].includes(body.qualificatif) ? body.qualificatif : "NORMAL";
     if (!vacheNutrav || !date) return NextResponse.json({ error: "La vache et la date sont requises" }, { status: 400 });
 
-    const vache = await prisma.animal.findUnique({ where: { nutrav: vacheNutrav } });
+    const vache = await prisma.animal.findUnique({ where: { nutrav: vacheNutrav }, include: { _count: { select: { velagesVache: true } } } });
     if (!vache) return NextResponse.json({ error: `Vache ${vacheNutrav} non trouvée` }, { status: 404 });
     const prevTarieFaite = vache.tarieFaite;
     const prevDateTarie = vache.dateTarie;
+    const prevCategorie = vache.categorie;
+    const prevEstGenisse = vache.estGenisse;
+    const isFirstCalving = vache._count.velagesVache === 0;
     const identificationConfig = await prisma.exploitationConfig.findUnique({ where: { id: "singleton" } });
     const lotActif = await obtenirLotBouclesActif();
 
@@ -85,7 +89,7 @@ export async function POST(request: NextRequest) {
       if (gestation) await tx.gestation.update({ where: { id: gestation.id }, data: { etat: "VELAGE" } });
       await tx.animal.update({
         where: { id: vache.id },
-        data: { tarieFaite: false, dateTarie: null },
+        data: { tarieFaite: false, dateTarie: null, ...motherUpdateAfterCalving(isFirstCalving) },
       });
       return cree;
     });
@@ -114,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
     let undoId = "";
     try {
-      const ops: import("@/lib/action-log").RevertStep[] = [{ op: "delete", model: "velage", id: velage.id }, { op: "update", model: "animal", where: { nutrav: vacheNutrav }, data: { tarieFaite: prevTarieFaite, dateTarie: prevDateTarie?.toISOString() ?? null } }];
+      const ops: import("@/lib/action-log").RevertStep[] = [{ op: "delete", model: "velage", id: velage.id }, { op: "update", model: "animal", where: { nutrav: vacheNutrav }, data: { tarieFaite: prevTarieFaite, dateTarie: prevDateTarie?.toISOString() ?? null, categorie: prevCategorie, estGenisse: prevEstGenisse } }];
       for (const v of resolus) {
         if (v.cree && v.animalId) ops.push({ op: "delete", model: "animal", id: v.animalId });
         else if (v.precedent && v.saisi.nutrav) ops.push({ op: "update", model: "animal", where: { nutrav: v.saisi.nutrav }, data: { ...v.precedent, danais: v.precedent.danais?.toISOString() ?? null } });

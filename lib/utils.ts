@@ -51,7 +51,19 @@ export function getCategorieAuto(sexbov: string, danais: Date, estGenisse: boole
 export function getCategorie(
   sexbov: string, danais: Date, estGenisse: boolean, categorie?: string | null
 ): CategorieAnimal {
-  if (categorie && categorie in CATEGORIES_LABELS) return categorie as CategorieAnimal;
+  if (categorie && categorie in CATEGORIES_LABELS) {
+    const explicite = categorie as CategorieAnimal;
+    // Une génisse déjà sélectionnée avance dans le cycle avec l’âge. On ne
+    // rétrograde jamais une étape choisie manuellement et les catégories
+    // métier (velle, présélection, engraissement…) restent strictes.
+    if (["PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(explicite)) {
+      const ageMois = differenceInMonths(new Date(), danais);
+      const automatique = ageMois >= 24 ? "GRANDE_GENISSE" : ageMois >= 12 ? "MOYENNE_GENISSE" : "PETITE_GENISSE";
+      const rang = { PETITE_GENISSE: 0, MOYENNE_GENISSE: 1, GRANDE_GENISSE: 2 } as const;
+      return rang[automatique] > rang[explicite as keyof typeof rang] ? automatique : explicite;
+    }
+    return explicite;
+  }
   return getCategorieAuto(sexbov, danais, estGenisse);
 }
 

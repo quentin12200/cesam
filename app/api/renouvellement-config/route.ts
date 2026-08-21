@@ -7,14 +7,11 @@ function validateSettings(value: unknown): RenewalSettings | null {
   const body = value as Partial<RenewalSettings>;
   const targetMothers = Number(body.targetMothers);
   const renewalRatePercent = Number(body.renewalRatePercent);
-  const firstCalvingAgeMonths = Number(body.firstCalvingAgeMonths);
   if (!Number.isFinite(targetMothers) || targetMothers < 1 || targetMothers > 10000) return null;
   if (!Number.isFinite(renewalRatePercent) || renewalRatePercent < 0 || renewalRatePercent > 100) return null;
-  if (!Number.isFinite(firstCalvingAgeMonths) || firstCalvingAgeMonths < 12 || firstCalvingAgeMonths > 60) return null;
   return {
     targetMothers: Math.round(targetMothers),
     renewalRatePercent,
-    firstCalvingAgeMonths: Math.round(firstCalvingAgeMonths),
   };
 }
 
