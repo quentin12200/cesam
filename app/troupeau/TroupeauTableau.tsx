@@ -13,6 +13,7 @@ import {
   type EtatGestation,
 } from "@/lib/utils";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
+import { getMotherWeaningDisplay } from "@/lib/troupeau-mother-weaning";
 
 export interface AnimalRow {
   id: string;
@@ -34,6 +35,9 @@ export interface AnimalRow {
   veauNutrav: string | null;
   veauStatut: string | null;
   veauSevreFait: boolean | null;
+  mereNutrav: string | null;
+  sevreFait: boolean;
+  dateSevrage: string | null;
   dernierPoids: number | null;
   dernierePeseeDate: string | null;
   enAttente: boolean;
@@ -288,7 +292,7 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
                   buildFilterUrl={buildFilterUrl}
                 />
               </th>
-              <th className="px-3 py-2.5 text-left font-semibold">Vente</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Mère / sevrage</th>
               <th className="px-3 py-2.5 text-left font-semibold">
                 <FilterDropdown
                   label="🍼 Veau" 
@@ -346,6 +350,11 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
                 etat === "VERT" && animal.gestationEtat === "VERT" && animal.saillieDate
                   ? differenceInDays(new Date(), new Date(animal.saillieDate))
                   : null;
+              const motherWeaning = getMotherWeaningDisplay({
+                motherNutrav: animal.mereNutrav,
+                sevreFait: animal.sevreFait,
+                dateSevrage: animal.dateSevrage,
+              });
 
               return (
                 <tr
@@ -415,11 +424,10 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
                     )}
                   </td>
                   <td className="px-3 py-2.5">
-                    {animal.enAttente ? (
-                      <span className="text-xs font-bold text-red-700">⛔ Interdite</span>
-                    ) : (
-                      <span className="text-xs font-medium text-green-700">Autorisée</span>
-                    )}
+                    <div className="min-w-[5.5rem] leading-tight">
+                      <span className="font-mono text-xs font-bold text-gray-800">{motherWeaning.motherLabel}</span>
+                      {motherWeaning.statusLabel && <div className={`mt-0.5 whitespace-nowrap text-[10px] font-semibold ${motherWeaning.weaned ? "text-green-700" : "text-blue-700"}`}>{motherWeaning.weaned ? "✓" : "🍼"} {motherWeaning.statusLabel}</div>}
+                    </div>
                   </td>
                   <td className="px-3 py-2.5">
                     {veauActif ? (
