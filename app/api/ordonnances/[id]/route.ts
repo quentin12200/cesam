@@ -6,6 +6,7 @@ import {
   supprimerGroupeOrdonnance,
   type OrdonnanceGroupDeletePersistence,
 } from "@/lib/ordonnance-group-delete";
+import { evidenceAvecConditionnementCorrige } from "@/lib/ordonnance-packaging";
 
 function nullableText(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -121,6 +122,12 @@ export async function PATCH(
           if (legacyResult.count !== 1) throw new Error("Médicament historique hors ordonnance");
           continue;
         }
+        const ligneExistante = medicament.conditionnementManuallyEdited
+          ? await tx.ordonnanceMedicament.findFirst({
+            where: { id: medicament.id, ordonnanceId: { in: ordonnanceIdsAutorises } },
+            select: { evidenceJson: true },
+          })
+          : null;
         const result = await tx.ordonnanceMedicament.updateMany({
           where: { id: medicament.id, ordonnanceId: { in: ordonnanceIdsAutorises } },
           data: {
@@ -139,6 +146,12 @@ export async function PATCH(
             delaiAttenteViande: nullableNumber(medicament.delaiAttenteViande),
             delaiAttenteAbats: nullableNumber(medicament.delaiAttenteAbats),
             delaiAttenteLait: nullableNumber(medicament.delaiAttenteLait),
+            ...(medicament.conditionnementManuallyEdited && {
+              evidenceJson: evidenceAvecConditionnementCorrige(
+                ligneExistante?.evidenceJson,
+                nullableText(medicament.conditionnement),
+              ),
+            }),
           },
         });
         if (result.count !== 1) throw new Error("Médicament hors ordonnance");

@@ -124,7 +124,7 @@ test("conserve un vrai flacon de 2 ml sans le confondre avec une dose", () => {
   );
   assert.match(
     formaterPresentationCompacte(normaliserConditionnementExtrait({ conditionnement: "BT 1 D. FL. 2 ML" })) ?? "",
-    /Flacon de 2 ml/i,
+    /Flacon 2 ml/i,
   );
   assert.equal(normaliserConditionnementExtrait({ conditionnement: null, sourceTexts: ["Dose : 2 ml"] }), null);
   assert.equal(normaliserConditionnementExtrait({ conditionnement: null, sourceTexts: ["Administrer 2 ml"] }), null);

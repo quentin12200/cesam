@@ -13,6 +13,7 @@ const [verification, medicationCard, route, detail, schema, scanRoute, verificat
   readFile(new URL("../lib/ordonnance-validation.ts", import.meta.url), "utf8"),
   readFile(new URL("../lib/ordonnance-medication-candidates.ts", import.meta.url), "utf8"),
 ]);
+const packagingEditor = await readFile(new URL("../components/ordonnances/StructuredPackagingEditor.tsx", import.meta.url), "utf8");
 
 test("scan verification et validation partagent les memes candidats pharmacie", () => {
   assert.match(scanRoute, /chargerCandidatsOrdonnance/);
@@ -46,8 +47,9 @@ test("les correspondances ambigues exigent un choix explicite", () => {
 
 test("la carte principale est compacte et les donnees techniques sont repliees", () => {
   const avantDetails = medicationCard.slice(0, medicationCard.indexOf("{med.medicationId ? ("));
-  assert.match(avantDetails, /conditionnementVisuel/);
-  assert.match(avantDetails, /conditionnementVisuel\.totalDoses/);
+  assert.match(avantDetails, /StructuredPackagingEditor/);
+  assert.match(packagingEditor, /Aperçu/);
+  assert.match(packagingEditor, /apercu\.totalDoses/);
   assert.match(avantDetails, /getCategorieMedicament/);
   assert.match(avantDetails, /À administrer/);
   assert.match(avantDetails, /Dose à vérifier/);
@@ -62,6 +64,13 @@ test("la carte principale est compacte et les donnees techniques sont repliees",
   assert.match(medicationCard, /Modifier/);
   assert.match(medicationCard, /Lecture OCR/);
   assert.doesNotMatch(medicationCard, /IA :/);
+});
+
+test("le conditionnement structure partage propose les formes personnalisees sans les creer depuis l OCR", () => {
+  assert.match(packagingEditor, /\+ Ajouter une forme/);
+  assert.match(packagingEditor, /window\.localStorage\.setItem/);
+  assert.match(packagingEditor, /structure\.needsVerification/);
+  assert.match(packagingEditor, /choisissez une forme avant validation/);
 });
 
 test("la verification relit le vrai conditionnement depuis sa preuve sans toucher a la dose", () => {
@@ -114,7 +123,8 @@ test("le formulaire de modification montre d'abord les informations pratiques", 
 
   assert.match(avantAvance, />Médicament</);
   assert.match(avantAvance, /Nom du médicament/);
-  assert.match(avantAvance, /Présentation et quantité délivrée/);
+  assert.match(medicationCard, /StructuredPackagingEditor/);
+  assert.match(packagingEditor, /Conditionnement \/ quantité délivrée/);
   assert.match(avantAvance, />Administration</);
   assert.match(avantAvance, /Dose pratique/);
   assert.match(avantAvance, /doseValue/);

@@ -15,7 +15,7 @@ export const maxDuration = 60;
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
-const PROMPT_VERSION = "ordonnance-v7-transcription-par-blocs";
+const PROMPT_VERSION = "ordonnance-v8-conditionnement-structure";
 
 interface OrdonnanceResult extends PropositionOrdonnance {
   raw: string;
@@ -66,9 +66,10 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
     "formePharmaceutique": "string ou null",
     "conditionnement": "presentation exacte avec quantite delivree si elle est explicite, par exemple 1 flacon de 100 ml, ou null",
     "presentation": {
-      "containerType": "flacon, aerosol, ampoule, boite ou null",
+      "containerType": "flacon, seringue, sachet, boite, ampoule, aerosol, tube, bidon, pot, autre ou null",
       "volumeValue": "number ou null",
-      "volumeUnit": "ml, cl, l ou null",
+      "volumeUnit": "ml, l, g, mg, kg, dose ou null",
+      "dosesPerContainer": "nombre de doses contenues dans chaque contenant ou null",
       "deliveredQuantity": "nombre d'unites delivrees ou null",
       "sourceText": "expression exacte complete ou null"
     },
@@ -144,6 +145,11 @@ Regles obligatoires :
   presentation, par exemple "1 flacon de 100 ml". N'invente jamais une quantite absente du document.
 - "100 ml" est un volume unitaire et jamais une quantite de 100 unites. Une mention separee "Qte : 1"
   signifie deliveredQuantity=1. "FL." signifie flacon uniquement lorsqu'il est bien present dans le texte source.
+  Conserve séparément containerType, volumeValue, volumeUnit, dosesPerContainer et deliveredQuantity.
+  Exemples : "3 FL.50ML(10D.)" = 3 flacons, 50 ml par flacon, 10 doses par flacon ;
+  "BT 5 D." = une boîte de 5 doses si la quantité délivrée vaut 1 ailleurs.
+  Une dose d'administration (ex. "Administrer 2 ml") ne doit jamais alimenter presentation.
+  Un contenant inhabituel ou douteux doit être "autre" et ne doit jamais devenir une nouvelle forme officielle.
 - Une dose "1 ml pour 10 kg" est ponderale : doseValue=1, referenceValue=10, referenceType=live_weight, normalizedDoseValue=0.1. Ce n'est pas une dose fixe de 1 ml.
 - Conserve séparément dosePratique et dosePharmacologique. Chaque valeur, unité et référence doit provenir de la même
   expression exacte conservée dans son sourceText. Ne combine jamais une valeur en mg avec la référence d'une expression en ml.

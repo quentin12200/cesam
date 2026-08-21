@@ -5,6 +5,11 @@ import {
   type ResolutionSourcesDose,
 } from "./ordonnance-dose-sources.ts";
 import type { MedicamentCorrespondant } from "./ordonnance-types.ts";
+import {
+  conditionnementCanonique,
+  extraireConditionnementDepuisTexte,
+  resoudreConditionnementStructure,
+} from "./ordonnance-packaging.ts";
 
 export { resoudreSourcesDose } from "./ordonnance-dose-sources.ts";
 export type { DoseSourceStructuree, ResolutionSourcesDose } from "./ordonnance-dose-sources.ts";
@@ -42,57 +47,21 @@ export interface ConditionnementVisuel {
   totalDoses: string | null;
 }
 
-function uniteVolume(value: string): string {
-  const unite = sansAccents(value).toLowerCase();
-  return /^m(?:l|i|1)$/.test(unite) ? "ml" : unite;
-}
-
 interface PresentationVeterinaire {
   libelle: string;
   quantitePrefixe: number | null;
   score: number;
 }
 
-function libelleDoses(value: string): string {
-  return `${value} dose${Number(value) > 1 ? "s" : ""}`;
-}
-
 function extrairePresentationVeterinaire(value: string): PresentationVeterinaire | null {
-  const texte = sansAccents(value).replace(/\s+/g, " ").trim();
-  if (!texte) return null;
-  const quantitePrefixeMatch = texte.match(
-    /^\s*(\d+)\s*[x×]?\s*(?=(?:fl(?:acon)?|ser(?:ingue)?|amp(?:oule)?|aer(?:osol)?|presentoir|bt|boite)s?\b)/i,
-  );
-  const quantitePrefixe = quantitePrefixeMatch ? Number(quantitePrefixeMatch[1]) : null;
-  const boite = texte.match(/\b(?:bt|boite)s?\.?\s*(?:de\s*)?(\d+)\s*d(?:\.|oses?)?\b/i);
-  const contenantVolume = texte.match(
-    /\b(fl(?:acon)?|ser(?:ingue)?|amp(?:oule)?|aer(?:osol)?|presentoir)s?\.?\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(m(?:l|i|1)|cl|l)\b(?:\s*[·-]?\s*\(?\s*(\d+)\s*d(?:\.|oses?)?\s*\)?)?/i,
-  );
-
-  const parties: string[] = [];
-  if (boite) parties.push(`boîte de ${libelleDoses(boite[1])}`);
-  if (contenantVolume) {
-    const noms: Record<string, string> = {
-      fl: "flacon",
-      flacon: "flacon",
-      ser: "seringue",
-      seringue: "seringue",
-      amp: "ampoule",
-      ampoule: "ampoule",
-      aer: "aérosol",
-      aerosol: "aérosol",
-      presentoir: "présentoir",
-    };
-    const contenant = noms[contenantVolume[1].toLowerCase()];
-    const volume = `${contenantVolume[2].replace(",", ".")} ${uniteVolume(contenantVolume[3])}`;
-    parties.push(`${contenant} de ${volume}${contenantVolume[4] ? ` · ${libelleDoses(contenantVolume[4])}` : ""}`);
-  }
-
-  if (parties.length === 0) return null;
+  const structure = extraireConditionnementDepuisTexte(value);
+  if (!structure || structure.needsVerification) return null;
+  const canonique = conditionnementCanonique({ ...structure, deliveredQuantity: null });
+  if (!canonique) return null;
   return {
-    libelle: parties.join(" · "),
-    quantitePrefixe,
-    score: (boite ? 1 : 0) + (contenantVolume ? 2 : 0) + (contenantVolume?.[4] ? 1 : 0),
+    libelle: canonique,
+    quantitePrefixe: structure.deliveredQuantity,
+    score: 1 + (structure.contentValue !== null ? 2 : 0) + (structure.dosesPerContainer !== null ? 1 : 0),
   };
 }
 
@@ -154,6 +123,11 @@ export function normaliserConditionnementExtrait({
   presentation?: Record<string, unknown> | null;
   sourceTexts?: string[];
 }): string | null {
+  const structure = resoudreConditionnementStructure({ conditionnement, presentation, sourceTexts });
+  const canoniqueStructure = conditionnementCanonique(structure);
+  if (structure.containerType && !structure.needsVerification && canoniqueStructure) {
+    return canoniqueStructure;
+  }
   const textes = [
     conditionnement,
     typeof presentation?.sourceText === "string" ? presentation.sourceText : null,

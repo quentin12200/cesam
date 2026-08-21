@@ -105,6 +105,7 @@ test("conserve la quantite structuree pendant la transcription par blocs", () =>
       containerType: "flacon",
       volumeValue: 50,
       volumeUnit: "ml",
+      dosesPerContainer: 10,
       deliveredQuantity: 1,
       sourceText: "FL.50ML(10D.)",
     },

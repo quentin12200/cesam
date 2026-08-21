@@ -17,6 +17,7 @@ import {
 } from "@/lib/ordonnance-dates";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
 import { normaliserConditionnementExtrait, resoudreSourcesDose } from "@/lib/ordonnance-display";
+import { resoudreConditionnementStructure } from "@/lib/ordonnance-packaging";
 import MedicamentVerificationCard, { type MedicationFields } from "./MedicamentVerificationCard";
 
 interface ExtractionInfo {
@@ -37,6 +38,40 @@ function s(value: string | number | null | undefined): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
+function preuveConditionnement(med: MedicationFields): Record<string, unknown> {
+  const structure = resoudreConditionnementStructure({ conditionnement: med.conditionnement });
+  if (!structure.containerType || structure.needsVerification) return {};
+  const sourceText = med.conditionnementManuallyEdited
+    ? null
+    : med.ia?.evidence.presentation?.sourceText ?? structure.sourceText;
+  const confidence = med.conditionnementManuallyEdited
+    ? 1
+    : med.ia?.evidence.presentation?.confidence ?? 0;
+  const presentation = {
+    containerType: structure.containerType,
+    volumeValue: structure.contentValue,
+    volumeUnit: structure.contentUnit,
+    dosesPerContainer: structure.dosesPerContainer,
+    deliveredQuantity: structure.deliveredQuantity,
+  };
+  return {
+    presentation: {
+      value: presentation,
+      sourceText,
+      confidence,
+      zone: med.conditionnementManuallyEdited ? "correction_manuelle" : "presentation",
+    },
+    ...(structure.deliveredQuantity !== null ? {
+      deliveredQuantity: {
+        value: structure.deliveredQuantity,
+        sourceText,
+        confidence,
+        zone: med.conditionnementManuallyEdited ? "correction_manuelle" : "presentation",
+      },
+    } : {}),
+  };
+}
+
 function versChamps(m: MedicamentPropose): MedicationFields {
   const presentationValue = m.evidence.presentation?.value;
   const presentation = presentationValue && typeof presentationValue === "object"
@@ -47,6 +82,11 @@ function versChamps(m: MedicamentPropose): MedicationFields {
     .filter((value): value is string => Boolean(value));
   const conditionnement = normaliserConditionnementExtrait({
     conditionnement: s(m.conditionnement),
+    presentation,
+    sourceTexts: sourcesConditionnement,
+  });
+  const conditionnementStructure = resoudreConditionnementStructure({
+    conditionnement,
     presentation,
     sourceTexts: sourcesConditionnement,
   });
@@ -84,6 +124,8 @@ function versChamps(m: MedicamentPropose): MedicationFields {
     familleTherapeutique: s(m.familleTherapeutique),
     formePharmaceutique: s(m.formePharmaceutique),
     conditionnement: conditionnement ?? "",
+    conditionnementAVerifier: conditionnementStructure.needsVerification,
+    conditionnementManuallyEdited: false,
     doseValue: doseRetenue.doseValue,
     doseUnit: doseRetenue.doseUnit,
     referenceValue: doseRetenue.referenceValue,
@@ -110,7 +152,8 @@ function champsVides(): MedicationFields {
   return {
     key: nouvelleCle(), medicationId: "", createMedication: false, categoryConfirmed: false,
     medicamentNom: "", numeroLot: "", substanceActive: "", concentration: "", categorie: "",
-    familleTherapeutique: "", formePharmaceutique: "", conditionnement: "", doseValue: "",
+    familleTherapeutique: "", formePharmaceutique: "", conditionnement: "", conditionnementAVerifier: false,
+    conditionnementManuallyEdited: false, doseValue: "",
     doseUnit: "", referenceValue: "", referenceUnit: "", referenceType: "", normalizedDoseValue: "",
     doseManuallyEdited: false,
     doseSources: { dosePratique: null, dosePharmacologique: null, doseAffichee: null, sourceHybrideDetectee: false },
@@ -167,7 +210,7 @@ export default function VerificationOrdonnanceClient({
       med.doseSources.sourceHybrideDetectee
       || (med.ia?.dosesPratiques ?? []).some((dose) => dose.aVerifier)
     );
-    return associationAConfirmer || doseAConfirmer;
+    return associationAConfirmer || doseAConfirmer || med.conditionnementAVerifier;
   }).length;
   const delivreCeJour = sourceIndiqueDelivreCeJour(deliveryEvidence?.sourceText);
   const masquerDateDelivrance = delivreCeJour
@@ -180,6 +223,15 @@ export default function VerificationOrdonnanceClient({
       [field]: value,
       doseManuallyEdited: med.doseManuallyEdited || champDose,
     } : med)));
+  }
+
+  function majConditionnement(index: number, conditionnement: string, aVerifier: boolean) {
+    setMedicaments((previous) => previous.map((med, i) => i === index ? {
+      ...med,
+      conditionnement,
+      conditionnementAVerifier: aVerifier,
+      conditionnementManuallyEdited: true,
+    } : med));
   }
 
   function majDecision(index: number, values: Partial<Pick<MedicationFields, "medicationId" | "createMedication" | "categoryConfirmed">>) {
@@ -298,6 +350,7 @@ export default function VerificationOrdonnanceClient({
             precautions: med.precautions,
             evidence: {
               ...(med.ia?.evidence ?? {}),
+              ...preuveConditionnement(med),
               ...(med.doseSources.dosePratique ? {
                 dosePratique: {
                   value: med.doseSources.dosePratique,
@@ -378,6 +431,7 @@ export default function VerificationOrdonnanceClient({
                 index={index}
                 total={medicaments.length}
                 onChange={(field, value) => majMed(index, field, value)}
+                onPackagingChange={(conditionnement, aVerifier) => majConditionnement(index, conditionnement, aVerifier)}
                 onDecision={(values) => majDecision(index, values)}
                 onUseMatch={(matchId) => utiliserFiche(index, matchId)}
                 onCreateInPharmacy={(values) => creerDansPharmacie(index, values)}

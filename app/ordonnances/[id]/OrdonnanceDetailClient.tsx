@@ -10,6 +10,7 @@ import { scanAndCreateExtraction } from "@/lib/scan-ordonnance-client";
 import { chargerPagesOrdonnance } from "@/lib/ordonnance-reanalysis-client";
 import { formatDate } from "@/lib/utils";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
+import StructuredPackagingEditor from "@/components/ordonnances/StructuredPackagingEditor";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
 import {
   formaterConditionnementVisuel,
@@ -103,6 +104,7 @@ interface MedicationDraft {
   ordonnanceId: string;
   nomExtrait: string;
   conditionnement: string;
+  conditionnementManuallyEdited: boolean;
   voieExtraite: string;
   posologieExtraite: string;
   dose: string;
@@ -157,6 +159,7 @@ export default function OrdonnanceDetailClient({
     ordonnanceId: medicament.ordonnanceId,
     nomExtrait: medicament.nomExtrait,
     conditionnement: medicament.conditionnement ?? "",
+    conditionnementManuallyEdited: false,
     voieExtraite: medicament.voieExtraite ?? "",
     posologieExtraite: medicament.posologieExtraite ?? "",
     dose: medicament.dose?.toString() ?? "",
@@ -177,11 +180,19 @@ export default function OrdonnanceDetailClient({
 
   function updateMedication(
     id: string,
-    field: keyof Omit<MedicationDraft, "id" | "storageType" | "ordonnanceId">,
+    field: keyof Omit<MedicationDraft, "id" | "storageType" | "ordonnanceId" | "conditionnementManuallyEdited">,
     value: string,
   ) {
     setMedicationDrafts((current) => current.map((medicament) => (
       medicament.id === id ? { ...medicament, [field]: value } : medicament
+    )));
+  }
+
+  function updateConditionnement(id: string, conditionnement: string) {
+    setMedicationDrafts((current) => current.map((medicament) => (
+      medicament.id === id
+        ? { ...medicament, conditionnement, conditionnementManuallyEdited: true }
+        : medicament
     )));
   }
 
@@ -484,12 +495,10 @@ export default function OrdonnanceDetailClient({
                   />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs text-gray-500">Conditionnement / quantité délivrée</label>
-                    <input
+                  <div className="sm:col-span-2">
+                    <StructuredPackagingEditor
                       value={medicament.conditionnement}
-                      onChange={(event) => updateMedication(medicament.id, "conditionnement", event.target.value)}
-                      className="w-full rounded-lg border px-3 py-2 text-sm"
+                      onChange={(conditionnement) => updateConditionnement(medicament.id, conditionnement)}
                     />
                   </div>
                   <div>

@@ -13,6 +13,7 @@ import {
   normaliserConditionnementExtrait,
   normaliserConditionRenouvellement,
 } from "./ordonnance-display.ts";
+import { resoudreConditionnementStructure } from "./ordonnance-packaging.ts";
 
 interface BlocMedicamentTranscrit {
   identification: string[];
@@ -353,9 +354,30 @@ export function appliquerTranscriptionParBlocs(
       const sourceText = bloc.presentation.join("\n");
       const presentationIA = objet(ia.presentation);
       const quantitePreuve = objet(evidenceIA.deliveredQuantity).value;
+      const presentationLocale = resoudreConditionnementStructure({
+        conditionnement: null,
+        presentation: presentationIA,
+        sourceTexts: bloc.presentation,
+      });
       const presentation = {
         ...presentationIA,
         sourceText,
+        ...(presentationLocale.containerType && !presentationLocale.needsVerification ? {
+          containerType: presentationLocale.containerType,
+          volumeValue: presentationLocale.contentValue,
+          volumeUnit: presentationLocale.contentUnit,
+          dosesPerContainer: presentationLocale.dosesPerContainer,
+        } : {}),
+        ...(presentationLocale.needsVerification ? {
+          containerType: "autre",
+          rawContainerType: presentationLocale.rawContainerType,
+          volumeValue: presentationLocale.contentValue,
+          volumeUnit: presentationLocale.contentUnit,
+          needsVerification: true,
+        } : {}),
+        ...(presentationLocale.deliveredQuantity !== null
+          ? { deliveredQuantity: presentationLocale.deliveredQuantity }
+          : {}),
         ...(presentationIA.deliveredQuantity == null && quantitePreuve != null
           ? { deliveredQuantity: quantitePreuve }
           : {}),

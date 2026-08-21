@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Beef, CalendarDays, ChevronDown, Milk, Package, Pencil, RotateCcw, Syringe } from "lucide-react";
+import { AlertTriangle, Beef, CalendarDays, ChevronDown, Milk, Pencil, RotateCcw, Syringe } from "lucide-react";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
+import StructuredPackagingEditor from "@/components/ordonnances/StructuredPackagingEditor";
 import type { MedicamentCorrespondant, MedicamentPropose } from "@/lib/ordonnance-types";
 import {
   controlerCoherenceDosePharmacie,
   formaterDose,
   formaterDoseCompacte,
-  formaterConditionnementVisuel,
   formaterRenouvellement,
   formaterRythme,
   formaterVoie,
@@ -36,6 +36,8 @@ export interface MedicationFields {
   familleTherapeutique: string;
   formePharmaceutique: string;
   conditionnement: string;
+  conditionnementAVerifier: boolean;
+  conditionnementManuallyEdited: boolean;
   doseValue: string;
   doseUnit: string;
   referenceValue: string;
@@ -78,6 +80,7 @@ export default function MedicamentVerificationCard({
   index,
   total,
   onChange,
+  onPackagingChange,
   onDecision,
   onUseMatch,
   onCreateInPharmacy,
@@ -88,6 +91,7 @@ export default function MedicamentVerificationCard({
   index: number;
   total: number;
   onChange: (field: keyof MedicationFields, value: string) => void;
+  onPackagingChange: (conditionnement: string, aVerifier: boolean) => void;
   onDecision: (values: Partial<Pick<MedicationFields, "medicationId" | "createMedication" | "categoryConfirmed">>) => void;
   onUseMatch: (matchId?: string) => void;
   onCreateInPharmacy: (values: Record<string, unknown>) => Promise<void>;
@@ -111,7 +115,6 @@ export default function MedicamentVerificationCard({
   const match = correspondances.find((item) => item.id === med.medicationId)
     ?? (med.medicationId ? med.ia?.medicationMatch : null)
     ?? pharmacyOptions.find((item) => item.id === med.medicationId);
-  const conditionnementVisuel = formaterConditionnementVisuel(med.conditionnement);
   const resolutionCourante = resoudreSourcesDose({
     ...med,
     doseSourceText: med.ia?.evidence.dose?.sourceText,
@@ -258,15 +261,6 @@ export default function MedicamentVerificationCard({
             </span>
           )}
           {matchInactif && <p className="mt-0.5 text-[11px] font-medium text-amber-800">Fiche inactive — conservée pour éviter un doublon.</p>}
-          {conditionnementVisuel.ligne && (
-            <div className="mt-1.5 flex items-start gap-1.5 text-sm text-gray-700">
-              <Package size={14} className="mt-0.5 shrink-0 text-gray-500" />
-              <div className="min-w-0">
-                <p className="font-medium">{conditionnementVisuel.ligne}</p>
-                {conditionnementVisuel.totalDoses && <p className="text-[11px] text-gray-500">{conditionnementVisuel.totalDoses}</p>}
-              </div>
-            </div>
-          )}
           {(doseAVerifier || dureeAVerifier || delaiAVerifier) && (
             <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-amber-800">
               {doseAVerifier && <span className="rounded bg-amber-50 px-1.5 py-0.5">Dose à vérifier</span>}
@@ -287,6 +281,19 @@ export default function MedicamentVerificationCard({
           }]} />
         )}
       </header>
+
+      <div className="mt-2">
+        <StructuredPackagingEditor
+          value={med.conditionnement}
+          presentation={med.ia?.evidence.presentation?.value && typeof med.ia.evidence.presentation.value === "object"
+            ? med.ia.evidence.presentation.value as Record<string, unknown>
+            : null}
+          sourceTexts={["conditionnement", "presentation", "deliveredQuantity"]
+            .map((key) => med.ia?.evidence[key]?.sourceText)
+            .filter((item): item is string => Boolean(item))}
+          onChange={(conditionnement, structure) => onPackagingChange(conditionnement, structure.needsVerification)}
+        />
+      </div>
 
       <div className="mt-2 space-y-1.5 text-sm text-gray-800">
         {voieCompacte && (
@@ -376,7 +383,7 @@ export default function MedicamentVerificationCard({
               <p className="mt-1 text-[11px] text-gray-600">Vérifiez et modifiez les informations avant de confirmer.</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <Field label="Nom *" wide><input required value={med.medicamentNom} onChange={(e) => change("medicamentNom", e.target.value)} className={inputClass} /></Field>
-                <Field label="Présentation / conditionnement"><input value={med.conditionnement} onChange={(e) => change("conditionnement", e.target.value)} className={inputClass} /></Field>
+                <div className="text-[11px] text-gray-600">Le conditionnement vérifié ci-dessus sera repris dans la fiche.</div>
                 <Field label="Forme pharmaceutique"><input value={med.formePharmaceutique} onChange={(e) => change("formePharmaceutique", e.target.value)} className={inputClass} /></Field>
                 <Field label="Voie"><input value={med.voie} onChange={(e) => change("voie", e.target.value)} className={inputClass} /></Field>
                 <Field label="Substance active"><input value={med.substanceActive} onChange={(e) => change("substanceActive", e.target.value)} className={inputClass} /></Field>
@@ -471,7 +478,6 @@ export default function MedicamentVerificationCard({
               <p className="mb-2 text-xs font-semibold text-gray-700">Médicament</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Nom du médicament *" wide><input required value={med.medicamentNom} onChange={(e) => change("medicamentNom", e.target.value)} className={inputClass} /></Field>
-                <Field label="Présentation et quantité délivrée" wide><input value={med.conditionnement} onChange={(e) => change("conditionnement", e.target.value)} className={inputClass} placeholder="1 flacon de 100 ml" /></Field>
               </div>
             </div>
 

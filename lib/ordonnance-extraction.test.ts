@@ -393,7 +393,7 @@ test("conserve plusieurs medicaments dans une seule extraction structuree", () =
   }, [tenaline]);
   assert.equal(multi.medicaments?.length, 2);
   assert.equal(multi.medicaments?.[0].numeroLot, "2111AA");
-  assert.equal(multi.medicaments?.[1].conditionnement, "Flacon 250 ml");
+  assert.equal(multi.medicaments?.[1].conditionnement, "flacon de 250 ml");
 });
 
 test("ne choisit pas entre plusieurs correspondances plausibles", () => {
