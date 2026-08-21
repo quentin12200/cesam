@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Save, ScanLine, Loader2, RefreshCw, Camera, CheckCircle2, AlertCircle, Beef, CalendarDays, FileText, ExternalLink, Milk, Package, Pencil, RotateCcw, Syringe } from "lucide-react";
 import { fileToDocumentDataUrl } from "@/lib/image-client";
 import { uploadDataUrlToStorage } from "@/lib/firebase-client";
+import { scanAndCreateExtraction } from "@/lib/scan-ordonnance-client";
+import { chargerPagesOrdonnance } from "@/lib/ordonnance-reanalysis-client";
 import { formatDate } from "@/lib/utils";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
@@ -116,18 +118,6 @@ interface MedicationDraft {
   delaiAttenteLait: string;
 }
 
-interface Extracted {
-  medicamentNom: string | null;
-  voie: string | null;
-  dose: number | null;
-  uniteDosage: string | null;
-  dureeJours: number | null;
-  dateDebut: string | null;
-  veterinaire: string | null;
-  motif: string | null;
-  ordonnanceNumero: string | null;
-}
-
 export default function OrdonnanceDetailClient({
   ordonnance,
   medicaments,
@@ -140,7 +130,7 @@ export default function OrdonnanceDetailClient({
   vaccinations: LinkedVaccination[];
 }) {
   const router = useRouter();
-  const { completeToOrigin } = useOriginNavigation();
+  const { completeToOrigin, hrefWithOrigin } = useOriginNavigation();
   const replaceRef = useRef<HTMLInputElement>(null);
 
   const [date, setDate] = useState(ordonnance.date.slice(0, 10));
@@ -160,7 +150,6 @@ export default function OrdonnanceDetailClient({
   const [editing, setEditing] = useState(false);
   const [replacing, setReplacing] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
-  const [reanalyzeResult, setReanalyzeResult] = useState<Extracted | null>(null);
   const [error, setError] = useState("");
   const [medicationDrafts, setMedicationDrafts] = useState<MedicationDraft[]>(() => medicaments.map((medicament) => ({
     id: medicament.id,
@@ -249,47 +238,18 @@ export default function OrdonnanceDetailClient({
   }
 
   async function reanalyser() {
-    if (!photoUrl) return;
+    if (documentUrlsAffiches.length === 0) return;
     setReanalyzing(true);
     setError("");
-    setReanalyzeResult(null);
     try {
-      const fileRes = await fetch(photoUrl);
-      const blob = await fileRes.blob();
-      const dataUrl: string = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error("Lecture impossible"));
-        reader.readAsDataURL(blob);
-      });
-      const base64 = dataUrl.split(",")[1] ?? "";
-      const res = await fetch("/api/scan-ordonnance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64, mimeType: blob.type || "image/jpeg" }),
-      });
-      if (!res.ok) throw new Error("Erreur lors de la réanalyse");
-      const result: Extracted = await res.json();
-      setReanalyzeResult(result);
-    } catch {
-      setError("La réanalyse a échoué");
+      const pages = await chargerPagesOrdonnance(documentUrlsAffiches);
+      const { extractionId } = await scanAndCreateExtraction(pages);
+      router.push(hrefWithOrigin(`/ordonnances/a-verifier/${extractionId}`));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "La réanalyse a échoué");
     } finally {
       setReanalyzing(false);
     }
-  }
-
-  function appliquerReanalyse() {
-    if (!reanalyzeResult) return;
-    if (reanalyzeResult.medicamentNom) setMedicamentNom(reanalyzeResult.medicamentNom);
-    if (reanalyzeResult.voie) setVoie(reanalyzeResult.voie);
-    if (reanalyzeResult.dose != null) setDose(String(reanalyzeResult.dose));
-    if (reanalyzeResult.uniteDosage) setUniteDosage(reanalyzeResult.uniteDosage);
-    if (reanalyzeResult.dureeJours != null) setDureeJours(String(reanalyzeResult.dureeJours));
-    if (reanalyzeResult.dateDebut) setDate(reanalyzeResult.dateDebut.slice(0, 10));
-    if (reanalyzeResult.veterinaire) setVeterinaireNom(reanalyzeResult.veterinaire);
-    if (reanalyzeResult.motif) setMotif(reanalyzeResult.motif);
-    if (reanalyzeResult.ordonnanceNumero) setNumero(reanalyzeResult.ordonnanceNumero);
-    setReanalyzeResult(null);
   }
 
   async function toggleArchive() {
@@ -361,7 +321,7 @@ export default function OrdonnanceDetailClient({
               {photoUrl ? "Remplacer le document" : "Ajouter un document"}
             </button>
             <input ref={replaceRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleReplace} />
-            {photoUrl && (
+            {documentUrlsAffiches.length > 0 && (
               <button
                 type="button"
                 onClick={reanalyser}
@@ -375,18 +335,6 @@ export default function OrdonnanceDetailClient({
           </div>
         )}
 
-        {reanalyzeResult && (
-          <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
-            <p className="font-medium mb-1">Nouvelle lecture proposée :</p>
-            <p>{reanalyzeResult.medicamentNom ?? "—"} · {reanalyzeResult.dose ?? "?"} {reanalyzeResult.uniteDosage ?? ""} · {reanalyzeResult.voie ?? "—"}</p>
-            <div className="flex gap-2 mt-2">
-              <button type="button" onClick={appliquerReanalyse}
-                className="px-2.5 py-1 bg-blue-600 text-white rounded text-xs">Appliquer aux champs</button>
-              <button type="button" onClick={() => setReanalyzeResult(null)}
-                className="px-2.5 py-1 border border-gray-300 rounded text-xs text-gray-600">Ignorer</button>
-            </div>
-          </div>
-        )}
       </section>
 
       {medicaments.length > 0 && (
@@ -723,9 +671,9 @@ export default function OrdonnanceDetailClient({
               onSelect: toggleArchive,
             },
             {
-              label: "Supprimer la saisie",
+              label: "Supprimer l’ordonnance",
               tone: "danger",
-              confirmMessage: "Supprimer cette ordonnance ?",
+              confirmMessage: "Supprimer cette ordonnance ? Elle devra être rescannée si vous souhaitez la traiter de nouveau.",
               onSelect: supprimer,
             },
           ]} />

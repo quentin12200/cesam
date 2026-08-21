@@ -185,6 +185,8 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
   const router = useRouter();
   const { hrefWithOrigin } = useOriginNavigation();
   const [archiving, setArchiving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   async function archive() {
     setArchiving(true);
@@ -195,6 +197,23 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
     });
     setArchiving(false);
     router.refresh();
+  }
+
+  async function supprimerOrdonnance() {
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const response = await fetch(`/api/ordonnances/${ord.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(payload?.error || "Suppression impossible");
+      }
+      router.refresh();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Suppression impossible");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const dateStr = new Date(ord.date).toLocaleDateString("fr-FR", {
@@ -281,12 +300,23 @@ function OrdonnanceCard({ ord }: { ord: OrdonnanceItem }) {
           )}
         </Link>
 
-        <RecordActionsMenu actions={[{
-          label: ord.statut === "ARCHIVE" ? "Repasser à l’état précédent" : "Archiver",
-          disabled: archiving,
-          onSelect: archive,
-        }]} />
+        <RecordActionsMenu actions={[
+          {
+            label: ord.statut === "ARCHIVE" ? "Repasser à l’état précédent" : "Archiver",
+            disabled: archiving || deleting,
+            onSelect: archive,
+          },
+          {
+            label: "Supprimer l’ordonnance",
+            tone: "danger",
+            disabled: deleting,
+            confirmMessage: "Supprimer cette ordonnance ? Elle devra être rescannée si vous souhaitez la traiter de nouveau.",
+            confirmLabel: "Supprimer",
+            onSelect: supprimerOrdonnance,
+          },
+        ]} />
       </div>
+      {deleteError && <p className="mt-2 text-xs text-red-600">{deleteError}</p>}
     </div>
   );
 }

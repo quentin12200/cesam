@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import {
+  OrdonnanceGroupDeleteError,
+  supprimerGroupeOrdonnance,
+  type OrdonnanceGroupDeletePersistence,
+} from "@/lib/ordonnance-group-delete";
 
 function nullableText(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -159,41 +164,20 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-
-  const ordonnance = await prisma.ordonnance.findUnique({
-    where: { id },
-    include: { _count: { select: { traitements: true, vaccinations: true } } },
-  });
-  if (!ordonnance) return NextResponse.json({ error: "Ordonnance non trouvée" }, { status: 404 });
-
-  if (ordonnance._count.traitements > 0 || ordonnance._count.vaccinations > 0) {
-    return NextResponse.json(
-      { error: "Cette ordonnance est liée à des traitements ou vaccinations, elle ne peut pas être supprimée" },
-      { status: 409 }
-    );
-  }
-
   try {
-    await prisma.ordonnance.delete({ where: { id } });
-
-    const desc = `Ordonnance ${ordonnance.medicamentNom || ''} supprimée`;
-    let undoId = "";
-    try {
-      undoId = await logAction("DELETE_ORDONNANCE", desc, {
-        op: "create",
-        model: "ordonnance",
-        data: {
-          date: ordonnance.date, numero: ordonnance.numero, veterinaireNom: ordonnance.veterinaireNom,
-          medicamentNom: ordonnance.medicamentNom, dose: ordonnance.dose, uniteDosage: ordonnance.uniteDosage,
-          voie: ordonnance.voie, dureeJours: ordonnance.dureeJours, motif: ordonnance.motif,
-          animaux: ordonnance.animaux, statut: ordonnance.statut, notes: ordonnance.notes,
-          photoUrl: ordonnance.photoUrl, updatedAt: new Date(),
-        },
-      });
-    } catch {}
-
-    return NextResponse.json({ ok: true, _undoId: undoId, _undoDesc: desc });
-  } catch {
-    return NextResponse.json({ error: "Ordonnance non trouvée" }, { status: 404 });
+    const result = await prisma.$transaction((tx) => supprimerGroupeOrdonnance(
+      tx as unknown as OrdonnanceGroupDeletePersistence,
+      id,
+    ));
+    return NextResponse.json({ ok: true, deleted: result.count });
+  } catch (error) {
+    if (error instanceof OrdonnanceGroupDeleteError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.code === "NOT_FOUND" ? 404 : 409 },
+      );
+    }
+    console.error("[ordonnances.delete] Suppression du groupe impossible", error);
+    return NextResponse.json({ error: "Suppression impossible" }, { status: 500 });
   }
 }

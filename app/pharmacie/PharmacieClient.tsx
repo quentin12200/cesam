@@ -53,6 +53,7 @@ export interface MedicamentItem {
 interface Props {
   medicaments: MedicamentItem[];
   ordonnances: OrdonnanceItem[];
+  initialView: "medicaments" | "ordonnances";
 }
 
 // ── Add Médicament form ────────────────────────────────────────────────────────
@@ -384,8 +385,9 @@ function Repertoire({ medicaments, onSaisiePrix }: { medicaments: MedicamentItem
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function PharmacieClient({ medicaments, ordonnances }: Props) {
-  const [vue, setVue] = useState<"medicaments" | "ordonnances">("medicaments");
+export default function PharmacieClient({ medicaments, ordonnances, initialView }: Props) {
+  const router = useRouter();
+  const [vue, setVue] = useState<"medicaments" | "ordonnances">(initialView);
   const [saisiePrix, setSaisiePrix] = useState(false);
   const ordonnancesActives = ordonnances.filter((o) => o.statut !== "ARCHIVE").length;
 
@@ -396,7 +398,10 @@ export default function PharmacieClient({ medicaments, ordonnances }: Props) {
           ["medicaments", "Médicaments", medicaments.filter((m) => m.actif).length],
           ["ordonnances", "Ordonnances", ordonnancesActives],
         ] as const).map(([id, label, count]) => (
-          <button key={id} onClick={() => setVue(id)}
+          <button key={id} onClick={() => {
+            setVue(id);
+            router.replace(`/pharmacie?vue=${id}`, { scroll: false });
+          }}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-sm font-medium transition-colors ${
               vue === id ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}>

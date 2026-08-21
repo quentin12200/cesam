@@ -99,8 +99,14 @@ async function getData() {
   return { medicamentItems, ordonnanceItems };
 }
 
-export default async function PharmaciePage() {
+export default async function PharmaciePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ vue?: string }>;
+}) {
+  const params = await searchParams;
   const { medicamentItems, ordonnanceItems } = await getData();
+  const initialView = params.vue === "ordonnances" ? "ordonnances" : "medicaments";
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
@@ -120,7 +126,11 @@ export default async function PharmaciePage() {
         </Link>
       </div>
 
-      <PharmacieClient medicaments={medicamentItems} ordonnances={ordonnanceItems} />
+      <PharmacieClient
+        medicaments={medicamentItems}
+        ordonnances={ordonnanceItems}
+        initialView={initialView}
+      />
     </div>
   );
 }
