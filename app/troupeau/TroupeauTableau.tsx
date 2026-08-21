@@ -14,6 +14,7 @@ import {
 } from "@/lib/utils";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 import { getMotherWeaningDisplay } from "@/lib/troupeau-mother-weaning";
+import { formatFather } from "@/lib/troupeau-display";
 
 export interface AnimalRow {
   id: string;
@@ -22,7 +23,6 @@ export interface AnimalRow {
   danais: string;
   sexbov: string;
   estGenisse: boolean;
-  tarieFaite: boolean;
   aEchographier: boolean;
   reproductionEtatManuel: EtatGestation | null;
   reproductionEtatPrecedent: EtatGestation | null;
@@ -32,12 +32,11 @@ export interface AnimalRow {
   gestationEtat: string | null;
   gestationVelagePrevue: string | null;
   velageDate: string | null;
-  veauNutrav: string | null;
-  veauStatut: string | null;
-  veauSevreFait: boolean | null;
   mereNutrav: string | null;
+  pereNom: string | null;
+  pereNumero: string | null;
   sevreFait: boolean;
-  dateSevrage: string | null;
+  activeCalves: { nutrav: string; href: string | null }[];
   dernierPoids: number | null;
   dernierePeseeDate: string | null;
   enAttente: boolean;
@@ -45,7 +44,6 @@ export interface AnimalRow {
 
 interface Props {
   animaux: AnimalRow[];
-  groupes: { id: string; nom: string }[];
   postCalvingRestDays: number;
 }
 
@@ -80,12 +78,6 @@ const REPRO_OPTIONS: FilterOption[] = [
   { value: "PLEINE", label: "Gestantes" },
   { value: "VIDE", label: "Vides" },
   { value: "A_ECO", label: "À échographier" },
-];
-
-const TARIE_OPTIONS: FilterOption[] = [
-  { value: undefined, label: "Toutes" },
-  { value: "oui", label: "Taries" },
-  { value: "non", label: "Non taries" },
 ];
 
 // ─── FilterDropdown ───────────────────────────────────────────────────────────
@@ -214,7 +206,7 @@ function SortHeader({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays }: Props) {
+export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -222,8 +214,6 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
   const currentTri = searchParams.get("tri") ?? undefined;
   const currentCategorie = searchParams.get("categorie") ?? undefined;
   const currentRepro = searchParams.get("repro") ?? undefined;
-  const currentTarie = searchParams.get("tarie") ?? undefined;
-  const currentGroupe = searchParams.get("groupe") ?? undefined;
 
   function buildFilterUrl(key: string, value: string | undefined): string {
     const params = new URLSearchParams(searchParams.toString());
@@ -237,11 +227,6 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
     return `/troupeau?${params.toString()}`;
   }
 
-  const groupeOptions: FilterOption[] = [
-    { value: undefined, label: "Tous groupes" },
-    ...groupes.map((g) => ({ value: g.id, label: g.nom })),
-  ];
-
   if (animaux.length === 0) {
     return (
       <div className="text-center text-gray-500 py-12 bg-white rounded-xl shadow">
@@ -253,7 +238,7 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
   return (
     <div className="bg-white rounded-xl shadow overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[820px]">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="bg-green-700 text-white text-xs select-none">
               <th className="px-3 py-2.5 text-left font-semibold">
@@ -292,29 +277,9 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
                   buildFilterUrl={buildFilterUrl}
                 />
               </th>
-              <th className="px-3 py-2.5 text-left font-semibold">Mère / sevrage</th>
-              <th className="px-3 py-2.5 text-left font-semibold">
-                <FilterDropdown
-                  label="🍼 Veau" 
-                  options={TARIE_OPTIONS}
-                  currentValue={currentTarie}
-                  paramKey="tarie"
-                  buildFilterUrl={buildFilterUrl}
-                />
-              </th>
-              <th className="px-3 py-2.5 text-left font-semibold">
-                {groupes.length > 0 ? (
-                  <FilterDropdown
-                    label="Groupe"
-                    options={groupeOptions}
-                    currentValue={currentGroupe}
-                    paramKey="groupe"
-                    buildFilterUrl={buildFilterUrl}
-                  />
-                ) : (
-                  "Groupe"
-                )}
-              </th>
+              <th className="px-3 py-2.5 text-left font-semibold">Mère</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Père</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Sevrage</th>
             </tr>
           </thead>
           <tbody>
@@ -342,10 +307,6 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
                     )
                   : null;
 
-              const veauActif =
-                animal.veauNutrav && animal.veauStatut === "ACTIF" && !animal.veauSevreFait && !animal.tarieFaite
-                  ? animal.veauNutrav
-                  : null;
               const gestationDays =
                 etat === "VERT" && animal.gestationEtat === "VERT" && animal.saillieDate
                   ? differenceInDays(new Date(), new Date(animal.saillieDate))
@@ -353,8 +314,8 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
               const motherWeaning = getMotherWeaningDisplay({
                 motherNutrav: animal.mereNutrav,
                 sevreFait: animal.sevreFait,
-                dateSevrage: animal.dateSevrage,
               });
+              const father = formatFather(animal.pereNom, animal.pereNumero);
 
               return (
                 <tr
@@ -424,28 +385,13 @@ export default function TroupeauTableau({ animaux, groupes, postCalvingRestDays 
                     )}
                   </td>
                   <td className="px-3 py-2.5">
-                    <div className="min-w-[5.5rem] leading-tight">
-                      <span className="font-mono text-xs font-bold text-gray-800">{motherWeaning.motherLabel}</span>
-                      {motherWeaning.statusLabel && <div className={`mt-0.5 whitespace-nowrap text-[10px] font-semibold ${motherWeaning.weaned ? "text-green-700" : "text-blue-700"}`}>{motherWeaning.weaned ? "✓" : "🍼"} {motherWeaning.statusLabel}</div>}
-                    </div>
+                    <span className="font-mono text-xs font-bold text-gray-800">{motherWeaning.motherLabel}</span>
+                  </td>
+                  <td className="max-w-[9rem] px-3 py-2.5 text-xs font-semibold text-gray-700">
+                    <span className="line-clamp-2">{father}</span>
                   </td>
                   <td className="px-3 py-2.5">
-                    {veauActif ? (
-                      <span className="text-xs font-mono bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
-                        🍼 {veauActif}
-                      </span>
-                    ) : (
-                      <span className="text-gray-200 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {animal.groupeNom ? (
-                      <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-                        {animal.groupeNom}
-                      </span>
-                    ) : (
-                      <span className="text-gray-200 text-xs">—</span>
-                    )}
+                    {motherWeaning.statusLabel && <span className="whitespace-nowrap text-[10px] font-semibold text-blue-700">🍼 {motherWeaning.statusLabel}</span>}
                   </td>
                 </tr>
               );

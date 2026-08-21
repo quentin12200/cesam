@@ -1,26 +1,18 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import {
-  getEtatGestation,
-  formatAge,
-  getCategorie,
-  getCategorieLabel,
-  getCategorieColor,
-} from "@/lib/utils";
 import Link from "next/link";
-import { ChevronRight, Search, Plus, SlidersHorizontal } from "lucide-react";
-import { differenceInDays, subDays } from "date-fns";
+import { Search, Plus, SlidersHorizontal } from "lucide-react";
+import { subDays } from "date-fns";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
 import GroupeCreateButton from "./GroupeCreateButton";
-import NutravBadge from "@/app/components/NutravBadge";
 import TroupeauScrollRestorer from "./TroupeauScrollRestorer";
 import TroupeauTableau, { type AnimalRow } from "./TroupeauTableau";
+import TroupeauMobileList from "./TroupeauMobileList";
 import MoreMenu from "./MoreMenu";
 import TroupeauTabs from "@/components/TroupeauTabs";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
-import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 import { filtrerAnimauxParCategorie } from "@/lib/troupeau-category-filter";
 
 interface PageProps {
@@ -117,8 +109,22 @@ async function getAnimaux(params: {
         categorie: true,
         groupeId: true,
         sevreFait: true,
-        dateSevrage: true,
         mere: { select: { nutrav: true } },
+        velageVeau: {
+          select: {
+            pereNom: true,
+            pereNunati: true,
+            gestation: {
+              select: {
+                saillie: {
+                  select: {
+                    taureau: { select: { nopere: true, nupere: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
         tarieFaite: true,
         aEchographier: true,
         demandesEchographie: {
@@ -258,6 +264,58 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     { value: "TAUREAU", label: "Taureaux" },
     { value: "VEAU_M", label: "Veaux" },
   ];
+
+  const tableauAnimaux = animaux.map<AnimalRow>((animal) => {
+    const dernierVelage = animal.velagesVache[0];
+    const activeCalves = new Map<string, { nutrav: string; href: string | null }>();
+
+    if (!animal.tarieFaite && dernierVelage?.veau?.statut === "ACTIF" && !dernierVelage.veau.sevreFait) {
+      activeCalves.set(dernierVelage.veau.nutrav, {
+        nutrav: dernierVelage.veau.nutrav,
+        href: `/troupeau/${dernierVelage.veau.nutrav}`,
+      });
+    }
+    if (!animal.tarieFaite) {
+      for (const detail of dernierVelage?.veauxDetails ?? []) {
+        const nutrav = detail.animal?.nutrav ?? detail.nutrav;
+        const actif = detail.statut !== "MORT_NE"
+          && (!detail.animal || (detail.animal.statut === "ACTIF" && !detail.animal.sevreFait));
+        if (nutrav && actif) {
+          activeCalves.set(nutrav, {
+            nutrav,
+            href: detail.animal ? `/troupeau/${detail.animal.nutrav}` : null,
+          });
+        }
+      }
+    }
+
+    const bull = animal.velageVeau?.gestation?.saillie?.taureau;
+    return {
+      id: animal.id,
+      nutrav: animal.nutrav,
+      nobovi: animal.nobovi,
+      danais: animal.danais.toISOString(),
+      sexbov: animal.sexbov,
+      estGenisse: animal.estGenisse,
+      aEchographier: animal.demandesEchographie.length > 0,
+      reproductionEtatManuel: animal.reproductionEtatManuel as AnimalRow["reproductionEtatManuel"],
+      reproductionEtatPrecedent: animal.reproductionEtatPrecedent as AnimalRow["reproductionEtatPrecedent"],
+      categorie: animal.categorie,
+      groupeNom: animal.groupe?.nom ?? null,
+      saillieDate: animal.saillies[0]?.date.toISOString() ?? null,
+      gestationEtat: animal.saillies[0]?.gestation?.etat ?? null,
+      gestationVelagePrevue: animal.saillies[0]?.gestation?.dateVelagePrevue?.toISOString() ?? null,
+      velageDate: dernierVelage?.date.toISOString() ?? null,
+      mereNutrav: animal.mere?.nutrav ?? null,
+      pereNom: bull?.nopere ?? animal.velageVeau?.pereNom ?? null,
+      pereNumero: bull?.nupere ?? animal.velageVeau?.pereNunati ?? null,
+      sevreFait: animal.sevreFait,
+      activeCalves: [...activeCalves.values()],
+      dernierPoids: animal.pesees[0]?.poids ?? null,
+      dernierePeseeDate: animal.pesees[0]?.date.toISOString() ?? null,
+      enAttente: animal.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente),
+    };
+  });
 
   return (
     <div className="p-4 space-y-4 max-w-6xl mx-auto pb-24">
@@ -613,168 +671,15 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         <Suspense fallback={<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Chargement…</div>}>
           <TroupeauTableau
             postCalvingRestDays={postCalvingRestDays}
-            animaux={animaux.map<AnimalRow>((a) => ({
-              id: a.id,
-              nutrav: a.nutrav,
-              nobovi: a.nobovi,
-              danais: a.danais.toISOString(),
-              sexbov: a.sexbov,
-              estGenisse: a.estGenisse,
-              tarieFaite: a.tarieFaite,
-              aEchographier: a.demandesEchographie.length > 0,
-              reproductionEtatManuel: a.reproductionEtatManuel as AnimalRow["reproductionEtatManuel"],
-              reproductionEtatPrecedent: a.reproductionEtatPrecedent as AnimalRow["reproductionEtatPrecedent"],
-              categorie: a.categorie,
-              groupeNom: a.groupe?.nom ?? null,
-              saillieDate: a.saillies[0]?.date.toISOString() ?? null,
-              gestationEtat: a.saillies[0]?.gestation?.etat ?? null,
-              gestationVelagePrevue: a.saillies[0]?.gestation?.dateVelagePrevue?.toISOString() ?? null,
-              velageDate: a.velagesVache[0]?.date.toISOString() ?? null,
-              veauNutrav: a.velagesVache[0]?.veau?.nutrav ?? null,
-              veauStatut: a.velagesVache[0]?.veau?.statut ?? null,
-              veauSevreFait: a.velagesVache[0]?.veau?.sevreFait ?? null,
-              mereNutrav: a.mere?.nutrav ?? null,
-              sevreFait: a.sevreFait,
-              dateSevrage: a.dateSevrage?.toISOString() ?? null,
-              dernierPoids: a.pesees[0]?.poids ?? null,
-              dernierePeseeDate: a.pesees[0]?.date.toISOString() ?? null,
-              enAttente: a.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente),
-            }))}
-            groupes={groupes}
+            animaux={tableauAnimaux}
           />
         </Suspense>
       </div>
 
       {/* Cartes sur téléphone */}
-      <div className="space-y-2 md:hidden">
-          {animaux.map((animal) => {
-            const cat = getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
-            const catLabel = getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
-            const catColor = getCategorieColor(cat);
-            const etat =
-              ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "A_ENGRAISSER"].includes(cat)
-                ? ((animal.reproductionEtatManuel as ReturnType<typeof getEtatGestation> | null) ?? getEtatGestation(
-                    animal.saillies[0]?.date ?? null,
-                    animal.saillies[0]?.gestation?.etat ?? null,
-                    animal.saillies[0]?.gestation?.dateVelagePrevue ?? null,
-                    animal.velagesVache[0]?.date ?? null,
-                    false,
-                    postCalvingRestDays
-                  ))
-                : null;
-            const dernierVelage = animal.velagesVache[0];
-            const veauxActifs = new Map<string, { nutrav: string; href: string | null }>();
-            if (!animal.tarieFaite && dernierVelage?.veau?.statut === "ACTIF" && !dernierVelage.veau.sevreFait) {
-              veauxActifs.set(dernierVelage.veau.nutrav, {
-                nutrav: dernierVelage.veau.nutrav,
-                href: `/troupeau/${dernierVelage.veau.nutrav}`,
-              });
-            }
-            if (!animal.tarieFaite) {
-              for (const detail of dernierVelage?.veauxDetails ?? []) {
-                const nutrav = detail.animal?.nutrav ?? detail.nutrav;
-                const actif = detail.statut !== "MORT_NE"
-                  && (!detail.animal || (detail.animal.statut === "ACTIF" && !detail.animal.sevreFait));
-                if (nutrav && actif) {
-                  veauxActifs.set(nutrav, {
-                    nutrav,
-                    href: detail.animal ? `/troupeau/${detail.animal.nutrav}` : null,
-                  });
-                }
-              }
-            }
-            const enAttente = animal.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente);
-
-            return (
-              <article
-                key={animal.id}
-                className="relative rounded-xl bg-white p-4 shadow transition-shadow hover:shadow-md"
-              >
-                <Link
-                  href={`/troupeau/${animal.nutrav}`}
-                  className="absolute inset-0 rounded-xl"
-                  aria-label={`Ouvrir la fiche de ${animal.nutrav}`}
-                />
-                <div className="pointer-events-none relative flex items-center gap-3">
-                  <NutravBadge nutrav={animal.nutrav} className="!bg-emerald-600" />
-                  <div className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900">
-                    {animal.nobovi ?? <span className="font-medium italic text-gray-400">Sans nom</span>}
-                  </div>
-                  <ChevronRight aria-hidden="true" size={18} className="shrink-0 text-gray-400" />
-                </div>
-
-                <div className="pointer-events-none relative mt-2 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        {etat && (
-                          <ReproductionListBadge
-                            etat={etat}
-                            fallbackLabel={
-                              etat === "ROSE" ? "Imminente"
-                                : etat === "JAUNE" ? "À écho"
-                                : etat === "GRIS" ? "Saillie récente"
-                                : etat === "REPOS" ? "Repos"
-                                : "Vide"
-                            }
-                            gestationDays={
-                              etat === "VERT" && animal.saillies[0]?.gestation?.etat === "VERT"
-                                ? differenceInDays(new Date(), animal.saillies[0].date)
-                                : null
-                            }
-                            className={etat === "VERT" ? "!px-2.5 !py-1 !font-extrabold" : ""}
-                          />
-                        )}
-                        {[...veauxActifs.values()].map((veau) => veau.href ? (
-                          <Link
-                            key={veau.nutrav}
-                            href={veau.href}
-                            className="pointer-events-auto relative z-10 rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-700"
-                          >
-                            🍼{veau.nutrav}
-                          </Link>
-                        ) : (
-                          <span key={veau.nutrav} className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-700">
-                            🍼{veau.nutrav}
-                          </span>
-                        ))}
-                        <span className="shrink-0 text-xs text-gray-500">{formatAge(animal.danais)}</span>
-                        <span className={`shrink-0 rounded-full px-1.5 py-px text-[11px] font-normal opacity-75 ${catColor}`}>
-                          {animal.sexbov === "F" ? "♀" : "♂"} {catLabel}
-                        </span>
-                        {enAttente && (
-                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700" title="Animal interdit à la vente pendant le délai d'attente">
-                            ⛔ Vente interdite
-                          </span>
-                        )}
-                        {animal.demandesEchographie.length > 0 && (
-                          <span
-                            className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800"
-                            title={animal.demandesEchographie[0]?.origine === "AUTOMATIQUE" ? "Demande automatique" : "Demande manuelle"}
-                          >
-                            Écho à faire
-                          </span>
-                        )}
-                        {animal.pesees[0] && (
-                          <span className="text-xs font-semibold text-gray-700">
-                            {animal.pesees[0].poids} kg
-                            <span className="ml-1 font-normal text-gray-400">
-                              · il y a {differenceInDays(new Date(), animal.pesees[0].date)} j
-                            </span>
-                          </span>
-                        )}
-                        {animal.groupe && (
-                          <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
-                            {animal.groupe.nom}
-                          </span>
-                        )}
-                </div>
-              </article>
-            );
-          })}
-          {animaux.length === 0 && (
-            <div className="text-center text-gray-500 py-12 bg-white rounded-xl shadow">
-              Aucun animal trouvé
-            </div>
-          )}
-        </div>
+      <div className="md:hidden">
+        <TroupeauMobileList animaux={tableauAnimaux} postCalvingRestDays={postCalvingRestDays} />
+      </div>
 
     </div>
   );
