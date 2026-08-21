@@ -6,12 +6,10 @@ import {
   getCategorie,
   getCategorieLabel,
   getCategorieColor,
-  CATEGORIES_LABELS,
-  type CategorieAnimal,
 } from "@/lib/utils";
 import Link from "next/link";
 import { ChevronRight, Search, Plus, SlidersHorizontal } from "lucide-react";
-import { addDays, differenceInDays, differenceInMonths, subDays } from "date-fns";
+import { differenceInDays, subDays } from "date-fns";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
@@ -23,6 +21,7 @@ import MoreMenu from "./MoreMenu";
 import TroupeauTabs from "@/components/TroupeauTabs";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
+import { filtrerAnimauxParCategorie } from "@/lib/troupeau-category-filter";
 
 interface PageProps {
   searchParams: Promise<{
@@ -96,61 +95,12 @@ async function getAnimaux(params: {
     where.evenements = { none: { resolu: false } };
   }
 
-  // Filtre catégorie
-  if (categorie && categorie !== "TOUS") {
-    const ageMoisMin = (m: number) => addDays(now, -(m * 30.44));
-    const ageMoisMax = (m: number) => addDays(now, -(m * 30.44));
-    switch (categorie as CategorieAnimal) {
-      case "VACHE":
-        where.sexbov = "F";
-        where.estGenisse = false;
-        where.danais = { lt: addDays(now, -365) };
-        where.categorie = null;
-        break;
-      case "VELLE":
-        where.sexbov = "F";
-        where.OR = [
-          { estGenisse: false, danais: { gte: addDays(now, -365) }, categorie: null },
-          { categorie: "VELLE" },
-        ];
-        break;
-      case "TAUREAU":
-        where.sexbov = "M";
-        where.danais = { lt: addDays(now, -456) }; // ~15 months
-        break;
-      case "VEAU_M":
-        where.sexbov = "M";
-        where.danais = { gte: addDays(now, -456) };
-        // inclure ceux sans catégorie manuelle (auto = VEAU_M) et ceux explicitement VEAU_M
-        break;
-      case "PETITE_GENISSE":
-        where.sexbov = "F";
-        where.estGenisse = true;
-        where.danais = { gte: addDays(now, -365) };
-        break;
-      case "MOYENNE_GENISSE":
-        where.sexbov = "F";
-        where.estGenisse = true;
-        where.danais = { gte: addDays(now, -730), lt: addDays(now, -365) };
-        break;
-      case "GRANDE_GENISSE":
-        where.sexbov = "F";
-        where.estGenisse = true;
-        where.danais = { gte: addDays(now, -1095), lt: addDays(now, -730) };
-        break;
-      default:
-        // PRESELECTION_GENISSE et autres — filtre direct par champ categorie
-        where.categorie = categorie;
-    }
-  }
-
   const orderBy: Prisma.AnimalOrderByWithRelationInput =
     tri === "age_asc" ? { danais: "desc" }
     : tri === "age_desc" ? { danais: "asc" }
     : { nutrav: "asc" };
 
-  const [total, animaux, groupes, reproductionConfig] = await Promise.all([
-    prisma.animal.count({ where }),
+  const [animauxNonFiltres, groupes, reproductionConfig] = await Promise.all([
     prisma.animal.findMany({
       where,
       orderBy,
@@ -224,9 +174,11 @@ async function getAnimaux(params: {
     }).catch(() => null),
   ]);
 
+  const animaux = filtrerAnimauxParCategorie(animauxNonFiltres, categorie);
+
   return {
     animaux,
-    total,
+    total: animaux.length,
     groupes,
     postCalvingRestDays: reproductionConfig?.reproReposObjectifJours ?? 60,
   };
