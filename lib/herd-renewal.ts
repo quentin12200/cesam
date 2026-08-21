@@ -1,25 +1,34 @@
 export const RENEWAL_PIPELINE_CATEGORIES = ["PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"] as const;
 export type RenewalStage = typeof RENEWAL_PIPELINE_CATEGORIES[number];
-export type RenewalDecision = "GARDER" | "A_REVOIR" | "SORTIR";
+export type RenewalDecision = "NON_DECIDEE" | "GARDER" | "A_REVOIR" | "SORTIR";
 export type CowExitDecision = "DECIDEE" | "A_SURVEILLER" | "PAS_PREVUE";
 
-export interface RenewalSettings { targetMothers: number; renewalRatePercent: number }
+export interface RenewalSettings { targetMothers: number; renewalRatePercent: number; renewalGenerationStartMonth: number }
 export interface ParentIdentity { id?: string | null; workNumber?: string | null; name?: string | null; nationalNumber?: string | null }
 export interface CandidateParentSources { directMother?: ParentIdentity | null; calvingMother?: ParentIdentity | null; calvingFather?: ParentIdentity | null; breedingBull?: ParentIdentity | null }
 export interface FirstCalvingRecord { birthDate: Date | string; calvings: Array<Date | string> }
-export interface FirstCalvingAverage { averageMonths: number; sampleSize: number; fallback: boolean }
+export interface FirstCalvingAverage { averageMonths: number; medianMonths: number; sampleSize: number; fallback: boolean }
 export interface ProjectedEntry { id: string; entryDate: Date | string; included?: boolean }
-export interface AnnualRenewalProjection {
-  year: number;
-  mothersAtStart: number;
+export interface RenewalGenerationProjection {
+  generation: number;
   entries: number;
   identifiedExits: number;
-  exitsNeededForTarget: number;
-  projectedMothers: number;
+  totalExitsNeeded: number;
+  remainingExits: number;
+}
+export interface MotherAuditAnimal { id: string; hasCalving: boolean; effectiveCategory: string; estGenisse: boolean; birthDate: Date | string }
+export interface MotherAudit {
+  total: number;
+  cows: number;
+  toFatten: number;
+  fattening: number;
+  inconsistentIds: string[];
+  motherIds: string[];
 }
 
 export const DEFAULT_RENEWAL_RATE = 20;
 export const FALLBACK_FIRST_CALVING_MONTHS = 36;
+export const DEFAULT_RENEWAL_GENERATION_START_MONTH = 9;
 const DAYS_PER_MONTH = 365.25 / 12;
 
 export function calculateAnnualRenewalNeed(targetMothers: number, renewalRatePercent: number): number {
@@ -43,8 +52,16 @@ export function calculateAverageFirstCalvingAge(records: FirstCalvingRecord[]): 
     const months = (first.getTime() - birth.getTime()) / 86400000 / DAYS_PER_MONTH;
     return Number.isFinite(months) && months >= 24 && months <= 48 ? [months] : [];
   });
-  if (!ages.length) return { averageMonths: FALLBACK_FIRST_CALVING_MONTHS, sampleSize: 0, fallback: true };
-  return { averageMonths: Math.round(ages.reduce((sum, value) => sum + value, 0) / ages.length * 10) / 10, sampleSize: ages.length, fallback: false };
+  if (!ages.length) return { averageMonths: FALLBACK_FIRST_CALVING_MONTHS, medianMonths: FALLBACK_FIRST_CALVING_MONTHS, sampleSize: 0, fallback: true };
+  const sorted = [...ages].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  return {
+    averageMonths: Math.round(ages.reduce((sum, value) => sum + value, 0) / ages.length * 10) / 10,
+    medianMonths: Math.round(median * 10) / 10,
+    sampleSize: ages.length,
+    fallback: false,
+  };
 }
 
 export function estimateMotherEntryDate(input: { birthDate: Date | string; expectedCalvingDate?: Date | string | null; firstCalvingAverageMonths: number }): Date {
@@ -60,39 +77,62 @@ export function estimateMotherEntryDate(input: { birthDate: Date | string; expec
   return birth;
 }
 
-export function buildAnnualRenewalProjection(input: {
-  currentYear: number;
-  minimumYears?: number;
+export function renewalGenerationForDate(date: Date | string, startMonth: number): number {
+  const value = new Date(date);
+  const safeStartMonth = Math.min(12, Math.max(1, Math.round(startMonth)));
+  return value.getFullYear() - (value.getMonth() + 1 < safeStartMonth ? 1 : 0);
+}
+
+export function buildRenewalGenerationProjection(input: {
+  currentDate: Date | string;
+  minimumGenerations?: number;
+  generationStartMonth: number;
   currentMothers: number;
   targetMothers: number;
   entries: ProjectedEntry[];
-  identifiedExitsCurrentYear: number;
-}): AnnualRenewalProjection[] {
+  identifiedExitsCurrentGeneration: number;
+}): RenewalGenerationProjection[] {
   const includedEntries = input.entries.filter((entry) => entry.included !== false);
-  const lastEntryYear = includedEntries.reduce((max, entry) => Math.max(max, new Date(entry.entryDate).getFullYear()), input.currentYear);
-  const lastYear = Math.max(input.currentYear + Math.max(3, input.minimumYears ?? 3) - 1, lastEntryYear);
-  const result: AnnualRenewalProjection[] = [];
-  let mothersAtStart = input.currentMothers;
-  for (let year = input.currentYear; year <= lastYear; year++) {
-    const entries = includedEntries.filter((entry) => new Date(entry.entryDate).getFullYear() === year).length;
-    const identifiedExits = year === input.currentYear ? input.identifiedExitsCurrentYear : 0;
-    const projectedMothers = Math.max(0, mothersAtStart + entries - identifiedExits);
+  const currentGeneration = renewalGenerationForDate(input.currentDate, input.generationStartMonth);
+  const lastEntryGeneration = includedEntries.reduce((max, entry) => Math.max(max, renewalGenerationForDate(entry.entryDate, input.generationStartMonth)), currentGeneration);
+  const lastGeneration = Math.max(currentGeneration + Math.max(3, input.minimumGenerations ?? 3) - 1, lastEntryGeneration);
+  const result: RenewalGenerationProjection[] = [];
+  for (let generation = currentGeneration; generation <= lastGeneration; generation++) {
+    const entries = includedEntries.filter((entry) => renewalGenerationForDate(entry.entryDate, input.generationStartMonth) === generation).length;
+    const identifiedExits = generation === currentGeneration ? input.identifiedExitsCurrentGeneration : 0;
+    const totalExitsNeeded = generation === currentGeneration
+      ? Math.max(0, input.currentMothers + entries - input.targetMothers)
+      : entries;
     result.push({
-      year,
-      mothersAtStart,
+      generation,
       entries,
       identifiedExits,
-      exitsNeededForTarget: Math.max(0, mothersAtStart + entries - input.targetMothers),
-      projectedMothers,
+      totalExitsNeeded,
+      remainingExits: Math.max(0, totalExitsNeeded - identifiedExits),
     });
-    mothersAtStart = projectedMothers;
   }
   return result;
 }
 
+export function auditCurrentMothers(animals: MotherAuditAnimal[], referenceDate = new Date()): MotherAudit {
+  const mothers = animals.filter((animal) => {
+    const ageMonths = (referenceDate.getTime() - new Date(animal.birthDate).getTime()) / 86400000 / DAYS_PER_MONTH;
+    return animal.hasCalving || animal.effectiveCategory === "VACHE" || (!animal.estGenisse && ageMonths >= 24);
+  });
+  const ids = new Set(mothers.map((animal) => animal.id));
+  const categoryCount = (category: string) => mothers.filter((animal) => animal.effectiveCategory === category).length;
+  const inconsistentIds = animals.filter((animal) =>
+    (animal.effectiveCategory === "VACHE" && !animal.hasCalving)
+    || (animal.hasCalving && ["PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(animal.effectiveCategory))
+  ).map((animal) => animal.id);
+  const toFatten = categoryCount("A_ENGRAISSER");
+  const fattening = categoryCount("ENGRAISSEMENT");
+  return { total: ids.size, cows: ids.size - toFatten - fattening, toFatten, fattening, inconsistentIds, motherIds: [...ids] };
+}
+
 export function countRenewalDecisions(decisions: Record<string, RenewalDecision>) {
   const values = Object.values(decisions);
-  return { kept: values.filter((value) => value === "GARDER").length, review: values.filter((value) => value === "A_REVOIR").length, rejected: values.filter((value) => value === "SORTIR").length, total: values.length };
+  return { undecided: values.filter((value) => value === "NON_DECIDEE").length, kept: values.filter((value) => value === "GARDER").length, review: values.filter((value) => value === "A_REVOIR").length, rejected: values.filter((value) => value === "SORTIR").length, total: values.length };
 }
 
 export function renewalPilotMessage(candidateCount: number, annualNeed: number): { tone: "green" | "orange" | "red"; text: string } {
@@ -126,8 +166,12 @@ export function groupCandidatesByParent<T>(candidates: T[], parent: (candidate: 
 export function parseRenewalSettings(raw: string | null | undefined, currentMothers: number): RenewalSettings {
   try {
     const stored = (raw ? JSON.parse(raw) as { renewalPlanning?: Partial<RenewalSettings> } : {}).renewalPlanning ?? {};
-    return { targetMothers: positiveInteger(stored.targetMothers, currentMothers), renewalRatePercent: boundedNumber(stored.renewalRatePercent, DEFAULT_RENEWAL_RATE, 0, 100) };
-  } catch { return { targetMothers: Math.max(1, currentMothers), renewalRatePercent: DEFAULT_RENEWAL_RATE }; }
+    return {
+      targetMothers: positiveInteger(stored.targetMothers, currentMothers),
+      renewalRatePercent: boundedNumber(stored.renewalRatePercent, DEFAULT_RENEWAL_RATE, 0, 100),
+      renewalGenerationStartMonth: boundedInteger(stored.renewalGenerationStartMonth, DEFAULT_RENEWAL_GENERATION_START_MONTH, 1, 12),
+    };
+  } catch { return { targetMothers: Math.max(1, currentMothers), renewalRatePercent: DEFAULT_RENEWAL_RATE, renewalGenerationStartMonth: DEFAULT_RENEWAL_GENERATION_START_MONTH }; }
 }
 
 export function mergeRenewalSettings(raw: string | null | undefined, settings: RenewalSettings): string {
@@ -139,3 +183,4 @@ export function mergeRenewalSettings(raw: string | null | undefined, settings: R
 
 function positiveInteger(value: unknown, fallback: number) { const number = Number(value); return Number.isFinite(number) && number > 0 ? Math.round(number) : Math.max(1, Math.round(fallback)); }
 function boundedNumber(value: unknown, fallback: number, min: number, max: number) { const number = Number(value); return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback; }
+function boundedInteger(value: unknown, fallback: number, min: number, max: number) { return Math.round(boundedNumber(value, fallback, min, max)); }

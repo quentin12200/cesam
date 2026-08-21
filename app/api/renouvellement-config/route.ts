@@ -7,11 +7,14 @@ function validateSettings(value: unknown): RenewalSettings | null {
   const body = value as Partial<RenewalSettings>;
   const targetMothers = Number(body.targetMothers);
   const renewalRatePercent = Number(body.renewalRatePercent);
+  const renewalGenerationStartMonth = Number(body.renewalGenerationStartMonth);
   if (!Number.isFinite(targetMothers) || targetMothers < 1 || targetMothers > 10000) return null;
   if (!Number.isFinite(renewalRatePercent) || renewalRatePercent < 0 || renewalRatePercent > 100) return null;
+  if (!Number.isInteger(renewalGenerationStartMonth) || renewalGenerationStartMonth < 1 || renewalGenerationStartMonth > 12) return null;
   return {
     targetMothers: Math.round(targetMothers),
     renewalRatePercent,
+    renewalGenerationStartMonth,
   };
 }
 

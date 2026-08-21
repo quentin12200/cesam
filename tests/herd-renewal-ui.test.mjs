@@ -6,25 +6,27 @@ const dashboard = readFileSync(new URL("../app/troupeau/renouvellement/RenewalDa
 const page = readFileSync(new URL("../app/troupeau/renouvellement/page.tsx", import.meta.url), "utf8");
 const calvingRoute = readFileSync(new URL("../app/api/velages/route.ts", import.meta.url), "utf8");
 
-test("affiche la moyenne réelle, la sélection des petites et la projection annuelle", () => {
-  for (const text of ["1er vêlage moyen", "Sélection en cours — Petites génisses", "Projection multi-années", "Mères au début", "Sorties nécessaires"]) assert.match(dashboard, new RegExp(text));
-  assert.doesNotMatch(dashboard, /1er vêlage \(mois\)/);
+test("affiche un tableau de bord compact et des générations", () => {
+  for (const text of ["1er vêlage typique", "Sélection en cours", "Mes générations", "Début de la campagne de renouvellement", "Mères présentes", "Voir le détail"]) assert.match(dashboard, new RegExp(text));
+  for (const removed of ["Projection multi-années", "Mères au début", "projectedMothers"]) assert.doesNotMatch(dashboard, new RegExp(removed));
 });
 
 test("compare uniquement les petites génisses", () => {
   assert.match(dashboard, /pipelineCandidates\.filter\(\(candidate\) => candidate\.category === "PETITE_GENISSE"\)/);
-  assert.match(dashboard, /Comparer les candidates/);
-  for (const text of ["Par père", "Par mère", "GARDER", "A_REVOIR", "SORTIR"]) assert.match(dashboard, new RegExp(text));
+  assert.match(dashboard, />Comparer</);
+  for (const text of ["Par père", "Par mère", "NON_DECIDEE", "GARDER", "A_REVOIR", "SORTIR", "à décider"]) assert.match(dashboard, new RegExp(text));
 });
 
-test("sépare le pipeline petite, moyenne, grande et les présélections", () => {
-  for (const value of ["PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "Présélections à venir"]) assert.match(dashboard, new RegExp(value));
+test("sépare le mini-pipeline petite, moyenne, grande et les présélections", () => {
+  for (const value of ["PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "Présélections à venir", "Petites", "Moyennes", "Grandes", "Vaches"]) assert.match(dashboard, new RegExp(value));
   assert.match(page, /PRESELECTION_GENISSE/);
 });
 
-test("reconnaît les anciennes mères par leurs vêlages et les sorties commerciales", () => {
-  assert.match(page, /isCurrentMother\(animal\.velagesVache\.length\)/);
-  assert.match(page, /isAutomaticPlannedExit\(animal\.velagesVache\.length, animal\.categorie\)/);
+test("audite les anciennes mères et les sorties commerciales", () => {
+  assert.match(page, /auditCurrentMothers/);
+  assert.match(page, /effectiveCategory/);
+  assert.match(page, /A_ENGRAISSER/);
+  assert.match(page, /ENGRAISSEMENT/);
 });
 
 test("la création du premier vêlage applique la transition vers vache", () => {

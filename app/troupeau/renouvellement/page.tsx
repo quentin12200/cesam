@@ -1,9 +1,9 @@
 import BackButton from "@/app/components/BackButton";
 import {
   calculateAverageFirstCalvingAge,
+  auditCurrentMothers,
   estimateMotherEntryDate,
   isAutomaticPlannedExit,
-  isCurrentMother,
   parseRenewalSettings,
   RENEWAL_PIPELINE_CATEGORIES,
   resolveCandidateParents,
@@ -50,9 +50,22 @@ export default async function RenewalPage() {
 
   const firstCalvingAverage = calculateAverageFirstCalvingAge(females.map((animal) => ({ birthDate: animal.danais, calvings: animal.velagesVache.map((calving) => calving.date) })));
   const activeFemales = females.filter((animal) => animal.statut === "ACTIF");
-  // Le vêlage réel prime sur une ancienne catégorie incohérente.
-  const mothers = activeFemales.filter((animal) => isCurrentMother(animal.velagesVache.length));
-  const settings = parseRenewalSettings(config?.reproductionRulesJson, mothers.length);
+  const activeWithCategory = activeFemales.map((animal) => ({
+    animal,
+    effectiveCategory: getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie),
+  }));
+  // Le vêlage réel reste la preuve forte, mais les vaches importées sans
+  // historique CESAM restent visibles grâce à leur catégorie/état adulte.
+  const motherAudit = auditCurrentMothers(activeWithCategory.map(({ animal, effectiveCategory }) => ({
+    id: animal.id,
+    hasCalving: animal.velagesVache.length > 0,
+    effectiveCategory,
+    estGenisse: animal.estGenisse,
+    birthDate: animal.danais,
+  })));
+  const motherIds = new Set(motherAudit.motherIds);
+  const mothers = activeWithCategory.filter(({ animal }) => motherIds.has(animal.id));
+  const settings = parseRenewalSettings(config?.reproductionRulesJson, motherAudit.total);
   const pipelineCategories = new Set<string>(RENEWAL_PIPELINE_CATEGORIES);
 
   const pipeline: RenewalCandidate[] = activeFemales
@@ -62,7 +75,7 @@ export default async function RenewalPage() {
     .map(({ animal, category }) => {
       const expected = animal.saillies[0]?.gestation;
       const reliableExpectedDate = expected?.dateVelagePrevue && ["VERT", "ROSE"].includes(expected.etat) ? expected.dateVelagePrevue : null;
-      const entryDate = estimateMotherEntryDate({ birthDate: animal.danais, expectedCalvingDate: reliableExpectedDate, firstCalvingAverageMonths: firstCalvingAverage.averageMonths });
+      const entryDate = estimateMotherEntryDate({ birthDate: animal.danais, expectedCalvingDate: reliableExpectedDate, firstCalvingAverageMonths: firstCalvingAverage.medianMonths });
       const calvingFather = animal.velageVeau?.pereNom || animal.velageVeau?.pereNunati ? { name: animal.velageVeau.pereNom, nationalNumber: animal.velageVeau.pereNunati } : null;
       const parents = resolveCandidateParents({ directMother: identity(animal.mere), calvingMother: identity(animal.velageVeau?.vache), breedingBull: identity(animal.velageVeau?.gestation?.saillie?.taureau), calvingFather });
       return {
@@ -75,7 +88,7 @@ export default async function RenewalPage() {
     });
 
   const preselectionCount = activeFemales.filter((animal) => animal.velagesVache.length === 0 && getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie) === "PRESELECTION_GENISSE").length;
-  const automaticExitIds = mothers.filter((animal) => isAutomaticPlannedExit(animal.velagesVache.length, animal.categorie)).map((animal) => animal.id);
+  const automaticExitIds = mothers.filter(({ animal, effectiveCategory }) => isAutomaticPlannedExit(animal.velagesVache.length, effectiveCategory) || (["A_ENGRAISSER", "ENGRAISSEMENT"].includes(effectiveCategory) && !animal.estGenisse)).map(({ animal }) => animal.id);
 
   return <main className="mx-auto min-h-screen max-w-3xl bg-slate-50 p-3 pb-24 sm:p-5">
     <header className="mb-4 flex items-center gap-3">
@@ -83,10 +96,10 @@ export default async function RenewalPage() {
       <div className="min-w-0 flex-1"><h1 className="flex items-center gap-2 text-xl font-black text-gray-900"><Sprout size={21} className="text-green-700" /> Renouvellement</h1><p className="text-xs text-gray-500">Sélection aujourd’hui, entrées comme mères dans les années à venir</p></div>
     </header>
     <RenewalDashboard
-      currentMothers={mothers.length}
+      motherAudit={motherAudit}
       pipelineCandidates={pipeline}
       preselectionCount={preselectionCount}
-      mothers={mothers.map((animal) => ({ id: animal.id, nutrav: animal.nutrav, name: animal.nobovi, automaticExit: automaticExitIds.includes(animal.id) }))}
+      mothers={mothers.map(({ animal, effectiveCategory }) => ({ id: animal.id, nutrav: animal.nutrav, name: animal.nobovi, category: effectiveCategory, automaticExit: automaticExitIds.includes(animal.id) }))}
       firstCalvingAverage={firstCalvingAverage}
       initialSettings={settings}
     />
