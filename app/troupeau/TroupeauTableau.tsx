@@ -36,7 +36,7 @@ export interface AnimalRow {
   pereNom: string | null;
   pereNumero: string | null;
   sevreFait: boolean;
-  activeCalves: { nutrav: string; href: string | null }[];
+  activeCalves: { nutrav: string; name: string | null; href: string | null }[];
   dernierPoids: number | null;
   dernierePeseeDate: string | null;
   enAttente: boolean;
@@ -314,6 +314,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
               const motherWeaning = getMotherWeaningDisplay({
                 motherNutrav: animal.mereNutrav,
                 sevreFait: animal.sevreFait,
+                birthDate: danais,
               });
               const father = formatFather(animal.pereNom, animal.pereNumero);
 

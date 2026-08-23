@@ -24,8 +24,23 @@ test("le numéro et le nom restent toujours visibles tandis que les autres infor
   }
 });
 
-test("l’affichage mobile ne montre Non sevrée que si nécessaire", () => {
-  assert.match(mobile, /isVisible\("notWeaned"\) && !animal\.sevreFait/);
-  assert.match(mobile, /🍼 Non sevrée/);
+test("l’affichage mobile ne montre Non sevré que pour un jeune concerné", () => {
+  assert.match(mobile, /shouldDisplayNonWeaned\(birthDate, animal\.sevreFait\)/);
+  assert.match(mobile, /🍼 Non sevré/);
   assert.doesNotMatch(mobile, /✓ Sevrée/);
+});
+
+test("la carte entière est ouvrable sans flèche et la filiation reste indépendante", () => {
+  assert.match(mobile, /role="link"/);
+  assert.match(mobile, /router\.push\(href\)/);
+  assert.doesNotMatch(mobile, /ChevronRight/);
+  assert.match(mobile, /<details[^>]*onClick=\{\(event\) => event\.stopPropagation\(\)\}/);
+  assert.match(mobile, />\s*Filiation\s*</);
+});
+
+test("le veau au pis reste une relation compacte sans phrase de sevrage", () => {
+  assert.match(mobile, /🍼 \{calf\.name \?\? calf\.nutrav\}/);
+  assert.doesNotMatch(mobile, /Veau non sevré/);
+  assert.doesNotMatch(mobile, /Non sevrée/);
+  assert.match(page, /nobovi: true, statut: true, sevreFait: true/);
 });

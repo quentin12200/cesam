@@ -149,12 +149,12 @@ async function getAnimaux(params: {
           take: 1,
           select: {
             date: true,
-            veau: { select: { nutrav: true, statut: true, sevreFait: true } },
+            veau: { select: { nutrav: true, nobovi: true, statut: true, sevreFait: true } },
             veauxDetails: {
               select: {
                 statut: true,
                 nutrav: true,
-                animal: { select: { nutrav: true, statut: true, sevreFait: true } },
+                animal: { select: { nutrav: true, nobovi: true, statut: true, sevreFait: true } },
               },
             },
           },
@@ -267,11 +267,12 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
 
   const tableauAnimaux = animaux.map<AnimalRow>((animal) => {
     const dernierVelage = animal.velagesVache[0];
-    const activeCalves = new Map<string, { nutrav: string; href: string | null }>();
+    const activeCalves = new Map<string, { nutrav: string; name: string | null; href: string | null }>();
 
     if (!animal.tarieFaite && dernierVelage?.veau?.statut === "ACTIF" && !dernierVelage.veau.sevreFait) {
       activeCalves.set(dernierVelage.veau.nutrav, {
         nutrav: dernierVelage.veau.nutrav,
+        name: dernierVelage.veau.nobovi,
         href: `/troupeau/${dernierVelage.veau.nutrav}`,
       });
     }
@@ -283,6 +284,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         if (nutrav && actif) {
           activeCalves.set(nutrav, {
             nutrav,
+            name: detail.animal?.nobovi ?? null,
             href: detail.animal ? `/troupeau/${detail.animal.nutrav}` : null,
           });
         }

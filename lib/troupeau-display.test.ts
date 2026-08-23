@@ -6,6 +6,7 @@ import {
   gestationDaysForDisplay,
   parseMobileDisplayPreferences,
   serializeMobileDisplayPreferences,
+  shouldDisplayNonWeaned,
 } from "./troupeau-display.ts";
 
 test("affiche le nom et le numéro du père lorsqu’ils sont connus", () => {
@@ -30,4 +31,12 @@ test("restaure les valeurs par défaut si les réglages sont invalides", () => {
 test("masque seulement la durée en mode gestation simple", () => {
   assert.equal(gestationDaysForDisplay("simple", 145), null);
   assert.equal(gestationDaysForDisplay("duration", 145), 145);
+});
+
+test("affiche Non sevré uniquement pour un jeune de moins d’un an non sevré", () => {
+  const now = new Date("2026-08-23T12:00:00.000Z");
+  assert.equal(shouldDisplayNonWeaned("2026-01-01", false, now), true);
+  assert.equal(shouldDisplayNonWeaned("2026-01-01", true, now), false);
+  assert.equal(shouldDisplayNonWeaned("2025-08-23", false, now), false);
+  assert.equal(shouldDisplayNonWeaned("2020-01-01", false, now), false);
 });
