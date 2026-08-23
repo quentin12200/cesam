@@ -1,19 +1,23 @@
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import Link from "next/link";
-import { Search, Plus, SlidersHorizontal } from "lucide-react";
+import { Plus } from "lucide-react";
 import { subDays } from "date-fns";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
-import GroupeCreateButton from "./GroupeCreateButton";
 import TroupeauScrollRestorer from "./TroupeauScrollRestorer";
 import TroupeauTableau, { type AnimalRow } from "./TroupeauTableau";
 import TroupeauMobileList from "./TroupeauMobileList";
 import MoreMenu from "./MoreMenu";
 import TroupeauTabs from "@/components/TroupeauTabs";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
-import { filtrerAnimauxParCategorie } from "@/lib/troupeau-category-filter";
+import TroupeauFilters from "./TroupeauFilters";
+import {
+  buildTroupeauWhere,
+  filtrerAnimauxParCriteresLocaux,
+  normalizeTroupeauFilters,
+  type TroupeauFilterParams,
+} from "@/lib/troupeau-filters";
 
 interface PageProps {
   searchParams: Promise<{
@@ -23,6 +27,7 @@ interface PageProps {
     tarie?: string;
     repro?: string;
     sanitaire?: string;
+    sevrage?: string;
     groupe?: string;
     tri?: string;
     nouveau?: string;
@@ -31,66 +36,16 @@ interface PageProps {
   }>;
 }
 
-async function getAnimaux(params: {
-  sexe?: string;
-  q?: string;
-  categorie?: string;
-  tarie?: string;
-  repro?: string;
-  sanitaire?: string;
-  groupe?: string;
-  tri?: string;
-}) {
+async function getAnimaux(params: TroupeauFilterParams) {
   await syncAutomaticEchoRequests();
-  const { sexe, q, categorie, tarie, repro, sanitaire, groupe, tri } = params;
   const now = new Date();
-  const where: Prisma.AnimalWhereInput = {};
+  const filters = normalizeTroupeauFilters(params);
+  const where = buildTroupeauWhere(filters);
 
-  if (sexe && (sexe === "F" || sexe === "M")) where.sexbov = sexe;
-  where.statut = "ACTIF";
-
-  if (q && q.trim()) {
-    where.OR = [
-      { nutrav: { contains: q.trim() } },
-      { nobovi: { contains: q.trim() } },
-      { nunati: { contains: q.trim() } },
-    ];
-  }
-
-  // Non tarie = a un veau actif non sevré ; tarie = femelle sans veau actif non sevré
-  if (tarie === "non") {
-    where.velagesVache = { some: { veau: { statut: "ACTIF", sevreFait: false } } };
-  }
-  if (tarie === "oui") {
-    if (!where.sexbov) where.sexbov = "F";
-    where.velagesVache = { none: { veau: { statut: "ACTIF", sevreFait: false } } };
-  }
-
-  if (groupe) where.groupeId = groupe;
-
-  // Filtre statut reproduction
-  if (repro === "PLEINE") {
-    where.sexbov = "F";
-    where.saillies = { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } };
-  } else if (repro === "VIDE") {
-    where.sexbov = "F";
-    where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } } };
-  } else if (repro === "A_ECO") {
-    where.sexbov = "F";
-    where.demandesEchographie = { some: { etat: "A_FAIRE" } };
-  }
-
-  // Filtre statut sanitaire
-  if (sanitaire === "PROBLEME") {
-    where.evenements = { some: { resolu: false } };
-  } else if (sanitaire === "OK") {
-    where.evenements = { none: { resolu: false } };
-  }
-
-  const orderBy: Prisma.AnimalOrderByWithRelationInput =
-    tri === "age_asc" ? { danais: "desc" }
-    : tri === "age_desc" ? { danais: "asc" }
-    : { nutrav: "asc" };
+  const orderBy =
+    filters.tri === "age_asc" ? { danais: "desc" as const }
+    : filters.tri === "age_desc" ? { danais: "asc" as const }
+    : { nutrav: "asc" as const };
 
   const [animauxNonFiltres, groupes, reproductionConfig] = await Promise.all([
     prisma.animal.findMany({
@@ -183,7 +138,7 @@ async function getAnimaux(params: {
     }).catch(() => null),
   ]);
 
-  const animaux = filtrerAnimauxParCategorie(animauxNonFiltres, categorie);
+  const animaux = filtrerAnimauxParCriteresLocaux(animauxNonFiltres, filters, now);
 
   return {
     animaux,
@@ -201,14 +156,13 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const tarie = params.tarie;
   const repro = params.repro;
   const sanitaire = params.sanitaire;
+  const sevrage = params.sevrage;
   const groupe = params.groupe;
   const tri = params.tri;
-  const vue = params.vue;
   const showForm = params.nouveau === "1";
-  const showFiltres = params.filtres === "1";
 
   const { animaux, total, groupes, postCalvingRestDays } = await getAnimaux({
-    sexe, q, categorie, tarie, repro, sanitaire, groupe, tri,
+    sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri,
   });
 
   // Velles à vendre rapidement : categorie = "VELLE", statut ACTIF, âge entre 351 et 365 jours
@@ -224,46 +178,6 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     select: { nutrav: true, nobovi: true, danais: true },
     orderBy: { danais: "asc" },
   });
-
-  function buildUrl(overrides: Record<string, string | undefined>) {
-    const p: Record<string, string> = {};
-    if (sexe) p.sexe = sexe;
-    if (q) p.q = q;
-    if (categorie) p.categorie = categorie;
-    if (tarie) p.tarie = tarie;
-    if (repro) p.repro = repro;
-    if (sanitaire) p.sanitaire = sanitaire;
-    if (groupe) p.groupe = groupe;
-    if (tri) p.tri = tri;
-    if (showFiltres) p.filtres = "1";
-    if (vue) p.vue = vue;
-    Object.assign(p, overrides);
-    Object.keys(p).forEach((k) => p[k] === undefined && delete p[k]);
-    const qs = new URLSearchParams(p as Record<string, string>).toString();
-    return `/troupeau${qs ? "?" + qs : ""}`;
-  }
-
-  const activeFiltersCount = [
-    sexe, tarie, repro, sanitaire, groupe,
-    categorie && categorie !== "TOUS" ? categorie : undefined,
-  ].filter(Boolean).length;
-
-
-  const CATS_F: { value: string; label: string }[] = [
-    { value: "VACHE", label: "Vaches" },
-    { value: "PETITE_GENISSE", label: "Petite génisse" },
-    { value: "MOYENNE_GENISSE", label: "Moy. génisse" },
-    { value: "GRANDE_GENISSE", label: "Grande génisse" },
-    { value: "PRESELECTION_GENISSE", label: "Présélection" },
-    { value: "VELLE", label: "Velle" },
-    { value: "A_ENGRAISSER", label: "À engraisser" },
-    { value: "ENGRAISSEMENT", label: "Engraissement" },
-  ];
-
-  const CATS_M: { value: string; label: string }[] = [
-    { value: "TAUREAU", label: "Taureaux" },
-    { value: "VEAU_M", label: "Veaux" },
-  ];
 
   const tableauAnimaux = animaux.map<AnimalRow>((animal) => {
     const dernierVelage = animal.velagesVache[0];
@@ -326,27 +240,10 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
           <h2 className="truncate text-xl font-bold text-gray-800">Animaux</h2>
           <p className="truncate text-xs text-gray-500">Consulter et rechercher tout le troupeau</p>
         </div>
-        <Link
-          href={buildUrl({ filtres: showFiltres ? undefined : "1" })}
-          className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-medium transition-colors ${
-            showFiltres || activeFiltersCount > 0
-              ? "bg-green-700 text-white"
-              : "bg-white text-gray-600"
-          }`}
-        >
-          <SlidersHorizontal size={16} />
-          <span className="hidden sm:inline">Filtres</span>
-          {activeFiltersCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-              {activeFiltersCount}
-            </span>
-          )}
-        </Link>
-
         <MoreMenu
           printHref={`/troupeau/impression?${new URLSearchParams(
             Object.fromEntries(
-              Object.entries({ sexe, q, categorie, tarie, repro, sanitaire, groupe, tri })
+              Object.entries({ sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri })
                 .filter(([, v]) => v !== undefined && v !== null) as [string, string][]
             )
           ).toString()}`}
@@ -403,268 +300,11 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* Panneau de filtres */}
-      {showFiltres && (
-        <div className="bg-white rounded-xl shadow p-4 space-y-4 border border-green-100">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-gray-800 text-sm">Filtres avancés</h3>
-            {activeFiltersCount > 0 && (
-              <Link
-                href="/troupeau?filtres=1"
-                className="text-xs text-red-500 font-medium hover:underline"
-              >
-                Réinitialiser tout
-              </Link>
-            )}
-          </div>
-
-          {/* Tri — placé en premier */}
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Trier par</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {[
-                { value: undefined, label: "N° Travail" },
-                { value: "age_asc", label: "Plus jeune d'abord" },
-                { value: "age_desc", label: "Plus âgé d'abord" },
-              ].map((opt) => (
-                <Link
-                  key={opt.label}
-                  href={buildUrl({ tri: opt.value })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    tri === opt.value || (!tri && !opt.value)
-                      ? "bg-green-700 text-white border-green-700"
-                      : "bg-white text-gray-600 border-gray-200"
-                  }`}
-                >
-                  {opt.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Sexe */}
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Sexe</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {[
-                { value: undefined, label: "Tous" },
-                { value: "F", label: "♀ Femelles" },
-                { value: "M", label: "♂ Mâles" },
-              ].map((opt) => (
-                <Link
-                  key={opt.label}
-                  href={buildUrl({ sexe: opt.value })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    sexe === opt.value || (!sexe && !opt.value)
-                      ? "bg-green-700 text-white border-green-700"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  {opt.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Catégorie femelle */}
-          {sexe !== "M" && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 mb-1.5">Catégorie femelle</p>
-              <div className="flex gap-1.5 flex-wrap">
-                <Link
-                  href={buildUrl({ categorie: undefined })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    !categorie ? "bg-green-700 text-white border-green-700" : "bg-white text-gray-600 border-gray-200"
-                  }`}
-                >
-                  Toutes
-                </Link>
-                {CATS_F.map((c) => (
-                  <Link
-                    key={c.value}
-                    href={buildUrl({ categorie: c.value, sexe: "F" })}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      categorie === c.value
-                        ? "bg-green-700 text-white border-green-700"
-                        : "bg-white text-gray-600 border-gray-200"
-                    }`}
-                  >
-                    {c.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Catégorie mâle */}
-          {sexe !== "F" && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 mb-1.5">Catégorie mâle</p>
-              <div className="flex gap-1.5 flex-wrap">
-                <Link
-                  href={buildUrl({ categorie: undefined })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    !categorie ? "bg-green-700 text-white border-green-700" : "bg-white text-gray-600 border-gray-200"
-                  }`}
-                >
-                  Tous
-                </Link>
-                {CATS_M.map((c) => (
-                  <Link
-                    key={c.value}
-                    href={buildUrl({ categorie: c.value, sexe: "M" })}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      categorie === c.value
-                        ? "bg-green-700 text-white border-green-700"
-                        : "bg-white text-gray-600 border-gray-200"
-                    }`}
-                  >
-                    {c.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Tarie */}
-          {sexe !== "M" && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 mb-1.5">État tarie</p>
-              <div className="flex gap-1.5 flex-wrap">
-                {[
-                  { value: undefined, label: "Toutes" },
-                  { value: "oui", label: "Taries" },
-                  { value: "non", label: "Non taries" },
-                ].map((opt) => (
-                  <Link
-                    key={opt.label}
-                    href={buildUrl({ tarie: opt.value })}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      tarie === opt.value || (!tarie && !opt.value)
-                        ? "bg-green-700 text-white border-green-700"
-                        : "bg-white text-gray-600 border-gray-200"
-                    }`}
-                  >
-                    {opt.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Statut reproduction */}
-          {sexe !== "M" && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 mb-1.5">Statut reproduction</p>
-              <div className="flex gap-1.5 flex-wrap">
-                {[
-                  { value: undefined, label: "Toutes" },
-                  { value: "PLEINE", label: "Gestantes" },
-                  { value: "VIDE", label: "Vides" },
-                  { value: "A_ECO", label: "À écho" },
-                ].map((opt) => (
-                  <Link
-                    key={opt.label}
-                    href={buildUrl({ repro: opt.value })}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      repro === opt.value || (!repro && !opt.value)
-                        ? "bg-green-700 text-white border-green-700"
-                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    {opt.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Statut sanitaire */}
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Santé</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {[
-                { value: undefined, label: "Tous" },
-                { value: "PROBLEME", label: "En traitement" },
-                { value: "OK", label: "Sains" },
-              ].map((opt) => (
-                <Link
-                  key={opt.label}
-                  href={buildUrl({ sanitaire: opt.value })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    sanitaire === opt.value || (!sanitaire && !opt.value)
-                      ? "bg-green-700 text-white border-green-700"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  {opt.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Groupe */}
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Groupe / Lot</p>
-            {groupes.length > 0 && (
-              <div className="flex gap-1.5 flex-wrap mb-1">
-                <Link
-                  href={buildUrl({ groupe: undefined })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    !groupe ? "bg-green-700 text-white border-green-700" : "bg-white text-gray-600 border-gray-200"
-                  }`}
-                >
-                  Tous
-                </Link>
-                {groupes.map((g) => (
-                  <Link
-                    key={g.id}
-                    href={buildUrl({ groupe: g.id })}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      groupe === g.id
-                        ? "bg-green-700 text-white border-green-700"
-                        : "bg-white text-gray-600 border-gray-200"
-                    }`}
-                  >
-                    {g.nom}
-                  </Link>
-                ))}
-              </div>
-            )}
-            <GroupeCreateButton />
-          </div>
-
-        </div>
-      )}
-
-      {/* Recherche */}
-      <form method="GET" action="/troupeau" className="relative">
-        {/* Preserve current filters */}
-        {sexe && <input type="hidden" name="sexe" value={sexe} />}
-        {categorie && <input type="hidden" name="categorie" value={categorie} />}
-        {tarie && <input type="hidden" name="tarie" value={tarie} />}
-        {repro && <input type="hidden" name="repro" value={repro} />}
-        {sanitaire && <input type="hidden" name="sanitaire" value={sanitaire} />}
-        {groupe && <input type="hidden" name="groupe" value={groupe} />}
-        {tri && <input type="hidden" name="tri" value={tri} />}
-        {showFiltres && <input type="hidden" name="filtres" value="1" />}
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="N° Travail, N° Nat ou nom…"
-          className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm shadow focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
-      </form>
-
-      {/* Résumé filtres actifs */}
-      <div className="flex items-center justify-between text-xs text-gray-500">
-        <span>
-          {total} {total > 1 ? "animaux" : "animal"}
-          {activeFiltersCount > 0 && ` · ${activeFiltersCount} filtre${activeFiltersCount > 1 ? "s" : ""} actif${activeFiltersCount > 1 ? "s" : ""}`}
-        </span>
-      </div>
+      <TroupeauFilters
+        total={total}
+        groups={groupes.map((item) => ({ id: item.id, nom: item.nom }))}
+        params={{ sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri }}
+      />
 
       {/* Tableau sur ordinateur */}
       <div className="hidden md:block">

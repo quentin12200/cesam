@@ -35,3 +35,16 @@ export function serializeMobileDisplayPreferences(value: MobileDisplayPreference
 export function gestationDaysForDisplay(mode: GestationDisplayMode, days: number | null): number | null {
   return mode === "simple" ? null : days;
 }
+
+export function shouldDisplayNonWeaned(
+  birthDate: Date | string,
+  sevreFait: boolean,
+  now = new Date()
+): boolean {
+  if (sevreFait) return false;
+  const bornAt = new Date(birthDate);
+  if (Number.isNaN(bornAt.getTime())) return false;
+  const firstBirthday = new Date(bornAt);
+  firstBirthday.setFullYear(firstBirthday.getFullYear() + 1);
+  return now < firstBirthday;
+}

@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import {
   getCategorie,
@@ -47,11 +45,6 @@ interface Props {
   postCalvingRestDays: number;
 }
 
-interface FilterOption {
-  value: string | undefined;
-  label: string;
-}
-
 const ETAT_LABEL: Record<string, string> = {
   VERT: "Gestante",
   ROSE: "Imminente",
@@ -60,96 +53,6 @@ const ETAT_LABEL: Record<string, string> = {
   ROUGE: "Vide",
   REPOS: "Repos",
 };
-
-const CATS_OPTIONS: FilterOption[] = [
-  { value: undefined, label: "Toutes catégories" },
-  { value: "VACHE", label: "♀ Vaches" },
-  { value: "GRANDE_GENISSE", label: "♀ Grande génisse" },
-  { value: "MOYENNE_GENISSE", label: "♀ Moy. génisse" },
-  { value: "PETITE_GENISSE", label: "♀ Petite génisse" },
-  { value: "PRESELECTION_GENISSE", label: "♀ Présélection" },
-  { value: "VELLE", label: "♀ Velle" },
-  { value: "TAUREAU", label: "♂ Taureau" },
-  { value: "VEAU_M", label: "♂ Veau" },
-];
-
-const REPRO_OPTIONS: FilterOption[] = [
-  { value: undefined, label: "Tous statuts" },
-  { value: "PLEINE", label: "Gestantes" },
-  { value: "VIDE", label: "Vides" },
-  { value: "A_ECO", label: "À échographier" },
-];
-
-// ─── FilterDropdown ───────────────────────────────────────────────────────────
-
-function FilterDropdown({
-  label,
-  options,
-  currentValue,
-  paramKey,
-  buildFilterUrl,
-}: {
-  label: string;
-  options: FilterOption[];
-  currentValue: string | undefined;
-  paramKey: string;
-  buildFilterUrl: (key: string, value: string | undefined) => string;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!open) return;
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const isFiltered = !!currentValue;
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-1 whitespace-nowrap hover:text-green-200 transition-colors ${
-          isFiltered ? "text-yellow-300" : ""
-        }`}
-      >
-        {label}
-        {isFiltered && <span className="w-1.5 h-1.5 rounded-full bg-yellow-300 shrink-0" />}
-        <ChevronDown size={10} className={`transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-0 mt-1 bg-white text-gray-800 rounded-lg shadow-xl z-50 min-w-max border border-gray-100 overflow-hidden">
-          {options.map((opt) => {
-            const active =
-              currentValue === opt.value || (!currentValue && opt.value === undefined);
-            return (
-              <button
-                key={opt.label}
-                onClick={() => {
-                  router.push(buildFilterUrl(paramKey, opt.value));
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-green-50 transition-colors ${
-                  active ? "font-semibold text-green-700 bg-green-50" : ""
-                }`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── SortHeader ──────────────────────────────────────────────────────────────
 
@@ -212,8 +115,6 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
 
   // Read current filter state
   const currentTri = searchParams.get("tri") ?? undefined;
-  const currentCategorie = searchParams.get("categorie") ?? undefined;
-  const currentRepro = searchParams.get("repro") ?? undefined;
 
   function buildFilterUrl(key: string, value: string | undefined): string {
     const params = new URLSearchParams(searchParams.toString());
@@ -259,24 +160,8 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                 />
               </th>
               <th className="px-3 py-2.5 text-left font-semibold">Dernier poids</th>
-              <th className="px-3 py-2.5 text-left font-semibold">
-                <FilterDropdown
-                  label="Catégorie"
-                  options={CATS_OPTIONS}
-                  currentValue={currentCategorie}
-                  paramKey="categorie"
-                  buildFilterUrl={buildFilterUrl}
-                />
-              </th>
-              <th className="px-3 py-2.5 text-left font-semibold">
-                <FilterDropdown
-                  label="Repro"
-                  options={REPRO_OPTIONS}
-                  currentValue={currentRepro}
-                  paramKey="repro"
-                  buildFilterUrl={buildFilterUrl}
-                />
-              </th>
+              <th className="px-3 py-2.5 text-left font-semibold">Catégorie</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Repro</th>
               <th className="px-3 py-2.5 text-left font-semibold">Mère</th>
               <th className="px-3 py-2.5 text-left font-semibold">Père</th>
               <th className="px-3 py-2.5 text-left font-semibold">Sevrage</th>

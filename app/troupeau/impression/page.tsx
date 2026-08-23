@@ -2,18 +2,22 @@ import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
-import { addDays, differenceInMonths, subDays } from "date-fns";
+import { differenceInMonths } from "date-fns";
 import {
   getCategorie, getCategorieLabel, getCategorieColor,
-  type CategorieAnimal,
 } from "@/lib/utils";
 import PrintButton from "./PrintButton";
+import {
+  buildTroupeauWhere,
+  filtrerAnimauxParCriteresLocaux,
+  getActiveTroupeauFilters,
+  normalizeTroupeauFilters,
+} from "@/lib/troupeau-filters";
 
 interface PageProps {
   searchParams: Promise<{
     sexe?: string; q?: string; categorie?: string;
-    tarie?: string; repro?: string; sanitaire?: string;
+    tarie?: string; repro?: string; sanitaire?: string; sevrage?: string;
     groupe?: string; tri?: string;
   }>;
 }
@@ -24,77 +28,21 @@ function fmt(d: Date | string | null | undefined) {
 }
 
 export default async function TroupeauImpressionPage({ searchParams }: PageProps) {
-  const { sexe, q, categorie, tarie, repro, sanitaire, groupe, tri } = await searchParams;
+  const params = await searchParams;
   const now = new Date();
+  const filters = normalizeTroupeauFilters(params);
+  const where = buildTroupeauWhere(filters);
+  const orderBy =
+    filters.tri === "age_asc" ? { danais: "desc" as const }
+    : filters.tri === "age_desc" ? { danais: "asc" as const }
+    : { nutrav: "asc" as const };
 
-  const where: Prisma.AnimalWhereInput = { statut: "ACTIF" };
-
-  if (sexe === "F" || sexe === "M") where.sexbov = sexe;
-
-  if (q?.trim()) {
-    where.OR = [
-      { nutrav: { contains: q.trim() } },
-      { nobovi: { contains: q.trim() } },
-      { nunati: { contains: q.trim() } },
-    ];
-  }
-
-  if (tarie === "non") where.velagesVache = { some: { veau: { statut: "ACTIF", sevreFait: false } } };
-  if (tarie === "oui") {
-    where.sexbov = "F";
-    where.velagesVache = { none: { veau: { statut: "ACTIF", sevreFait: false } } };
-  }
-  if (groupe) where.groupeId = groupe;
-
-  if (repro === "PLEINE") { where.sexbov = "F"; where.saillies = { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } }; }
-  else if (repro === "VIDE") { where.sexbov = "F"; where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } } }; }
-  else if (repro === "A_ECO") {
-    where.sexbov = "F";
-    where.saillies = {
-      some: {
-        date: { lte: subDays(now, 35) },
-        gestation: { etat: { notIn: ["VERT", "ROUGE"] } },
-      },
-    };
-  }
-
-  if (sanitaire === "PROBLEME") where.evenements = { some: { resolu: false } };
-  else if (sanitaire === "OK") where.evenements = { none: { resolu: false } };
-
-  if (categorie && categorie !== "TOUS") {
-    switch (categorie as CategorieAnimal) {
-      case "VACHE":
-        where.sexbov = "F"; where.estGenisse = false;
-        where.danais = { lt: addDays(now, -365) }; where.categorie = null; break;
-      case "PETITE_GENISSE":
-        where.sexbov = "F"; where.estGenisse = true;
-        where.danais = { gte: addDays(now, -365) }; break;
-      case "MOYENNE_GENISSE":
-        where.sexbov = "F"; where.estGenisse = true;
-        where.danais = { gte: addDays(now, -730), lt: addDays(now, -365) }; break;
-      case "GRANDE_GENISSE":
-        where.sexbov = "F"; where.estGenisse = true;
-        where.danais = { gte: addDays(now, -1095), lt: addDays(now, -730) }; break;
-      case "TAUREAU":
-        where.sexbov = "M"; where.danais = { lt: addDays(now, -456) }; break;
-      case "VEAU_M":
-        where.sexbov = "M"; where.danais = { gte: addDays(now, -456) }; break;
-      default:
-        where.categorie = categorie;
-    }
-  }
-
-  const orderBy: Prisma.AnimalOrderByWithRelationInput =
-    tri === "age_asc" ? { danais: "desc" }
-    : tri === "age_desc" ? { danais: "asc" }
-    : { nutrav: "asc" };
-
-  const animaux = await prisma.animal.findMany({
+  const animauxNonFiltres = await prisma.animal.findMany({
     where,
     orderBy,
     select: {
       id: true, nutrav: true, nobovi: true, nunati: true, danais: true,
-      sexbov: true, estGenisse: true, categorie: true, race: true,
+      sexbov: true, estGenisse: true, categorie: true, race: true, sevreFait: true,
       groupe: { select: { nom: true } },
       saillies: {
         orderBy: { date: "desc" },
@@ -108,22 +56,15 @@ export default async function TroupeauImpressionPage({ searchParams }: PageProps
       velagesVache: { orderBy: { date: "desc" }, take: 1, select: { date: true } },
     },
   });
+  const animaux = filtrerAnimauxParCriteresLocaux(animauxNonFiltres, filters, now);
 
   const printDate = new Date().toLocaleDateString("fr-FR", {
     day: "2-digit", month: "long", year: "numeric",
   });
 
   // Build filter summary
-  const filterParts: string[] = [];
-  if (sexe === "F") filterParts.push("Femelles");
-  else if (sexe === "M") filterParts.push("Mâles");
-  if (categorie && categorie !== "TOUS") filterParts.push(categorie.replace(/_/g, " ").toLowerCase());
-  if (tarie === "non") filterParts.push("Non taries");
-  if (tarie === "oui") filterParts.push("Taries");
-  if (repro === "PLEINE") filterParts.push("Gestantes");
-  if (repro === "VIDE") filterParts.push("Vides");
-  if (repro === "A_ECO") filterParts.push("À échographier");
-  if (q) filterParts.push(`Recherche : "${q}"`);
+  const filterParts = getActiveTroupeauFilters(filters).map((filter) => filter.label);
+  if (filters.q) filterParts.push(`Recherche : "${filters.q}"`);
 
   return (
     <div className="min-h-screen bg-white">

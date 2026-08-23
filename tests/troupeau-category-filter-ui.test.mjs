@@ -4,8 +4,8 @@ import test from "node:test";
 
 const page = await readFile(new URL("../app/troupeau/page.tsx", import.meta.url), "utf8");
 
-test("la page filtre sur la catégorie effective puis recalcule le compteur", () => {
-  assert.match(page, /filtrerAnimauxParCategorie\(animauxNonFiltres, categorie\)/);
+test("la page utilise le moteur commun de catégorie effective puis recalcule le compteur", () => {
+  assert.match(page, /filtrerAnimauxParCriteresLocaux\(animauxNonFiltres, filters, now\)/);
   assert.match(page, /total: animaux\.length/);
   assert.doesNotMatch(page, /case "PETITE_GENISSE"/);
   assert.doesNotMatch(page, /case "MOYENNE_GENISSE"/);
