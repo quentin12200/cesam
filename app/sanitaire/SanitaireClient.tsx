@@ -6,6 +6,7 @@ import {
   CheckSquare, Square, Syringe, Pill, AlertTriangle,
   CheckCircle, CheckCircle2, X, List, LayoutGrid, RefreshCw,
   AlertCircle, Clock, ShieldCheck,
+  CalendarDays,
 } from "lucide-react";
 import Link from "next/link";
 import { differenceInDays } from "date-fns";
@@ -451,6 +452,9 @@ function VaccinsVachesTab({ toutesVaches, onRefresh }: { toutesVaches: VacheVacc
 
   return (
     <div className="space-y-4">
+      <Link href="/sanitaire/planificateur-vaccinal" className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-700 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+        <CalendarDays size={16} /> Ouvrir le planificateur pré-vêlage
+      </Link>
       {/* Filtres visuels */}
       <div className="flex gap-2 flex-wrap">
         {([

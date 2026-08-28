@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { normaliserRegleConservationSaisie } from "@/lib/vaccine-planner";
 
 export async function PATCH(
   request: NextRequest,
@@ -12,6 +13,8 @@ export async function PATCH(
     nom, dci, forme, categorie, voie, dosagePourKg, uniteDosage,
     delaiAttenteViandeJ, delaiAttenteLaitJ, prescriptionRequise, actif, commentaire,
     stockActuel, stockUnite, stockSeuilAlert, favori, actions,
+    conservationOuvertureStatut, conservationOuvertureJours,
+    conservationOuvertureCondition, conservationOuvertureSource, conservationOuvertureNote,
   } = body;
 
   const prev = await prisma.medicament.findUnique({ where: { id } });
@@ -35,8 +38,22 @@ export async function PATCH(
   if (stockSeuilAlert !== undefined) prevFields.stockSeuilAlert = prev.stockSeuilAlert;
   if (favori !== undefined) prevFields.favori = prev.favori;
   if (actions !== undefined) prevFields.actions = prev.actions;
+  if (conservationOuvertureStatut !== undefined) {
+    prevFields.conservationOuvertureStatut = prev.conservationOuvertureStatut;
+    prevFields.conservationOuvertureJours = prev.conservationOuvertureJours;
+    prevFields.conservationOuvertureCondition = prev.conservationOuvertureCondition;
+    prevFields.conservationOuvertureSource = prev.conservationOuvertureSource;
+    prevFields.conservationOuvertureNote = prev.conservationOuvertureNote;
+  }
 
   try {
+    const conservation = conservationOuvertureStatut === undefined ? null : normaliserRegleConservationSaisie({
+      conservationOuvertureStatut,
+      conservationOuvertureJours,
+      conservationOuvertureCondition,
+      conservationOuvertureSource,
+      conservationOuvertureNote,
+    });
     const med = await prisma.medicament.update({
       where: { id },
       data: {
@@ -57,6 +74,10 @@ export async function PATCH(
         ...(stockSeuilAlert !== undefined && { stockSeuilAlert: stockSeuilAlert != null ? Number(stockSeuilAlert) : null }),
         ...(favori !== undefined && { favori: Boolean(favori) }),
         ...(actions !== undefined && { actions: actions?.trim() || null }),
+        ...(conservation && {
+          ...conservation,
+          conservationOuvertureStatut: conservation.conservationOuvertureStatut ?? "INCONNUE",
+        }),
       },
     });
 
@@ -67,7 +88,10 @@ export async function PATCH(
     } catch {}
 
     return NextResponse.json({ ...med, _undoId: undoId, _undoDesc: desc });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("conservation") || error.message.includes("durée"))) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return NextResponse.json({ error: "Médicament non trouvé" }, { status: 404 });
   }
 }
