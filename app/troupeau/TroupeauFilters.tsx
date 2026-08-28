@@ -181,7 +181,7 @@ export default function TroupeauFilters({ total, groups, params }: Props) {
           <div className="absolute right-0 z-40 mt-2 w-72 space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-xl">
             <DesktopSelect label="Groupe / lot" value={filters.groupe} options={groups.map((group) => ({ value: group.id, label: group.nom }))} onChange={(value) => setFilter("groupe", value)} />
             <DesktopSelect label="Tarissement de la mère" value={filters.tarie} options={[{ value: "oui", label: "Tarie" }, { value: "non", label: "Non tarie" }]} onChange={(value) => setFilter("tarie", value)} />
-            <DesktopSelect label="Tri" value={filters.tri} options={[{ value: "age_asc", label: "Plus jeunes" }, { value: "age_desc", label: "Plus âgés" }]} onChange={(value) => setFilter("tri", value)} />
+            <DesktopSelect label="Tri" value={filters.tri} options={[{ value: "age_asc", label: "Plus jeunes" }, { value: "age_desc", label: "Plus âgés" }, { value: "velage_asc", label: "Vêlage le plus ancien" }, { value: "velage_desc", label: "Vêlage le plus récent" }]} onChange={(value) => setFilter("tri", value)} />
             <GroupeCreateButton />
           </div>
         </details>
@@ -247,7 +247,7 @@ export default function TroupeauFilters({ total, groups, params }: Props) {
                 <div className="mt-4 space-y-5">
                   <MobileChoices label="Groupe / lot" value={filters.groupe} options={groups.map((group) => ({ value: group.id, label: group.nom }))} onChange={(value) => setFilter("groupe", value)} />
                   <MobileChoices label="Tarissement de la mère" value={filters.tarie} options={[{ value: "oui", label: "Tarie" }, { value: "non", label: "Non tarie" }]} onChange={(value) => setFilter("tarie", value)} />
-                  <MobileChoices label="Tri" value={filters.tri} options={[{ value: "age_asc", label: "Plus jeunes" }, { value: "age_desc", label: "Plus âgés" }]} onChange={(value) => setFilter("tri", value)} />
+                  <MobileChoices label="Tri" value={filters.tri} options={[{ value: "age_asc", label: "Plus jeunes" }, { value: "age_desc", label: "Plus âgés" }, { value: "velage_asc", label: "Vêlage le plus ancien" }, { value: "velage_desc", label: "Vêlage le plus récent" }]} onChange={(value) => setFilter("tri", value)} />
                   <GroupeCreateButton />
                 </div>
               </details>

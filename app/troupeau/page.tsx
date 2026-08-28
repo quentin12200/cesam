@@ -12,6 +12,8 @@ import MoreMenu from "./MoreMenu";
 import TroupeauTabs from "@/components/TroupeauTabs";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import TroupeauFilters from "./TroupeauFilters";
+import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
+import { getCurrentReproductionSummary } from "@/lib/current-reproduction-summary";
 import {
   buildTroupeauWhere,
   filtrerAnimauxParCriteresLocaux,
@@ -92,11 +94,19 @@ async function getAnimaux(params: TroupeauFilterParams) {
         reproductionEtatPrecedent: true,
         groupe: { select: { id: true, nom: true, couleur: true } },
         saillies: {
-          orderBy: { date: "desc" as const },
-          take: 1,
+          orderBy: [{ date: "desc" as const }, { createdAt: "desc" as const }],
           select: {
+            id: true,
             date: true,
-            gestation: { select: { etat: true, dateVelagePrevue: true } },
+            type: true,
+            gestation: {
+              select: {
+                etat: true,
+                dateVelagePrevue: true,
+                dateEcho: true,
+                resultatEcho: true,
+              },
+            },
           },
         },
         velagesVache: {
@@ -139,6 +149,16 @@ async function getAnimaux(params: TroupeauFilterParams) {
   ]);
 
   const animaux = filtrerAnimauxParCriteresLocaux(animauxNonFiltres, filters, now);
+  if (filters.tri === "velage_asc" || filters.tri === "velage_desc") {
+    const direction = filters.tri === "velage_asc" ? 1 : -1;
+    animaux.sort((left, right) => {
+      const leftDate = left.velagesVache[0]?.date?.getTime() ?? null;
+      const rightDate = right.velagesVache[0]?.date?.getTime() ?? null;
+      if (leftDate === null) return rightDate === null ? 0 : 1;
+      if (rightDate === null) return -1;
+      return (leftDate - rightDate) * direction;
+    });
+  }
 
   return {
     animaux,
@@ -181,6 +201,15 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
 
   const tableauAnimaux = animaux.map<AnimalRow>((animal) => {
     const dernierVelage = animal.velagesVache[0];
+    const reproductionSummary = getCurrentReproductionSummary(
+      animal.saillies,
+      dernierVelage?.date ?? null,
+      today,
+    );
+    const currentBreeding = getCurrentCycleBreeding(
+      animal.saillies,
+      dernierVelage?.date ?? null,
+    );
     const activeCalves = new Map<string, { nutrav: string; href: string | null }>();
 
     if (!animal.tarieFaite && dernierVelage?.veau?.statut === "ACTIF" && !dernierVelage.veau.sevreFait) {
@@ -216,10 +245,19 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       reproductionEtatPrecedent: animal.reproductionEtatPrecedent as AnimalRow["reproductionEtatPrecedent"],
       categorie: animal.categorie,
       groupeNom: animal.groupe?.nom ?? null,
-      saillieDate: animal.saillies[0]?.date.toISOString() ?? null,
-      gestationEtat: animal.saillies[0]?.gestation?.etat ?? null,
-      gestationVelagePrevue: animal.saillies[0]?.gestation?.dateVelagePrevue?.toISOString() ?? null,
+      saillieDate: currentBreeding?.date.toISOString() ?? null,
+      gestationEtat: currentBreeding?.gestation?.etat ?? null,
+      gestationVelagePrevue: currentBreeding?.gestation?.dateVelagePrevue?.toISOString() ?? null,
       velageDate: dernierVelage?.date.toISOString() ?? null,
+      reproductionSummary: {
+        lastCalvingDate: reproductionSummary.lastCalving?.toISOString() ?? null,
+        daysSinceLastCalving: reproductionSummary.daysSinceLastCalving,
+        lastEchoDate: reproductionSummary.lastEcho?.date.toISOString() ?? null,
+        lastEchoResult: reproductionSummary.lastEcho?.result ?? null,
+        lastAttemptDate: reproductionSummary.lastAttempt?.date.toISOString() ?? null,
+        lastAttemptType: reproductionSummary.lastAttempt?.type ?? null,
+        daysSinceLastAttempt: reproductionSummary.lastAttempt?.daysSince ?? null,
+      },
       mereNutrav: animal.mere?.nutrav ?? null,
       pereNom: bull?.nopere ?? animal.velageVeau?.pereNom ?? null,
       pereNumero: bull?.nupere ?? animal.velageVeau?.pereNunati ?? null,

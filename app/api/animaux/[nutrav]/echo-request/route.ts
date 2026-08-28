@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createManualEchoRequest } from "@/lib/manual-echo-requests";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(
@@ -12,42 +13,22 @@ export async function POST(
     observation?: string;
     saillieId?: string | null;
   };
-  const animal = await prisma.animal.findUnique({
-    where: { nutrav },
-    select: {
-      id: true,
-      sexbov: true,
-      demandesEchographie: { where: { etat: "A_FAIRE" }, take: 1, select: { id: true } },
-      saillies: { orderBy: [{ date: "desc" }, { createdAt: "desc" }], select: { id: true } },
-    },
+  const result = await createManualEchoRequest({
+    nutrav,
+    motif: body.motif,
+    datePlanification: body.datePlanification,
+    observation: body.observation,
+    saillieId: body.saillieId,
   });
-  if (!animal) return NextResponse.json({ error: "Animal non trouvé" }, { status: 404 });
-  if (animal.sexbov !== "F") return NextResponse.json({ error: "Cette action concerne une femelle" }, { status: 400 });
-  if (animal.demandesEchographie[0]) {
-    return NextResponse.json({ request: animal.demandesEchographie[0], duplicate: true });
+  if (result.status === "NOT_FOUND") return NextResponse.json({ error: "Animal non trouvé" }, { status: 404 });
+  if (result.status === "NOT_FEMALE") return NextResponse.json({ error: "Cette action concerne une femelle" }, { status: 400 });
+  if (result.status === "INVALID_BREEDING") {
+    return NextResponse.json({ error: "La tentative sélectionnée n’appartient pas au cycle actuel" }, { status: 400 });
   }
-  const requestedBreedingId = body.saillieId ?? animal.saillies[0]?.id ?? null;
-  if (requestedBreedingId && !animal.saillies.some((saillie) => saillie.id === requestedBreedingId)) {
-    return NextResponse.json({ error: "La tentative sélectionnée n’appartient pas à cet animal" }, { status: 400 });
-  }
-
-  const requestEcho = await prisma.$transaction(async (tx) => {
-    const created = await tx.demandeEchographie.create({
-      data: {
-        animalId: animal.id,
-        saillieId: requestedBreedingId,
-        origine: "MANUELLE",
-        etat: "A_FAIRE",
-        motif: body.motif?.trim() || null,
-        planifieeAt: body.datePlanification ? new Date(body.datePlanification) : new Date(),
-        observation: body.observation?.trim() || null,
-        requestKey: `MANUAL_ACTIVE:${animal.id}`,
-      },
-    });
-    await tx.animal.update({ where: { id: animal.id }, data: { aEchographier: true } });
-    return created;
-  });
-  return NextResponse.json({ request: requestEcho }, { status: 201 });
+  return NextResponse.json(
+    { request: result.request, duplicate: result.status === "ALREADY_ACTIVE" },
+    { status: result.status === "ADDED" ? 201 : 200 },
+  );
 }
 
 export async function DELETE(

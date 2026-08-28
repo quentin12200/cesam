@@ -20,10 +20,12 @@ import {
   gestationDaysForDisplay,
   parseMobileDisplayPreferences,
   serializeMobileDisplayPreferences,
+  shouldDisplayNonWeaned,
   type MobileDisplayKey,
   type MobileDisplayPreferences,
 } from "@/lib/troupeau-display";
 import type { AnimalRow } from "./TroupeauTableau";
+import ReproductionCycleSummary from "./ReproductionCycleSummary";
 
 export const TROUPEAU_MOBILE_DISPLAY_STORAGE_KEY = "cesam:troupeau-mobile-display:v1";
 
@@ -207,6 +209,9 @@ export default function TroupeauMobileList({
               {isVisible("reproduction") && animal.aEchographier && reproduction !== "JAUNE" && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">À écho</span>
               )}
+              {isVisible("reproduction") && reproduction && (
+                <ReproductionCycleSummary summary={animal.reproductionSummary} compact />
+              )}
               {isVisible("age") && <span className="rounded-full bg-gray-50 px-2 py-0.5 text-gray-600">{formatAgeCompact(birthDate)}</span>}
               {isVisible("weight") && animal.dernierPoids !== null && (
                 <span className="rounded-full bg-gray-50 px-2 py-0.5 font-semibold text-gray-700">
@@ -223,7 +228,7 @@ export default function TroupeauMobileList({
               )}
               {isVisible("mother") && <span className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-800">Mère {animal.mereNutrav ?? "—"}</span>}
               {isVisible("father") && <span className="max-w-full truncate rounded-full bg-sky-50 px-2 py-0.5 text-sky-800">Père {father}</span>}
-              {isVisible("notWeaned") && !animal.sevreFait && (
+              {isVisible("notWeaned") && !animal.sevreFait && shouldDisplayNonWeaned(birthDate, animal.sevreFait) && (
                 <span className="rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">🍼 Non sevrée</span>
               )}
               {isVisible("group") && animal.groupeNom && (

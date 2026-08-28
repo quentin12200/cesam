@@ -5,6 +5,7 @@ import {
   filtrerAnimauxParCriteresLocaux,
   getActiveTroupeauFilters,
   impliedSexForCategory,
+  normalizeTroupeauFilters,
   resetTroupeauSearchParams,
   updateTroupeauSearchParams,
 } from "./troupeau-filters.ts";
@@ -66,6 +67,11 @@ test("l'URL préserve recherche et tri, évite le doublon Sexe/Catégorie et per
   assert.equal(reset.get("tri"), "age_desc");
   assert.equal(reset.has("categorie"), false);
   assert.equal(reset.has("sanitaire"), false);
+});
+
+test("le tri par dernier vêlage conserve ses deux directions", () => {
+  assert.equal(normalizeTroupeauFilters({ tri: "velage_asc" }).tri, "velage_asc");
+  assert.equal(normalizeTroupeauFilters({ tri: "velage_desc" }).tri, "velage_desc");
 });
 
 test("le compteur ne crée pas un filtre Femelle implicite", () => {

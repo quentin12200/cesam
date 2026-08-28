@@ -63,7 +63,7 @@ export function normalizeTroupeauFilters(params: TroupeauFilterParams): Troupeau
     sanitaire: VALID_HEALTH.has(params.sanitaire as TroupeauHealthFilter) ? params.sanitaire : undefined,
     sevrage: VALID_WEANING.has(params.sevrage as TroupeauWeaningFilter) ? params.sevrage : undefined,
     groupe: params.groupe || undefined,
-    tri: ["age_asc", "age_desc"].includes(params.tri ?? "") ? params.tri : undefined,
+    tri: ["age_asc", "age_desc", "velage_asc", "velage_desc"].includes(params.tri ?? "") ? params.tri : undefined,
   };
 }
 
