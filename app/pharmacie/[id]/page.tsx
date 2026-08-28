@@ -91,6 +91,11 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
           stockUnite: medicament.stockUnite,
           stockSeuilAlert: medicament.stockSeuilAlert,
           delaiAttenteLaitJ: medicament.delaiAttenteLaitJ,
+          conservationOuvertureStatut: medicament.conservationOuvertureStatut,
+          conservationOuvertureJours: medicament.conservationOuvertureJours,
+          conservationOuvertureCondition: medicament.conservationOuvertureCondition,
+          conservationOuvertureSource: medicament.conservationOuvertureSource,
+          conservationOuvertureNote: medicament.conservationOuvertureNote,
         }}
         preconisations={medicament.preconisations.map((p) => ({
           id: p.id,
@@ -119,6 +124,11 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
           uniteFlacon: conditionnement.uniteFlacon,
           doses: conditionnement.doses,
           prixFlaconEur: conditionnement.prixFlaconEur,
+          conservationOuvertureStatut: conditionnement.conservationOuvertureStatut,
+          conservationOuvertureJours: conditionnement.conservationOuvertureJours,
+          conservationOuvertureCondition: conditionnement.conservationOuvertureCondition,
+          conservationOuvertureSource: conditionnement.conservationOuvertureSource,
+          conservationOuvertureNote: conditionnement.conservationOuvertureNote,
         }))}
         ordonnances={Array.from(ordonnancesMap.values())}
         historique={traitements.map((t) => ({

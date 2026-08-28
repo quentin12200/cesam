@@ -17,6 +17,7 @@ import MedicamentDetailClient from "./MedicamentDetailClient";
 import PreconisationFields from "./PreconisationFields";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import ConditionnementsSection from "./ConditionnementsSection";
+import ConservationOuvertureSection from "./ConservationOuvertureSection";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 interface MedicamentData {
@@ -36,6 +37,11 @@ interface MedicamentData {
   stockActuel: number | null;
   stockUnite: string | null;
   stockSeuilAlert: number | null;
+  conservationOuvertureStatut: string;
+  conservationOuvertureJours: number | null;
+  conservationOuvertureCondition: string | null;
+  conservationOuvertureSource: string | null;
+  conservationOuvertureNote: string | null;
 }
 
 interface PreconisationData {
@@ -95,6 +101,11 @@ interface Props {
     uniteFlacon: string | null;
     doses: number;
     prixFlaconEur: number | null;
+    conservationOuvertureStatut: string | null;
+    conservationOuvertureJours: number | null;
+    conservationOuvertureCondition: string | null;
+    conservationOuvertureSource: string | null;
+    conservationOuvertureNote: string | null;
   }>;
   ordonnances: OrdonnanceAssociee[];
   historique: HistoriqueItem[];
@@ -234,6 +245,11 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
       )}
 
       <ConditionnementsSection medicamentId={medicament.id} initialConditionnements={conditionnements} />
+      <ConservationOuvertureSection
+        medicamentId={medicament.id}
+        initialMedicament={medicament}
+        initialConditionnements={conditionnements}
+      />
 
       {/* Préconisations */}
       <section className="space-y-3">

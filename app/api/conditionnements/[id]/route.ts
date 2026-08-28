@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { normaliserRegleConservationSaisie } from "@/lib/vaccine-planner";
 
 const UNITES = new Set(["ml", "L", "g", "kg", "dose", "comprimé", "sachet", "autre"]);
 
@@ -13,20 +14,34 @@ function valeursValides(quantiteFlacon: unknown, uniteFlacon: unknown, doses: un
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { quantiteFlacon, uniteFlacon, doses, prixFlaconEur } = await request.json();
-  if (!valeursValides(quantiteFlacon, uniteFlacon, doses, prixFlaconEur)) {
+  const body = await request.json();
+  const { quantiteFlacon, uniteFlacon, doses, prixFlaconEur } = body;
+  const modifierFormat = ["quantiteFlacon", "uniteFlacon", "doses", "prixFlaconEur"].some((champ) => Object.hasOwn(body, champ));
+  const modifierConservation = Object.hasOwn(body, "conservationOuvertureStatut");
+  if ((!modifierFormat && !modifierConservation) || (modifierFormat && !valeursValides(quantiteFlacon, uniteFlacon, doses, prixFlaconEur))) {
     return NextResponse.json({ error: "Quantité, unité ou prix du flacon invalides" }, { status: 400 });
   }
   const existe = await prisma.conditionnementMedicament.findUnique({ where: { id }, select: { id: true } });
   if (!existe) return NextResponse.json({ error: "Conditionnement non trouvé" }, { status: 404 });
 
+  let conservation = {};
+  if (modifierConservation) {
+    try {
+      conservation = normaliserRegleConservationSaisie(body, true);
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Conservation invalide" }, { status: 400 });
+    }
+  }
   const conditionnement = await prisma.conditionnementMedicament.update({
     where: { id },
     data: {
-      quantiteFlacon: Number(quantiteFlacon),
-      uniteFlacon: String(uniteFlacon),
-      doses: doses === "" || doses == null ? 0 : Number(doses),
-      prixFlaconEur: Number(prixFlaconEur),
+      ...(modifierFormat && {
+        quantiteFlacon: Number(quantiteFlacon),
+        uniteFlacon: String(uniteFlacon),
+        doses: doses === "" || doses == null ? 0 : Number(doses),
+        prixFlaconEur: Number(prixFlaconEur),
+      }),
+      ...conservation,
     },
   });
   return NextResponse.json(conditionnement);

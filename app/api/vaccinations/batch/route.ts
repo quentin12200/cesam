@@ -5,15 +5,27 @@ import { logAction } from "@/lib/action-log";
 export async function POST(request: NextRequest) {
   try {
     const { items, date, voie } = await request.json();
-    // items: { nutrav: string; vaccin: string }[]
+    type VaccinationBatchItem = {
+      nutrav: string;
+      vaccin: string;
+      dose?: number | null;
+      medicamentId?: string | null;
+      protocoleId?: string | null;
+      etapeProtocoleId?: string | null;
+      gestationId?: string | null;
+      typeInjection?: string | null;
+    };
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "items requis" }, { status: 400 });
     }
     if (!date) {
       return NextResponse.json({ error: "date requise" }, { status: 400 });
     }
+    if (items.some((item: VaccinationBatchItem) => item.dose != null && !Number.isFinite(Number(item.dose)))) {
+      return NextResponse.json({ error: "dose invalide" }, { status: 400 });
+    }
 
-    const nutravs = [...new Set(items.map((i: { nutrav: string }) => i.nutrav))];
+    const nutravs = [...new Set(items.map((i: VaccinationBatchItem) => i.nutrav))];
     const animaux = await prisma.animal.findMany({
       where: { nutrav: { in: nutravs } },
       select: { id: true, nutrav: true },
@@ -24,7 +36,7 @@ export async function POST(request: NextRequest) {
     const resolvedVoie: string = voie ?? "IM";
     const now = new Date();
 
-    const data = items.map((item: { nutrav: string; vaccin: string }) => {
+    const data = items.map((item: VaccinationBatchItem) => {
       const animalId = nutravToId.get(item.nutrav);
       if (!animalId) throw new Error(`Animal ${item.nutrav} non trouvé`);
       return {
@@ -32,6 +44,12 @@ export async function POST(request: NextRequest) {
         vaccin: item.vaccin,
         date: resolvedDate,
         voie: resolvedVoie,
+        dose: item.dose == null ? null : Number(item.dose),
+        medicamentId: item.medicamentId || null,
+        protocoleId: item.protocoleId || null,
+        etapeProtocoleId: item.etapeProtocoleId || null,
+        gestationId: item.gestationId || null,
+        typeInjection: item.typeInjection || null,
         updatedAt: now,
       };
     });

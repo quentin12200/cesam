@@ -70,6 +70,7 @@ model Animal {
   pesees          Pesee[]
   saleSimulationLines SaleSimulationAnimal[]
   vaccinations    Vaccination[]
+  statutsProtocolesVaccinaux StatutProtocoleVaccinal[]
   evenements      EvenementSanitaire[]
   parages         Parage[]
   complementsAlim ComplementAlim[]
@@ -140,6 +141,7 @@ model Gestation {
   sousResultat     String?
 
   velage           Velage?
+  vaccinations     Vaccination[]
 
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -189,8 +191,24 @@ model Vaccination {
   veterinaire String?
   notes      String?
 
+  medicamentId       String?
+  medicament         Medicament?              @relation(fields: [medicamentId], references: [id], onDelete: SetNull)
+  protocoleId        String?
+  protocole          ProtocoleVaccin?          @relation(fields: [protocoleId], references: [id], onDelete: SetNull)
+  etapeProtocoleId   String?
+  etapeProtocole     EtapeProtocoleVaccin?     @relation(fields: [etapeProtocoleId], references: [id], onDelete: SetNull)
+  gestationId        String?
+  gestation          Gestation?                @relation(fields: [gestationId], references: [id], onDelete: SetNull)
+  typeInjection      String?
+  utilisationsFlacon UtilisationFlaconVaccin[]
+
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+
+  @@index([medicamentId])
+  @@index([protocoleId])
+  @@index([etapeProtocoleId])
+  @@index([gestationId])
 }
 
 model EvenementSanitaire {
@@ -595,6 +613,8 @@ model ProtocoleVaccin {
   lotCible           String?
   ageMaxJours        Int?
   etapes             EtapeProtocoleVaccin[]
+  statutsAnimaux     StatutProtocoleVaccinal[]
+  vaccinations       Vaccination[]
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
@@ -618,6 +638,11 @@ model Medicament {
   stockUnite          String?
   stockSeuilAlert     Float?
   favori              Boolean      @default(false)
+  conservationOuvertureStatut    String @default("INCONNUE")
+  conservationOuvertureJours     Int?
+  conservationOuvertureCondition String?
+  conservationOuvertureSource    String?
+  conservationOuvertureNote      String?
   /// Actions simples pour l'affichage répertoire (ex: "Douleur,Inflammation,Fièvre")
   actions             String?
   traitements         Traitement[]
@@ -626,6 +651,8 @@ model Medicament {
   aliasesVocaux       MedicamentAliasVocal[]
   etapesProtocoles    EtapeProtocoleMedicament[]
   conditionnements    ConditionnementMedicament[]
+  vaccinations        Vaccination[]
+  flaconsOuverts      FlaconMedicamentOuvert[]
   ordonnances         Ordonnance[]
   ordonnanceMedicaments OrdonnanceMedicament[]
   createdAt           DateTime     @default(now())
@@ -650,6 +677,7 @@ model EtapeProtocoleVaccin {
   recurrenceMois Int?
   obligatoire    Boolean  @default(true)
   medicaments    EtapeProtocoleMedicament[]
+  vaccinations   Vaccination[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   @@index([protocoleId, ordre])
@@ -676,8 +704,73 @@ model ConditionnementMedicament {
   doses        Float    @default(0)
   prixFlaconEur Float?
   actif        Boolean  @default(true)
+  conservationOuvertureStatut    String?
+  conservationOuvertureJours     Int?
+  conservationOuvertureCondition String?
+  conservationOuvertureSource    String?
+  conservationOuvertureNote      String?
+  flaconsOuverts FlaconMedicamentOuvert[]
   createdAt    DateTime @default(now())
   @@index([medicamentId])
+}
+
+model StatutProtocoleVaccinal {
+  id          String   @id @default(cuid())
+  animalId    String
+  protocoleId String
+  statut      String   @default("A_CONFIRMER")
+  source      String   @default("MANUEL")
+  confirmeAt  DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  animal      Animal          @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  protocole   ProtocoleVaccin @relation(fields: [protocoleId], references: [id], onDelete: Cascade)
+
+  @@unique([animalId, protocoleId])
+  @@index([protocoleId, statut])
+}
+
+model FlaconMedicamentOuvert {
+  id                    String   @id @default(cuid())
+  medicamentId          String
+  conditionnementId     String?
+  dateOuverture         DateTime
+  dosesInitiales        Float
+  conservationJours     Int?
+  dateLimiteUtilisation DateTime?
+  conditionConservation String?
+  sourceConservation    String?
+  statut                String   @default("OUVERT")
+  numeroLot             String?
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  medicament            Medicament                  @relation(fields: [medicamentId], references: [id], onDelete: Restrict)
+  conditionnement       ConditionnementMedicament?  @relation(fields: [conditionnementId], references: [id], onDelete: SetNull)
+  utilisations          UtilisationFlaconVaccin[]
+
+  @@index([medicamentId, statut])
+  @@index([conditionnementId])
+  @@index([dateLimiteUtilisation])
+}
+
+model UtilisationFlaconVaccin {
+  id             String   @id @default(cuid())
+  flaconId       String
+  vaccinationId  String?
+  date            DateTime
+  dosesUtilisees  Float
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  flacon          FlaconMedicamentOuvert @relation(fields: [flaconId], references: [id], onDelete: Cascade)
+  vaccination     Vaccination?           @relation(fields: [vaccinationId], references: [id], onDelete: SetNull)
+
+  @@index([flaconId, date])
+  @@index([vaccinationId])
 }
 
 model MedicamentAliasVocal {
