@@ -123,7 +123,7 @@ export default async function SevragePage() {
   return (
     <div className="max-w-3xl mx-auto p-4 pb-24 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mt-2">
+      <div className="flex flex-wrap items-center gap-3 mt-2">
         <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex-1">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -134,6 +134,12 @@ export default async function SevragePage() {
             À faire, bientôt à prévoir et récemment effectués
           </p>
         </div>
+        <Link
+          href="/troupeau/sevrage/impression"
+          className="w-full shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-center text-sm font-semibold text-gray-800 shadow-sm sm:w-auto"
+        >
+          🖨️ Imprimer la liste
+        </Link>
       </div>
 
       <WeaningDryOffPanel
