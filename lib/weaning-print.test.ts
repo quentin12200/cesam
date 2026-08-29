@@ -5,20 +5,23 @@ import {
   getWeaningPrintMotherInfo,
   type WeaningPrintCandidate,
 } from "./weaning-print.ts";
+import { classifyWeaningWindow, type WeaningWindow } from "./weaning-dry-off.ts";
 
 const now = new Date("2026-08-29T12:00:00.000Z");
 
 function candidate(
   id: string,
   birthDate: string,
+  window: WeaningWindow,
   overrides: Partial<WeaningPrintCandidate> = {},
 ): WeaningPrintCandidate {
   return {
     id,
     nutrav: id,
     birthDate: new Date(birthDate),
-    statut: "ACTIF",
-    sevreFait: false,
+    window,
+    needsWeaning: true,
+    sex: "F",
     motherNutrav: "M-1",
     motherStatus: "Vide",
     motherHasActiveEchoRequest: false,
@@ -26,33 +29,45 @@ function candidate(
   };
 }
 
-test("sépare les veaux de six mois et ceux de cinq à moins de six mois", () => {
+test("conserve les groupes NOW et SOON fournis par la logique opérationnelle", () => {
+  const thresholdMonths = 8;
+  const readyWindow = classifyWeaningWindow(new Date("2025-12-28T12:00:00.000Z"), thresholdMonths, now).window;
+  const upcomingWindow = classifyWeaningWindow(new Date("2026-01-15T12:00:00.000Z"), thresholdMonths, now).window;
+  assert.equal(readyWindow, "NOW");
+  assert.equal(upcomingWindow, "SOON");
+
   const groups = buildWeaningPrintGroups([
-    candidate("ready", "2026-02-28T12:00:00.000Z"),
-    candidate("upcoming", "2026-03-15T12:00:00.000Z"),
-    candidate("too-young", "2026-04-01T12:00:00.000Z"),
-  ], now);
+    candidate("ready", "2025-12-28T12:00:00.000Z", readyWindow),
+    candidate("upcoming", "2026-01-15T12:00:00.000Z", upcomingWindow),
+  ]);
 
   assert.deepEqual(groups.ready.map((row) => row.id), ["ready"]);
   assert.deepEqual(groups.upcoming.map((row) => row.id), ["upcoming"]);
 });
 
-test("exclut les animaux sevrés, inactifs et les adultes incohérents", () => {
+test("n'ajoute aucun animal absent des candidats opérationnels", () => {
   const groups = buildWeaningPrintGroups([
-    candidate("weaned", "2026-02-01T12:00:00.000Z", { sevreFait: true }),
-    candidate("inactive", "2026-02-01T12:00:00.000Z", { statut: "VENDU" }),
-    candidate("adult", "2024-01-01T12:00:00.000Z"),
-  ], now);
+    candidate("operational", "2025-12-01T12:00:00.000Z", "NOW"),
+  ]);
+
+  assert.deepEqual(groups.ready.map((row) => row.id), ["operational"]);
+  assert.equal(groups.ready.some((row) => row.id === "ten-months-without-valid-cycle"), false);
+});
+
+test("exclut les candidats récemment sevrés proposés seulement pour annulation", () => {
+  const groups = buildWeaningPrintGroups([
+    candidate("recently-weaned", "2025-12-01T12:00:00.000Z", "NOW", { needsWeaning: false }),
+  ]);
 
   assert.deepEqual(groups, { ready: [], upcoming: [] });
 });
 
 test("trie du plus âgé au plus jeune", () => {
   const groups = buildWeaningPrintGroups([
-    candidate("youngest", "2026-02-20T12:00:00.000Z"),
-    candidate("oldest", "2026-01-10T12:00:00.000Z"),
-    candidate("middle", "2026-02-01T12:00:00.000Z"),
-  ], now);
+    candidate("youngest", "2026-02-20T12:00:00.000Z", "NOW"),
+    candidate("oldest", "2026-01-10T12:00:00.000Z", "NOW"),
+    candidate("middle", "2026-02-01T12:00:00.000Z", "NOW"),
+  ]);
 
   assert.deepEqual(groups.ready.map((row) => row.id), ["oldest", "middle", "youngest"]);
 });
@@ -67,25 +82,27 @@ test("priorise la demande d'échographie active", () => {
     simultaneousTask: "—",
   });
   const groups = buildWeaningPrintGroups([
-    candidate("echo", "2026-02-01T12:00:00.000Z", {
+    candidate("echo", "2026-02-01T12:00:00.000Z", "NOW", {
       motherStatus: "Gestante",
       motherHasActiveEchoRequest: true,
     }),
-  ], now);
+  ]);
   assert.equal(groups.ready[0]?.motherStatus, "À écho");
   assert.equal(groups.ready[0]?.simultaneousTask, "☐ Échographier mère");
 });
 
-test("supporte une mère ou un statut absent", () => {
+test("affiche le sexe et supporte une mère ou un statut absent", () => {
   const info = getWeaningPrintMotherInfo(false, null);
   const groups = buildWeaningPrintGroups([
-    candidate("without-mother", "2026-02-01T12:00:00.000Z", {
+    candidate("without-mother", "2026-02-01T12:00:00.000Z", "NOW", {
       motherNutrav: null,
       motherStatus: info.motherStatus,
+      sex: null,
     }),
-  ], now);
+  ]);
 
   assert.equal(groups.ready[0]?.motherNutrav, null);
   assert.equal(groups.ready[0]?.motherStatus, "Inconnu");
   assert.equal(groups.ready[0]?.simultaneousTask, "—");
+  assert.equal(groups.ready[0]?.sexLabel, "—");
 });

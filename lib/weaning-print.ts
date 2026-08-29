@@ -1,18 +1,19 @@
-import { classifyWeaningWindow } from "./weaning-dry-off.ts";
-import { shouldDisplayNonWeaned } from "./troupeau-display.ts";
+import type { WeaningWindow } from "./weaning-dry-off.ts";
 
 export interface WeaningPrintCandidate {
   id: string;
   nutrav: string;
   birthDate: Date;
-  statut: string;
-  sevreFait: boolean;
+  window: WeaningWindow;
+  needsWeaning: boolean;
+  sex: string | null;
   motherNutrav: string | null;
   motherStatus: string;
   motherHasActiveEchoRequest: boolean;
 }
 
 export interface WeaningPrintRow extends WeaningPrintCandidate {
+  sexLabel: "F" | "M" | "—";
   simultaneousTask: string;
 }
 
@@ -34,27 +35,20 @@ export function getWeaningPrintMotherInfo(
 
 export function buildWeaningPrintGroups(
   candidates: WeaningPrintCandidate[],
-  now = new Date(),
 ): { ready: WeaningPrintRow[]; upcoming: WeaningPrintRow[] } {
   const rows = candidates
-    .filter((candidate) =>
-      candidate.statut === "ACTIF"
-      && !candidate.sevreFait
-      && shouldDisplayNonWeaned(candidate.birthDate, candidate.sevreFait, now)
-    )
-    .flatMap((candidate) => {
-      const window = classifyWeaningWindow(candidate.birthDate, 6, now).window;
-      if (!window) return [];
+    .filter((candidate) => candidate.needsWeaning)
+    .map((candidate) => {
       const motherInfo = getWeaningPrintMotherInfo(
         candidate.motherHasActiveEchoRequest,
         candidate.motherStatus,
       );
-      return [{
+      return {
         ...candidate,
+        sexLabel: candidate.sex === "F" || candidate.sex === "M" ? candidate.sex : "—",
         motherStatus: motherInfo.motherStatus,
         simultaneousTask: motherInfo.simultaneousTask,
-        window,
-      }];
+      } satisfies WeaningPrintRow;
     })
     .sort((left, right) => left.birthDate.getTime() - right.birthDate.getTime());
 
