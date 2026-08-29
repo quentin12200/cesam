@@ -59,15 +59,34 @@ export async function POST(request: NextRequest) {
   }
 
   const context = await findCalfWithCurrentCycle(calfId);
-  if (!context) {
+  const allowsStandaloneCalf = action === "WEAN_ONLY" || action === "UNDO_WEANING";
+  if (!context && !allowsStandaloneCalf) {
     return NextResponse.json(
       { error: "Le cycle mère–veau actuel n’a pas pu être établi." },
       { status: 409 }
     );
   }
 
-  const { calf, currentCycle } = context;
-  const mother = currentCycle.mother;
+  const standaloneCalf = !context && allowsStandaloneCalf
+    ? await prisma.animal.findFirst({
+        where: { id: calfId, statut: "ACTIF" },
+        select: {
+          id: true,
+          nutrav: true,
+          sevreFait: true,
+          dateSevrage: true,
+        },
+      })
+    : null;
+  const calf = context?.calf ?? standaloneCalf;
+  if (!calf) {
+    return NextResponse.json(
+      { error: "Le veau actif n’a pas été retrouvé." },
+      { status: 404 }
+    );
+  }
+  const currentCycle = context?.currentCycle ?? null;
+  const mother = currentCycle?.mother ?? null;
 
   if (action === "UNDO_WEANING") {
     const reversibleSince = new Date(Date.now() - 12 * 60 * 60 * 1000);
@@ -120,14 +139,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const latestDryOffLog = logs.find((log) =>
-      readUpdateSteps(log.revertData).some(
-        (step) =>
-          (step.where?.id === mother.id ||
-            step.where?.nutrav === mother.nutrav) &&
-          step.data?.tarieFaite === false
-      )
-    );
+    const latestDryOffLog = mother
+      ? logs.find((log) =>
+          readUpdateSteps(log.revertData).some(
+            (step) =>
+              (step.where?.id === mother.id ||
+                step.where?.nutrav === mother.nutrav) &&
+              step.data?.tarieFaite === false
+          )
+        )
+      : null;
     const latestDryOffWasAutomatic = Boolean(
       latestDryOffLog &&
         ([
@@ -140,7 +161,7 @@ export async function POST(request: NextRequest) {
             )))
     );
     const automaticMotherStep =
-      latestDryOffLog && latestDryOffWasAutomatic
+      mother && latestDryOffLog && latestDryOffWasAutomatic
         ? readUpdateSteps(latestDryOffLog.revertData).find(
             (step) =>
               (step.where?.id === mother.id ||
@@ -155,7 +176,7 @@ export async function POST(request: NextRequest) {
           where: { id: calf.id },
           data: { sevreFait: false, dateSevrage: null },
         });
-        if (automaticMotherStep?.data && mother.tarieFaite) {
+        if (automaticMotherStep?.data && mother?.tarieFaite) {
           await tx.animal.update({
             where: { id: mother.id },
             data: {
@@ -180,30 +201,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const motherStillDriedOff = automaticMotherStep
-      ? false
-      : mother.tarieFaite;
+    const motherStillDriedOff = mother
+      ? automaticMotherStep
+        ? false
+        : mother.tarieFaite
+      : false;
     return NextResponse.json({
       ok: true,
       undone: true,
-      cycleProgress: {
-        total: currentCycle.linkedCalves.length,
-        weaned: Math.max(
-          0,
-          currentCycle.linkedCalves.filter(
-            (linkedCalf) => linkedCalf.sevreFait
-          ).length - 1
-        ),
-        pending: currentCycle.pendingCalves.length + 1,
-      },
+      cycleProgress: currentCycle
+        ? {
+            total: currentCycle.linkedCalves.length,
+            weaned: Math.max(
+              0,
+              currentCycle.linkedCalves.filter(
+                (linkedCalf) => linkedCalf.sevreFait
+              ).length - 1
+            ),
+            pending: currentCycle.pendingCalves.length + 1,
+          }
+        : null,
       calf: { id: calf.id, sevreFait: false, dateSevrage: null },
-      mother: {
-        id: mother.id,
-        tarieFaite: motherStillDriedOff,
-        dateTarie: motherStillDriedOff
-          ? mother.dateTarie?.toISOString() ?? null
-          : null,
-      },
+      mother: mother
+        ? {
+            id: mother.id,
+            tarieFaite: motherStillDriedOff,
+            dateTarie: motherStillDriedOff
+              ? mother.dateTarie?.toISOString() ?? null
+              : null,
+          }
+        : null,
     });
   }
 
@@ -238,18 +265,20 @@ export async function POST(request: NextRequest) {
           where: { id: calf.id },
           data: { sevreFait: true, dateSevrage: effectiveActionDate },
         });
-        const remainingCalves = await tx.animal.count({
-          where: {
-            id: { in: currentCycle.linkedCalves.map((linkedCalf) => linkedCalf.id) },
-            statut: "ACTIF",
-            sevreFait: false,
-          },
-        });
-        automaticDryOff = !mother.tarieFaite && remainingCalves === 0;
+        if (currentCycle && mother) {
+          const remainingCalves = await tx.animal.count({
+            where: {
+              id: { in: currentCycle.linkedCalves.map((linkedCalf) => linkedCalf.id) },
+              statut: "ACTIF",
+              sevreFait: false,
+            },
+          });
+          automaticDryOff = !mother.tarieFaite && remainingCalves === 0;
+        }
       }
 
       const mustDryOff = manualDryOff || automaticDryOff;
-      if (mustDryOff && !mother.tarieFaite) {
+      if (mustDryOff && mother && !mother.tarieFaite) {
         revertSteps.push({
           op: "update",
           model: "animal",
@@ -267,10 +296,10 @@ export async function POST(request: NextRequest) {
 
       if (revertSteps.length > 0) {
         const description = mustWean
-          ? automaticDryOff
+          ? automaticDryOff && mother
             ? `Sevrage de ${calf.nutrav} et tarissement automatique de ${mother.nutrav}`
             : `Sevrage de ${calf.nutrav}`
-          : `Tarissement manuel de ${mother.nutrav}`;
+          : `Tarissement manuel de ${mother?.nutrav ?? "la mère"}`;
         const log = await tx.actionLog.create({
           data: {
             type: mustWean
@@ -293,23 +322,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const cycleWeanedCount =
-    currentCycle.linkedCalves.filter((linkedCalf) => linkedCalf.sevreFait)
-      .length + (mustWean ? 1 : 0);
-  const cyclePendingCount = Math.max(
-    0,
-    currentCycle.pendingCalves.length - (mustWean ? 1 : 0)
-  );
+  const cycleWeanedCount = currentCycle
+    ? currentCycle.linkedCalves.filter((linkedCalf) => linkedCalf.sevreFait)
+        .length + (mustWean ? 1 : 0)
+    : 0;
+  const cyclePendingCount = currentCycle
+    ? Math.max(
+        0,
+        currentCycle.pendingCalves.length - (mustWean ? 1 : 0)
+      )
+    : 0;
   const mustDryOff = manualDryOff || automaticDryOff;
 
   return NextResponse.json({
     ok: true,
     automaticDryOff,
-    cycleProgress: {
-      total: currentCycle.linkedCalves.length,
-      weaned: cycleWeanedCount,
-      pending: cyclePendingCount,
-    },
+    cycleProgress: currentCycle
+      ? {
+          total: currentCycle.linkedCalves.length,
+          weaned: cycleWeanedCount,
+          pending: cyclePendingCount,
+        }
+      : null,
     calf: {
       id: calf.id,
       sevreFait: mustWean ? true : calf.sevreFait,
@@ -317,13 +351,15 @@ export async function POST(request: NextRequest) {
         ? effectiveActionDate.toISOString()
         : calf.dateSevrage?.toISOString() ?? null,
     },
-    mother: {
-      id: mother.id,
-      tarieFaite: mustDryOff ? true : mother.tarieFaite,
-      dateTarie: mustDryOff
-        ? effectiveActionDate.toISOString()
-        : mother.dateTarie?.toISOString() ?? null,
-    },
+    mother: mother
+      ? {
+          id: mother.id,
+          tarieFaite: mustDryOff ? true : mother.tarieFaite,
+          dateTarie: mustDryOff
+            ? effectiveActionDate.toISOString()
+            : mother.dateTarie?.toISOString() ?? null,
+        }
+      : null,
     _undoId: undoId,
   });
 }
