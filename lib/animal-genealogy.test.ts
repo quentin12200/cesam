@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveBiologicalMother, resolveFatherLabel } from "./animal-genealogy.ts";
+import {
+  buildAncestryUpdate,
+  rankAncestryMatches,
+  resolveAncestryIdentity,
+  resolveBiologicalMother,
+  resolveFatherLabel,
+  resolveParentWorkNumber,
+  workNumberFromHistoricalNational,
+  type AncestrySearchMatch,
+} from "./animal-genealogy.ts";
 
 const activeMother = { id: "m1", nutrav: "92", nobovi: "Malice", statut: "ACTIF" };
 
@@ -66,4 +75,95 @@ test("ne fabrique aucun père quand aucune donnée n'existe", () => {
     birthNumber: null,
     birthName: null,
   }), null);
+});
+
+test("9226 conserve MALICE dans l'arbre sans mereId", () => {
+  const mother = resolveAncestryIdentity([{
+    workNumber: null,
+    nationalNumber: "8235464428",
+    name: "MALICE",
+    linkedAnimalNutrav: null,
+  }]);
+  assert.equal(mother?.nationalNumber, "8235464428");
+  assert.equal(mother?.name, "MALICE");
+});
+
+test("la fiche affiche uniquement le numéro de travail résolu", () => {
+  assert.equal(resolveParentWorkNumber({
+    linkedWorkNumber: null,
+    historicalMatchedWorkNumber: "4428",
+    manualWorkNumber: "autre",
+  }), "4428");
+  assert.equal(resolveParentWorkNumber({
+    linkedWorkNumber: null,
+    historicalMatchedWorkNumber: null,
+    historicalNationalNumber: "FR8235464428",
+    manualWorkNumber: null,
+  }), "4428");
+  assert.equal(workNumberFromHistoricalNational("FR4635275801"), "5801");
+});
+
+test("une mère sortie reste recherchable et le n° travail exact est prioritaire", () => {
+  const matches: AncestrySearchMatch[] = [
+    { key: "name", source: "HISTORIQUE", sourceId: null, workNumber: null, nationalNumber: "FR92", name: "92", status: null },
+    { key: "inactive", source: "ANIMAL", sourceId: "m1", workNumber: "92", nationalNumber: "FR0092", name: "MALICE", status: "SORTI" },
+  ];
+  const ranked = rankAncestryMatches(matches, "92");
+  assert.equal(ranked[0].key, "inactive");
+  assert.equal(ranked[0].status, "SORTI");
+});
+
+test("la recherche priorise travail, national, suffixe national puis nom", () => {
+  const matches: AncestrySearchMatch[] = [
+    { key: "name", source: "ANIMAL", sourceId: "a1", workNumber: "1111", nationalNumber: "FR1111111111", name: "5801", status: "ACTIF" },
+    { key: "suffix", source: "TAUREAU", sourceId: "t1", workNumber: null, nationalNumber: "FR4635275801", name: "MICKEY", status: "SORTI" },
+    { key: "work", source: "ANIMAL", sourceId: "a2", workNumber: "5801", nationalNumber: "FR4635275801", name: "MICKEY", status: "SORTI" },
+  ];
+  assert.deepEqual(rankAncestryMatches(matches, "5801").map((match) => match.key), ["work", "suffix", "name"]);
+});
+
+test("une saisie sans correspondance stocke seulement un snapshot manuel", () => {
+  assert.deepEqual(buildAncestryUpdate({
+    parent: "MERE",
+    source: "MANUEL",
+    sourceId: null,
+    workNumber: "M-92",
+    nationalNumber: "FR0092",
+    name: "MALICE",
+  }), {
+    mereTravailManuel: "M-92",
+    mereNationalManuel: "FR0092",
+    mereNomManuel: "MALICE",
+  });
+});
+
+test("une correspondance existante crée un lien, jamais un faux parent", () => {
+  assert.deepEqual(buildAncestryUpdate({
+    parent: "MERE",
+    source: "ANIMAL",
+    sourceId: "animal-malice",
+    workNumber: "4428",
+    nationalNumber: "8235464428",
+    name: "MALICE",
+  }), { mereId: "animal-malice" });
+  assert.deepEqual(buildAncestryUpdate({
+    parent: "PERE",
+    source: "TAUREAU",
+    sourceId: "bull-1",
+    workNumber: "",
+    nationalNumber: "FR-P1",
+    name: "PERE",
+  }), { taureauId: "bull-1" });
+  assert.deepEqual(buildAncestryUpdate({
+    parent: "PERE",
+    source: "ANIMAL",
+    sourceId: "mickey-animal",
+    workNumber: "5801",
+    nationalNumber: "FR4635275801",
+    name: "MICKEY",
+  }), {
+    pereTravailManuel: "5801",
+    pereNationalManuel: "FR4635275801",
+    pereNomManuel: "MICKEY",
+  });
 });

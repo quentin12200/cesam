@@ -3,6 +3,8 @@
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import type { ArbreData, TreeNode } from "./page";
+import AncestryEditor from "./AncestryEditor";
+import type { AncestryParent } from "@/lib/animal-genealogy";
 
 /* ─── Couleurs par rôle ─────────────────────────────── */
 const COLORS = {
@@ -24,13 +26,15 @@ function NodeCard({
   node,
   isCenter = false,
   label,
+  showNational = false,
 }: {
   node: TreeNode;
   isCenter?: boolean;
   label?: string;
+  showNational?: boolean;
 }) {
   const c = nodeColors(node, isCenter);
-  const href = node.isTaureau ? undefined : `/troupeau/${node.nutrav}`;
+  const href = node.linkNutrav ? `/troupeau/${node.linkNutrav}` : undefined;
   const age = node.danais
     ? Math.floor((Date.now() - new Date(node.danais).getTime()) / (1000 * 60 * 60 * 24 * 365))
     : null;
@@ -49,7 +53,9 @@ function NodeCard({
           {label}
         </div>
       )}
-      <div className="font-bold text-sm leading-tight truncate">{node.nutrav}</div>
+      <div className="font-bold text-sm leading-tight truncate">
+        {showNational ? node.nationalNumber ?? node.nutrav : node.nutrav}
+      </div>
       {node.nobovi && (
         <div className="text-xs opacity-85 truncate mt-0.5">{node.nobovi}</div>
       )}
@@ -72,13 +78,22 @@ function NodeCard({
 }
 
 /* ─── Nœud fantôme (père/mère inconnu) ─────────────── */
-function UnknownCard({ label }: { label: string }) {
+function UnknownCard({
+  label,
+  animalNutrav,
+  parent,
+}: {
+  label: string;
+  animalNutrav?: string;
+  parent?: AncestryParent;
+}) {
   return (
     <div className="rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-3 py-2.5 min-w-[110px] max-w-[140px] text-center">
       <div className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1">
         {label}
       </div>
       <div className="text-gray-400 text-xs">Inconnu</div>
+      {animalNutrav && parent && <AncestryEditor animalNutrav={animalNutrav} parent={parent} />}
     </div>
   );
 }
@@ -210,12 +225,12 @@ export default function ArbreClient({ data }: { data: ArbreData }) {
               </div>
               <div ref={refGrandMere} className="flex justify-center">
                 {data.grandMere
-                  ? <NodeCard node={data.grandMere} label="Grand-mère" />
+                  ? <NodeCard node={data.grandMere} label="Grand-mère" showNational />
                   : <UnknownCard label="Grand-mère" />}
               </div>
               <div ref={refGrandPere} className="flex justify-center">
                 {data.grandPere
-                  ? <NodeCard node={data.grandPere} label="Grand-père" />
+                  ? <NodeCard node={data.grandPere} label="Grand-père" showNational />
                   : <UnknownCard label="Grand-père" />}
               </div>
             </div>
@@ -228,13 +243,13 @@ export default function ArbreClient({ data }: { data: ArbreData }) {
             </div>
             <div ref={refMere} className="flex justify-center">
               {data.mere
-                ? <NodeCard node={data.mere} label="Mère" />
-                : <UnknownCard label="Mère" />}
+                ? <NodeCard node={data.mere} label="Mère" showNational />
+                : <UnknownCard label="Mère" animalNutrav={data.animal.nutrav} parent="MERE" />}
             </div>
             <div ref={refPere} className="flex justify-center">
               {data.pere
-                ? <NodeCard node={data.pere} label="Père" />
-                : <UnknownCard label="Père" />}
+                ? <NodeCard node={data.pere} label="Père" showNational />
+                : <UnknownCard label="Père" animalNutrav={data.animal.nutrav} parent="PERE" />}
             </div>
           </div>
 
@@ -284,16 +299,26 @@ export default function ArbreClient({ data }: { data: ArbreData }) {
         {data.mere && (
           <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
             <p className="text-xs font-semibold text-emerald-700 mb-1">Mère</p>
-            <Link href={`/troupeau/${data.mere.nutrav}`} className="font-mono font-bold text-emerald-800 hover:underline">
-              {data.mere.nutrav}
-            </Link>
+            {data.mere.linkNutrav ? (
+              <Link href={`/troupeau/${data.mere.linkNutrav}`} className="font-mono font-bold text-emerald-800 hover:underline">
+                {data.mere.nationalNumber ?? data.mere.nutrav}
+              </Link>
+            ) : (
+              <p className="font-mono font-bold text-emerald-800">{data.mere.nationalNumber ?? data.mere.nutrav}</p>
+            )}
             {data.mere.nobovi && <p className="text-sm text-emerald-700">{data.mere.nobovi}</p>}
           </div>
         )}
         {data.pere && (
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
             <p className="text-xs font-semibold text-blue-700 mb-1">Père</p>
-            <p className="font-mono font-bold text-blue-800">{data.pere.nutrav}</p>
+            {data.pere.linkNutrav ? (
+              <Link href={`/troupeau/${data.pere.linkNutrav}`} className="font-mono font-bold text-blue-800 hover:underline">
+                {data.pere.nationalNumber ?? data.pere.nutrav}
+              </Link>
+            ) : (
+              <p className="font-mono font-bold text-blue-800">{data.pere.nationalNumber ?? data.pere.nutrav}</p>
+            )}
             {data.pere.nobovi && <p className="text-sm text-blue-700">{data.pere.nobovi}</p>}
           </div>
         )}

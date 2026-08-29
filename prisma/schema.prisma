@@ -39,8 +39,16 @@ model Animal {
   mere          Animal?   @relation("Genealogie", fields: [mereId], references: [id])
   veaux         Animal[]  @relation("Genealogie")
 
+  mereTravailManuel  String?
+  mereNationalManuel String?
+  mereNomManuel      String?
+
   taureauId     String?
   taureau       Taureau?  @relation(fields: [taureauId], references: [id])
+
+  pereTravailManuel  String?
+  pereNationalManuel String?
+  pereNomManuel      String?
 
   boucleNumero  String?
   boucleFaite   Boolean   @default(false)
