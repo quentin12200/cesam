@@ -63,6 +63,7 @@ import HeatReturnReminder from "@/app/components/HeatReturnReminder";
 import { getHeatReturnReminder } from "@/lib/heat-return-monitoring";
 import ChaleursHistory from "./ChaleursHistory";
 import VelageActions from "./VelageActions";
+import { resolveBiologicalMother, resolveFatherLabel } from "@/lib/animal-genealogy";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -157,13 +158,13 @@ async function getAnimal(nutrav: string) {
       },
       velageVeau: {
         include: {
-          vache: { select: { nutrav: true, nobovi: true } },
+          vache: { select: { id: true, nutrav: true, nobovi: true } },
         },
       },
       veauxVelage: {
         take: 1,
         include: {
-          velage: { include: { vache: { select: { nutrav: true, nobovi: true } } } },
+          velage: { include: { vache: { select: { id: true, nutrav: true, nobovi: true } } } },
         },
       },
       saillies: {
@@ -190,6 +191,18 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
   if (!animal) notFound();
   const birthVelage = animal.velageVeau ?? animal.veauxVelage[0]?.velage ?? null;
+  const biologicalMother = resolveBiologicalMother({
+    linkedMother: animal.mere,
+    birthMother: birthVelage?.vache ?? null,
+    historicalNumber: animal.numeip,
+    historicalName: animal.nomeip,
+  });
+  const fatherLabel = resolveFatherLabel({
+    linkedNumber: animal.taureau?.nupere ?? null,
+    linkedName: animal.taureau?.nopere ?? null,
+    birthNumber: birthVelage?.pereNunati ?? null,
+    birthName: birthVelage?.pereNom ?? null,
+  });
   const lastCalving = animal.velagesVache[0]?.date ?? null;
   const currentBreeding = getCurrentCycleBreeding(animal.saillies, lastCalving);
   const activeEchoRequest = animal.demandesEchographie[0] ?? null;
@@ -601,18 +614,18 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 {/* Mère */}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Mère</span>
-                  {animal.mere ? (
+                  {biologicalMother.linked ? (
                     <Link
-                      href={`/troupeau/${animal.mere.nutrav}`}
+                      href={`/troupeau/${biologicalMother.linked.nutrav}`}
                       className="flex items-center gap-1.5 text-green-700 font-medium hover:underline"
                     >
                       <span className="font-mono text-xs bg-green-100 px-1.5 py-0.5 rounded">
-                        {animal.mere.nutrav}
+                        {biologicalMother.linked.nutrav}
                       </span>
-                      {animal.mere.nobovi && <span>{animal.mere.nobovi}</span>}
+                      {biologicalMother.linked.nobovi && <span>{biologicalMother.linked.nobovi}</span>}
                     </Link>
                   ) : (
-                    <span className="text-gray-400">{animal.nomeip ?? "—"}</span>
+                    <span className="text-gray-400">{biologicalMother.historicalLabel ?? "—"}</span>
                   )}
                 </div>
 
@@ -621,7 +634,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   <span className="text-gray-500">Père</span>
                   <div className="flex items-center gap-2 flex-wrap justify-end">
                     <span className="font-medium text-gray-800">
-                      {animal.taureau?.nopere ?? animal.taureau?.nupere ?? "—"}
+                      {fatherLabel ?? "—"}
                     </span>
                     {perePresentExploitation && (
                       <span className="flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">
