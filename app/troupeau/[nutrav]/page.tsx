@@ -26,7 +26,6 @@ import {
   LogOut,
   ShieldCheck,
   ShieldX,
-  AlertTriangle,
   CheckCircle2,
   Circle,
   Clock,
@@ -63,7 +62,8 @@ import HeatReturnReminder from "@/app/components/HeatReturnReminder";
 import { getHeatReturnReminder } from "@/lib/heat-return-monitoring";
 import ChaleursHistory from "./ChaleursHistory";
 import VelageActions from "./VelageActions";
-import { resolveBiologicalMother, resolveFatherLabel } from "@/lib/animal-genealogy";
+import { resolveBiologicalMother, resolveParentWorkNumber } from "@/lib/animal-genealogy";
+import { findAnimalsByExactNational, normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -191,17 +191,29 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
   if (!animal) notFound();
   const birthVelage = animal.velageVeau ?? animal.veauxVelage[0]?.velage ?? null;
+  const ancestryAnimals = await findAnimalsByExactNational([
+    animal.numeip,
+    animal.taureau?.nupere,
+    birthVelage?.pereNunati,
+  ]);
   const biologicalMother = resolveBiologicalMother({
     linkedMother: animal.mere,
     birthMother: birthVelage?.vache ?? null,
     historicalNumber: animal.numeip,
     historicalName: animal.nomeip,
   });
-  const fatherLabel = resolveFatherLabel({
-    linkedNumber: animal.taureau?.nupere ?? null,
-    linkedName: animal.taureau?.nopere ?? null,
-    birthNumber: birthVelage?.pereNunati ?? null,
-    birthName: birthVelage?.pereNom ?? null,
+  const motherWorkNumber = resolveParentWorkNumber({
+    linkedWorkNumber: biologicalMother.linked?.nutrav ?? null,
+    historicalMatchedWorkNumber: ancestryAnimals.get(normalizeGenealogyNational(animal.numeip))?.nutrav ?? null,
+    manualWorkNumber: animal.mereTravailManuel,
+  });
+  const fatherWorkNumber = resolveParentWorkNumber({
+    linkedWorkNumber: null,
+    historicalMatchedWorkNumber:
+      ancestryAnimals.get(normalizeGenealogyNational(animal.taureau?.nupere))?.nutrav
+      ?? ancestryAnimals.get(normalizeGenealogyNational(birthVelage?.pereNunati))?.nutrav
+      ?? null,
+    manualWorkNumber: animal.pereTravailManuel,
   });
   const lastCalving = animal.velagesVache[0]?.date ?? null;
   const currentBreeding = getCurrentCycleBreeding(animal.saillies, lastCalving);
@@ -246,7 +258,6 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
   const protocolSteps = getVaccinProtocolSteps(animal.danais, animal.vaccinations, protocoles);
   const mheStatus = isMheVendable(animal.vaccinations);
-  const perePresentExploitation = animal.taureau?.present === true;
   const affichageDelaiAttente = configAffichage.affichageDelaiAttente;
   const testReproEnabled = animal.nutrav === "0000" && testRepro === "1";
   const reproductiveCycleProps = {
@@ -622,35 +633,17 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                       <span className="font-mono text-xs bg-green-100 px-1.5 py-0.5 rounded">
                         {biologicalMother.linked.nutrav}
                       </span>
-                      {biologicalMother.linked.nobovi && <span>{biologicalMother.linked.nobovi}</span>}
                     </Link>
                   ) : (
-                    <span className="text-gray-400">{biologicalMother.historicalLabel ?? "—"}</span>
+                    <span className="font-mono text-gray-700">{motherWorkNumber ?? "—"}</span>
                   )}
                 </div>
 
                 {/* Père */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-gray-500">Père</span>
-                  <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <span className="font-medium text-gray-800">
-                      {fatherLabel ?? "—"}
-                    </span>
-                    {perePresentExploitation && (
-                      <span className="flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">
-                        <AlertTriangle size={11} />
-                        Présent — risque consanguinité
-                      </span>
-                    )}
-                  </div>
+                  <span className="font-mono font-medium text-gray-800">{fatherWorkNumber ?? "—"}</span>
                 </div>
-
-                {animal.taureau?.traper && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">Race père</span>
-                    <span className="text-gray-700">{animal.taureau.traper}</span>
-                  </div>
-                )}
               </div>
 
               {/* Veaux */}

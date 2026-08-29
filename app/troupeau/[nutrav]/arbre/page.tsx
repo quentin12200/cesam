@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { GitBranch } from "lucide-react";
 import ArbreClient from "./ArbreClient";
+import { findAnimalsByExactNational, normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
+import { resolveAncestryIdentity } from "@/lib/animal-genealogy";
 
 import BackButton from "@/app/components/BackButton";
 export interface TreeNode {
@@ -13,6 +15,8 @@ export interface TreeNode {
   categorie?: string | null;
   danais?: string | null;
   isTaureau?: boolean;
+  nationalNumber?: string | null;
+  linkNutrav?: string | null;
 }
 
 export interface ArbreData {
@@ -39,6 +43,17 @@ async function getArbreData(nutrav: string): Promise<ArbreData | null> {
       statut: true,
       categorie: true,
       danais: true,
+      nunati: true,
+      numeroNational: true,
+      numeip: true,
+      nomeip: true,
+      mereTravailManuel: true,
+      mereNationalManuel: true,
+      mereNomManuel: true,
+      pereTravailManuel: true,
+      pereNationalManuel: true,
+      pereNomManuel: true,
+      taureau: { select: { id: true, nupere: true, nopere: true } },
       mere: {
         select: {
           id: true,
@@ -48,12 +63,23 @@ async function getArbreData(nutrav: string): Promise<ArbreData | null> {
           statut: true,
           categorie: true,
           danais: true,
+          nunati: true,
+          numeroNational: true,
+          numeip: true,
+          nomeip: true,
+          mereTravailManuel: true,
+          mereNationalManuel: true,
+          mereNomManuel: true,
+          pereTravailManuel: true,
+          pereNationalManuel: true,
+          pereNomManuel: true,
+          taureau: { select: { id: true, nupere: true, nopere: true } },
           mereId: true,
           mere: {
-            select: { id: true, nutrav: true, nobovi: true, sexbov: true, statut: true, categorie: true, danais: true },
+            select: { id: true, nutrav: true, nunati: true, numeroNational: true, nobovi: true, sexbov: true, statut: true, categorie: true, danais: true },
           },
           velageVeau: {
-            select: { pereNom: true, pereNunati: true, gestation: { select: { saillie: { select: { taureau: { select: { id: true, nupere: true, nopere: true } } } } } } },
+            select: { pereNom: true, pereNunati: true, vache: { select: { id: true, nutrav: true, nunati: true, numeroNational: true, nobovi: true, sexbov: true, statut: true, categorie: true, danais: true } }, gestation: { select: { saillie: { select: { taureau: { select: { id: true, nupere: true, nopere: true } } } } } } },
           },
         },
       },
@@ -61,6 +87,7 @@ async function getArbreData(nutrav: string): Promise<ArbreData | null> {
         select: {
           pereNom: true,
           pereNunati: true,
+          vache: { select: { id: true, nutrav: true, nunati: true, numeroNational: true, nobovi: true, sexbov: true, statut: true, categorie: true, danais: true } },
           gestation: {
             select: {
               saillie: {
@@ -68,6 +95,20 @@ async function getArbreData(nutrav: string): Promise<ArbreData | null> {
                   taureau: { select: { id: true, nupere: true, nopere: true } },
                 },
               },
+            },
+          },
+        },
+      },
+      veauxVelage: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          velage: {
+            select: {
+              pereNom: true,
+              pereNunati: true,
+              vache: { select: { id: true, nutrav: true, nunati: true, numeroNational: true, nobovi: true, sexbov: true, statut: true, categorie: true, danais: true } },
+              gestation: { select: { saillie: { select: { taureau: { select: { id: true, nupere: true, nopere: true } } } } } },
             },
           },
         },
@@ -96,42 +137,134 @@ async function getArbreData(nutrav: string): Promise<ArbreData | null> {
 
   if (!animal) return null;
 
-  function toNode(a: { id: string; nutrav: string; nobovi: string | null; sexbov: string; statut?: string; categorie?: string | null; danais?: Date | null }): TreeNode {
+  const birthVelage = animal.velageVeau ?? animal.veauxVelage[0]?.velage ?? null;
+  const ancestryAnimals = await findAnimalsByExactNational([
+    animal.numeip,
+    animal.mereNationalManuel,
+    animal.taureau?.nupere,
+    birthVelage?.pereNunati,
+    animal.pereNationalManuel,
+    animal.mere?.numeip,
+    animal.mere?.mereNationalManuel,
+    animal.mere?.taureau?.nupere,
+    animal.mere?.velageVeau?.pereNunati,
+    animal.mere?.pereNationalManuel,
+  ]);
+
+  function toNode(a: { id: string; nutrav: string; nunati?: string; numeroNational?: string | null; nobovi: string | null; sexbov: string; statut?: string; categorie?: string | null; danais?: Date | null }): TreeNode {
     return {
       id: a.id,
       nutrav: a.nutrav,
+      nationalNumber: a.numeroNational ?? a.nunati ?? null,
       nobovi: a.nobovi,
       sexe: a.sexbov,
       statut: a.statut,
       categorie: a.categorie,
       danais: a.danais?.toISOString() ?? null,
+      linkNutrav: a.nutrav,
     };
   }
 
-  function taureauToNode(t: { id: string; nupere: string; nopere: string | null } | null | undefined, fallbackNom: string | null, fallbackNunati: string | null): TreeNode | null {
-    if (t) {
-      return { id: t.id, nutrav: t.nupere, nobovi: t.nopere, sexe: "T", isTaureau: true };
+  function identityToNode(identity: ReturnType<typeof resolveAncestryIdentity>, sex: "F" | "T"): TreeNode | null {
+    if (!identity) return null;
+    const matched = ancestryAnimals.get(normalizeGenealogyNational(identity.nationalNumber));
+    if (matched) {
+      return toNode({
+        id: matched.id,
+        nutrav: matched.nutrav,
+        nunati: matched.nationalNumber,
+        numeroNational: matched.nationalNumber,
+        nobovi: matched.name,
+        sexbov: matched.sex,
+        statut: matched.status,
+        categorie: matched.category,
+        danais: matched.birthDate,
+      });
     }
-    const nom = fallbackNom ?? fallbackNunati;
-    if (!nom) return null;
-    return { id: `ext-${nom}`, nutrav: nom, nobovi: null, sexe: "T", isTaureau: true };
+    return {
+      id: `ext-${sex}-${identity.workNumber ?? identity.nationalNumber ?? identity.name}`,
+      nutrav: identity.workNumber ?? identity.nationalNumber ?? "—",
+      nationalNumber: identity.nationalNumber,
+      nobovi: identity.name,
+      sexe: sex,
+      isTaureau: sex === "T",
+      linkNutrav: null,
+    };
   }
 
-  // Père de l'animal
-  const pereAnimal = taureauToNode(
-    animal.velageVeau?.gestation?.saillie?.taureau ?? null,
-    animal.velageVeau?.pereNom ?? null,
-    animal.velageVeau?.pereNunati ?? null
-  );
+  const motherRecord = animal.mere ?? birthVelage?.vache ?? null;
+  const motherIdentity = resolveAncestryIdentity([
+    motherRecord
+      ? null
+      : {
+          workNumber: animal.mereTravailManuel,
+          nationalNumber: animal.numeip ?? animal.mereNationalManuel,
+          name: animal.nomeip ?? animal.mereNomManuel,
+          linkedAnimalNutrav: null,
+        },
+  ]);
+  const motherNode = motherRecord ? toNode(motherRecord) : identityToNode(motherIdentity, "F");
 
-  // Père de la mère (grand-père maternel)
-  const grandPere = animal.mere
-    ? taureauToNode(
-        animal.mere.velageVeau?.gestation?.saillie?.taureau ?? null,
-        animal.mere.velageVeau?.pereNom ?? null,
-        animal.mere.velageVeau?.pereNunati ?? null
-      )
+  const linkedFather = animal.taureau ?? birthVelage?.gestation?.saillie?.taureau ?? null;
+  const fatherIdentity = resolveAncestryIdentity([
+    linkedFather
+      ? {
+          workNumber: animal.pereTravailManuel,
+          nationalNumber: linkedFather.nupere,
+          name: linkedFather.nopere,
+          linkedAnimalNutrav: null,
+        }
+      : null,
+    birthVelage
+      ? {
+          workNumber: animal.pereTravailManuel,
+          nationalNumber: birthVelage.pereNunati ?? animal.pereNationalManuel,
+          name: birthVelage.pereNom ?? animal.pereNomManuel,
+          linkedAnimalNutrav: null,
+        }
+      : null,
+    {
+      workNumber: animal.pereTravailManuel,
+      nationalNumber: animal.pereNationalManuel,
+      name: animal.pereNomManuel,
+      linkedAnimalNutrav: null,
+    },
+  ]);
+  const pereAnimal = identityToNode(fatherIdentity, "T");
+
+  const grandMotherIdentity = animal.mere
+    ? resolveAncestryIdentity([{
+        workNumber: animal.mere.mereTravailManuel,
+        nationalNumber: animal.mere.numeip ?? animal.mere.mereNationalManuel,
+        name: animal.mere.nomeip ?? animal.mere.mereNomManuel,
+        linkedAnimalNutrav: null,
+      }])
     : null;
+  const grandMere = animal.mere?.mere
+    ? toNode(animal.mere.mere)
+    : identityToNode(grandMotherIdentity, "F");
+  const motherFather = animal.mere?.taureau
+    ?? animal.mere?.velageVeau?.gestation?.saillie?.taureau
+    ?? null;
+  const grandFatherIdentity = animal.mere
+    ? resolveAncestryIdentity([
+        motherFather
+          ? {
+              workNumber: animal.mere.pereTravailManuel,
+              nationalNumber: motherFather.nupere,
+              name: motherFather.nopere,
+              linkedAnimalNutrav: null,
+            }
+          : null,
+        {
+          workNumber: animal.mere.pereTravailManuel,
+          nationalNumber: animal.mere.velageVeau?.pereNunati ?? animal.mere.pereNationalManuel,
+          name: animal.mere.velageVeau?.pereNom ?? animal.mere.pereNomManuel,
+          linkedAnimalNutrav: null,
+        },
+      ])
+    : null;
+  const grandPere = identityToNode(grandFatherIdentity, "T");
 
   const veaux = animal.veaux.map((v) => {
     const pereLabel =
@@ -144,9 +277,9 @@ async function getArbreData(nutrav: string): Promise<ArbreData | null> {
   });
 
   return {
-    grandMere: animal.mere?.mere ? toNode(animal.mere.mere) : null,
+    grandMere,
     grandPere,
-    mere: animal.mere ? toNode(animal.mere) : null,
+    mere: motherNode,
     pere: pereAnimal,
     animal: toNode(animal),
     veaux,
