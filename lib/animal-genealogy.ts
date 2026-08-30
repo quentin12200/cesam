@@ -70,11 +70,46 @@ export function resolveParentWorkNumber(input: {
   historicalNationalNumber?: string | null;
   manualWorkNumber: string | null;
 }): string | null {
-  return input.linkedWorkNumber?.trim()
-    || input.historicalMatchedWorkNumber?.trim()
-    || workNumberFromHistoricalNational(input.historicalNationalNumber)
-    || input.manualWorkNumber?.trim()
-    || null;
+  return resolveParentDisplay({
+    ...input,
+    linkedName: null,
+    historicalMatchedName: null,
+    historicalName: null,
+    manualName: null,
+  }).workNumber;
+}
+
+export function resolveParentDisplay(input: {
+  linkedWorkNumber: string | null;
+  linkedName: string | null;
+  historicalMatchedWorkNumber: string | null;
+  historicalMatchedName: string | null;
+  historicalNationalNumber?: string | null;
+  historicalName: string | null;
+  manualWorkNumber: string | null;
+  manualName: string | null;
+}): { workNumber: string | null; name: string | null } {
+  const linkedWorkNumber = input.linkedWorkNumber?.trim() || null;
+  if (linkedWorkNumber) return { workNumber: linkedWorkNumber, name: input.linkedName?.trim() || null };
+
+  const matchedWorkNumber = input.historicalMatchedWorkNumber?.trim() || null;
+  if (matchedWorkNumber) {
+    return {
+      workNumber: matchedWorkNumber,
+      name: input.historicalMatchedName?.trim() || input.historicalName?.trim() || null,
+    };
+  }
+
+  const historicalWorkNumber = workNumberFromHistoricalNational(input.historicalNationalNumber);
+  if (historicalWorkNumber) {
+    return { workNumber: historicalWorkNumber, name: input.historicalName?.trim() || null };
+  }
+
+  const manualWorkNumber = input.manualWorkNumber?.trim() || null;
+  return {
+    workNumber: manualWorkNumber,
+    name: manualWorkNumber ? input.manualName?.trim() || null : null,
+  };
 }
 
 export function canUseAnimalAsParent(input: {

@@ -15,7 +15,9 @@ test("affiche les colonnes Mère, Père et l’alerte de sevrage sur ordinateur"
 });
 
 test("charge uniquement les données généalogiques et de sevrage nécessaires", () => {
-  assert.match(page, /mere: \{ select: \{ nutrav: true \} \}/);
+  assert.match(page, /mere: \{ select: \{ id: true, nutrav: true, nobovi: true \} \}/);
+  assert.match(page, /numeip: true/);
+  assert.match(page, /nomeip: true/);
   assert.match(page, /sevreFait: true/);
   assert.match(page, /taureau: \{ select: \{ nopere: true, nupere: true \} \}/);
   assert.doesNotMatch(page, /dateSevrage: true/);

@@ -13,7 +13,7 @@ import {
 } from "@/lib/utils";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 import { getMotherWeaningDisplay } from "@/lib/troupeau-mother-weaning";
-import { formatFather, shouldDisplayNonWeaned } from "@/lib/troupeau-display";
+import { shouldDisplayNonWeaned } from "@/lib/troupeau-display";
 import ReproductionCycleSummary, { type ReproductionSummaryRow } from "./ReproductionCycleSummary";
 
 export interface AnimalRow {
@@ -34,6 +34,8 @@ export interface AnimalRow {
   velageDate: string | null;
   reproductionSummary: ReproductionSummaryRow;
   mereNutrav: string | null;
+  mereNom: string | null;
+  pereNutrav: string | null;
   pereNom: string | null;
   pereNumero: string | null;
   sevreFait: boolean;
@@ -320,7 +322,6 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                 motherNutrav: animal.mereNutrav,
                 sevreFait: animal.sevreFait,
               });
-              const father = formatFather(animal.pereNom, animal.pereNumero);
               const selectable = eligibleIds.has(animal.id);
               const displayNonWeaned = shouldDisplayNonWeaned(danais, animal.sevreFait);
 
@@ -406,10 +407,20 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                     )}
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className="font-mono text-xs font-bold text-gray-800">{motherWeaning.motherLabel}</span>
+                    <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+                      <span className="font-mono text-xs font-bold text-gray-800">{motherWeaning.motherLabel}</span>
+                      {animal.mereNutrav && animal.mereNom && (
+                        <span className="max-w-24 truncate text-[10px] text-gray-400">{animal.mereNom}</span>
+                      )}
+                    </span>
                   </td>
-                  <td className="max-w-[9rem] px-3 py-2.5 text-xs font-semibold text-gray-700">
-                    <span className="line-clamp-2">{father}</span>
+                  <td className="max-w-[9rem] px-3 py-2.5">
+                    <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+                      <span className="font-mono text-xs font-bold text-gray-800">{animal.pereNutrav ?? "—"}</span>
+                      {animal.pereNutrav && animal.pereNom && (
+                        <span className="max-w-24 truncate text-[10px] text-gray-400">{animal.pereNom}</span>
+                      )}
+                    </span>
                   </td>
                   <td className="px-3 py-2.5">
                     {displayNonWeaned && motherWeaning.statusLabel && <span className="whitespace-nowrap text-[10px] font-semibold text-blue-700">🍼 {motherWeaning.statusLabel}</span>}

@@ -8,6 +8,7 @@ import {
   resolveAncestryIdentity,
   resolveBiologicalMother,
   resolveFatherLabel,
+  resolveParentDisplay,
   resolveParentWorkNumber,
   workNumberFromHistoricalNational,
   type AncestrySearchMatch,
@@ -103,6 +104,29 @@ test("la fiche affiche uniquement le numéro de travail résolu", () => {
     manualWorkNumber: null,
   }), "4428");
   assert.equal(workNumberFromHistoricalNational("FR4635275801"), "5801");
+});
+
+test("la fiche et le tableau résolvent ensemble numéro de travail et nom", () => {
+  assert.deepEqual(resolveParentDisplay({
+    linkedWorkNumber: null,
+    linkedName: null,
+    historicalMatchedWorkNumber: "4428",
+    historicalMatchedName: "MALICE",
+    historicalNationalNumber: "8235464428",
+    historicalName: "MALICE historique",
+    manualWorkNumber: "autre",
+    manualName: "Autre mère",
+  }), { workNumber: "4428", name: "MALICE" });
+  assert.deepEqual(resolveParentDisplay({
+    linkedWorkNumber: null,
+    linkedName: null,
+    historicalMatchedWorkNumber: null,
+    historicalMatchedName: null,
+    historicalNationalNumber: null,
+    historicalName: null,
+    manualWorkNumber: "5801",
+    manualName: "MICKEY",
+  }), { workNumber: "5801", name: "MICKEY" });
 });
 
 test("une mère sortie reste recherchable et le n° travail exact est prioritaire", () => {

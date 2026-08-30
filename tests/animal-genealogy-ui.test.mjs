@@ -2,13 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [animalPage, treePage, treeClient, ancestryEditor, ancestryRoute, migration] = await Promise.all([
+const [animalPage, treePage, treeClient, ancestryEditor, ancestryRoute, migration, herdPage, herdTable] = await Promise.all([
   readFile(new URL("../app/troupeau/[nutrav]/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/troupeau/[nutrav]/arbre/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/troupeau/[nutrav]/arbre/ArbreClient.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/troupeau/[nutrav]/arbre/AncestryEditor.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/api/animaux/[nutrav]/ascendance/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../prisma/migrations/20260829120000_add_manual_ancestry_snapshots/migration.sql", import.meta.url), "utf8"),
+  readFile(new URL("../app/troupeau/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/troupeau/TroupeauTableau.tsx", import.meta.url), "utf8"),
 ]);
 
 test("la fiche affiche numéro de travail et nom, sans numéro national", () => {
@@ -17,6 +19,17 @@ test("la fiche affiche numéro de travail et nom, sans numéro national", () => 
   assert.match(animalPage, /motherWorkNumber && motherName/);
   assert.match(animalPage, /fatherWorkNumber && fatherName/);
   assert.doesNotMatch(animalPage, /Race père/);
+});
+
+test("le tableau affiche le numéro de travail puis le nom résolus sans nouvelle colonne", () => {
+  assert.match(herdPage, /resolveParentDisplay/);
+  assert.match(herdPage, /mereNom: motherDisplay\.name/);
+  assert.match(herdPage, /pereNutrav: fatherDisplay\.workNumber/);
+  assert.match(herdTable, /animal\.mereNom/);
+  assert.match(herdTable, /animal\.pereNutrav/);
+  assert.match(herdTable, /text-\[10px\] text-gray-400/);
+  assert.equal((herdTable.match(/>Mère</g) ?? []).length, 1);
+  assert.equal((herdTable.match(/>Père</g) ?? []).length, 1);
 });
 
 test("l'arbre lit les historiques mère et père et ne lie que les Animal CESAM", () => {

@@ -62,7 +62,7 @@ import HeatReturnReminder from "@/app/components/HeatReturnReminder";
 import { getHeatReturnReminder } from "@/lib/heat-return-monitoring";
 import ChaleursHistory from "./ChaleursHistory";
 import VelageActions from "./VelageActions";
-import { resolveBiologicalMother, resolveParentWorkNumber } from "@/lib/animal-genealogy";
+import { resolveBiologicalMother, resolveParentDisplay } from "@/lib/animal-genealogy";
 import { findAnimalsByExactNational, normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
 
 interface PageProps {
@@ -210,28 +210,35 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     historicalName: animal.nomeip,
   });
   const matchedMother = ancestryAnimals.get(normalizeGenealogyNational(animal.numeip));
-  const motherWorkNumber = resolveParentWorkNumber({
+  const motherDisplay = resolveParentDisplay({
     linkedWorkNumber: biologicalMother.linked?.nutrav ?? null,
+    linkedName: biologicalMother.linked?.nobovi ?? null,
     historicalMatchedWorkNumber: matchedMother?.nutrav ?? null,
+    historicalMatchedName: matchedMother?.name ?? null,
     historicalNationalNumber: animal.numeip,
+    historicalName: animal.nomeip,
     manualWorkNumber: animal.mereTravailManuel,
+    manualName: animal.mereNomManuel,
   });
-  const motherName = biologicalMother.linked?.nobovi
-    ?? matchedMother?.name
-    ?? animal.nomeip
-    ?? animal.mereNomManuel;
+  const motherWorkNumber = motherDisplay.workNumber;
+  const motherName = motherDisplay.name;
   const matchedFather = ancestryAnimals.get(normalizeGenealogyNational(fatherNational));
-  const fatherWorkNumber = resolveParentWorkNumber({
-    linkedWorkNumber: null,
-    historicalMatchedWorkNumber: matchedFather?.nutrav ?? null,
-    historicalNationalNumber: fatherNational,
-    manualWorkNumber: animal.pereTravailManuel,
-  });
-  const fatherName = animal.taureau?.nopere
+  const fatherHistoricalName = animal.taureau?.nopere
     ?? birthVelage?.gestation?.saillie?.taureau?.nopere
     ?? birthVelage?.pereNom
-    ?? matchedFather?.name
-    ?? animal.pereNomManuel;
+    ?? null;
+  const fatherDisplay = resolveParentDisplay({
+    linkedWorkNumber: null,
+    linkedName: null,
+    historicalMatchedWorkNumber: matchedFather?.nutrav ?? null,
+    historicalMatchedName: fatherHistoricalName ?? matchedFather?.name ?? null,
+    historicalNationalNumber: fatherNational,
+    historicalName: fatherHistoricalName,
+    manualWorkNumber: animal.pereTravailManuel,
+    manualName: animal.pereNomManuel,
+  });
+  const fatherWorkNumber = fatherDisplay.workNumber;
+  const fatherName = fatherDisplay.name;
   const lastCalving = animal.velagesVache[0]?.date ?? null;
   const currentBreeding = getCurrentCycleBreeding(animal.saillies, lastCalving);
   const activeEchoRequest = animal.demandesEchographie[0] ?? null;

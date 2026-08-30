@@ -14,6 +14,8 @@ import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import TroupeauFilters from "./TroupeauFilters";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
 import { getCurrentReproductionSummary } from "@/lib/current-reproduction-summary";
+import { resolveBiologicalMother, resolveParentDisplay } from "@/lib/animal-genealogy";
+import { findAnimalsByExactNational, normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
 import {
   buildTroupeauWhere,
   filtrerAnimauxParCriteresLocaux,
@@ -66,16 +68,45 @@ async function getAnimaux(params: TroupeauFilterParams) {
         categorie: true,
         groupeId: true,
         sevreFait: true,
-        mere: { select: { nutrav: true } },
+        numeip: true,
+        nomeip: true,
+        mereTravailManuel: true,
+        mereNomManuel: true,
+        pereTravailManuel: true,
+        pereNomManuel: true,
+        mere: { select: { id: true, nutrav: true, nobovi: true } },
+        taureau: { select: { nopere: true, nupere: true } },
         velageVeau: {
           select: {
             pereNom: true,
             pereNunati: true,
+            vache: { select: { id: true, nutrav: true, nobovi: true } },
             gestation: {
               select: {
                 saillie: {
                   select: {
                     taureau: { select: { nopere: true, nupere: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        veauxVelage: {
+          take: 1,
+          select: {
+            velage: {
+              select: {
+                pereNom: true,
+                pereNunati: true,
+                vache: { select: { id: true, nutrav: true, nobovi: true } },
+                gestation: {
+                  select: {
+                    saillie: {
+                      select: {
+                        taureau: { select: { nopere: true, nupere: true } },
+                      },
+                    },
                   },
                 },
               },
@@ -199,6 +230,15 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     orderBy: { danais: "asc" },
   });
 
+  const ancestryAnimals = await findAnimalsByExactNational(animaux.flatMap((animal) => {
+    const birthVelage = animal.velageVeau ?? animal.veauxVelage[0]?.velage ?? null;
+    const fatherNational = animal.taureau?.nupere
+      ?? birthVelage?.gestation?.saillie?.taureau?.nupere
+      ?? birthVelage?.pereNunati
+      ?? null;
+    return [animal.numeip, fatherNational];
+  }));
+
   const tableauAnimaux = animaux.map<AnimalRow>((animal) => {
     const dernierVelage = animal.velagesVache[0];
     const reproductionSummary = getCurrentReproductionSummary(
@@ -232,7 +272,38 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       }
     }
 
-    const bull = animal.velageVeau?.gestation?.saillie?.taureau;
+    const birthVelage = animal.velageVeau ?? animal.veauxVelage[0]?.velage ?? null;
+    const bull = animal.taureau ?? birthVelage?.gestation?.saillie?.taureau ?? null;
+    const fatherNational = bull?.nupere ?? birthVelage?.pereNunati ?? null;
+    const biologicalMother = resolveBiologicalMother({
+      linkedMother: animal.mere,
+      birthMother: birthVelage?.vache ?? null,
+      historicalNumber: animal.numeip,
+      historicalName: animal.nomeip,
+    });
+    const matchedMother = ancestryAnimals.get(normalizeGenealogyNational(animal.numeip));
+    const motherDisplay = resolveParentDisplay({
+      linkedWorkNumber: biologicalMother.linked?.nutrav ?? null,
+      linkedName: biologicalMother.linked?.nobovi ?? null,
+      historicalMatchedWorkNumber: matchedMother?.nutrav ?? null,
+      historicalMatchedName: matchedMother?.name ?? null,
+      historicalNationalNumber: animal.numeip,
+      historicalName: animal.nomeip,
+      manualWorkNumber: animal.mereTravailManuel,
+      manualName: animal.mereNomManuel,
+    });
+    const matchedFather = ancestryAnimals.get(normalizeGenealogyNational(fatherNational));
+    const fatherHistoricalName = bull?.nopere ?? birthVelage?.pereNom ?? null;
+    const fatherDisplay = resolveParentDisplay({
+      linkedWorkNumber: null,
+      linkedName: null,
+      historicalMatchedWorkNumber: matchedFather?.nutrav ?? null,
+      historicalMatchedName: fatherHistoricalName ?? matchedFather?.name ?? null,
+      historicalNationalNumber: fatherNational,
+      historicalName: fatherHistoricalName,
+      manualWorkNumber: animal.pereTravailManuel,
+      manualName: animal.pereNomManuel,
+    });
     return {
       id: animal.id,
       nutrav: animal.nutrav,
@@ -258,9 +329,11 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         lastAttemptType: reproductionSummary.lastAttempt?.type ?? null,
         daysSinceLastAttempt: reproductionSummary.lastAttempt?.daysSince ?? null,
       },
-      mereNutrav: animal.mere?.nutrav ?? null,
-      pereNom: bull?.nopere ?? animal.velageVeau?.pereNom ?? null,
-      pereNumero: bull?.nupere ?? animal.velageVeau?.pereNunati ?? null,
+      mereNutrav: motherDisplay.workNumber,
+      mereNom: motherDisplay.name,
+      pereNutrav: fatherDisplay.workNumber,
+      pereNom: fatherDisplay.name,
+      pereNumero: fatherNational,
       sevreFait: animal.sevreFait,
       activeCalves: [...activeCalves.values()],
       dernierPoids: animal.pesees[0]?.poids ?? null,
