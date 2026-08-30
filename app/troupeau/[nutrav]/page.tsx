@@ -209,19 +209,29 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     historicalNumber: animal.numeip,
     historicalName: animal.nomeip,
   });
+  const matchedMother = ancestryAnimals.get(normalizeGenealogyNational(animal.numeip));
   const motherWorkNumber = resolveParentWorkNumber({
     linkedWorkNumber: biologicalMother.linked?.nutrav ?? null,
-    historicalMatchedWorkNumber: ancestryAnimals.get(normalizeGenealogyNational(animal.numeip))?.nutrav ?? null,
+    historicalMatchedWorkNumber: matchedMother?.nutrav ?? null,
     historicalNationalNumber: animal.numeip,
     manualWorkNumber: animal.mereTravailManuel,
   });
+  const motherName = biologicalMother.linked?.nobovi
+    ?? matchedMother?.name
+    ?? animal.nomeip
+    ?? animal.mereNomManuel;
+  const matchedFather = ancestryAnimals.get(normalizeGenealogyNational(fatherNational));
   const fatherWorkNumber = resolveParentWorkNumber({
     linkedWorkNumber: null,
-    historicalMatchedWorkNumber:
-      ancestryAnimals.get(normalizeGenealogyNational(fatherNational))?.nutrav ?? null,
+    historicalMatchedWorkNumber: matchedFather?.nutrav ?? null,
     historicalNationalNumber: fatherNational,
     manualWorkNumber: animal.pereTravailManuel,
   });
+  const fatherName = animal.taureau?.nopere
+    ?? birthVelage?.gestation?.saillie?.taureau?.nopere
+    ?? birthVelage?.pereNom
+    ?? matchedFather?.name
+    ?? animal.pereNomManuel;
   const lastCalving = animal.velagesVache[0]?.date ?? null;
   const currentBreeding = getCurrentCycleBreeding(animal.saillies, lastCalving);
   const activeEchoRequest = animal.demandesEchographie[0] ?? null;
@@ -635,21 +645,28 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   {biologicalMother.linked ? (
                     <Link
                       href={`/troupeau/${biologicalMother.linked.nutrav}`}
-                      className="flex items-center gap-1.5 text-green-700 font-medium hover:underline"
+                      className="flex items-center gap-1.5 whitespace-nowrap text-green-700 font-medium hover:underline"
                     >
                       <span className="font-mono text-xs bg-green-100 px-1.5 py-0.5 rounded">
                         {biologicalMother.linked.nutrav}
                       </span>
+                      {biologicalMother.linked.nobovi && <span>{biologicalMother.linked.nobovi}</span>}
                     </Link>
                   ) : (
-                    <span className="font-mono text-gray-700">{motherWorkNumber ?? "—"}</span>
+                    <span className="flex items-center gap-2 whitespace-nowrap text-gray-700">
+                      <span className="font-mono">{motherWorkNumber ?? "—"}</span>
+                      {motherWorkNumber && motherName && <span>{motherName}</span>}
+                    </span>
                   )}
                 </div>
 
                 {/* Père */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-gray-500">Père</span>
-                  <span className="font-mono font-medium text-gray-800">{fatherWorkNumber ?? "—"}</span>
+                  <span className="flex items-center gap-2 whitespace-nowrap text-gray-800">
+                    <span className="font-mono font-medium">{fatherWorkNumber ?? "—"}</span>
+                    {fatherWorkNumber && fatherName && <span>{fatherName}</span>}
+                  </span>
                 </div>
               </div>
 

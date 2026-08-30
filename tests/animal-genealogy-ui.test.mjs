@@ -11,11 +11,12 @@ const [animalPage, treePage, treeClient, ancestryEditor, ancestryRoute, migratio
   readFile(new URL("../prisma/migrations/20260829120000_add_manual_ancestry_snapshots/migration.sql", import.meta.url), "utf8"),
 ]);
 
-test("la fiche limite mère et père au numéro de travail", () => {
+test("la fiche affiche numéro de travail et nom, sans numéro national", () => {
   assert.match(animalPage, /motherWorkNumber \?\? "—"/);
   assert.match(animalPage, /fatherWorkNumber \?\? "—"/);
+  assert.match(animalPage, /motherWorkNumber && motherName/);
+  assert.match(animalPage, /fatherWorkNumber && fatherName/);
   assert.doesNotMatch(animalPage, /Race père/);
-  assert.doesNotMatch(animalPage, /biologicalMother\.linked\.nobovi/);
 });
 
 test("l'arbre lit les historiques mère et père et ne lie que les Animal CESAM", () => {
