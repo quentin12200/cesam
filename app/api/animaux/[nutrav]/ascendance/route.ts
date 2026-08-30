@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   buildAncestryUpdate,
+  canUseAnimalAsParent,
+  isSameAncestryIdentity,
   rankAncestryMatches,
   workNumberFromHistoricalNational,
   type AncestryParent,
@@ -16,12 +18,21 @@ function includes(value: string | null | undefined, query: string) {
     || normalizeGenealogyNational(value).includes(normalizeGenealogyNational(query));
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ nutrav: string }> },
+) {
+  const { nutrav } = await context.params;
   const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
   const parent = new URL(request.url).searchParams.get("parent") as AncestryParent | null;
-  if (!query || !["MERE", "PERE"].includes(parent ?? "")) {
+  if (!query || (parent !== "MERE" && parent !== "PERE")) {
     return NextResponse.json({ matches: [] });
   }
+  const target = await prisma.animal.findUnique({
+    where: { nutrav },
+    select: { id: true, nutrav: true, nunati: true, numeroNational: true },
+  });
+  if (!target) return NextResponse.json({ error: "Animal introuvable." }, { status: 404 });
   const searchTerms = [...new Set([
     query,
     query.replace(/\s+/g, ""),
@@ -48,6 +59,7 @@ export async function GET(request: NextRequest) {
         numeroNational: true,
         nobovi: true,
         statut: true,
+        sexbov: true,
         numeip: true,
         nomeip: true,
       },
@@ -76,7 +88,15 @@ export async function GET(request: NextRequest) {
 
   const matches: AncestrySearchMatch[] = [];
   for (const animal of animals) {
-    if ([animal.nutrav, animal.nunati, animal.numeroNational, animal.nobovi].some((value) => includes(value, query))) {
+    if (
+      canUseAnimalAsParent({
+        targetId: target.id,
+        candidateId: animal.id,
+        candidateSex: animal.sexbov,
+        parent,
+      })
+      && [animal.nutrav, animal.nunati, animal.numeroNational, animal.nobovi].some((value) => includes(value, query))
+    ) {
       matches.push({
         key: `animal-${animal.id}`,
         source: "ANIMAL",
@@ -88,7 +108,13 @@ export async function GET(request: NextRequest) {
       });
     }
     if (parent === "MERE" && [animal.numeip, animal.nomeip].some((value) => includes(value, query))) {
-      const linked = linkedByNational.get(normalizeGenealogyNational(animal.numeip));
+      const possibleLinked = linkedByNational.get(normalizeGenealogyNational(animal.numeip));
+      const linked = possibleLinked && canUseAnimalAsParent({
+        targetId: target.id,
+        candidateId: possibleLinked.id,
+        candidateSex: possibleLinked.sex,
+        parent,
+      }) ? possibleLinked : null;
       matches.push({
         key: `historique-${animal.id}-${animal.numeip ?? animal.nomeip}`,
         source: linked ? "ANIMAL" : "HISTORIQUE",
@@ -112,7 +138,13 @@ export async function GET(request: NextRequest) {
     });
   }
   for (const calving of calvings) {
-    const linked = linkedByNational.get(normalizeGenealogyNational(calving.pereNunati));
+    const possibleLinked = linkedByNational.get(normalizeGenealogyNational(calving.pereNunati));
+    const linked = possibleLinked && canUseAnimalAsParent({
+      targetId: target.id,
+      candidateId: possibleLinked.id,
+      candidateSex: possibleLinked.sex,
+      parent,
+    }) ? possibleLinked : null;
     matches.push({
       key: `velage-${calving.id}`,
       source: linked ? "ANIMAL" : "VELAGE",
@@ -124,7 +156,13 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const uniqueMatches = [...new Map(matches.map((match) => [
+  const validMatches = matches.filter((match) => !isSameAncestryIdentity({
+    targetWorkNumber: target.nutrav,
+    targetNationalNumbers: [target.nunati, target.numeroNational],
+    candidateWorkNumber: match.workNumber,
+    candidateNationalNumber: match.nationalNumber,
+  }));
+  const uniqueMatches = [...new Map(validMatches.map((match) => [
     `${match.source}:${match.sourceId ?? ""}:${match.workNumber ?? ""}:${match.nationalNumber ?? ""}:${match.name ?? ""}`,
     match,
   ])).values()];
@@ -143,17 +181,38 @@ export async function POST(
     return NextResponse.json({ error: "Ascendance invalide." }, { status: 400 });
   }
 
+  const target = await prisma.animal.findUnique({
+    where: { nutrav },
+    select: { id: true, nutrav: true, nunati: true, numeroNational: true },
+  });
+  if (!target) return NextResponse.json({ error: "Animal introuvable." }, { status: 404 });
+
   let sourceId = typeof body.sourceId === "string" ? body.sourceId : null;
   let workNumber = typeof body.workNumber === "string" ? body.workNumber.trim() : "";
   let nationalNumber = typeof body.nationalNumber === "string" ? body.nationalNumber.trim() || null : null;
   let name = typeof body.name === "string" ? body.name.trim() || null : null;
 
+  if (source === "TAUREAU" && parent !== "PERE") {
+    return NextResponse.json({ error: "Un taureau ne peut pas être enregistré comme mère." }, { status: 400 });
+  }
+  if ((source === "ANIMAL" || source === "TAUREAU") && !sourceId) {
+    return NextResponse.json({ error: "Parent introuvable." }, { status: 404 });
+  }
+
   if (source === "ANIMAL" && sourceId) {
     const animal = await prisma.animal.findUnique({
       where: { id: sourceId },
-      select: { nutrav: true, nunati: true, numeroNational: true, nobovi: true },
+      select: { id: true, nutrav: true, nunati: true, numeroNational: true, nobovi: true, sexbov: true },
     });
     if (!animal) return NextResponse.json({ error: "Parent introuvable." }, { status: 404 });
+    if (!canUseAnimalAsParent({
+      targetId: target.id,
+      candidateId: animal.id,
+      candidateSex: animal.sexbov,
+      parent,
+    })) {
+      return NextResponse.json({ error: "Cet animal ne peut pas être enregistré comme parent." }, { status: 400 });
+    }
     workNumber = animal.nutrav;
     nationalNumber = animal.numeroNational ?? animal.nunati;
     name = animal.nobovi;
@@ -170,6 +229,15 @@ export async function POST(
     if (!workNumber) {
       return NextResponse.json({ error: "Le N° de travail est requis." }, { status: 400 });
     }
+  }
+
+  if (isSameAncestryIdentity({
+    targetWorkNumber: target.nutrav,
+    targetNationalNumbers: [target.nunati, target.numeroNational],
+    candidateWorkNumber: workNumber,
+    candidateNationalNumber: nationalNumber,
+  })) {
+    return NextResponse.json({ error: "Un animal ne peut pas être son propre parent." }, { status: 400 });
   }
 
   const data = buildAncestryUpdate({ parent, source, sourceId, workNumber, nationalNumber, name });

@@ -37,6 +37,13 @@ test("la recherche couvre les animaux sortis et toutes les sources demandées", 
   assert.doesNotMatch(ancestryRoute, /\.animal\.create|\.taureau\.create/);
 });
 
+test("la recherche et l'API bloquent auto-parent et sexe incohérent", () => {
+  assert.match(ancestryRoute, /canUseAnimalAsParent/);
+  assert.match(ancestryRoute, /isSameAncestryIdentity/);
+  assert.match(ancestryRoute, /animal\.sexbov/);
+  assert.match(ancestryRoute, /parent !== "PERE"/);
+});
+
 test("la migration est uniquement additive", () => {
   assert.equal((migration.match(/ALTER TABLE "Animal" ADD COLUMN/g) ?? []).length, 6);
   assert.doesNotMatch(migration, /DROP|DELETE|CREATE TABLE|RENAME/i);

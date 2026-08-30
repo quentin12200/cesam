@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildAncestryUpdate,
+  canUseAnimalAsParent,
+  isSameAncestryIdentity,
   rankAncestryMatches,
   resolveAncestryIdentity,
   resolveBiologicalMother,
@@ -166,4 +168,32 @@ test("une correspondance existante crée un lien, jamais un faux parent", () => 
     pereNationalManuel: "FR4635275801",
     pereNomManuel: "MICKEY",
   });
+});
+
+test("un animal ne peut pas être son propre parent", () => {
+  assert.equal(canUseAnimalAsParent({
+    targetId: "animal-1",
+    candidateId: "animal-1",
+    candidateSex: "F",
+    parent: "MERE",
+  }), false);
+  assert.equal(isSameAncestryIdentity({
+    targetWorkNumber: "92-26",
+    targetNationalNumbers: ["FR001234"],
+    candidateWorkNumber: "92-26",
+    candidateNationalNumber: null,
+  }), true);
+  assert.equal(isSameAncestryIdentity({
+    targetWorkNumber: "92-26",
+    targetNationalNumbers: ["FR001234"],
+    candidateWorkNumber: "autre",
+    candidateNationalNumber: "001234",
+  }), true);
+});
+
+test("une mère Animal doit être femelle et un père Animal mâle", () => {
+  assert.equal(canUseAnimalAsParent({ targetId: "c", candidateId: "f", candidateSex: "F", parent: "MERE" }), true);
+  assert.equal(canUseAnimalAsParent({ targetId: "c", candidateId: "m", candidateSex: "M", parent: "MERE" }), false);
+  assert.equal(canUseAnimalAsParent({ targetId: "c", candidateId: "m", candidateSex: "M", parent: "PERE" }), true);
+  assert.equal(canUseAnimalAsParent({ targetId: "c", candidateId: "f", candidateSex: "F", parent: "PERE" }), false);
 });

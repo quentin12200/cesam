@@ -77,6 +77,32 @@ export function resolveParentWorkNumber(input: {
     || null;
 }
 
+export function canUseAnimalAsParent(input: {
+  targetId: string;
+  candidateId: string;
+  candidateSex: string;
+  parent: AncestryParent;
+}): boolean {
+  return input.candidateId !== input.targetId
+    && input.candidateSex === (input.parent === "MERE" ? "F" : "M");
+}
+
+export function isSameAncestryIdentity(input: {
+  targetWorkNumber: string;
+  targetNationalNumbers: Array<string | null | undefined>;
+  candidateWorkNumber: string | null | undefined;
+  candidateNationalNumber: string | null | undefined;
+}): boolean {
+  if (input.candidateWorkNumber?.trim() === input.targetWorkNumber.trim()) return true;
+  const candidateNational = input.candidateNationalNumber
+    ?.replace(/\s+/g, "")
+    .replace(/^FR/i, "")
+    .toLocaleUpperCase("fr") ?? "";
+  return Boolean(candidateNational) && input.targetNationalNumbers.some((value) => (
+    value?.replace(/\s+/g, "").replace(/^FR/i, "").toLocaleUpperCase("fr") === candidateNational
+  ));
+}
+
 export function workNumberFromHistoricalNational(value: string | null | undefined): string | null {
   const normalized = value?.replace(/\s+/g, "").replace(/^FR/i, "").trim() ?? "";
   return normalized.length >= 4 ? normalized.slice(-4) : null;
