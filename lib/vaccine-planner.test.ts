@@ -190,3 +190,48 @@ test("la préparation privilégie le reliquat valide puis complète en condition
     reliquatUtilise: 4, nombre: 2, dosesParConditionnement: 5, totalDisponible: 14,
   });
 });
+
+test("PROTOCOLE_ACQUIS sans historique propose l'entretien et jamais Primo 1", () => {
+  const etapes = [
+    etape({ id: "primo", label: "Primo 1", ordre: 0 }),
+    etape({ id: "entretien", label: "Entretien", ordre: 1, cycle: "ENTRETIEN" }),
+  ];
+  const action = calculerActionVaccinale({
+    date: utc("2026-08-31"), dateNaissance: utc("2026-08-01"), etapes, vaccinations: [], statutProtocole: "PROTOCOLE_ACQUIS",
+  });
+  assert.equal(action.etape?.id, "entretien");
+  assert.notEqual(action.etape?.id, "primo");
+});
+
+test("PRIMO_A_FAIRE commence par Primo 1", () => {
+  const action = calculerActionVaccinale({
+    date: utc("2026-08-31"), dateNaissance: utc("2026-08-31"), etapes: [etape({ label: "Primo 1" })], vaccinations: [], statutProtocole: "PRIMO_A_FAIRE",
+  });
+  assert.equal(action.etape?.label, "Primo 1");
+  assert.equal(action.statut, "A_FAIRE");
+});
+
+test("A_CONFIRMER ne produit aucune recommandation médicale", () => {
+  const action = calculerActionVaccinale({
+    date: utc("2026-08-31"), dateNaissance: utc("2026-08-31"), etapes: [etape({ label: "Primo 1" })], vaccinations: [], statutProtocole: "A_CONFIRMER",
+  });
+  assert.equal(action.statut, "A_CONFIRMER");
+  assert.equal(action.etape, null);
+  assert.equal(action.dateMin, null);
+});
+
+test("l'absence de statut et d'historique reste à confirmer", () => {
+  const action = calculerActionVaccinale({
+    date: utc("2026-08-31"), dateNaissance: utc("2026-08-31"), etapes: [etape({ label: "Primo 1" })], vaccinations: [], statutProtocole: null,
+  });
+  assert.equal(action.statut, "A_CONFIRMER");
+  assert.equal(action.etape, null);
+});
+
+test("une étape VELAGE sans date prévue n'est jamais terminée", () => {
+  const action = calculerActionVaccinale({
+    date: utc("2026-08-31"), dateNaissance: utc("2022-01-01"), etapes: [etape({ reference: "VELAGE" })], vaccinations: [], statutProtocole: "PRIMO_A_FAIRE",
+  });
+  assert.equal(action.statut, "A_CONFIRMER");
+  assert.notEqual(action.statut, "TERMINE");
+});

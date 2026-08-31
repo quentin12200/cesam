@@ -22,3 +22,14 @@ test("la feuille A4 est une lecture seule et contient les colonnes terrain", () 
   assert.match(page, /Notes/);
   assert.doesNotMatch(loader, /\.create\(|\.update\(|\.delete\(/);
 });
+
+test("les statuts à confirmer sont sélectionnables et utilisent l'API existante", () => {
+  const component = read("app/sanitaire/vaccins/StatutsAConfirmer.tsx");
+  const loader = read("lib/vaccine-preparation-data.ts");
+  assert.match(component, /Statut à confirmer/);
+  assert.match(component, /Déjà primovaccinés/);
+  assert.match(component, /Primo à faire/);
+  assert.match(component, /api\/protocoles\/\$\{protocoleId\}\/statuts/);
+  assert.match(loader, /statutsProtocolesVaccinaux/);
+  assert.match(loader, /statutProtocole:/);
+});

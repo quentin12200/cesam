@@ -7,6 +7,7 @@ import {
   calculerActionVaccinale,
   proposerConditionnements,
   reliquatFlacon,
+  type StatutProtocoleVaccinal,
   type StatutPreparationVaccin,
 } from "@/lib/vaccine-planner";
 
@@ -28,6 +29,7 @@ export interface GroupePreparationVaccin {
   vaccin: string;
   medicamentId: string | null;
   lignes: LignePreparationVaccin[];
+  aConfirmer: Array<{ animalId: string; nutrav: string; nom: string | null }>;
   aFaire: number;
   bientot: number;
   termines: number;
@@ -110,6 +112,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
           select: { gestation: { select: { id: true, dateVelagePrevue: true } } },
         },
         vaccinations: { select: { date: true, protocoleId: true, etapeProtocoleId: true, gestationId: true } },
+        statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true } },
       },
     }),
   ]);
@@ -119,6 +122,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
     const totalInitial = protocole.etapes.filter((etape) => etape.cycle !== "ENTRETIEN").length;
     let termines = 0;
     const lignes: LignePreparationVaccin[] = [];
+    const aConfirmer: GroupePreparationVaccin["aConfirmer"] = [];
     let medicamentReference = protocole.etapes.flatMap((etape) => etape.medicaments)[0]?.medicament ?? null;
 
     for (const animal of animaux) {
@@ -146,7 +150,12 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         bientotJours: protocole.urgenceJours ?? 30,
         etapes: protocole.etapes,
         vaccinations,
+        statutProtocole: (animal.statutsProtocolesVaccinaux.find((statut) => statut.protocoleId === protocole.id)?.statut ?? null) as StatutProtocoleVaccinal | null,
       });
+      if (action.statut === "A_CONFIRMER") {
+        aConfirmer.push({ animalId: animal.id, nutrav: animal.nutrav, nom: animal.nobovi });
+        continue;
+      }
       if (action.statut === "TERMINE") {
         termines += 1;
         continue;
@@ -200,6 +209,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       vaccin: medicamentReference?.nom || protocole.label,
       medicamentId: medicamentReference?.id ?? null,
       lignes,
+      aConfirmer,
       aFaire: lignes.filter((ligne) => ligne.statut === "A_FAIRE" || ligne.statut === "EN_RETARD").length,
       bientot: lignes.filter((ligne) => ligne.statut === "A_PREVOIR").length,
       termines,

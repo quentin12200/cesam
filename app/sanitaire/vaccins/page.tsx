@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { CalendarDays, PackageOpen, Printer, Syringe } from "lucide-react";
 import { getPreparationsVaccinales } from "@/lib/vaccine-preparation-data";
+import StatutsAConfirmer from "./StatutsAConfirmer";
 
 const dateCourte = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
@@ -51,7 +52,8 @@ export default async function VaccinsPage() {
               </Link>
             </div>
 
-            {visibles.length === 0 ? <p className="p-5 text-center text-sm text-gray-500">Rien à préparer pour le moment.</p> : (
+            {groupe.aConfirmer.length > 0 && <StatutsAConfirmer protocoleId={groupe.protocoleId} animaux={groupe.aConfirmer} />}
+            {visibles.length === 0 && groupe.aConfirmer.length === 0 ? <p className="p-5 text-center text-sm text-gray-500">Rien à préparer pour le moment.</p> : visibles.length > 0 ? (
               <div className="divide-y">
                 {visibles.map((ligne) => (
                   <article key={`${ligne.animalId}-${ligne.injection}`} className="grid gap-2 p-3 sm:grid-cols-[1.1fr_1fr_1.35fr_1.5fr_.8fr] sm:items-center">
@@ -63,7 +65,7 @@ export default async function VaccinsPage() {
                   </article>
                 ))}
               </div>
-            )}
+            ) : null}
 
             <details className="border-t px-4 py-3 text-xs text-gray-500">
               <summary className="cursor-pointer">{groupe.termines} terminé(s) · {groupe.lignes.filter((ligne) => ligne.statut === "TROP_TOT").length} trop tôt</summary>

@@ -220,7 +220,7 @@ export function determinerProchaineInjection({
     : { type: "ENTRETIEN", fenetre: calculerFenetreVaccinale(dateVelagePrevue, "ENTRETIEN"), aConfirmer: false, couvert: false };
 }
 
-export type StatutPreparationVaccin = "A_FAIRE" | "A_PREVOIR" | "TROP_TOT" | "EN_RETARD" | "TERMINE";
+export type StatutPreparationVaccin = "A_FAIRE" | "A_PREVOIR" | "TROP_TOT" | "EN_RETARD" | "TERMINE" | "A_CONFIRMER";
 
 export interface EtapeVaccinaleConfig {
   id: string;
@@ -352,6 +352,7 @@ export function calculerActionVaccinale({
   bientotJours = 30,
   etapes,
   vaccinations,
+  statutProtocole,
 }: {
   date: Date;
   dateNaissance: Date;
@@ -361,8 +362,40 @@ export function calculerActionVaccinale({
   bientotJours?: number;
   etapes: ReadonlyArray<EtapeVaccinaleConfig>;
   vaccinations: ReadonlyArray<VaccinationEtape>;
+  /** undefined conserve l'ancien calcul générique ; null signifie qu'aucun statut n'est renseigné. */
+  statutProtocole?: StatutProtocoleVaccinal | null;
 }): ActionVaccinaleCalculee {
-  const ordonnees = [...etapes].sort((a, b) => a.ordre - b.ordre);
+  const toutesEtapes = [...etapes].sort((a, b) => a.ordre - b.ordre);
+  const initiales = toutesEtapes.filter((etape) => etape.cycle !== "ENTRETIEN");
+  const entretiens = toutesEtapes.filter((etape) => etape.cycle === "ENTRETIEN");
+  let statutEffectif = statutProtocole;
+  if (statutProtocole === null) {
+    const initialesFaites = new Set(vaccinations.map((vaccination) => vaccination.etapeProtocoleId).filter(Boolean));
+    if (initiales.some((etape) => initialesFaites.has(etape.id))) {
+      statutEffectif = initiales.filter((etape) => etape.obligatoire !== false).every((etape) => initialesFaites.has(etape.id))
+        ? "PROTOCOLE_ACQUIS"
+        : "PRIMO_EN_COURS";
+    } else {
+      statutEffectif = "A_CONFIRMER";
+    }
+  }
+  if (statutEffectif === "A_CONFIRMER") {
+    return { statut: "A_CONFIRMER", etape: null, dateMin: null, dateMax: null, raison: null };
+  }
+  if (statutEffectif === "PRIMO_EN_COURS" && !initiales.some((etape) => vaccinations.some((vaccination) => vaccination.etapeProtocoleId === etape.id))) {
+    return { statut: "A_CONFIRMER", etape: null, dateMin: null, dateMax: null, raison: null };
+  }
+  const ordonnees = statutEffectif === "PROTOCOLE_ACQUIS"
+    ? entretiens
+    : statutEffectif === "PRIMO_A_FAIRE" || statutEffectif === "PRIMO_EN_COURS"
+      ? initiales
+      : toutesEtapes;
+  if (ordonnees.some((etape) => etape.obligatoire !== false && (
+    (etape.reference === "VELAGE" && !dateVelagePrevue)
+    || (etape.reference === "DATE_FIXE" && !etape.dateFixe)
+  ))) {
+    return { statut: "A_CONFIRMER", etape: null, dateMin: null, dateMax: null, raison: null };
+  }
   let dateEtapePrecedente: Date | null = null;
 
   for (const [index, etape] of ordonnees.entries()) {
@@ -385,7 +418,12 @@ export function calculerActionVaccinale({
     } else {
       fenetre = calculerFenetreEtape({ etape, dateNaissance, dateVelagePrevue, dateEtapePrecedente, ageMinJours, ageMaxJours });
     }
-    if (!fenetre) continue;
+    if (!fenetre) {
+      if (etape.obligatoire !== false) {
+        return { statut: "A_CONFIRMER", etape: null, dateMin: null, dateMax: null, raison: null };
+      }
+      continue;
+    }
 
     let statut = statutPreparation(date, fenetre, bientotJours);
     if (statut === "A_FAIRE" && !etapesSuivantesPlanifiables({
