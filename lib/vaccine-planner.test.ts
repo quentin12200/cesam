@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   calculerDateLimiteUtilisation,
+  calculerActionVaccinale,
   calculerFenetreVaccinale,
   calculerRappelPrimo,
   dateDansFenetre,
   determinerProchaineInjection,
   reliquatFlacon,
   reliquatUtilisableA,
+  proposerConditionnements,
   resoudreRegleConservation,
   statutApresInjection,
 } from "./vaccine-planner.ts";
@@ -123,4 +125,68 @@ test("un historique absent reste à confirmer et un primo en cours expose son ra
   const rappel = determinerProchaineInjection({ statut: "PRIMO_EN_COURS", dateVelagePrevue: velage, vaccinationsCycle: [{ date: utc("2026-09-05"), type: "PRIMO_1" }] });
   assert.equal(rappel.type, "RAPPEL");
   assert.equal(iso(rappel.fenetre!.debut), "2026-10-03");
+});
+
+const etape = (overrides: Partial<{
+  id: string; label: string; ordre: number; cycle: string; reference: string;
+  debutValeur: number; debutUnite: string; debutPosition: string;
+  finValeur: number; finUnite: string; finPosition: string; recurrenceMois: number | null;
+}> = {}) => ({
+  id: "e1", label: "Injection", ordre: 0, cycle: "INITIAL", reference: "NAISSANCE",
+  debutValeur: 0, debutUnite: "JOUR", debutPosition: "APRES",
+  finValeur: 30, finUnite: "JOUR", finPosition: "APRES", recurrenceMois: null,
+  ...overrides,
+});
+
+test("un vaccin dès la naissance rend le veau J0 éligible", () => {
+  const action = calculerActionVaccinale({ date: utc("2026-08-31"), dateNaissance: utc("2026-08-31"), etapes: [etape()], vaccinations: [] });
+  assert.equal(action.statut, "A_FAIRE");
+  assert.equal(iso(action.dateMin!), "2026-08-31");
+});
+
+test("l'âge minimum combiné garde un animal trop jeune hors préparation", () => {
+  const action = calculerActionVaccinale({ date: utc("2026-08-31"), dateNaissance: utc("2026-08-21"), ageMinJours: 20, etapes: [etape()], vaccinations: [] });
+  assert.equal(action.statut, "A_PREVOIR");
+  assert.equal(iso(action.dateMin!), "2026-09-10");
+});
+
+test("une fenêtre avant vêlage conserve ses deux bornes", () => {
+  const action = calculerActionVaccinale({
+    date: utc("2026-09-05"), dateNaissance: utc("2022-01-01"), dateVelagePrevue: utc("2026-12-04"),
+    etapes: [etape({ reference: "VELAGE", debutValeur: 90, debutPosition: "AVANT", finValeur: 21, finPosition: "AVANT" })], vaccinations: [],
+  });
+  assert.equal(action.statut, "A_FAIRE");
+  assert.equal(iso(action.dateMin!), "2026-09-05");
+  assert.equal(iso(action.dateMax!), "2026-11-13");
+});
+
+test("la primo 1 mène à la primo 2 selon l'intervalle configuré", () => {
+  const etapes = [etape({ label: "Primo 1/2" }), etape({ id: "e2", label: "Primo 2/2", ordre: 1, reference: "ETAPE_PRECEDENTE", debutValeur: 28, finValeur: 28 })];
+  const action = calculerActionVaccinale({ date: utc("2026-09-28"), dateNaissance: utc("2026-09-01"), etapes, vaccinations: [{ date: utc("2026-09-01"), etapeProtocoleId: "e1" }] });
+  assert.equal(action.etape?.id, "e2");
+  assert.equal(iso(action.dateMin!), "2026-09-29");
+});
+
+test("la primo 1 est refusée si la primo 2 sortirait de la limite d'âge", () => {
+  const etapes = [etape({ label: "Primo 1/2", finValeur: 100 }), etape({ id: "e2", label: "Primo 2/2", ordre: 1, reference: "ETAPE_PRECEDENTE", debutValeur: 28, finValeur: 28 })];
+  const action = calculerActionVaccinale({ date: utc("2026-03-25"), dateNaissance: utc("2026-01-01"), ageMaxJours: 100, etapes, vaccinations: [] });
+  assert.equal(action.statut, "EN_RETARD");
+});
+
+test("un rappel annuel repart de la dernière vaccination", () => {
+  const rappel = etape({ cycle: "ENTRETIEN", recurrenceMois: 12 });
+  const action = calculerActionVaccinale({ date: utc("2026-08-31"), dateNaissance: utc("2024-01-01"), etapes: [rappel], vaccinations: [{ date: utc("2025-08-31"), etapeProtocoleId: "e1" }] });
+  assert.equal(action.statut, "A_FAIRE");
+  assert.equal(iso(action.dateMin!), "2026-08-31");
+});
+
+test("un protocole sans étape restante est terminé", () => {
+  const action = calculerActionVaccinale({ date: utc("2026-08-31"), dateNaissance: utc("2026-08-01"), etapes: [etape()], vaccinations: [{ date: utc("2026-08-10"), etapeProtocoleId: "e1" }] });
+  assert.equal(action.statut, "TERMINE");
+});
+
+test("la préparation privilégie le reliquat valide puis complète en conditionnements", () => {
+  assert.deepEqual(proposerConditionnements({ dosesNecessaires: 14, reliquatsUtilisables: [4], conditionnements: [5] }), {
+    reliquatUtilise: 4, nombre: 2, dosesParConditionnement: 5, totalDisponible: 14,
+  });
 });

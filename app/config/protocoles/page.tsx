@@ -33,7 +33,7 @@ async function getProtocoles() {
 
 export default async function ProtocolesConfigPage() {
   const protocoles = await getProtocoles();
-  const medicaments = await prisma.medicament.findMany({ where: { actif: true }, select: { id: true, nom: true, voie: true, conditionnements: { where: { actif: true }, select: { doses: true } } }, orderBy: { nom: "asc" } });
+  const medicaments = await prisma.medicament.findMany({ where: { actif: true }, select: { id: true, nom: true, voie: true, conditionnements: { where: { actif: true }, select: { doses: true } }, preconisations: { where: { statut: "VALIDE", dose: { not: null } }, select: { id: true, dose: true, unite: true, voie: true, categorieAnimaux: true } } }, orderBy: { nom: "asc" } });
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">

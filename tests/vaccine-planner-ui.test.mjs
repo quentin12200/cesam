@@ -18,12 +18,13 @@ test("la fiche Pharmacie expose la conservation par défaut et les surcharges", 
 });
 
 test("la première vue du planificateur reste factuelle et rattachée à la gestation", () => {
-  const page = read("app/sanitaire/planificateur-vaccinal/page.tsx");
-  assert.match(page, /gestationId === gestation\.id/);
-  assert.match(page, /determinerProchaineInjection/);
-  assert.match(page, /Protocole à confirmer/);
-  assert.match(page, /aucune session n’est enregistrée automatiquement/);
-  assert.doesNotMatch(page, /300/);
+  const loader = read("lib/vaccine-preparation-data.ts");
+  const page = read("app/sanitaire/vaccins/page.tsx");
+  assert.match(loader, /vaccination\.gestationId === gestation\?\.id/);
+  assert.match(loader, /calculerActionVaccinale/);
+  assert.match(page, /dateMin/);
+  assert.match(page, /dateMax/);
+  assert.doesNotMatch(loader, /\.create\(|\.update\(/);
 });
 
 test("les APIs séparent dose administrée et doses commerciales", () => {

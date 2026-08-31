@@ -1,4 +1,4 @@
-import { addDays, differenceInCalendarDays, subDays } from "date-fns";
+import { addDays, addMonths, differenceInCalendarDays, subDays } from "date-fns";
 
 export const STATUTS_CONSERVATION = ["IMMEDIATE", "CONSERVABLE", "INCONNUE"] as const;
 export type StatutConservation = (typeof STATUTS_CONSERVATION)[number];
@@ -218,4 +218,205 @@ export function determinerProchaineInjection({
   return entretienFait
     ? { type: null, fenetre: null, aConfirmer: false, couvert: true }
     : { type: "ENTRETIEN", fenetre: calculerFenetreVaccinale(dateVelagePrevue, "ENTRETIEN"), aConfirmer: false, couvert: false };
+}
+
+export type StatutPreparationVaccin = "A_FAIRE" | "A_PREVOIR" | "TROP_TOT" | "EN_RETARD" | "TERMINE";
+
+export interface EtapeVaccinaleConfig {
+  id: string;
+  label: string;
+  ordre: number;
+  cycle: string;
+  reference: string;
+  debutValeur: number;
+  debutUnite: string;
+  debutPosition: string;
+  finValeur: number;
+  finUnite: string;
+  finPosition: string;
+  dateFixe?: Date | null;
+  recurrenceMois?: number | null;
+  obligatoire?: boolean;
+}
+
+export interface ActionVaccinaleCalculee {
+  statut: StatutPreparationVaccin;
+  etape: EtapeVaccinaleConfig | null;
+  dateMin: Date | null;
+  dateMax: Date | null;
+  raison: "AGE" | "VELAGE" | "ETAPE_PRECEDENTE" | "DATE_FIXE" | null;
+}
+
+type VaccinationEtape = { date: Date; etapeProtocoleId: string | null };
+
+function decalageJours(value: number, unite: string): number {
+  if (unite === "SEMAINE") return value * 7;
+  if (unite === "MOIS") return value * 30;
+  return value;
+}
+
+function appliquerDecalage(reference: Date, value: number, unite: string, position: string): Date {
+  const jours = decalageJours(value, unite);
+  return addDays(reference, position === "AVANT" ? -jours : jours);
+}
+
+function intersectionFenetre(
+  fenetre: FenetreVaccinale,
+  minimum: Date | null,
+  maximum: Date | null
+): FenetreVaccinale | null {
+  const debut = minimum && minimum > fenetre.debut ? minimum : fenetre.debut;
+  const fin = maximum && maximum < fenetre.fin ? maximum : fenetre.fin;
+  return debut <= fin ? { debut, fin } : null;
+}
+
+export function calculerFenetreEtape({
+  etape,
+  dateNaissance,
+  dateVelagePrevue,
+  dateEtapePrecedente,
+  ageMinJours,
+  ageMaxJours,
+}: {
+  etape: EtapeVaccinaleConfig;
+  dateNaissance: Date;
+  dateVelagePrevue?: Date | null;
+  dateEtapePrecedente?: Date | null;
+  ageMinJours?: number | null;
+  ageMaxJours?: number | null;
+}): FenetreVaccinale | null {
+  let reference: Date | null = null;
+  if (etape.reference === "NAISSANCE") reference = dateNaissance;
+  if (etape.reference === "VELAGE") reference = dateVelagePrevue ?? null;
+  if (etape.reference === "ETAPE_PRECEDENTE") reference = dateEtapePrecedente ?? null;
+  if (etape.reference === "DATE_FIXE") reference = etape.dateFixe ?? null;
+  if (!reference) return null;
+
+  const fenetre = etape.reference === "DATE_FIXE"
+    ? { debut: reference, fin: reference }
+    : {
+        debut: appliquerDecalage(reference, etape.debutValeur, etape.debutUnite, etape.debutPosition),
+        fin: appliquerDecalage(reference, etape.finValeur, etape.finUnite, etape.finPosition),
+      };
+  const ordonnee = fenetre.debut <= fenetre.fin
+    ? fenetre
+    : { debut: fenetre.fin, fin: fenetre.debut };
+  return intersectionFenetre(
+    ordonnee,
+    ageMinJours == null ? null : addDays(dateNaissance, ageMinJours),
+    ageMaxJours == null ? null : addDays(dateNaissance, ageMaxJours)
+  );
+}
+
+function statutPreparation(date: Date, fenetre: FenetreVaccinale, bientotJours: number): StatutPreparationVaccin {
+  if (date > fenetre.fin) return "EN_RETARD";
+  if (date >= fenetre.debut) return "A_FAIRE";
+  return differenceInCalendarDays(fenetre.debut, date) <= bientotJours ? "A_PREVOIR" : "TROP_TOT";
+}
+
+function etapesSuivantesPlanifiables({
+  etapes,
+  index,
+  datePremiere,
+  dateNaissance,
+  dateVelagePrevue,
+  ageMinJours,
+  ageMaxJours,
+}: {
+  etapes: ReadonlyArray<EtapeVaccinaleConfig>;
+  index: number;
+  datePremiere: Date;
+  dateNaissance: Date;
+  dateVelagePrevue?: Date | null;
+  ageMinJours?: number | null;
+  ageMaxJours?: number | null;
+}): boolean {
+  let precedente = datePremiere;
+  for (const etape of etapes.slice(index + 1).filter((item) => item.obligatoire !== false && item.cycle !== "ENTRETIEN")) {
+    const fenetre = calculerFenetreEtape({ etape, dateNaissance, dateVelagePrevue, dateEtapePrecedente: precedente, ageMinJours, ageMaxJours });
+    if (!fenetre) return false;
+    const dateChoisie = fenetre.debut > precedente ? fenetre.debut : precedente;
+    if (dateChoisie > fenetre.fin) return false;
+    precedente = dateChoisie;
+  }
+  return true;
+}
+
+/** Calcule la prochaine intervention sans écrire de vaccination ni modifier le stock. */
+export function calculerActionVaccinale({
+  date,
+  dateNaissance,
+  dateVelagePrevue,
+  ageMinJours,
+  ageMaxJours,
+  bientotJours = 30,
+  etapes,
+  vaccinations,
+}: {
+  date: Date;
+  dateNaissance: Date;
+  dateVelagePrevue?: Date | null;
+  ageMinJours?: number | null;
+  ageMaxJours?: number | null;
+  bientotJours?: number;
+  etapes: ReadonlyArray<EtapeVaccinaleConfig>;
+  vaccinations: ReadonlyArray<VaccinationEtape>;
+}): ActionVaccinaleCalculee {
+  const ordonnees = [...etapes].sort((a, b) => a.ordre - b.ordre);
+  let dateEtapePrecedente: Date | null = null;
+
+  for (const [index, etape] of ordonnees.entries()) {
+    const faites = vaccinations
+      .filter((vaccination) => vaccination.etapeProtocoleId === etape.id)
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    if (faites.length > 0 && etape.cycle !== "ENTRETIEN") {
+      dateEtapePrecedente = faites[0].date;
+      continue;
+    }
+    if (faites.length > 0 && etape.cycle === "ENTRETIEN" && !etape.recurrenceMois) continue;
+
+    let fenetre: FenetreVaccinale | null;
+    if (faites.length > 0 && etape.cycle === "ENTRETIEN" && etape.recurrenceMois) {
+      const rappel = addMonths(faites[0].date, etape.recurrenceMois);
+      fenetre = intersectionFenetre({ debut: rappel, fin: rappel },
+        ageMinJours == null ? null : addDays(dateNaissance, ageMinJours),
+        ageMaxJours == null ? null : addDays(dateNaissance, ageMaxJours));
+    } else {
+      fenetre = calculerFenetreEtape({ etape, dateNaissance, dateVelagePrevue, dateEtapePrecedente, ageMinJours, ageMaxJours });
+    }
+    if (!fenetre) continue;
+
+    let statut = statutPreparation(date, fenetre, bientotJours);
+    if (statut === "A_FAIRE" && !etapesSuivantesPlanifiables({
+      etapes: ordonnees,
+      index,
+      datePremiere: date,
+      dateNaissance,
+      dateVelagePrevue,
+      ageMinJours,
+      ageMaxJours,
+    })) statut = "EN_RETARD";
+    return { statut, etape, dateMin: fenetre.debut, dateMax: fenetre.fin, raison: etape.reference as ActionVaccinaleCalculee["raison"] };
+  }
+  return { statut: "TERMINE", etape: null, dateMin: null, dateMax: null, raison: null };
+}
+
+export function proposerConditionnements({
+  dosesNecessaires,
+  reliquatsUtilisables,
+  conditionnements,
+}: {
+  dosesNecessaires: number;
+  reliquatsUtilisables: ReadonlyArray<number>;
+  conditionnements: ReadonlyArray<number>;
+}): { reliquatUtilise: number; nombre: number; dosesParConditionnement: number | null; totalDisponible: number } {
+  const reliquatUtilise = Math.min(dosesNecessaires, reliquatsUtilisables.reduce((total, doses) => total + Math.max(0, doses), 0));
+  const restant = Math.max(0, dosesNecessaires - reliquatUtilise);
+  if (restant === 0) return { reliquatUtilise, nombre: 0, dosesParConditionnement: null, totalDisponible: reliquatUtilise };
+  const options = conditionnements.filter((doses) => doses > 0).map((doses) => ({ doses, nombre: Math.ceil(restant / doses) }));
+  options.sort((a, b) => (a.nombre * a.doses - restant) - (b.nombre * b.doses - restant) || a.nombre - b.nombre);
+  const choix = options[0];
+  if (!choix) return { reliquatUtilise, nombre: 0, dosesParConditionnement: null, totalDisponible: reliquatUtilise };
+  return { reliquatUtilise, nombre: choix.nombre, dosesParConditionnement: choix.doses, totalDisponible: reliquatUtilise + choix.nombre * choix.doses };
 }
