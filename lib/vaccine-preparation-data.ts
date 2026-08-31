@@ -28,6 +28,7 @@ export interface GroupePreparationVaccin {
   protocoleId: string;
   vaccin: string;
   medicamentId: string | null;
+  conditionnementRenseigne: boolean;
   lignes: LignePreparationVaccin[];
   aConfirmer: Array<{ animalId: string; nutrav: string; nom: string | null; groupe: string; categorie: string; ageJours: number }>;
   aFaire: number;
@@ -216,6 +217,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       protocoleId: protocole.id,
       vaccin: medicamentReference?.nom || protocole.label,
       medicamentId: medicamentReference?.id ?? null,
+      conditionnementRenseigne: (medicamentReference?.conditionnements.length ?? 0) > 0,
       lignes,
       aConfirmer,
       aFaire: lignes.filter((ligne) => ligne.statut === "A_FAIRE").length,

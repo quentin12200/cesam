@@ -40,3 +40,26 @@ test("les statuts à confirmer sont sélectionnables et utilisent l'API existant
   assert.match(loader, /statutsProtocolesVaccinaux/);
   assert.match(loader, /statutProtocole:/);
 });
+
+test("l'éditeur de protocole ne crée jamais de conditionnement commercial", () => {
+  const editor = read("app/config/protocoles/ProtocoleEditor.tsx");
+  const preparation = read("app/sanitaire/vaccins/page.tsx");
+  const impression = read("app/sanitaire/vaccins/impression/page.tsx");
+  assert.doesNotMatch(editor, /PACKS_DEFAUT/);
+  assert.doesNotMatch(editor, /api\/medicaments\/.*\/conditionnements/);
+  assert.doesNotMatch(editor, /1, 5, 10, 25, 50/);
+  assert.match(editor, /Conditionnement à renseigner dans la Pharmacie/);
+  assert.match(editor, /med\.conditionnements\.map/);
+  assert.match(preparation, /Impossible de calculer — conditionnement non renseigné/);
+  assert.match(impression, /Impossible de calculer — conditionnement non renseigné/);
+  assert.match(read("lib/vaccine-preparation-data.ts"), /conditionnementRenseigne/);
+});
+
+test("le calendrier vaccinal utilise les étapes et jamais une fréquence générique", () => {
+  const editor = read("app/config/protocoles/ProtocoleEditor.tsx");
+  const planner = read("lib/vaccine-planner.ts");
+  const loader = read("lib/vaccine-preparation-data.ts");
+  assert.match(editor, /recurrenceMois/);
+  assert.match(planner, /etape\.recurrenceMois/);
+  assert.doesNotMatch(`${editor}\n${planner}\n${loader}`, /frequence|1 fois \/ Jour/i);
+});

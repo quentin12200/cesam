@@ -28,7 +28,7 @@ export default async function ImpressionVaccinsPage({ searchParams }: { searchPa
                 <tbody>{lignes.map((ligne) => <tr key={`${ligne.animalId}-${ligne.injection}`}><td className="text-lg">☐</td><td><b className="font-mono text-sm">{ligne.nutrav}</b>{ligne.nom ? ` ${ligne.nom}` : ""}</td><td>{ligne.injection}</td><td>{ligne.repere}</td><td>{dateCourte.format(ligne.dateMin)} → {dateCourte.format(ligne.dateMax)}</td><td>{ligne.groupe}</td><td>{ligne.dose}</td><td /></tr>)}</tbody>
               </table>
             )}
-            <p className="mt-2 text-xs">Flacons : {groupe.flacons.reliquatUtilise > 0 ? `reliquat valide ${groupe.flacons.reliquatUtilise} dose(s) + ` : ""}{groupe.flacons.dosesParConditionnement ? `${groupe.flacons.nombre} × ${groupe.flacons.dosesParConditionnement} doses` : "conditionnement à confirmer"}</p>
+            <p className="mt-2 text-xs">Flacons : {!groupe.conditionnementRenseigne ? "Impossible de calculer — conditionnement non renseigné" : <>{groupe.flacons.reliquatUtilise > 0 ? `reliquat valide ${groupe.flacons.reliquatUtilise} dose(s) + ` : ""}{groupe.flacons.dosesParConditionnement ? `${groupe.flacons.nombre} × ${groupe.flacons.dosesParConditionnement} doses` : "Conditionnement insuffisant"}</>}</p>
           </section>
         );
       })}

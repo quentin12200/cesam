@@ -191,6 +191,12 @@ test("la préparation privilégie le reliquat valide puis complète en condition
   });
 });
 
+test("aucun conditionnement renseigné ne produit aucune proposition inventée", () => {
+  assert.deepEqual(proposerConditionnements({ dosesNecessaires: 14, reliquatsUtilisables: [], conditionnements: [] }), {
+    reliquatUtilise: 0, nombre: 0, dosesParConditionnement: null, totalDisponible: 0,
+  });
+});
+
 test("PROTOCOLE_ACQUIS sans historique propose l'entretien et jamais Primo 1", () => {
   const etapes = [
     etape({ id: "primo", label: "Primo 1", ordre: 0 }),

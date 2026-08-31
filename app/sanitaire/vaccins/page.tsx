@@ -77,7 +77,7 @@ export default async function VaccinsPage() {
           {groupes.filter((groupe) => groupe.dosesNecessaires > 0).map((groupe) => (
             <div key={groupe.protocoleId} className="rounded-xl border p-3 text-sm">
               <b>{groupe.vaccin}</b><p className="mt-1 text-gray-600">{groupe.dosesNecessaires} dose(s) nécessaire(s)</p>
-              <p className="text-xs text-gray-500">{groupe.flacons.reliquatUtilise > 0 ? `${groupe.flacons.reliquatUtilise} dose(s) de reliquat valide · ` : ""}{groupe.flacons.dosesParConditionnement ? `${groupe.flacons.nombre} × ${groupe.flacons.dosesParConditionnement} doses` : groupe.flacons.reliquatUtilise >= groupe.dosesNecessaires ? "Reliquat suffisant" : "Conditionnement non renseigné"}</p>
+              <p className="text-xs text-gray-500">{!groupe.conditionnementRenseigne ? "Impossible de calculer — conditionnement non renseigné" : <>{groupe.flacons.reliquatUtilise > 0 ? `${groupe.flacons.reliquatUtilise} dose(s) de reliquat valide · ` : ""}{groupe.flacons.dosesParConditionnement ? `${groupe.flacons.nombre} × ${groupe.flacons.dosesParConditionnement} doses` : groupe.flacons.reliquatUtilise >= groupe.dosesNecessaires ? "Reliquat suffisant" : "Conditionnement insuffisant"}</>}</p>
             </div>
           ))}
         </div>
