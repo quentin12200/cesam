@@ -9,8 +9,8 @@ import {
   reliquatFlacon,
   resoudreVoieVaccinale,
   type StatutProtocoleVaccinal,
-  type StatutPreparationVaccin,
 } from "@/lib/vaccine-planner";
+import { statutPlanningVaccin, type StatutPlanningVaccin } from "@/lib/vaccine-planning-status";
 
 export interface LignePreparationVaccin {
   animalId: string;
@@ -30,7 +30,7 @@ export interface LignePreparationVaccin {
   etapeProtocoleId: string;
   gestationId: string | null;
   typeInjection: string | null;
-  statut: StatutPreparationVaccin;
+  statut: StatutPlanningVaccin;
 }
 
 export interface GroupePreparationVaccin {
@@ -42,8 +42,10 @@ export interface GroupePreparationVaccin {
   voie: string;
   lignes: LignePreparationVaccin[];
   aConfirmer: Array<{ animalId: string; nutrav: string; nom: string | null; groupe: string; categorie: string; ageJours: number }>;
-  aFaire: number;
+  tropTot: number;
   bientot: number;
+  aFaire: number;
+  retardLeger: number;
   enRetard: number;
   termines: number;
   dosesNecessaires: number;
@@ -183,7 +185,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         dateVelagePrevue: gestation?.dateVelagePrevue,
         ageMinJours: protocole.ageMinJours,
         ageMaxJours: protocole.ageMaxJours,
-        bientotJours: protocole.urgenceJours ?? 30,
+        bientotJours: 7,
         etapes: protocole.etapes,
         vaccinations,
         statutProtocole: (animal.statutsProtocolesVaccinaux.find((statut) => statut.protocoleId === protocole.id)?.statut ?? null) as StatutProtocoleVaccinal | null,
@@ -229,6 +231,9 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       const joursAvantVelage = gestation?.dateVelagePrevue
         ? differenceInCalendarDays(gestation.dateVelagePrevue, date)
         : null;
+      const statut = action.statut === "EN_RETARD" && date <= action.dateMax
+        ? "EN_RETARD"
+        : statutPlanningVaccin(date, action.dateMin, action.dateMax);
       lignes.push({
         animalId: animal.id,
         nutrav: animal.nutrav,
@@ -254,17 +259,17 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         etapeProtocoleId: action.etape.id,
         gestationId: protocoleLieAuVelage ? gestation?.id ?? null : null,
         typeInjection: action.etape.cycle === "ENTRETIEN" ? "ENTRETIEN" : etapesInitiales[0]?.id === action.etape.id ? "PRIMO_1" : "RAPPEL",
-        statut: action.statut,
+        statut,
       });
     }
 
-    const imprimables = lignes.filter((ligne) => ["A_FAIRE", "A_PREVOIR", "EN_RETARD"].includes(ligne.statut));
+    const preparables = lignes.filter((ligne) => ["A_FAIRE", "EN_RETARD_LEGER", "EN_RETARD"].includes(ligne.statut));
     const flaconsOuverts = medicamentReference?.flaconsOuverts ?? [];
     const reliquatsUtilisables = flaconsOuverts
       .filter((flacon) => flacon.dateOuverture <= date && flacon.dateLimiteUtilisation != null && flacon.dateLimiteUtilisation >= date)
       .map((flacon) => reliquatFlacon(flacon.dosesInitiales, flacon.utilisations));
     const flacons = proposerConditionnements({
-      dosesNecessaires: imprimables.length,
+      dosesNecessaires: preparables.length,
       reliquatsUtilisables,
       conditionnements: (medicamentReference?.conditionnements ?? []).map((conditionnement) => ({
         doses: conditionnement.doses,
@@ -278,15 +283,17 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       vaccin: medicamentReference?.nom || protocole.label,
       medicamentId: medicamentReference?.id ?? null,
       conditionnementRenseigne: (medicamentReference?.conditionnements.length ?? 0) > 0,
-      dose: valeurUnique(imprimables.map((ligne) => ligne.dose), "Non renseignée"),
-      voie: valeurUnique(imprimables.map((ligne) => ligne.voie), "À renseigner"),
+      dose: valeurUnique(lignes.map((ligne) => ligne.dose), "Non renseignée"),
+      voie: valeurUnique(lignes.map((ligne) => ligne.voie), "À renseigner"),
       lignes,
       aConfirmer,
-      aFaire: lignes.filter((ligne) => ligne.statut === "A_FAIRE").length,
+      tropTot: lignes.filter((ligne) => ligne.statut === "TROP_TOT").length,
       bientot: lignes.filter((ligne) => ligne.statut === "A_PREVOIR").length,
+      aFaire: lignes.filter((ligne) => ligne.statut === "A_FAIRE").length,
+      retardLeger: lignes.filter((ligne) => ligne.statut === "EN_RETARD_LEGER").length,
       enRetard: lignes.filter((ligne) => ligne.statut === "EN_RETARD").length,
       termines,
-      dosesNecessaires: imprimables.length,
+      dosesNecessaires: preparables.length,
       flacons: {
         ...flacons,
         ouverts: flaconsOuverts.length,
