@@ -94,7 +94,7 @@ test("le stock vaccinal présente seulement les données terrain utiles", () => 
   assert.match(page, /Flacons ouverts/);
   assert.match(page, /Doses restantes/);
   assert.match(page, /Prochaine limite/);
-  assert.match(page, /Besoin à venir/);
+  assert.match(page, /Besoin maintenant/);
   assert.match(loader, /stockPharmacie/);
   assert.match(loader, /prochaineLimite/);
 });
