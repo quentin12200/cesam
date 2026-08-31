@@ -14,7 +14,7 @@ test("l'écran Vaccins ouvre sur la préparation et expose les trois espaces", (
   assert.match(card, /<details ref={detailsRef} className="group">/);
   assert.match(card, /Voir les animaux/);
   assert.match(card, /Faire la séance/);
-  assert.match(card, /Besoin total/);
+  assert.match(card, /Besoin maintenant/);
   assert.match(page, /Achat conseillé/);
   assert.match(card, /Reliquat utilisable/);
 });
@@ -25,6 +25,7 @@ test("la feuille A4 est une lecture seule et contient les colonnes terrain", () 
   assert.match(page, /size:A4 landscape/);
   assert.match(page, /Animal/);
   assert.match(page, /Injection/);
+  assert.match(page, /Statut/);
   assert.match(page, /Groupe \/ localisation/);
   assert.match(page, /Notes/);
   assert.doesNotMatch(loader, /\.create\(|\.update\(|\.delete\(/);
@@ -71,13 +72,19 @@ test("le calendrier vaccinal utilise les étapes et jamais une fréquence géné
   assert.doesNotMatch(`${editor}\n${planner}\n${loader}`, /frequence|1 fois \/ Jour/i);
 });
 
-test("le détail d'un vaccin reste secondaire et limité aux trois groupes terrain", () => {
+test("le détail d'un vaccin affiche les cinq niveaux terrain", () => {
   const page = read("app/sanitaire/vaccins/PreparationVaccinCard.tsx");
-  assert.match(page, /statut: "A_FAIRE", titre: "À faire"/);
-  assert.match(page, /statut: "A_PREVOIR", titre: "Bientôt"/);
-  assert.match(page, /statut: "EN_RETARD", titre: "En retard"/);
+  assert.match(page, /statut: "TROP_TOT", titre: "Trop tôt"/);
+  assert.match(page, /statut: "A_PREVOIR", titre: "Dans ≤ 7 j"/);
+  assert.match(page, /statut: "A_FAIRE", titre: "Dans la fenêtre"/);
+  assert.match(page, /statut: "EN_RETARD_LEGER", titre: "Retard 1–3 j"/);
+  assert.match(page, /statut: "EN_RETARD", titre: "Retard > 3 j"/);
+  assert.match(page, /border-blue-500/);
+  assert.match(page, /border-yellow-400/);
+  assert.match(page, /border-green-500/);
+  assert.match(page, /border-orange-500/);
+  assert.match(page, /border-red-500/);
   assert.match(page, /ligne\.dose.*ligne\.voie/);
-  assert.doesNotMatch(page, /visibles\.map/);
 });
 
 test("le stock vaccinal présente seulement les données terrain utiles", () => {
@@ -113,11 +120,12 @@ test("la séance terrain sélectionne exactement les animaux cochés", () => {
   const card = read("app/sanitaire/vaccins/PreparationVaccinCard.tsx");
   const form = read("app/sanitaire/nouvel-evenement/NouvelEvenementForm.tsx");
   assert.match(card, /useState<Set<string>>\(\(\) => new Set\(\)\)/);
-  assert.match(card, /Tout sélectionner/);
+  assert.match(card, /Tout sélectionner à faire/);
   assert.match(card, /Tout désélectionner/);
   assert.match(card, /selection\.has\(ligne\.animalId\)/);
   assert.match(card, /animaux: nutravs\.join\(","\)/);
   assert.match(card, /if \(selection\.size === 0\)/);
+  assert.match(card, /STATUTS_SELECTIONNABLES/);
   assert.match(form, /presetVaccination\.animaux\.filter/);
 });
 
