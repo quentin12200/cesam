@@ -14,6 +14,7 @@ import {
   normaliserConditionRenouvellement,
 } from "./ordonnance-display.ts";
 import { resoudreConditionnementStructure } from "./ordonnance-packaging.ts";
+import { extraireConditionsImportantes } from "./ordonnance-important-conditions.ts";
 
 interface BlocMedicamentTranscrit {
   identification: string[];
@@ -226,6 +227,9 @@ function delaisDepuisBloc(sourceTexts: string[]): {
   let milkDays: number | null = null;
   for (const sourceText of sourceTexts) {
     const source = sourceText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (/\btoutes?\s+les?\s+denrees?\s*[:=\-]?\s*0\s*(?:j|jour|jours)\b/.test(source)) {
+      meatDays = offalDays = milkDays = 0;
+    }
     const commun = source.match(/\bviande\s+(?:et|&)\s+abats?\s*[:=\-]?\s*(\d{1,3})\s*(?:j|jour|jours)\b/i);
     if (commun) meatDays = offalDays = Number(commun[1]);
     for (const match of source.matchAll(
@@ -285,6 +289,7 @@ function voieDepuisBloc(sourceTexts: string[]): string | null {
     ["IV", /\b(?:intraveineuse|intra\s*veineuse)\b/],
     ["IM", /\b(?:intramusculaire|intra\s*musculaire)\b/],
     ["SC", /\b(?:sous[- ]?cutanee)\b/],
+    ["nasale", /\b(?:voie\s+)?(?:intra[- ]?nasale|nasale)\b/],
   ] as const;
   const trouvees = voies.filter(([, expression]) => expression.test(source)).map(([code]) => code);
   return trouvees.length > 0 ? trouvees.join(" / ") : null;
@@ -346,6 +351,15 @@ export function appliquerTranscriptionParBlocs(
 
     patch.medicamentNom = nomDepuisBloc(bloc, ia.medicamentNom);
     patch.numeroLot = numeroLotDepuisBloc(bloc) ?? ia.numeroLot ?? null;
+    patch.conditionsImportantes = [
+      ...(Array.isArray(ia.conditionsImportantes) ? ia.conditionsImportantes : []),
+      ...extraireConditionsImportantes([
+        ...bloc.posologie,
+        ...bloc.renouvellement,
+        ...bloc.instructionsPrecautions,
+        ...bloc.autres,
+      ]),
+    ];
 
     const voieTranscrite = voieDepuisBloc([...bloc.posologie, ...bloc.instructionsPrecautions]);
     if (voieTranscrite) patch.voie = voieTranscrite;
@@ -436,6 +450,7 @@ export function appliquerTranscriptionParBlocs(
       patch.administrationProtocol = {
         ...protocoleIA,
         administrationCount: renouvellementConditionnel(bloc.renouvellement)
+          || bloc.renouvellement.some((ligne) => /\bdose\s+unique\b/i.test(normaliserPourDetection(ligne)))
           ? 1 : protocoleIA.administrationCount ?? null,
         administrationIntervalHours: intervalle,
         repeatCondition: condition,

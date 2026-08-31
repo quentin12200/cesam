@@ -45,6 +45,13 @@ function sansAccents(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
+export function estInstructionReconstitution(value: string | null | undefined): boolean {
+  const source = sansAccents(value?.trim() ?? "").toLowerCase();
+  if (!source) return false;
+  return /\b(?:reconstituer|reconstitution|solvant|diluer|dilution)\b/.test(source)
+    || /^\s*\d+(?:[.,]\d+)?\s*doses?\s*(?:(?:[-=]+>|→|:|=)\s*)?\d+(?:[.,]\d+)?\s*ml\b/.test(source);
+}
+
 function nombre(value: string): string {
   return value.replace(",", ".");
 }
@@ -111,6 +118,7 @@ export function extraireDosesPratiquesContextuelles(sourceTexts: string[]): Dose
   const resultats: DosePratiqueContextuelle[] = [];
   for (const sourceText of sourceTexts) {
     const texte = sourceText.trim();
+    if (estInstructionReconstitution(texte)) continue;
     const frequenceCommune = /\b(?:par|chaque)\s+jour\b|\/\s*jour\b|\bquotidien(?:ne)?\b/i.test(texte)
       && !/\b(?:par|chaque)\s+(?:semaine|mois)\b|\btoutes?\s+les?\s+\d+\s*(?:h|heures?)\b/i.test(texte)
       ? "par jour" : null;
@@ -308,6 +316,9 @@ export function extraireSourcesDose(sourceText: string | null | undefined): {
 } {
   const texte = sourceText?.trim() ?? "";
   if (!texte) return { dosePratique: null, dosePharmacologique: null };
+  if (estInstructionReconstitution(texte)) {
+    return { dosePratique: null, dosePharmacologique: null };
+  }
 
   const tokens = Array.from(texte.matchAll(
     /\b(\d+(?:[.,]\d+)?)\s*(ml|cl|l|g|grammes?|comprim(?:e|é)s?|cp|bolus|unit(?:e|é)s?|mg|mcg|µg|μg|ug)\b/giu,

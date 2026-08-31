@@ -89,8 +89,21 @@ export function extraireConditionnementDepuisTexte(sourceText: string): Conditio
   const source = sourceText.trim();
   if (!source) return null;
   const normalise = sansAccents(source).toUpperCase().replace(/\s+/g, " ");
+  const multiDose = normalise.match(/\b(\d+(?:[.,]\d+)?)\s*[X×]\s*(\d+(?:[.,]\d+)?)\s*D(?:\.|OSES?)?\b/i);
   const motifContenant = /(?:^|\s)(?:(\d+)\s*[X×]?\s*)?(FL(?:ACON)?|SER(?:INGUE)?|SACH(?:ET)?|BT|BOITE|AMP(?:OULE)?|AER(?:OSOL)?|TUBE|BIDON|POT|PRESENTOIR)S?\.?\b/gi;
   const contenants = [...normalise.matchAll(motifContenant)];
+  if (contenants.length === 0 && multiDose) {
+    return {
+      deliveredQuantity: null,
+      containerType: "boîte",
+      contentValue: null,
+      contentUnit: null,
+      dosesPerContainer: (nombre(multiDose[1]) ?? 0) * (nombre(multiDose[2]) ?? 0),
+      sourceText: source,
+      needsVerification: false,
+      rawContainerType: null,
+    };
+  }
   if (contenants.length === 0) return null;
   const candidats = contenants.map((match, index) => {
     const debutSuite = (match.index ?? 0) + match[0].length;
@@ -204,7 +217,8 @@ export function conditionnementCanonique(structure: ConditionnementStructure): s
     ? `${nombreLisible(structure.dosesPerContainer)} dose${structure.dosesPerContainer > 1 ? "s" : ""}`
     : null;
   if (structure.containerType === "boîte" && structure.contentValue === null && doses) {
-    return `${structure.deliveredQuantity !== null ? `${nombreLisible(structure.deliveredQuantity)} ` : ""}boîte de ${doses}`;
+    const forme = structure.deliveredQuantity !== null && structure.deliveredQuantity > 1 ? "boîtes" : "boîte";
+    return `${structure.deliveredQuantity !== null ? `${nombreLisible(structure.deliveredQuantity)} ` : ""}${forme} de ${doses}`;
   }
   const parties = [
     structure.deliveredQuantity !== null ? nombreLisible(structure.deliveredQuantity) : null,

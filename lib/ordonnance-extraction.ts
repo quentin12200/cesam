@@ -16,6 +16,7 @@ import {
 } from "./ordonnance-dates.ts";
 import {
   calculerDoseVolumiqueSure,
+  estInstructionReconstitution,
   extraireConcentrationsCalcul,
   extraireDosesPharmacologiquesCalcul,
   marquerDosesPratiquesIncoherentes,
@@ -27,6 +28,7 @@ import {
   normaliserConditionnementExtrait,
   normaliserConditionRenouvellement,
 } from "./ordonnance-display.ts";
+import { normaliserConditionsImportantes } from "./ordonnance-important-conditions.ts";
 
 export interface MedicamentCandidat {
   id: string;
@@ -122,6 +124,9 @@ export function extraireDelaisAttente(sourceTexts: string[]): {
   let milkDays: number | null = null;
   for (const sourceText of sourceTexts) {
     const source = sourceText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (/\btoutes?\s+les?\s+denrees?\s*[:=\-]?\s*0\s*(?:j|jour|jours)\b/.test(source)) {
+      meatDays = offalDays = milkDays = 0;
+    }
     const viandeEtAbats = source.match(
       /\bviande\s+(?:et|&)\s+abats?\s*[:=\-]?\s*(\d{1,3})\s*(?:j|jour|jours)\b/i,
     );
@@ -178,7 +183,8 @@ function dosesPratiques(value: unknown): DosePratiqueContextuelle[] {
     const raw = objet(item);
     const doseValue = texte(raw.doseValue);
     const doseUnit = texte(raw.doseUnit);
-    if (!doseValue || !doseUnit) return [];
+    const sourceText = texte(raw.sourceText);
+    if (!doseValue || !doseUnit || estInstructionReconstitution(sourceText)) return [];
     return [{
       categorieAnimaux: texte(raw.categorieAnimaux),
       doseValue,
@@ -188,7 +194,7 @@ function dosesPratiques(value: unknown): DosePratiqueContextuelle[] {
       frequence: texte(raw.frequence),
       maximum: raw.maximum === true,
       origine: raw.origine === "calculee" || raw.origine === "manuelle" ? raw.origine : "ordonnance",
-      sourceText: texte(raw.sourceText),
+      sourceText,
       aVerifier: raw.aVerifier === true,
     } satisfies DosePratiqueContextuelle];
   });
@@ -630,6 +636,12 @@ export function normaliserAnalyseOrdonnance(
         milkDays: delaisSources.milkDays ?? entier(delais.milkDays ?? m.delaiAttenteLaitJ),
       },
       precautions: texte(m.precautions),
+      conditionsImportantes: normaliserConditionsImportantes(m.conditionsImportantes, [
+        ...textesSourcesMedicament,
+        texte(protocole.administrationInstructions),
+        texte(protocole.repeatCondition),
+        texte(m.precautions),
+      ]),
       medicationMatch: null,
       evidence: evidenceConditionnement,
     };

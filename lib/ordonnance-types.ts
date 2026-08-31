@@ -33,6 +33,13 @@ export interface DosePratiqueContextuelle {
   aVerifier: boolean;
 }
 
+export interface ConditionImportanteOrdonnance {
+  type: string;
+  value: string;
+  sourceText: string;
+  confidence: number;
+}
+
 export interface PreconisationPharmacieControle {
   dose: number | null;
   unite: string | null;
@@ -92,6 +99,7 @@ export interface MedicamentPropose {
   administrationInstructions: string | null;
   withdrawalPeriods: PeriodesAttente;
   precautions: string | null;
+  conditionsImportantes: ConditionImportanteOrdonnance[];
   medicationMatch: MedicamentCorrespondant | null;
   medicationMatches: MedicamentCorrespondant[];
   medicationMatchStatus: "matched" | "ambiguous" | "unmatched" | "manually_confirmed";
@@ -157,6 +165,7 @@ export function medicamentVide(): MedicamentPropose {
     administrationInstructions: null,
     withdrawalPeriods: { meatDays: null, offalDays: null, milkDays: null },
     precautions: null,
+    conditionsImportantes: [],
     medicationMatch: null,
     medicationMatches: [],
     medicationMatchStatus: "unmatched",

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formaterPresentationCompacte } from "./ordonnance-display.ts";
+import { formaterConditionnementVisuel, formaterPresentationCompacte } from "./ordonnance-display.ts";
 import { formaterDosePratiqueContextuelle, formaterDoseSource } from "./ordonnance-dose-sources.ts";
 import { normaliserAnalyseOrdonnance } from "./ordonnance-extraction.ts";
 import { appliquerTranscriptionParBlocs } from "./ordonnance-transcription.ts";
@@ -111,6 +111,49 @@ test("conserve la quantite structuree pendant la transcription par blocs", () =>
     },
   );
   assert.equal(proposition.medicaments?.[0].evidence.deliveredQuantity?.value, 1);
+});
+
+test("analyse BOVILIS sans confondre conditionnement, reconstitution et dose", () => {
+  const proposition = normaliserAnalyseOrdonnance(appliquerTranscriptionParBlocs({
+    transcription: {
+      entete: { lignes: ["ordonnance n°26-08-0700[V] le 30/08/2026"] },
+      medicaments: [{
+        identification: ["BOVILIS INTRANASAL RSP LIVE 5X1 D.+SOLV"],
+        presentation: ["BOVILIS INTRANASAL RSP LIVE 5X1 D.+SOLV", "Qté : 3"],
+        posologie: [
+          "Administrer 2 mL par animal par voie nasale",
+          "1 dose -> 2 mL",
+          "5 doses -> 10 mL",
+          "10 doses -> 20 mL",
+          "20 doses 40 mL",
+        ],
+        renouvellement: ["Dose unique", "Renouvellement interdit"],
+        delaisAttente: ["Toutes les denrées : 0 jour"],
+        instructionsPrecautions: ["Utilisable dès la naissance"],
+        autres: [],
+      }],
+    },
+    medicaments: [{ medicamentNom: "BOVILIS INTRANASAL RSP LIVE" }],
+  }));
+
+  const medicament = proposition.medicaments![0];
+  assert.equal(formaterPresentationCompacte(medicament.conditionnement), "Boîte de 5 doses · Qté 3");
+  assert.equal(formaterConditionnementVisuel(medicament.conditionnement).totalDoses, "15 doses au total");
+  assert.equal(formaterDoseSource(medicament.dosePratique ?? null), "2 ml / animal");
+  assert.deepEqual(medicament.dosesPratiques?.map((dose) => dose.doseValue), ["2"]);
+  assert.equal(medicament.voie, "nasale");
+  assert.equal(medicament.administrationCount, 1);
+  assert.equal(medicament.repeatCondition, "renouvellement interdit");
+  assert.deepEqual(medicament.withdrawalPeriods, { meatDays: 0, offalDays: 0, milkDays: 0 });
+  assert.deepEqual(medicament.conditionsImportantes.map((condition) => ({
+    value: condition.value,
+    sourceText: condition.sourceText,
+  })), [
+    { value: "Dose unique", sourceText: "Dose unique" },
+    { value: "Renouvellement interdit", sourceText: "Renouvellement interdit" },
+    { value: "Utilisable dès la naissance", sourceText: "Utilisable dès la naissance" },
+  ]);
+  assert.doesNotMatch(JSON.stringify(medicament.dosesPratiques), /"12"|"510"|"1020"|"2040"/);
 });
 
 test("ne recupere aucune donnee dans un bloc metier voisin", () => {

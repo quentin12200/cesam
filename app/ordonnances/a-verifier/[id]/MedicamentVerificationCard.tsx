@@ -103,6 +103,7 @@ export default function MedicamentVerificationCard({
   const [creatingInPharmacy, setCreatingInPharmacy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [creationError, setCreationError] = useState("");
+  const [conditionsConfirmees, setConditionsConfirmees] = useState<Set<number>>(new Set());
   const categoriesPharmacie = useMemo(
     () => getCategoriesMedicamentUtilisees(pharmacyOptions.map((option) => option.categorie)),
     [pharmacyOptions],
@@ -163,6 +164,7 @@ export default function MedicamentVerificationCard({
       aVerifier: false,
     }]
     : med.ia?.dosesPratiques ?? [];
+  const conditionsImportantes = med.ia?.conditionsImportantes ?? [];
   const dureeTerrain = med.treatmentDurationDays
     ? `Pendant ${med.treatmentDurationDays} jour${med.treatmentDurationDays === "1" ? "" : "s"}`
     : null;
@@ -312,6 +314,32 @@ export default function MedicamentVerificationCard({
         {renouvellement && (
           <p className="flex items-start gap-2"><RotateCcw size={15} className="mt-0.5 shrink-0 text-violet-700" /> {renouvellement}</p>
         )}
+        {conditionsImportantes.map((condition, conditionIndex) => {
+          const incertaine = condition.confidence < 0.7 && !conditionsConfirmees.has(conditionIndex);
+          return (
+            <div key={`${condition.type}-${condition.value}-${conditionIndex}`} className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span title={condition.sourceText} className="text-gray-700">{condition.value}</span>
+              {incertaine && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setConditionsConfirmees((current) => new Set(current).add(conditionIndex))}
+                    className="rounded border border-green-300 px-1.5 py-0.5 font-semibold text-green-800"
+                  >
+                    Confirmer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="rounded border border-gray-300 px-1.5 py-0.5 font-semibold text-gray-700"
+                  >
+                    Corriger
+                  </button>
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {delaisComplets && (

@@ -350,6 +350,13 @@ export default function VerificationOrdonnanceClient({
             precautions: med.precautions,
             evidence: {
               ...(med.ia?.evidence ?? {}),
+              ...((med.ia?.conditionsImportantes ?? []).length > 0 ? {
+                conditionsImportantes: {
+                  value: med.ia?.conditionsImportantes,
+                  sourceText: med.ia?.conditionsImportantes.map((condition) => condition.sourceText).join("\n") ?? null,
+                  confidence: Math.min(...(med.ia?.conditionsImportantes.map((condition) => condition.confidence) ?? [0])),
+                },
+              } : {}),
               ...preuveConditionnement(med),
               ...(med.doseSources.dosePratique ? {
                 dosePratique: {

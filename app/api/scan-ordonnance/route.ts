@@ -15,7 +15,7 @@ export const maxDuration = 60;
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
-const PROMPT_VERSION = "ordonnance-v8-conditionnement-structure";
+const PROMPT_VERSION = "ordonnance-v9-bovilis-conditions";
 
 interface OrdonnanceResult extends PropositionOrdonnance {
   raw: string;
@@ -111,6 +111,12 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
       "offalDays": "number ou null",
       "milkDays": "number ou null"
     },
+    "conditionsImportantes": [{
+      "type": "age_minimum, velage, rappel, categorie_animaux ou restriction",
+      "value": "synthese courte et fidele",
+      "sourceText": "texte exact complet",
+      "confidence": 0.95
+    }],
     "precautions": "string ou null",
     "evidence": {
       "dose": { "value": "texte interprete", "sourceText": "texte exact complet", "confidence": 0.95, "zone": "prescription" },
@@ -148,6 +154,7 @@ Regles obligatoires :
   Conserve séparément containerType, volumeValue, volumeUnit, dosesPerContainer et deliveredQuantity.
   Exemples : "3 FL.50ML(10D.)" = 3 flacons, 50 ml par flacon, 10 doses par flacon ;
   "BT 5 D." = une boîte de 5 doses si la quantité délivrée vaut 1 ailleurs.
+  "BOVILIS ... 5X1 D.+SOLV" avec "Qté : 3" = 3 conditionnements de 5 doses, soit 15 doses au total.
   Une dose d'administration (ex. "Administrer 2 ml") ne doit jamais alimenter presentation.
   Un contenant inhabituel ou douteux doit être "autre" et ne doit jamais devenir une nouvelle forme officielle.
 - Une dose "1 ml pour 10 kg" est ponderale : doseValue=1, referenceValue=10, referenceType=live_weight, normalizedDoseValue=0.1. Ce n'est pas une dose fixe de 1 ml.
@@ -160,6 +167,9 @@ Regles obligatoires :
 - Si dose pratique et dose pharmacologique figurent dans une meme phrase, evidence.dose.sourceText doit conserver la phrase
   entiere contenant les deux expressions, sans en supprimer une. Chaque bloc sourceText conserve sa propre expression complete.
 - Accepte aussi les doses fixes par animal et les doses en mg/kg.
+- Un tableau de reconstitution (par exemple "1 dose -> 2 ml", "5 doses -> 10 ml",
+  "10 doses -> 20 ml", "20 doses -> 40 ml") décrit la préparation du produit : ses lignes ne sont
+  jamais des doses d'administration et ne doivent jamais alimenter dose, dosePratique ou dosesPratiques.
 - Separe une injection initiale, un rappel conditionnel et la duree du traitement.
 - administrationCount contient le nombre d'administrations. repeatCondition contient uniquement la condition
   de renouvellement. administrationInstructions contient uniquement les consignes pratiques (agiter,
@@ -170,6 +180,10 @@ Regles obligatoires :
 - Les nombres des delais viande, abats ou lait ne sont jamais une duree de traitement.
 - Recherche et conserve separement les trois delais meatDays, offalDays et milkDays lorsqu'ils sont ecrits.
   "viande et abats : 21 jours, lait : 7 jours" signifie meatDays=21, offalDays=21 et milkDays=7.
+- "toutes les denrées : 0 jour" signifie meatDays=0, offalDays=0 et milkDays=0.
+- Dans conditionsImportantes, conserve avec sourceText les règles explicitement utiles : âge minimum ou
+  utilisation dès la naissance, avant/après vêlage, rappel et intervalle, catégorie d'animaux et restrictions.
+  Reste bref dans value et n'invente aucune règle absente du document.
 - Pour chaque champ important, fournis le texte source et une confiance entre 0 et 1.
 - Si une information n'est pas lisible, mets null.`;
 
