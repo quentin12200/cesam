@@ -3,29 +3,51 @@ import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { normaliserPattes } from "@/lib/parage";
 
+interface TraitementDraft {
+  medicamentId?: string | null;
+  medicamentNom: string;
+  voie?: string | null;
+  executant?: string | null;
+  dose?: number | null;
+  doseParAnimal?: Record<string, number | null>;
+  uniteDosage?: string | null;
+  frequence?: string | null;
+  dureeJours?: number | null;
+  doseUnique?: boolean;
+  motif?: string | null;
+  delaiAttenteViandeJ?: number | null;
+  delaiAttenteLaitJ?: number | null;
+}
+
+interface VaccinationSession {
+  protocoleId: string;
+  vaccin: string;
+  medicamentId: string;
+  voie?: string | null;
+  dose?: number | null;
+  animaux: Array<{
+    animalId: string;
+    etapeProtocoleId: string;
+    gestationId?: string | null;
+    typeInjection?: string | null;
+  }>;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { animalIds, nutravs, date, moment, categorie, type, symptomes, reponses, temperature, description, photos, constatePar, traitements, parage } = body;
-
-    if (!type?.trim() || !date) {
-      return NextResponse.json({ error: "type et date requis" }, { status: 400 });
-    }
+    const vaccinationSession = body.vaccinationSession as VaccinationSession | null | undefined;
+    if (!type?.trim() || !date) return NextResponse.json({ error: "type et date requis" }, { status: 400 });
 
     const symptomesList: { libelle: string; typeEvenementId?: string | null }[] = Array.isArray(symptomes)
-      ? symptomes
-          .filter((s: { libelle?: string }) => s?.libelle?.trim())
-          .map((s: { libelle: string; typeEvenementId?: string | null }) => ({ libelle: s.libelle.trim(), typeEvenementId: s.typeEvenementId ?? null }))
+      ? symptomes.filter((s: { libelle?: string }) => s?.libelle?.trim()).map((s: { libelle: string; typeEvenementId?: string | null }) => ({ libelle: s.libelle.trim(), typeEvenementId: s.typeEvenementId ?? null }))
       : [];
-
     const reponsesList: { questionId: string; valeur: string; libelleEnregistre: string }[] = Array.isArray(reponses)
       ? reponses.filter((r: { questionId?: string; valeur?: unknown }) => r?.questionId && r.valeur !== undefined)
       : [];
-
     const paragePattes = parage ? normaliserPattes(parage.pattes) : [];
-    if (parage && paragePattes.length === 0) {
-      return NextResponse.json({ error: "Au moins une patte est requise pour le parage" }, { status: 400 });
-    }
+    if (parage && paragePattes.length === 0) return NextResponse.json({ error: "Au moins une patte est requise pour le parage" }, { status: 400 });
 
     let resolvedCategorie: string | null = categorie ?? null;
     const premierTypeId = symptomesList[0]?.typeEvenementId;
@@ -34,142 +56,151 @@ export async function POST(request: NextRequest) {
       resolvedCategorie = premierType?.categorie ?? null;
     }
 
-    let ids: string[] = Array.isArray(animalIds) ? animalIds : [];
+    let ids: string[] = Array.isArray(animalIds) ? [...new Set(animalIds)] as string[] : [];
     if (ids.length === 0 && Array.isArray(nutravs) && nutravs.length > 0) {
-      const animaux = await prisma.animal.findMany({
-        where: { nutrav: { in: nutravs } },
-        select: { id: true },
-      });
-      ids = animaux.map((a) => a.id);
+      const animaux = await prisma.animal.findMany({ where: { nutrav: { in: nutravs } }, select: { id: true } });
+      ids = animaux.map((animal) => animal.id);
+    }
+    if (ids.length === 0) return NextResponse.json({ error: "animalIds ou nutravs requis" }, { status: 400 });
+
+    let vaccinationConfig: {
+      session: VaccinationSession;
+      etapes: Array<{ id: string; ordre: number; cycle: string; reference: string; obligatoire: boolean; protocoleId: string }>;
+      medicamentNom: string;
+    } | null = null;
+    if (vaccinationSession) {
+      const idsSession = vaccinationSession.animaux.map((animal) => animal.animalId);
+      if (idsSession.length === 0 || idsSession.length !== ids.length || ids.some((id) => !idsSession.includes(id))) {
+        return NextResponse.json({ error: "La sélection vaccinale ne correspond pas aux animaux de la séance" }, { status: 400 });
+      }
+      if (!vaccinationSession.protocoleId || !vaccinationSession.medicamentId || vaccinationSession.dose != null && !Number.isFinite(Number(vaccinationSession.dose))) {
+        return NextResponse.json({ error: "Contexte vaccinal invalide" }, { status: 400 });
+      }
+      const gestationIds = vaccinationSession.animaux.map((animal) => animal.gestationId).filter((id): id is string => Boolean(id));
+      const [protocole, medicament, gestations] = await Promise.all([
+        prisma.protocoleVaccin.findUnique({
+          where: { id: vaccinationSession.protocoleId },
+          select: { etapes: { select: { id: true, ordre: true, cycle: true, reference: true, obligatoire: true, protocoleId: true, medicaments: { select: { medicamentId: true } } } } },
+        }),
+        prisma.medicament.findUnique({ where: { id: vaccinationSession.medicamentId }, select: { nom: true } }),
+        prisma.gestation.findMany({ where: { id: { in: gestationIds } }, select: { id: true, saillie: { select: { animalId: true } } } }),
+      ]);
+      if (!protocole || !medicament || vaccinationSession.animaux.some((animal) => {
+        const etape = protocole.etapes.find((item) => item.id === animal.etapeProtocoleId);
+        const gestationValide = !animal.gestationId || gestations.some((gestation) => gestation.id === animal.gestationId && gestation.saillie.animalId === animal.animalId);
+        return !etape || !gestationValide || !etape.medicaments.some((liaison) => liaison.medicamentId === vaccinationSession.medicamentId);
+      })) return NextResponse.json({ error: "Étape vaccinale ou médicament invalide" }, { status: 400 });
+      vaccinationConfig = { session: vaccinationSession, etapes: protocole.etapes, medicamentNom: medicament.nom };
     }
 
-    if (ids.length === 0) {
-      return NextResponse.json({ error: "animalIds ou nutravs requis" }, { status: 400 });
-    }
-
+    const traitementsList: TraitementDraft[] = Array.isArray(traitements)
+      ? traitements.filter((traitement: TraitementDraft) => traitement?.medicamentNom?.trim())
+      : [];
     const resolvedDate = new Date(date);
     const now = new Date();
 
-    const evenements = await Promise.all(
-      ids.map((animalId: string) =>
-        prisma.evenementSanitaire.create({
-          data: {
-            animalId,
-            categorie: resolvedCategorie,
-            type: type.trim(),
-            date: resolvedDate,
-            moment: moment ?? null,
-            temperature: temperature != null && temperature !== "" ? Number(temperature) : null,
-            description: description?.trim() || null,
-            photos: photos ?? null,
-            constatePar: constatePar?.trim() || null,
-            updatedAt: now,
-            ...(symptomesList.length > 0
-              ? { symptomes: { create: symptomesList.map((s) => ({ libelle: s.libelle, typeEvenementId: s.typeEvenementId ?? null })) } }
-              : {}),
-            ...(reponsesList.length > 0
-              ? { reponses: { create: reponsesList.map((r) => ({ questionId: r.questionId, valeur: r.valeur, libelleEnregistre: r.libelleEnregistre })) } }
-              : {}),
-          },
-        })
-      )
-    );
+    const resultat = await prisma.$transaction(async (tx) => {
+      const evenements = await Promise.all(ids.map((animalId) => tx.evenementSanitaire.create({
+        data: {
+          animalId,
+          categorie: resolvedCategorie,
+          type: type.trim(),
+          date: resolvedDate,
+          moment: moment ?? null,
+          temperature: temperature != null && temperature !== "" ? Number(temperature) : null,
+          description: description?.trim() || null,
+          photos: photos ?? null,
+          constatePar: constatePar?.trim() || null,
+          updatedAt: now,
+          ...(symptomesList.length > 0 ? { symptomes: { create: symptomesList.map((symptome) => ({ libelle: symptome.libelle, typeEvenementId: symptome.typeEvenementId ?? null })) } } : {}),
+          ...(reponsesList.length > 0 ? { reponses: { create: reponsesList.map((reponse) => ({ questionId: reponse.questionId, valeur: reponse.valeur, libelleEnregistre: reponse.libelleEnregistre })) } } : {}),
+        },
+      })));
+      const parAnimal = new Map(evenements.map((evenement) => [evenement.animalId, evenement.id]));
+      const traitementsCrees = await Promise.all(traitementsList.flatMap((traitement) => ids.map((animalId) => tx.traitement.create({
+        data: {
+          animalId,
+          evenementId: parAnimal.get(animalId) ?? null,
+          medicamentId: traitement.medicamentId || null,
+          medicamentNom: traitement.medicamentNom.trim(),
+          dateDebut: resolvedDate,
+          dureeJours: traitement.doseUnique ? 1 : Math.max(1, traitement.dureeJours ?? 1),
+          doseUnique: traitement.doseUnique === true,
+          voie: traitement.voie || null,
+          frequence: traitement.doseUnique ? null : traitement.frequence || null,
+          dose: traitement.doseParAnimal?.[animalId] ?? traitement.dose ?? null,
+          uniteDosage: traitement.uniteDosage || null,
+          motif: traitement.motif || null,
+          executant: traitement.executant || null,
+          moment: moment ?? null,
+          delaiAttenteViandeJ: traitement.delaiAttenteViandeJ ?? null,
+          delaiAttenteLaitJ: traitement.delaiAttenteLaitJ ?? null,
+          statut: traitement.doseUnique ? "TERMINE" : "EN_COURS",
+        },
+        select: { id: true },
+      }))));
+      const paragesCrees = parage ? await Promise.all(evenements.map((evenement) => tx.parage.create({
+        data: { animalId: evenement.animalId, evenementId: evenement.id, date: resolvedDate, motif: parage.motif === "BOITERIE" ? "BOITERIE" : "PARAGE", pattes: JSON.stringify(paragePattes), notes: typeof parage.note === "string" && parage.note.trim() ? parage.note.trim() : null, statut: "A_VOIR" },
+        select: { id: true },
+      }))) : [];
 
-    // Traitement(s) optionnel(s), créés dans la même opération que l'événement :
-    // un traitement s'applique à tous les animaux ciblés, lié à l'événement propre à chacun.
-    interface TraitementDraft {
-      medicamentId?: string | null;
-      medicamentNom: string;
-      voie?: string | null;
-      executant?: string | null;
-      dose?: number | null;
-      doseParAnimal?: Record<string, number | null>;
-      uniteDosage?: string | null;
-      frequence?: string | null;
-      dureeJours?: number | null;
-      doseUnique?: boolean;
-      motif?: string | null;
-      delaiAttenteViandeJ?: number | null;
-      delaiAttenteLaitJ?: number | null;
-    }
-    const traitementsList: TraitementDraft[] = Array.isArray(traitements)
-      ? traitements.filter((t: TraitementDraft) => t?.medicamentNom?.trim())
-      : [];
+      const vaccinationsCrees = vaccinationConfig ? await Promise.all(vaccinationConfig.session.animaux.map((animal) => tx.vaccination.create({
+        data: {
+          animalId: animal.animalId,
+          vaccin: vaccinationConfig.medicamentNom,
+          date: resolvedDate,
+          voie: vaccinationConfig.session.voie?.trim() || null,
+          dose: vaccinationConfig.session.dose == null ? null : Number(vaccinationConfig.session.dose),
+          medicamentId: vaccinationConfig.session.medicamentId,
+          protocoleId: vaccinationConfig.session.protocoleId,
+          etapeProtocoleId: animal.etapeProtocoleId,
+          gestationId: vaccinationConfig.etapes.find((etape) => etape.id === animal.etapeProtocoleId)?.reference === "VELAGE" ? animal.gestationId || null : null,
+          typeInjection: vaccinationConfig.etapes.find((etape) => etape.id === animal.etapeProtocoleId)?.cycle === "ENTRETIEN"
+            ? "ENTRETIEN"
+            : vaccinationConfig.etapes.filter((etape) => etape.cycle !== "ENTRETIEN").sort((a, b) => a.ordre - b.ordre)[0]?.id === animal.etapeProtocoleId ? "PRIMO_1" : "RAPPEL",
+          updatedAt: now,
+        },
+        select: { id: true, animalId: true },
+      }))) : [];
 
-    let traitementsCrees: { id: string }[] = [];
-    if (traitementsList.length > 0) {
-      const parAnimal = new Map(evenements.map((e) => [e.animalId, e.id]));
-      traitementsCrees = await Promise.all(
-        traitementsList.flatMap((t) =>
-          ids.map((animalId) =>
-            prisma.traitement.create({
-              data: {
-                animalId,
-                evenementId: parAnimal.get(animalId) ?? null,
-                medicamentId: t.medicamentId || null,
-                medicamentNom: t.medicamentNom.trim(),
-                dateDebut: resolvedDate,
-                dureeJours: t.doseUnique ? 1 : Math.max(1, t.dureeJours ?? 1),
-                doseUnique: t.doseUnique === true,
-                voie: t.voie || null,
-                frequence: t.frequence || null,
-                dose: t.doseParAnimal?.[animalId] ?? t.dose ?? null,
-                uniteDosage: t.uniteDosage || null,
-                motif: t.motif || null,
-                executant: t.executant || null,
-                moment: moment ?? null,
-                delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? null,
-                delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? null,
-                statut: t.doseUnique ? "TERMINE" : "EN_COURS",
-              },
-              select: { id: true },
-            })
-          )
-        )
-      );
-    }
+      if (vaccinationConfig) {
+        for (const animal of vaccinationConfig.session.animaux) {
+          const etape = vaccinationConfig.etapes.find((item) => item.id === animal.etapeProtocoleId)!;
+          let statut = "PROTOCOLE_ACQUIS";
+          if (etape.cycle !== "ENTRETIEN") {
+            const initialesRequises = vaccinationConfig.etapes.filter((item) => item.cycle !== "ENTRETIEN" && item.obligatoire).map((item) => item.id);
+            const realisees = await tx.vaccination.findMany({ where: { animalId: animal.animalId, protocoleId: vaccinationConfig.session.protocoleId, etapeProtocoleId: { in: initialesRequises } }, select: { etapeProtocoleId: true } });
+            statut = initialesRequises.every((id) => realisees.some((vaccination) => vaccination.etapeProtocoleId === id)) ? "PROTOCOLE_ACQUIS" : "PRIMO_EN_COURS";
+          }
+          await tx.statutProtocoleVaccinal.upsert({
+            where: { animalId_protocoleId: { animalId: animal.animalId, protocoleId: vaccinationConfig.session.protocoleId } },
+            create: { animalId: animal.animalId, protocoleId: vaccinationConfig.session.protocoleId, statut, source: "VACCINATION", confirmeAt: now },
+            update: { statut, source: "VACCINATION", confirmeAt: now },
+          });
+        }
+      }
+      return { evenements, traitementsCrees, paragesCrees, vaccinationsCrees };
+    });
 
-    let paragesCrees: { id: string }[] = [];
-    if (parage) {
-      paragesCrees = await Promise.all(
-        evenements.map((evenement) =>
-          prisma.parage.create({
-            data: {
-              animalId: evenement.animalId,
-              evenementId: evenement.id,
-              date: resolvedDate,
-              motif: parage.motif === "BOITERIE" ? "BOITERIE" : "PARAGE",
-              pattes: JSON.stringify(paragePattes),
-              notes: typeof parage.note === "string" && parage.note.trim() ? parage.note.trim() : null,
-              statut: "A_VOIR",
-            },
-            select: { id: true },
-          })
-        )
-      );
-    }
-
-    const desc = `Événement sanitaire "${type.trim()}" enregistré pour ${evenements.length} animal(s)`
-      + (traitementsCrees.length > 0 ? ` avec ${traitementsCrees.length} traitement(s)` : "")
-      + (paragesCrees.length > 0 ? ` et ${paragesCrees.length} ajout(s) au parage` : "");
+    const desc = `Événement sanitaire "${type.trim()}" enregistré pour ${resultat.evenements.length} animal(s)`
+      + (resultat.traitementsCrees.length > 0 ? ` avec ${resultat.traitementsCrees.length} traitement(s)` : "")
+      + (resultat.vaccinationsCrees.length > 0 ? ` et ${resultat.vaccinationsCrees.length} vaccination(s)` : "")
+      + (resultat.paragesCrees.length > 0 ? ` et ${resultat.paragesCrees.length} ajout(s) au parage` : "");
     let undoId = "";
     try {
-      undoId = await logAction(
-        "BATCH_EVENEMENT_SANITAIRE",
-        desc,
-        [
-          ...evenements.map((e) => ({ op: "delete" as const, model: "evenementSanitaire", id: e.id })),
-          ...traitementsCrees.map((t) => ({ op: "delete" as const, model: "traitement", id: t.id })),
-          ...paragesCrees.map((p) => ({ op: "delete" as const, model: "parage", id: p.id })),
-        ]
-      );
+      undoId = await logAction("BATCH_EVENEMENT_SANITAIRE", desc, [
+        ...resultat.evenements.map((evenement) => ({ op: "delete" as const, model: "evenementSanitaire", id: evenement.id })),
+        ...resultat.traitementsCrees.map((traitement) => ({ op: "delete" as const, model: "traitement", id: traitement.id })),
+        ...resultat.vaccinationsCrees.map((vaccination) => ({ op: "delete" as const, model: "vaccination", id: vaccination.id })),
+        ...resultat.paragesCrees.map((parageCree) => ({ op: "delete" as const, model: "parage", id: parageCree.id })),
+      ]);
     } catch {}
-
     return NextResponse.json({
-      count: evenements.length,
-      evenements: evenements.map((e) => ({ id: e.id, animalId: e.animalId })),
-      traitementsCount: traitementsCrees.length,
-      paragesCount: paragesCrees.length,
+      count: resultat.evenements.length,
+      evenements: resultat.evenements.map((evenement) => ({ id: evenement.id, animalId: evenement.animalId })),
+      traitementsCount: resultat.traitementsCrees.length,
+      vaccinationsCount: resultat.vaccinationsCrees.length,
+      paragesCount: resultat.paragesCrees.length,
       _undoId: undoId,
       _undoDesc: desc,
     }, { status: 201 });

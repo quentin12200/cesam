@@ -220,6 +220,18 @@ export function determinerProchaineInjection({
     : { type: "ENTRETIEN", fenetre: calculerFenetreVaccinale(dateVelagePrevue, "ENTRETIEN"), aConfirmer: false, couvert: false };
 }
 
+export function resoudreVoieVaccinale({
+  voiePreconisation,
+  voieMedicament,
+  voieLiaison,
+}: {
+  voiePreconisation?: string | null;
+  voieMedicament?: string | null;
+  voieLiaison?: string | null;
+}): string {
+  return voiePreconisation?.trim() || voieMedicament?.trim() || voieLiaison?.trim() || "À renseigner";
+}
+
 export type StatutPreparationVaccin = "A_FAIRE" | "A_PREVOIR" | "TROP_TOT" | "EN_RETARD" | "TERMINE" | "A_CONFIRMER";
 
 export interface EtapeVaccinaleConfig {
@@ -447,14 +459,78 @@ export function proposerConditionnements({
 }: {
   dosesNecessaires: number;
   reliquatsUtilisables: ReadonlyArray<number>;
-  conditionnements: ReadonlyArray<number>;
-}): { reliquatUtilise: number; nombre: number; dosesParConditionnement: number | null; totalDisponible: number } {
+  conditionnements: ReadonlyArray<number | {
+    doses: number;
+    prixFlaconEur?: number | null;
+    conservationOuvertureStatut?: string | null;
+  }>;
+}): {
+  reliquatUtilise: number;
+  nombre: number;
+  dosesParConditionnement: number | null;
+  totalDisponible: number;
+  perte: number;
+  conservationConnue: boolean;
+  achats: Array<{ doses: number; nombre: number }>;
+} {
   const reliquatUtilise = Math.min(dosesNecessaires, reliquatsUtilisables.reduce((total, doses) => total + Math.max(0, doses), 0));
   const restant = Math.max(0, dosesNecessaires - reliquatUtilise);
-  if (restant === 0) return { reliquatUtilise, nombre: 0, dosesParConditionnement: null, totalDisponible: reliquatUtilise };
-  const options = conditionnements.filter((doses) => doses > 0).map((doses) => ({ doses, nombre: Math.ceil(restant / doses) }));
-  options.sort((a, b) => (a.nombre * a.doses - restant) - (b.nombre * b.doses - restant) || a.nombre - b.nombre);
-  const choix = options[0];
-  if (!choix) return { reliquatUtilise, nombre: 0, dosesParConditionnement: null, totalDisponible: reliquatUtilise };
-  return { reliquatUtilise, nombre: choix.nombre, dosesParConditionnement: choix.doses, totalDisponible: reliquatUtilise + choix.nombre * choix.doses };
+  if (restant === 0) return { reliquatUtilise, nombre: 0, dosesParConditionnement: null, totalDisponible: reliquatUtilise, perte: 0, conservationConnue: true, achats: [] };
+  const formats = conditionnements
+    .map((conditionnement) => typeof conditionnement === "number"
+      ? { doses: conditionnement, prixFlaconEur: null, conservationOuvertureStatut: null }
+      : conditionnement)
+    .filter((conditionnement) => Number.isFinite(conditionnement.doses) && conditionnement.doses > 0);
+  if (formats.length === 0) return { reliquatUtilise, nombre: 0, dosesParConditionnement: null, totalDisponible: reliquatUtilise, perte: 0, conservationConnue: false, achats: [] };
+
+  const toutesAvecPrix = formats.every((format) => format.prixFlaconEur != null && Number.isFinite(format.prixFlaconEur));
+  const maxDose = Math.ceil(Math.max(...formats.map((format) => format.doses)));
+  const limite = Math.ceil(restant) + maxDose;
+  type Option = { total: number; cout: number; nombre: number; achats: number[] };
+  const options: Option[] = [{ total: 0, cout: 0, nombre: 0, achats: Array(formats.length).fill(0) }];
+  for (let total = 0; total <= limite; total += 1) {
+    const base = options[total];
+    if (!base) continue;
+    formats.forEach((format, index) => {
+      const prochainTotal = total + Math.ceil(format.doses);
+      if (prochainTotal > limite) return;
+      const candidat: Option = {
+        total: prochainTotal,
+        cout: base.cout + (format.prixFlaconEur ?? 0),
+        nombre: base.nombre + 1,
+        achats: base.achats.map((nombre, achatIndex) => nombre + (achatIndex === index ? 1 : 0)),
+      };
+      const actuel = options[prochainTotal];
+      if (!actuel || (toutesAvecPrix
+        ? candidat.cout < actuel.cout || (candidat.cout === actuel.cout && candidat.nombre < actuel.nombre)
+        : candidat.nombre < actuel.nombre)) options[prochainTotal] = candidat;
+    });
+  }
+  const candidates = options.filter((option) => option && option.total >= restant);
+  const tolerance = Math.max(1, restant * 0.1);
+  candidates.sort((a, b) => {
+    if (toutesAvecPrix) return a.cout - b.cout || a.nombre - b.nombre || (a.total - restant) - (b.total - restant);
+    const aFaiblePerte = a.total - restant <= tolerance;
+    const bFaiblePerte = b.total - restant <= tolerance;
+    if (aFaiblePerte !== bFaiblePerte) return aFaiblePerte ? -1 : 1;
+    return aFaiblePerte
+      ? a.nombre - b.nombre || (a.total - restant) - (b.total - restant)
+      : (a.total - restant) - (b.total - restant) || a.nombre - b.nombre;
+  });
+  const choix = candidates[0];
+  if (!choix) return { reliquatUtilise, nombre: 0, dosesParConditionnement: null, totalDisponible: reliquatUtilise, perte: 0, conservationConnue: false, achats: [] };
+  const achats = choix.achats.flatMap((nombre, index) => nombre > 0 ? [{ doses: formats[index].doses, nombre }] : []);
+  const formatUnique = achats.length === 1 ? achats[0] : null;
+  return {
+    reliquatUtilise,
+    nombre: choix.nombre,
+    dosesParConditionnement: formatUnique?.doses ?? null,
+    totalDisponible: reliquatUtilise + choix.total,
+    perte: choix.total - restant,
+    conservationConnue: achats.every((achat) => {
+      const format = formats.find((item) => item.doses === achat.doses);
+      return format?.conservationOuvertureStatut === "IMMEDIATE" || format?.conservationOuvertureStatut === "CONSERVABLE";
+    }),
+    achats,
+  };
 }

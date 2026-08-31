@@ -11,6 +11,7 @@ import AnimalPickerModal from "./AnimalPickerModal";
 import QuestionPanel, { type QuestionTemplateData } from "./QuestionPanel";
 import TraitementDraftRow, { type TraitementDraft } from "./TraitementDraftRow";
 import { type MedicamentOption } from "./MedicamentPicker";
+import type { VaccinationSessionPreset } from "@/lib/vaccination-session";
 import { type Intervenant } from "./ExecutantSelect";
 import { getMomentActuel } from "@/lib/evenements-sanitaires";
 import { searchTypesEvenement, normalizeSearch, type RecherchableTypeEvenement } from "@/lib/fuzzy-search";
@@ -42,7 +43,7 @@ function nouveauDraft(): TraitementDraft {
   return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", executant: "", dose: "", uniteDosage: "ml", motif: "", doseUnique: true, frequence: "", dureeJours: "" };
 }
 
-export default function NouvelEvenementForm({ presetNutrav, presetNutravs, presetMedicamentId }: { presetNutrav?: string; presetNutravs?: string[]; presetMedicamentId?: string }) {
+export default function NouvelEvenementForm({ presetNutrav, presetNutravs, presetMedicamentId, presetVaccination }: { presetNutrav?: string; presetNutravs?: string[]; presetMedicamentId?: string; presetVaccination?: VaccinationSessionPreset }) {
   const router = useRouter();
   const { completeToOrigin } = useOriginNavigation();
 
@@ -57,7 +58,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
   const [catalogue, setCatalogue] = useState<RecherchableTypeEvenement[]>([]);
   const [recents, setRecents] = useState<{ libelle: string; typeEvenementId: string | null }[]>([]);
   const [query, setQuery] = useState("");
-  const [selectedTypes, setSelectedTypes] = useState<TypeSelectionne[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<TypeSelectionne[]>(presetVaccination ? [{ id: "vaccination-session", nom: "Vaccination" }] : []);
   const [questionsByType, setQuestionsByType] = useState<Record<string, QuestionTemplateData[]>>({});
   const [answers, setAnswers] = useState<Record<string, Record<string, unknown>>>({});
   const [panelOuvert, setPanelOuvert] = useState<string | null>(null);
@@ -144,9 +145,16 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
     setTraitementsDrafts((prev) => {
       if (prev.some((d) => d.medicament?.id === m.id)) return prev;
       const [first, ...rest] = prev;
-      return [{ ...first, medicament: m, voie: voiceDraft?.voieAdministration ?? m.voie ?? first.voie }, ...rest];
+      return [{
+        ...first,
+        medicament: m,
+        voie: voiceDraft?.voieAdministration ?? presetVaccination?.voie ?? m.voie ?? first.voie,
+        dose: presetVaccination?.dose != null ? String(presetVaccination.dose) : first.dose,
+        uniteDosage: presetVaccination?.uniteDosage ?? first.uniteDosage,
+        doseUnique: presetVaccination ? true : first.doseUnique,
+      }, ...rest];
     });
-  }, [presetMedicamentId, medicaments, voiceDraft]);
+  }, [presetMedicamentId, presetVaccination, medicaments, voiceDraft]);
 
   useEffect(() => {
     if (!voiceDraft?.event || catalogue.length === 0) return;
@@ -198,6 +206,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
   }
 
   function retirerType(id: string) {
+    if (presetVaccination && id === "vaccination-session") return;
     setSelectedTypes((prev) => prev.filter((t) => t.id !== id));
     setAnswers((prev) => {
       const next = { ...prev };
@@ -257,6 +266,13 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
 
     const animaux = selectedAnimaux;
     if (animaux.length === 0) { setError("Sélectionne au moins un animal"); return; }
+    if (presetVaccination) {
+      const autorises = new Set(presetVaccination.animaux.map((animal) => animal.animalId));
+      if (animaux.some((animal) => !autorises.has(animal.id))) {
+        setError("Un animal ajouté n’a pas d’étape vaccinale préparée. Reviens à Vaccins pour l’ajouter à une séance.");
+        return;
+      }
+    }
 
     if (traitementActif) {
       if (draftsValides.length === 0) { setError("Choisis au moins un médicament, ou désactive l'ajout de traitement"); return; }
@@ -297,7 +313,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
           date,
           moment,
           type: premier.nom,
-          symptomes: selectedTypes.map((t) => ({ libelle: t.nom, typeEvenementId: t.id.startsWith("libre-") ? null : t.id })),
+          symptomes: selectedTypes.map((t) => ({ libelle: t.nom, typeEvenementId: t.id.startsWith("libre-") || t.id === "vaccination-session" ? null : t.id })),
           reponses,
           temperature: temperature !== "" ? Number(temperature) : null,
           description: description || null,
@@ -317,6 +333,14 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
             delaiAttenteViandeJ: d.medicament!.delaiAttenteViandeJ ?? null,
             delaiAttenteLaitJ: d.medicament!.delaiAttenteLaitJ ?? null,
           })),
+          vaccinationSession: presetVaccination ? {
+            protocoleId: presetVaccination.protocoleId,
+            vaccin: presetVaccination.vaccin,
+            medicamentId: draftsValides[0]?.medicament?.id ?? presetVaccination.medicamentId,
+            voie: draftsValides[0]?.voie || null,
+            dose: draftsValides[0]?.dose !== "" ? Number(draftsValides[0]?.dose) : null,
+            animaux: presetVaccination.animaux.filter((item) => animaux.some((animal) => animal.id === item.animalId)),
+          } : null,
           parage: ajouterAuParage ? { motif: "BOITERIE", pattes: paragePattes, note: parageNote || null } : null,
         }),
       });
@@ -325,6 +349,11 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
         throw new Error(err.error ?? "Erreur serveur");
       }
       const data = await res.json();
+      if (presetVaccination) {
+        router.push("/sanitaire/vaccins");
+        router.refresh();
+        return;
+      }
       const animalParage = animaux.length === 1 ? animaux[0] : null;
       const parageDraft: VoiceParageDraft | null = aBoiterie && !ajouterAuParage && animalParage
         ? {
@@ -501,9 +530,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
             {selectedTypes.map((t) => (
               <span key={t.id} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-800 rounded-full pl-2.5 pr-1 py-1 text-xs font-medium">
                 {t.nom}
-                <button type="button" onClick={() => retirerType(t.id)} className="hover:bg-blue-100 rounded-full p-0.5">
-                  <X size={11} />
-                </button>
+                {!(presetVaccination && t.id === "vaccination-session") && <button type="button" onClick={() => retirerType(t.id)} className="hover:bg-blue-100 rounded-full p-0.5"><X size={11} /></button>}
               </span>
             ))}
           </div>

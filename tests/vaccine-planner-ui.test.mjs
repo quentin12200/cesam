@@ -20,10 +20,11 @@ test("la fiche Pharmacie expose la conservation par défaut et les surcharges", 
 test("la première vue du planificateur reste factuelle et rattachée à la gestation", () => {
   const loader = read("lib/vaccine-preparation-data.ts");
   const page = read("app/sanitaire/vaccins/page.tsx");
+  const card = read("app/sanitaire/vaccins/PreparationVaccinCard.tsx");
   assert.match(loader, /vaccination\.gestationId === gestation\?\.id/);
   assert.match(loader, /calculerActionVaccinale/);
-  assert.match(page, /dateMin/);
-  assert.match(page, /dateMax/);
+  assert.match(`${page}\n${card}`, /dateMin/);
+  assert.match(`${page}\n${card}`, /dateMax/);
   assert.doesNotMatch(loader, /\.create\(|\.update\(/);
 });
 

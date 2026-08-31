@@ -7,6 +7,7 @@ import {
   calculerActionVaccinale,
   proposerConditionnements,
   reliquatFlacon,
+  resoudreVoieVaccinale,
   type StatutProtocoleVaccinal,
   type StatutPreparationVaccin,
 } from "@/lib/vaccine-planner";
@@ -20,8 +21,15 @@ export interface LignePreparationVaccin {
   dateMin: Date;
   dateMax: Date;
   groupe: string;
+  mere: string | null;
   dose: string;
+  doseValeur: number | null;
+  doseUnite: string | null;
   voie: string;
+  medicamentId: string | null;
+  etapeProtocoleId: string;
+  gestationId: string | null;
+  typeInjection: string | null;
   statut: StatutPreparationVaccin;
 }
 
@@ -47,6 +55,9 @@ export interface GroupePreparationVaccin {
     ouverts: number;
     dosesRestantes: number;
     prochaineLimite: Date | null;
+    perte: number;
+    conservationConnue: boolean;
+    achats: Array<{ doses: number; nombre: number }>;
   };
   stockPharmacie: string;
 }
@@ -119,6 +130,15 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         categorie: true,
         groupe: { select: { nom: true } },
         localisation: { select: { nom: true } },
+        mereTravailManuel: true,
+        mere: {
+          select: {
+            nutrav: true,
+            nobovi: true,
+            groupe: { select: { nom: true } },
+            localisation: { select: { nom: true } },
+          },
+        },
         _count: { select: { velagesVache: true } },
         saillies: {
           where: { gestation: { is: { dateVelagePrevue: { not: null }, etat: { in: ["VERT", "ROSE"] } } } },
@@ -134,7 +154,8 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
 
   return protocoles.map((protocole) => {
     const cibles = categoriesCibles(protocole.categoriesJson);
-    const totalInitial = protocole.etapes.filter((etape) => etape.cycle !== "ENTRETIEN").length;
+    const etapesInitiales = protocole.etapes.filter((etape) => etape.cycle !== "ENTRETIEN");
+    const totalInitial = etapesInitiales.length;
     let termines = 0;
     const lignes: LignePreparationVaccin[] = [];
     const aConfirmer: GroupePreparationVaccin["aConfirmer"] = [];
@@ -191,9 +212,17 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       const preconisationLiee = liaison?.preconisationId
         ? medicament?.preconisations.find((item) => item.id === liaison.preconisationId)
         : null;
-      const preconisationsValides = medicament?.preconisations.filter((item) => item.statut === "VALIDE" && item.dose != null) ?? [];
-      const preconisation = preconisationLiee ?? (preconisationsValides.length === 1 ? preconisationsValides[0] : null);
-      const voie = liaison?.voie || preconisation?.voie || medicament?.voie || "Inconnue";
+      const preconisationsValides = medicament?.preconisations.filter((item) => item.statut === "VALIDE") ?? [];
+      const preconisationsValidesDosees = preconisationsValides.filter((item) => item.dose != null);
+      const preconisation = preconisationLiee ?? (preconisationsValidesDosees.length === 1 ? preconisationsValidesDosees[0] : null);
+      const preconisationValideeAvecVoie = preconisationLiee?.statut === "VALIDE" && preconisationLiee.voie
+        ? preconisationLiee
+        : preconisationsValides.find((item) => item.voie) ?? null;
+      const voie = resoudreVoieVaccinale({
+        voiePreconisation: preconisationValideeAvecVoie?.voie,
+        voieMedicament: medicament?.voie,
+        voieLiaison: liaison?.voie,
+      });
       const dose = preconisation?.dose == null
         ? "Dose inconnue"
         : `${preconisation.dose} ${preconisation.unite || medicament?.uniteDosage || ""}`.trim();
@@ -211,8 +240,20 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         dateMin: action.dateMin,
         dateMax: action.dateMax,
         groupe: [animal.groupe?.nom, animal.localisation?.nom].filter(Boolean).join(" · ") || "—",
+        mere: differenceInCalendarDays(date, animal.danais) < 183
+          ? [
+              `Mère ${animal.mere?.nutrav || animal.mereTravailManuel || "—"}`,
+              animal.mere ? [animal.mere.groupe?.nom, animal.mere.localisation?.nom].filter(Boolean).join(" · ") : null,
+            ].filter(Boolean).join(" · ")
+          : null,
         dose,
+        doseValeur: preconisation?.dose ?? null,
+        doseUnite: preconisation?.unite || medicament?.uniteDosage || null,
         voie,
+        medicamentId: medicament?.id ?? null,
+        etapeProtocoleId: action.etape.id,
+        gestationId: protocoleLieAuVelage ? gestation?.id ?? null : null,
+        typeInjection: action.etape.cycle === "ENTRETIEN" ? "ENTRETIEN" : etapesInitiales[0]?.id === action.etape.id ? "PRIMO_1" : "RAPPEL",
         statut: action.statut,
       });
     }
@@ -225,7 +266,11 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
     const flacons = proposerConditionnements({
       dosesNecessaires: imprimables.length,
       reliquatsUtilisables,
-      conditionnements: (medicamentReference?.conditionnements ?? []).map((conditionnement) => conditionnement.doses),
+      conditionnements: (medicamentReference?.conditionnements ?? []).map((conditionnement) => ({
+        doses: conditionnement.doses,
+        prixFlaconEur: conditionnement.prixFlaconEur,
+        conservationOuvertureStatut: conditionnement.conservationOuvertureStatut ?? medicamentReference?.conservationOuvertureStatut,
+      })),
     });
     lignes.sort((a, b) => a.dateMax.getTime() - b.dateMax.getTime() || a.nutrav.localeCompare(b.nutrav));
     return {
@@ -234,7 +279,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       medicamentId: medicamentReference?.id ?? null,
       conditionnementRenseigne: (medicamentReference?.conditionnements.length ?? 0) > 0,
       dose: valeurUnique(imprimables.map((ligne) => ligne.dose), "Non renseignée"),
-      voie: valeurUnique(imprimables.map((ligne) => ligne.voie), "Inconnue"),
+      voie: valeurUnique(imprimables.map((ligne) => ligne.voie), "À renseigner"),
       lignes,
       aConfirmer,
       aFaire: lignes.filter((ligne) => ligne.statut === "A_FAIRE").length,

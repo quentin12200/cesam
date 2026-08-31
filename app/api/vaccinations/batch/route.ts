@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const nutravToId = new Map(animaux.map((a) => [a.nutrav, a.id]));
 
     const resolvedDate = new Date(date);
-    const resolvedVoie: string = voie ?? "IM";
+    const resolvedVoie: string | null = voie?.trim() || null;
     const now = new Date();
 
     const data = items.map((item: VaccinationBatchItem) => {

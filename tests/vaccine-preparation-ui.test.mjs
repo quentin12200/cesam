@@ -6,16 +6,17 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 
 test("l'écran Vaccins ouvre sur la préparation et expose les trois espaces", () => {
   const page = read("app/sanitaire/vaccins/page.tsx");
+  const card = read("app/sanitaire/vaccins/PreparationVaccinCard.tsx");
   assert.match(page, />À préparer</);
   assert.match(page, />Protocoles</);
   assert.match(page, />Stock \/ flacons</);
-  assert.match(page, /Préparer \/ imprimer/);
-  assert.match(page, /<details className="group">/);
-  assert.match(page, /Voir les animaux/);
-  assert.match(page, /Faire la séance/);
-  assert.match(page, /Besoin total/);
+  assert.match(card, /Préparer \/ imprimer/);
+  assert.match(card, /<details ref={detailsRef} className="group">/);
+  assert.match(card, /Voir les animaux/);
+  assert.match(card, /Faire la séance/);
+  assert.match(card, /Besoin total/);
   assert.match(page, /Achat conseillé/);
-  assert.match(page, /Reliquat utilisable/);
+  assert.match(card, /Reliquat utilisable/);
 });
 
 test("la feuille A4 est une lecture seule et contient les colonnes terrain", () => {
@@ -71,7 +72,7 @@ test("le calendrier vaccinal utilise les étapes et jamais une fréquence géné
 });
 
 test("le détail d'un vaccin reste secondaire et limité aux trois groupes terrain", () => {
-  const page = read("app/sanitaire/vaccins/page.tsx");
+  const page = read("app/sanitaire/vaccins/PreparationVaccinCard.tsx");
   assert.match(page, /statut: "A_FAIRE", titre: "À faire"/);
   assert.match(page, /statut: "A_PREVOIR", titre: "Bientôt"/);
   assert.match(page, /statut: "EN_RETARD", titre: "En retard"/);
@@ -105,5 +106,36 @@ test("les cartes Protocoles résument la règle, la dose et la voie", () => {
   assert.match(editor, /resumeTypeProtocole/);
   assert.match(editor, /resumeRegleEtape/);
   assert.match(editor, /Dose \{dose\?\.dose/);
-  assert.match(editor, /voie \{premiereLiaison/);
+  assert.match(editor, /voie \{dose\?\.voie \|\| produit\?\.voie \|\| premiereLiaison\?\.voie/);
+});
+
+test("la séance terrain sélectionne exactement les animaux cochés", () => {
+  const card = read("app/sanitaire/vaccins/PreparationVaccinCard.tsx");
+  const form = read("app/sanitaire/nouvel-evenement/NouvelEvenementForm.tsx");
+  assert.match(card, /useState<Set<string>>\(\(\) => new Set\(\)\)/);
+  assert.match(card, /Tout sélectionner/);
+  assert.match(card, /Tout désélectionner/);
+  assert.match(card, /selection\.has\(ligne\.animalId\)/);
+  assert.match(card, /animaux: nutravs\.join\(","\)/);
+  assert.match(card, /if \(selection\.size === 0\)/);
+  assert.match(form, /presetVaccination\.animaux\.filter/);
+});
+
+test("la validation sanitaire crée aussi les vaccinations liées", () => {
+  const route = read("app/api/evenements/batch/route.ts");
+  assert.match(route, /prisma\.\$transaction/);
+  assert.match(route, /tx\.vaccination\.create/);
+  assert.match(route, /etapeProtocoleId: animal\.etapeProtocoleId/);
+  assert.match(route, /gestationId: vaccinationConfig\.etapes\.find/);
+  assert.match(route, /tx\.statutProtocoleVaccinal\.upsert/);
+});
+
+test("les veaux de moins de six mois exposent leur mère", () => {
+  const loader = read("lib/vaccine-preparation-data.ts");
+  const card = read("app/sanitaire/vaccins/PreparationVaccinCard.tsx");
+  const print = read("app/sanitaire/vaccins/impression/page.tsx");
+  assert.match(loader, /differenceInCalendarDays\(date, animal\.danais\) < 183/);
+  assert.match(loader, /mereTravailManuel/);
+  assert.match(card, /ligne\.mere/);
+  assert.match(print, /ligne\.mere/);
 });

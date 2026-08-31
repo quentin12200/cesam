@@ -10,6 +10,7 @@ import {
   reliquatFlacon,
   reliquatUtilisableA,
   proposerConditionnements,
+  resoudreVoieVaccinale,
   resoudreRegleConservation,
   statutApresInjection,
 } from "./vaccine-planner.ts";
@@ -188,13 +189,39 @@ test("un protocole sans étape restante est terminé", () => {
 test("la préparation privilégie le reliquat valide puis complète en conditionnements", () => {
   assert.deepEqual(proposerConditionnements({ dosesNecessaires: 14, reliquatsUtilisables: [4], conditionnements: [5] }), {
     reliquatUtilise: 4, nombre: 2, dosesParConditionnement: 5, totalDisponible: 14,
+    perte: 0, conservationConnue: false, achats: [{ doses: 5, nombre: 2 }],
   });
 });
 
 test("aucun conditionnement renseigné ne produit aucune proposition inventée", () => {
   assert.deepEqual(proposerConditionnements({ dosesNecessaires: 14, reliquatsUtilisables: [], conditionnements: [] }), {
     reliquatUtilise: 0, nombre: 0, dosesParConditionnement: null, totalDisponible: 0,
+    perte: 0, conservationConnue: false, achats: [],
   });
+});
+
+test("la voie validée puis Pharmacie priment sur une ancienne liaison IM", () => {
+  assert.equal(resoudreVoieVaccinale({ voiePreconisation: "NASAL", voieMedicament: "ORAL", voieLiaison: "IM" }), "NASAL");
+  assert.equal(resoudreVoieVaccinale({ voieMedicament: "NASAL", voieLiaison: "IM" }), "NASAL");
+  assert.equal(resoudreVoieVaccinale({}), "À renseigner");
+});
+
+test("19 doses avec formats 1 et 20 privilégient un seul flacon de 20", () => {
+  const proposition = proposerConditionnements({ dosesNecessaires: 19, reliquatsUtilisables: [], conditionnements: [1, 20] });
+  assert.deepEqual(proposition.achats, [{ doses: 20, nombre: 1 }]);
+  assert.equal(proposition.perte, 1);
+});
+
+test("avec tous les prix renseignés le coût total prime", () => {
+  const proposition = proposerConditionnements({
+    dosesNecessaires: 19,
+    reliquatsUtilisables: [],
+    conditionnements: [
+      { doses: 1, prixFlaconEur: 0.5, conservationOuvertureStatut: "IMMEDIATE" },
+      { doses: 20, prixFlaconEur: 20, conservationOuvertureStatut: "CONSERVABLE" },
+    ],
+  });
+  assert.deepEqual(proposition.achats, [{ doses: 1, nombre: 19 }]);
 });
 
 test("PROTOCOLE_ACQUIS sans historique propose l'entretien et jamais Primo 1", () => {
