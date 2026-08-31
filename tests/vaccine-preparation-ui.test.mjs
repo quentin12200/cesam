@@ -9,7 +9,7 @@ test("l'écran Vaccins ouvre sur la préparation et expose les trois espaces", (
   assert.match(page, />À préparer</);
   assert.match(page, />Protocoles</);
   assert.match(page, />Stock \/ flacons</);
-  assert.match(page, /Imprimer la préparation/);
+  assert.match(page, /Préparer \/ imprimer la séance/);
 });
 
 test("la feuille A4 est une lecture seule et contient les colonnes terrain", () => {
@@ -29,6 +29,13 @@ test("les statuts à confirmer sont sélectionnables et utilisent l'API existant
   assert.match(component, /Statut à confirmer/);
   assert.match(component, /Déjà primovaccinés/);
   assert.match(component, /Primo à faire/);
+  assert.match(component, /Initialiser le protocole/);
+  assert.match(component, /Quelle est la situation pour ce vaccin/);
+  assert.match(component, /Choisissez un filtre ou recherchez un animal/);
+  assert.match(component, /Tous les groupes/);
+  assert.match(component, /Toutes les catégories/);
+  assert.match(component, /Tous les âges/);
+  assert.match(component, /LIMITE_AFFICHEE = 40/);
   assert.match(component, /api\/protocoles\/\$\{protocoleId\}\/statuts/);
   assert.match(loader, /statutsProtocolesVaccinaux/);
   assert.match(loader, /statutProtocole:/);

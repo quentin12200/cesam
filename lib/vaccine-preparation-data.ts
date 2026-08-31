@@ -2,7 +2,7 @@ import "server-only";
 
 import { differenceInCalendarDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
-import { getCategorie } from "@/lib/utils";
+import { getCategorie, getCategorieLabel } from "@/lib/utils";
 import {
   calculerActionVaccinale,
   proposerConditionnements,
@@ -29,9 +29,10 @@ export interface GroupePreparationVaccin {
   vaccin: string;
   medicamentId: string | null;
   lignes: LignePreparationVaccin[];
-  aConfirmer: Array<{ animalId: string; nutrav: string; nom: string | null }>;
+  aConfirmer: Array<{ animalId: string; nutrav: string; nom: string | null; groupe: string; categorie: string; ageJours: number }>;
   aFaire: number;
   bientot: number;
+  enRetard: number;
   termines: number;
   dosesNecessaires: number;
   flacons: {
@@ -153,7 +154,14 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         statutProtocole: (animal.statutsProtocolesVaccinaux.find((statut) => statut.protocoleId === protocole.id)?.statut ?? null) as StatutProtocoleVaccinal | null,
       });
       if (action.statut === "A_CONFIRMER") {
-        aConfirmer.push({ animalId: animal.id, nutrav: animal.nutrav, nom: animal.nobovi });
+        aConfirmer.push({
+          animalId: animal.id,
+          nutrav: animal.nutrav,
+          nom: animal.nobovi,
+          groupe: animal.groupe?.nom || "Sans groupe",
+          categorie: getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie),
+          ageJours: differenceInCalendarDays(date, animal.danais),
+        });
         continue;
       }
       if (action.statut === "TERMINE") {
@@ -210,8 +218,9 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       medicamentId: medicamentReference?.id ?? null,
       lignes,
       aConfirmer,
-      aFaire: lignes.filter((ligne) => ligne.statut === "A_FAIRE" || ligne.statut === "EN_RETARD").length,
+      aFaire: lignes.filter((ligne) => ligne.statut === "A_FAIRE").length,
       bientot: lignes.filter((ligne) => ligne.statut === "A_PREVOIR").length,
+      enRetard: lignes.filter((ligne) => ligne.statut === "EN_RETARD").length,
       termines,
       dosesNecessaires: imprimables.length,
       flacons,

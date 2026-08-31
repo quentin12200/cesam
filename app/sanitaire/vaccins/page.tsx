@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { CalendarDays, PackageOpen, Printer, Syringe } from "lucide-react";
+import { CalendarDays, PackageOpen, Printer } from "lucide-react";
 import { getPreparationsVaccinales } from "@/lib/vaccine-preparation-data";
 import StatutsAConfirmer from "./StatutsAConfirmer";
 
@@ -42,13 +42,10 @@ export default async function VaccinsPage() {
             <div className="flex flex-wrap items-center gap-3 border-b p-4">
               <div className="min-w-0 flex-1">
                 <h2 className="truncate text-lg font-black text-gray-900">{groupe.vaccin}</h2>
-                <p className="text-sm text-gray-600"><b>{groupe.aFaire}</b> à faire · <b>{groupe.bientot}</b> bientôt</p>
+                <p className="text-sm text-gray-600"><b>{groupe.aFaire}</b> à faire · <b>{groupe.bientot}</b> bientôt · <b>{groupe.enRetard}</b> en retard</p>
               </div>
               <Link href={`/sanitaire/vaccins/impression?protocole=${groupe.protocoleId}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-gray-300 px-3 text-sm font-semibold text-gray-800">
-                <Printer size={17} /> Imprimer la préparation
-              </Link>
-              <Link href="/sanitaire" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-green-700 px-4 text-sm font-semibold text-white">
-                <Syringe size={17} /> Faire la séance
+                <Printer size={17} /> Préparer / imprimer la séance
               </Link>
             </div>
 
