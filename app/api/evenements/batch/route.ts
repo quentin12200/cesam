@@ -98,6 +98,15 @@ export async function POST(request: NextRequest) {
       : [];
     const resolvedDate = new Date(date);
     const now = new Date();
+    const statutsVaccinauxAvant = vaccinationConfig
+      ? await prisma.statutProtocoleVaccinal.findMany({
+          where: {
+            protocoleId: vaccinationConfig.session.protocoleId,
+            animalId: { in: vaccinationConfig.session.animaux.map((animal) => animal.animalId) },
+          },
+          select: { id: true, animalId: true, statut: true, source: true, confirmeAt: true },
+        })
+      : [];
 
     const resultat = await prisma.$transaction(async (tx) => {
       const evenements = await Promise.all(ids.map((animalId) => tx.evenementSanitaire.create({
@@ -163,6 +172,7 @@ export async function POST(request: NextRequest) {
         select: { id: true, animalId: true },
       }))) : [];
 
+      const statutsVaccinauxModifies: Array<{ id: string; animalId: string }> = [];
       if (vaccinationConfig) {
         for (const animal of vaccinationConfig.session.animaux) {
           const etape = vaccinationConfig.etapes.find((item) => item.id === animal.etapeProtocoleId)!;
@@ -172,26 +182,40 @@ export async function POST(request: NextRequest) {
             const realisees = await tx.vaccination.findMany({ where: { animalId: animal.animalId, protocoleId: vaccinationConfig.session.protocoleId, etapeProtocoleId: { in: initialesRequises } }, select: { etapeProtocoleId: true } });
             statut = initialesRequises.every((id) => realisees.some((vaccination) => vaccination.etapeProtocoleId === id)) ? "PROTOCOLE_ACQUIS" : "PRIMO_EN_COURS";
           }
-          await tx.statutProtocoleVaccinal.upsert({
+          const statutModifie = await tx.statutProtocoleVaccinal.upsert({
             where: { animalId_protocoleId: { animalId: animal.animalId, protocoleId: vaccinationConfig.session.protocoleId } },
             create: { animalId: animal.animalId, protocoleId: vaccinationConfig.session.protocoleId, statut, source: "VACCINATION", confirmeAt: now },
             update: { statut, source: "VACCINATION", confirmeAt: now },
+            select: { id: true, animalId: true },
           });
+          statutsVaccinauxModifies.push(statutModifie);
         }
       }
-      return { evenements, traitementsCrees, paragesCrees, vaccinationsCrees };
+      return { evenements, traitementsCrees, paragesCrees, vaccinationsCrees, statutsVaccinauxModifies };
     });
 
     const desc = `Événement sanitaire "${type.trim()}" enregistré pour ${resultat.evenements.length} animal(s)`
       + (resultat.traitementsCrees.length > 0 ? ` avec ${resultat.traitementsCrees.length} traitement(s)` : "")
       + (resultat.vaccinationsCrees.length > 0 ? ` et ${resultat.vaccinationsCrees.length} vaccination(s)` : "")
       + (resultat.paragesCrees.length > 0 ? ` et ${resultat.paragesCrees.length} ajout(s) au parage` : "");
+    const statutsVaccinauxRevert = resultat.statutsVaccinauxModifies.map((statutModifie) => {
+      const avant = statutsVaccinauxAvant.find((statut) => statut.animalId === statutModifie.animalId);
+      return avant
+        ? {
+            op: "update" as const,
+            model: "statutProtocoleVaccinal",
+            where: { id: statutModifie.id },
+            data: { statut: avant.statut, source: avant.source, confirmeAt: avant.confirmeAt },
+          }
+        : { op: "delete" as const, model: "statutProtocoleVaccinal", id: statutModifie.id };
+    });
     let undoId = "";
     try {
       undoId = await logAction("BATCH_EVENEMENT_SANITAIRE", desc, [
         ...resultat.evenements.map((evenement) => ({ op: "delete" as const, model: "evenementSanitaire", id: evenement.id })),
         ...resultat.traitementsCrees.map((traitement) => ({ op: "delete" as const, model: "traitement", id: traitement.id })),
         ...resultat.vaccinationsCrees.map((vaccination) => ({ op: "delete" as const, model: "vaccination", id: vaccination.id })),
+        ...statutsVaccinauxRevert,
         ...resultat.paragesCrees.map((parageCree) => ({ op: "delete" as const, model: "parage", id: parageCree.id })),
       ]);
     } catch {}
