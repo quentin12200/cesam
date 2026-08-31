@@ -41,7 +41,7 @@ export default async function VaccinsPage() {
                 <dt className="text-gray-500">Flacons ouverts</dt><dd className="text-right font-semibold">{groupe.flacons.ouverts}</dd>
                 <dt className="text-gray-500">Doses restantes</dt><dd className="text-right font-semibold">{groupe.flacons.dosesRestantes}</dd>
                 <dt className="text-gray-500">Prochaine limite</dt><dd className="text-right font-semibold">{groupe.flacons.prochaineLimite ? dateCourte.format(groupe.flacons.prochaineLimite) : "—"}</dd>
-                <dt className="text-gray-500">Besoin à venir</dt><dd className="text-right font-semibold">{groupe.dosesNecessaires} doses</dd>
+                <dt className="text-gray-500">Besoin maintenant</dt><dd className="text-right font-semibold">{groupe.dosesNecessaires} doses</dd>
                 <dt className="text-gray-500">Achat conseillé</dt><dd className="text-right font-semibold">{groupe.conditionnementRenseigne ? achatConseille(groupe.flacons.achats, groupe.flacons.perte, groupe.flacons.conservationConnue) : "Impossible de calculer — conditionnement non renseigné"}</dd>
               </dl>
             </div>
