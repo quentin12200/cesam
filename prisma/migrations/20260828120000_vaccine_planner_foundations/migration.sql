@@ -59,7 +59,7 @@ CREATE TABLE "FlaconMedicamentOuvert" (
 
 CREATE INDEX "FlaconMedicamentOuvert_medicamentId_statut_idx" ON "FlaconMedicamentOuvert"("medicamentId", "statut");
 CREATE INDEX "FlaconMedicamentOuvert_conditionnementId_idx" ON "FlaconMedicamentOuvert"("conditionnementId");
-CREATE INDEX "FlaconMedicamentOuvert_dateLimiteUtilisation_idx" ON "FlaconMedicamentOuvert"("dateLimiteUtilisation");
+CREATE INDEX "FlaconMedicamentOuvert_statut_dateLimiteUtilisation_idx" ON "FlaconMedicamentOuvert"("statut", "dateLimiteUtilisation");
 
 CREATE TABLE "UtilisationFlaconVaccin" (
   "id" TEXT NOT NULL PRIMARY KEY,
@@ -70,7 +70,7 @@ CREATE TABLE "UtilisationFlaconVaccin" (
   "notes" TEXT,
   "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "UtilisationFlaconVaccin_flaconId_fkey" FOREIGN KEY ("flaconId") REFERENCES "FlaconMedicamentOuvert"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "UtilisationFlaconVaccin_vaccinationId_fkey" FOREIGN KEY ("vaccinationId") REFERENCES "Vaccination"("id") ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT "UtilisationFlaconVaccin_vaccinationId_fkey" FOREIGN KEY ("vaccinationId") REFERENCES "Vaccination"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE INDEX "UtilisationFlaconVaccin_flaconId_date_idx" ON "UtilisationFlaconVaccin"("flaconId", "date");

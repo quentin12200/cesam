@@ -36,6 +36,20 @@ test("le flacon ne stocke pas de compteur dosesRestantes", () => {
   assert.match(schema, /model UtilisationFlaconVaccin[\s\S]*dosesUtilisees\s+Float/);
 });
 
+test("une utilisation est supprimée avec la vaccination pour éviter une consommation fantôme", () => {
+  assert.match(schema, /vaccination\s+Vaccination\?[\s\S]*onDelete: Cascade/);
+  assert.match(migration, /UtilisationFlaconVaccin_vaccinationId_fkey[\s\S]*ON DELETE CASCADE/);
+});
+
+test("les index correspondent aux recherches du planificateur", () => {
+  for (const field of ["medicamentId", "protocoleId", "etapeProtocoleId", "gestationId"]) {
+    assert.match(schema, new RegExp(`@@index\\(\\[${field}\\]\\)`));
+  }
+  assert.match(schema, /@@index\(\[medicamentId, statut\]\)/);
+  assert.match(schema, /@@index\(\[statut, dateLimiteUtilisation\]\)/);
+  assert.match(schema, /model UtilisationFlaconVaccin[\s\S]*@@index\(\[flaconId, date\]\)[\s\S]*@@index\(\[vaccinationId\]\)/);
+});
+
 test("les règles de conservation permettent héritage et override explicite", () => {
   assert.match(schema, /model Medicament[\s\S]*conservationOuvertureStatut\s+String\s+@default\("INCONNUE"\)/);
   assert.match(schema, /model ConditionnementMedicament[\s\S]*conservationOuvertureStatut\s+String\?/);
