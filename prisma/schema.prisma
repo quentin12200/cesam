@@ -746,7 +746,7 @@ model FlaconMedicamentOuvert {
 
   @@index([medicamentId, statut])
   @@index([conditionnementId])
-  @@index([dateLimiteUtilisation])
+  @@index([statut, dateLimiteUtilisation])
 }
 
 model UtilisationFlaconVaccin {
@@ -759,7 +759,7 @@ model UtilisationFlaconVaccin {
   createdAt       DateTime @default(now())
 
   flacon          FlaconMedicamentOuvert @relation(fields: [flaconId], references: [id], onDelete: Cascade)
-  vaccination     Vaccination?           @relation(fields: [vaccinationId], references: [id], onDelete: SetNull)
+  vaccination     Vaccination?           @relation(fields: [vaccinationId], references: [id], onDelete: Cascade)
 
   @@index([flaconId, date])
   @@index([vaccinationId])
