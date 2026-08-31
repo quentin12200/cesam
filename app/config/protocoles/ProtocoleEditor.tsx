@@ -19,6 +19,22 @@ const etapeVide = (label = "Primo"): Etape => ({ label, cycle: "INITIAL", refere
 const formulaireVide = (): Formulaire => ({ nom: "", label: "", description: "", categories: [], ageMinJours: "", ageMaxJours: "", sexeCible: "", stadeReproduction: "", gestante: "", rangVelageMin: "", rangVelageMax: "", lotCible: "", etapes: [etapeVide()] });
 const libelleCategorie = (code: string) => CATEGORIES.find((c) => c.code === code)?.label ?? code;
 
+function resumeTypeProtocole(etapes: any[]): string {
+  const initiales = etapes.filter((etape) => etape.cycle !== "ENTRETIEN").length;
+  const entretien = etapes.some((etape) => etape.cycle === "ENTRETIEN");
+  if (initiales > 1) return `Primo + rappel${entretien ? " · puis entretien" : ""}`;
+  return entretien ? (initiales > 0 ? "Primo · puis entretien" : "Entretien") : "Primo";
+}
+
+function resumeRegleEtape(etape: any): string {
+  if (!etape) return "Règle à définir";
+  const unite = etape.debutUnite === "MOIS" ? "mois" : etape.debutUnite === "SEMAINE" ? "semaines" : "jours";
+  if (etape.reference === "VELAGE") return `De ${etape.debutValeur} à ${etape.finValeur} ${unite} autour du vêlage`;
+  if (etape.reference === "ETAPE_PRECEDENTE") return `${etape.debutValeur} à ${etape.finValeur} ${unite} après l’étape précédente`;
+  if (etape.reference === "DATE_FIXE") return "À une date définie";
+  return etape.debutValeur === etape.finValeur ? `À partir de ${etape.debutValeur} ${unite}` : `Entre ${etape.debutValeur} et ${etape.finValeur} ${unite} d’âge`;
+}
+
 function ResumeBloc({ titre, resume, ouvert, onClick, children }: { titre: string; resume: string; ouvert: boolean; onClick: () => void; children: React.ReactNode }) {
   return <section className="overflow-hidden rounded-xl border bg-white"><button type="button" onClick={onClick} className="flex min-h-14 w-full items-center gap-3 px-3 text-left"><span className="flex-1"><b className="block text-sm text-gray-900">{titre}</b><small className="block truncate text-xs text-gray-500">{resume}</small></span><ChevronDown size={17} className={`text-gray-400 transition ${ouvert ? "rotate-180" : ""}`} /></button>{ouvert && <div className="border-t p-3">{children}</div>}</section>;
 }
@@ -103,6 +119,6 @@ export default function ProtocoleEditor({ protocoles, medicaments }: { protocole
       <button disabled={saving || !form.nom || !form.label} onClick={() => void enregistrer()} className="min-h-12 w-full rounded-xl bg-green-700 font-semibold text-white disabled:opacity-40">{saving ? "Enregistrement…" : "Enregistrer le protocole"}</button>
     </div>}
 
-    {protocoles.map((p) => <div key={p.id} className={`rounded-xl border bg-white p-3 shadow-sm ${p.actif ? "" : "opacity-50"}`}><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><b className="text-sm">{p.label}</b><div className="mt-1 flex flex-wrap gap-1">{(p.categoriesJson ? JSON.parse(p.categoriesJson) : []).map((code: string) => <span key={code} className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px]">{libelleCategorie(code)}</span>)}</div><p className="mt-1 text-xs text-gray-500">{p.etapes?.map((e: any) => e.label).join(" → ") || "Protocole historique"}</p></div><button onClick={() => ouvrirEdition(p)}><Pencil size={15} /></button><button onClick={() => dupliquer(p)}><Copy size={15} /></button><button onClick={() => void supprimer(p.id)}><Trash2 size={15} /></button><button onClick={() => void basculer(p)} className={`h-6 w-10 rounded-full ${p.actif ? "bg-green-500" : "bg-gray-300"}`} /></div></div>)}
+    {protocoles.map((p) => { const liaisons = p.etapes?.flatMap((etape: any) => etape.medicaments) ?? []; const produits = [...new Set(liaisons.map((liaison: any) => medicaments.find((medicament) => medicament.id === liaison.medicamentId)?.nom).filter(Boolean))]; const premiereLiaison = liaisons[0]; const produit = medicaments.find((medicament) => medicament.id === premiereLiaison?.medicamentId); const dose = produit?.preconisations.find((preconisation) => preconisation.id === premiereLiaison?.preconisationId) ?? (produit?.preconisations.length === 1 ? produit.preconisations[0] : null); return <div key={p.id} className={`rounded-xl border bg-white p-3 shadow-sm ${p.actif ? "" : "opacity-50"}`}><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><b className="text-base text-gray-950">{p.label}</b><p className="truncate text-xs font-semibold text-blue-700">{produits.join(" · ") || "Vaccin à associer"}</p><div className="mt-1 flex flex-wrap gap-1">{(p.categoriesJson ? JSON.parse(p.categoriesJson) : []).map((code: string) => <span key={code} className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px]">{libelleCategorie(code)}</span>)}</div><p className="mt-2 text-xs font-semibold text-gray-700">{resumeTypeProtocole(p.etapes ?? [])}</p><p className="text-xs text-gray-500">{resumeRegleEtape(p.etapes?.[0])}</p><p className="mt-1 text-xs text-gray-600">Dose {dose?.dose == null ? "à renseigner" : `${dose.dose} ${dose.unite || ""}`} · voie {premiereLiaison?.voie || dose?.voie || produit?.voie || "à renseigner"}{p.etapes?.some((etape: any) => etape.recurrenceMois) ? ` · rappel tous les ${p.etapes.find((etape: any) => etape.recurrenceMois)?.recurrenceMois} mois` : ""}</p></div><button onClick={() => ouvrirEdition(p)} aria-label={`Modifier ${p.label}`}><Pencil size={15} /></button><button onClick={() => dupliquer(p)} aria-label={`Dupliquer ${p.label}`}><Copy size={15} /></button><button onClick={() => void supprimer(p.id)} aria-label={`Supprimer ${p.label}`}><Trash2 size={15} /></button><button onClick={() => void basculer(p)} aria-label={`${p.actif ? "Désactiver" : "Activer"} ${p.label}`} className={`h-6 w-10 rounded-full ${p.actif ? "bg-green-500" : "bg-gray-300"}`} /></div></div>; })}
   </div>;
 }

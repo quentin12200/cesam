@@ -9,7 +9,13 @@ test("l'écran Vaccins ouvre sur la préparation et expose les trois espaces", (
   assert.match(page, />À préparer</);
   assert.match(page, />Protocoles</);
   assert.match(page, />Stock \/ flacons</);
-  assert.match(page, /Préparer \/ imprimer la séance/);
+  assert.match(page, /Préparer \/ imprimer/);
+  assert.match(page, /<details className="group">/);
+  assert.match(page, /Voir les animaux/);
+  assert.match(page, /Faire la séance/);
+  assert.match(page, /Besoin total/);
+  assert.match(page, /Achat conseillé/);
+  assert.match(page, /Reliquat utilisable/);
 });
 
 test("la feuille A4 est une lecture seule et contient les colonnes terrain", () => {
@@ -62,4 +68,42 @@ test("le calendrier vaccinal utilise les étapes et jamais une fréquence géné
   assert.match(editor, /recurrenceMois/);
   assert.match(planner, /etape\.recurrenceMois/);
   assert.doesNotMatch(`${editor}\n${planner}\n${loader}`, /frequence|1 fois \/ Jour/i);
+});
+
+test("le détail d'un vaccin reste secondaire et limité aux trois groupes terrain", () => {
+  const page = read("app/sanitaire/vaccins/page.tsx");
+  assert.match(page, /statut: "A_FAIRE", titre: "À faire"/);
+  assert.match(page, /statut: "A_PREVOIR", titre: "Bientôt"/);
+  assert.match(page, /statut: "EN_RETARD", titre: "En retard"/);
+  assert.match(page, /ligne\.dose.*ligne\.voie/);
+  assert.doesNotMatch(page, /visibles\.map/);
+});
+
+test("le stock vaccinal présente seulement les données terrain utiles", () => {
+  const page = read("app/sanitaire/vaccins/page.tsx");
+  const loader = read("lib/vaccine-preparation-data.ts");
+  assert.match(page, /Stock Pharmacie/);
+  assert.match(page, /Flacons ouverts/);
+  assert.match(page, /Doses restantes/);
+  assert.match(page, /Prochaine limite/);
+  assert.match(page, /Besoin à venir/);
+  assert.match(loader, /stockPharmacie/);
+  assert.match(loader, /prochaineLimite/);
+});
+
+test("l'ancien onglet Vaccination sert à la saisie et à l'historique", () => {
+  const sanitaire = read("app/sanitaire/SanitaireClient.tsx");
+  assert.match(sanitaire, /Enregistrer une vaccination faite/);
+  assert.match(sanitaire, /Ouvrir Vaccins · À préparer/);
+  assert.match(sanitaire, /afficherAncienPilotageVaccinal = false/);
+  assert.match(sanitaire, /<VaccinationFormWrapper \/>/);
+  assert.match(sanitaire, /<RecentSection/);
+});
+
+test("les cartes Protocoles résument la règle, la dose et la voie", () => {
+  const editor = read("app/config/protocoles/ProtocoleEditor.tsx");
+  assert.match(editor, /resumeTypeProtocole/);
+  assert.match(editor, /resumeRegleEtape/);
+  assert.match(editor, /Dose \{dose\?\.dose/);
+  assert.match(editor, /voie \{premiereLiaison/);
 });

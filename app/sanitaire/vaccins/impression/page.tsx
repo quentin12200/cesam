@@ -25,7 +25,7 @@ export default async function ImpressionVaccinsPage({ searchParams }: { searchPa
             {lignes.length === 0 ? <p className="border p-8 text-center">Aucun animal à préparer.</p> : (
               <table className="print-table">
                 <thead><tr><th className="w-8">☐</th><th>Animal</th><th>Injection</th><th>Repère</th><th>Fenêtre</th><th>Groupe / localisation</th><th>Dose</th><th className="w-40">Notes</th></tr></thead>
-                <tbody>{lignes.map((ligne) => <tr key={`${ligne.animalId}-${ligne.injection}`}><td className="text-lg">☐</td><td><b className="font-mono text-sm">{ligne.nutrav}</b>{ligne.nom ? ` ${ligne.nom}` : ""}</td><td>{ligne.injection}</td><td>{ligne.repere}</td><td>{dateCourte.format(ligne.dateMin)} → {dateCourte.format(ligne.dateMax)}</td><td>{ligne.groupe}</td><td>{ligne.dose}</td><td /></tr>)}</tbody>
+                <tbody>{lignes.map((ligne) => <tr key={`${ligne.animalId}-${ligne.injection}`}><td className="text-lg">☐</td><td><b className="font-mono text-sm">{ligne.nutrav}</b>{ligne.nom ? ` ${ligne.nom}` : ""}</td><td>{ligne.injection}</td><td>{ligne.repere}</td><td>{dateCourte.format(ligne.dateMin)} → {dateCourte.format(ligne.dateMax)}</td><td>{ligne.groupe}</td><td>{ligne.dose} · {ligne.voie}</td><td /></tr>)}</tbody>
               </table>
             )}
             <p className="mt-2 text-xs">Flacons : {!groupe.conditionnementRenseigne ? "Impossible de calculer — conditionnement non renseigné" : <>{groupe.flacons.reliquatUtilise > 0 ? `reliquat valide ${groupe.flacons.reliquatUtilise} dose(s) + ` : ""}{groupe.flacons.dosesParConditionnement ? `${groupe.flacons.nombre} × ${groupe.flacons.dosesParConditionnement} doses` : "Conditionnement insuffisant"}</>}</p>

@@ -657,6 +657,7 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
 
   const urgents = veauxAVacciner.filter((a) => a.vaccinsManquants.some((v) => v.urgent));
   const totalPending = veauxKeys.length + cryptoKeys.length + bolusKeys.length;
+  const afficherAncienPilotageVaccinal = false;
 
   return (
     <>
@@ -668,7 +669,7 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
             count: traitements.filter((t) => t.enCours).length,
             urgent: false,
           },
-          { id: "vaccination", label: "Vaccination", icon: "💉", count: urgents.length + cryptoRotavec.length + bolus.length, urgent: urgents.length > 0 },
+          { id: "vaccination", label: "Vaccination", icon: "💉", count: 0, urgent: false },
         ] as const).map((tab) => (
           <button
             key={tab.id}
@@ -693,8 +694,20 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
       {/* Onglet Événements — regroupe événements sanitaires et traitements (en cours / historique) */}
       {onglet === "evenements" && <EvenementsTab evenements={evenements} traitements={traitements} />}
 
-      {/* Onglet Vaccination — sous-navigation interne */}
       {onglet === "vaccination" && (
+        <div className="space-y-4">
+          <div className="rounded-xl bg-white p-4 shadow-sm">
+            <h2 className="font-bold text-gray-900">Enregistrer une vaccination faite</h2>
+            <p className="mt-1 text-sm text-gray-500">Le pilotage et la préparation des séances se trouvent dans l’espace Vaccins.</p>
+            <Link href="/sanitaire/vaccins" className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl bg-green-700 px-4 text-sm font-semibold text-white">Ouvrir Vaccins · À préparer</Link>
+          </div>
+          <VaccinationFormWrapper />
+          {vaccinationsRecentes.length > 0 && <RecentSection items={vaccinationsRecentes} onRefresh={() => router.refresh()} />}
+        </div>
+      )}
+
+      {/* Onglet Vaccination — sous-navigation interne */}
+      {onglet === "vaccination" && afficherAncienPilotageVaccinal && (
         <>
           <div className="flex bg-white rounded-xl shadow overflow-hidden">
             {([
@@ -735,7 +748,7 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
 
 
       {/* Onglet vaccination urgent — contenu existant */}
-      {onglet === "vaccination" && vaccinTab === "urgent" && (
+      {onglet === "vaccination" && afficherAncienPilotageVaccinal && vaccinTab === "urgent" && (
       <>
       {/* Stats bar */}
       <div className="grid grid-cols-4 gap-2">

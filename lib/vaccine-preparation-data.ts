@@ -21,6 +21,7 @@ export interface LignePreparationVaccin {
   dateMax: Date;
   groupe: string;
   dose: string;
+  voie: string;
   statut: StatutPreparationVaccin;
 }
 
@@ -29,6 +30,8 @@ export interface GroupePreparationVaccin {
   vaccin: string;
   medicamentId: string | null;
   conditionnementRenseigne: boolean;
+  dose: string;
+  voie: string;
   lignes: LignePreparationVaccin[];
   aConfirmer: Array<{ animalId: string; nutrav: string; nom: string | null; groupe: string; categorie: string; ageJours: number }>;
   aFaire: number;
@@ -41,7 +44,11 @@ export interface GroupePreparationVaccin {
     nombre: number;
     dosesParConditionnement: number | null;
     totalDisponible: number;
+    ouverts: number;
+    dosesRestantes: number;
+    prochaineLimite: Date | null;
   };
+  stockPharmacie: string;
 }
 
 function categoriesCibles(raw: string | null): string[] {
@@ -67,6 +74,12 @@ function libelleInjection(label: string, ordre: number, totalInitial: number, cy
   if (cycle === "ENTRETIEN") return /rappel/i.test(label) ? label : "Entretien";
   if (totalInitial > 1) return /primo|rappel/i.test(label) ? label : `Primo ${ordre + 1}/${totalInitial}`;
   return label || "Injection";
+}
+
+function valeurUnique(valeurs: string[], inconnue: string): string {
+  const uniques = [...new Set(valeurs.filter(Boolean))];
+  if (uniques.length === 0) return inconnue;
+  return uniques.length === 1 ? uniques[0] : "Selon l’étape";
 }
 
 export async function getPreparationsVaccinales(date = new Date()): Promise<GroupePreparationVaccin[]> {
@@ -180,10 +193,10 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         : null;
       const preconisationsValides = medicament?.preconisations.filter((item) => item.statut === "VALIDE" && item.dose != null) ?? [];
       const preconisation = preconisationLiee ?? (preconisationsValides.length === 1 ? preconisationsValides[0] : null);
-      const voie = liaison?.voie || preconisation?.voie || medicament?.voie;
+      const voie = liaison?.voie || preconisation?.voie || medicament?.voie || "Inconnue";
       const dose = preconisation?.dose == null
-        ? (voie ? `Dose inconnue · ${voie}` : "—")
-        : `${preconisation.dose} ${preconisation.unite || medicament?.uniteDosage || ""}${voie ? ` · ${voie}` : ""}`.trim();
+        ? "Dose inconnue"
+        : `${preconisation.dose} ${preconisation.unite || medicament?.uniteDosage || ""}`.trim();
       const joursAvantVelage = gestation?.dateVelagePrevue
         ? differenceInCalendarDays(gestation.dateVelagePrevue, date)
         : null;
@@ -199,12 +212,14 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         dateMax: action.dateMax,
         groupe: [animal.groupe?.nom, animal.localisation?.nom].filter(Boolean).join(" · ") || "—",
         dose,
+        voie,
         statut: action.statut,
       });
     }
 
     const imprimables = lignes.filter((ligne) => ["A_FAIRE", "A_PREVOIR", "EN_RETARD"].includes(ligne.statut));
-    const reliquatsUtilisables = (medicamentReference?.flaconsOuverts ?? [])
+    const flaconsOuverts = medicamentReference?.flaconsOuverts ?? [];
+    const reliquatsUtilisables = flaconsOuverts
       .filter((flacon) => flacon.dateOuverture <= date && flacon.dateLimiteUtilisation != null && flacon.dateLimiteUtilisation >= date)
       .map((flacon) => reliquatFlacon(flacon.dosesInitiales, flacon.utilisations));
     const flacons = proposerConditionnements({
@@ -218,6 +233,8 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       vaccin: medicamentReference?.nom || protocole.label,
       medicamentId: medicamentReference?.id ?? null,
       conditionnementRenseigne: (medicamentReference?.conditionnements.length ?? 0) > 0,
+      dose: valeurUnique(imprimables.map((ligne) => ligne.dose), "Non renseignée"),
+      voie: valeurUnique(imprimables.map((ligne) => ligne.voie), "Inconnue"),
       lignes,
       aConfirmer,
       aFaire: lignes.filter((ligne) => ligne.statut === "A_FAIRE").length,
@@ -225,7 +242,13 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       enRetard: lignes.filter((ligne) => ligne.statut === "EN_RETARD").length,
       termines,
       dosesNecessaires: imprimables.length,
-      flacons,
+      flacons: {
+        ...flacons,
+        ouverts: flaconsOuverts.length,
+        dosesRestantes: flaconsOuverts.reduce((total, flacon) => total + reliquatFlacon(flacon.dosesInitiales, flacon.utilisations), 0),
+        prochaineLimite: flaconsOuverts.map((flacon) => flacon.dateLimiteUtilisation).filter((limite): limite is Date => limite != null).sort((a, b) => a.getTime() - b.getTime())[0] ?? null,
+      },
+      stockPharmacie: medicamentReference?.stockActuel == null ? "Non renseigné" : `${medicamentReference.stockActuel} ${medicamentReference.stockUnite || "dose(s)"}`,
     };
   });
 }
