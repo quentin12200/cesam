@@ -199,11 +199,11 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
     <div className="space-y-4">
       {/* Header */}
       <div className="space-y-2 rounded-xl bg-white p-3 shadow">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs font-medium px-2 py-1 rounded-full" style={{ background: cat.bg, color: cat.text }}>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full px-3 py-1.5 text-sm font-semibold" style={{ background: cat.bg, color: cat.text }}>
             {cat.label}
           </span>
-          <span className={`text-xs px-2 py-1 rounded-full ${medicament.actif ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>{medicament.actif ? "Actif" : "Inactif"}</span>
+          {!medicament.actif && <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500">Inactif</span>}
           <button onClick={toggleFavori} disabled={savingFavori} className="ml-auto p-1" aria-label="Favori"><Star size={17} className={medicament.favori ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} /></button>
           <button onClick={() => setEditMode(true)} className="flex items-center gap-1 px-1.5 py-1 text-xs text-gray-500"><Pencil size={12} /> Modifier la fiche</button>
         </div>
@@ -211,10 +211,23 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
         <div className="flex items-center gap-1.5 border-t pt-2 text-xs text-gray-700"><Package size={14} className="text-gray-400" /><span><b>Stock :</b> {medicament.stockActuel ?? "—"} {medicament.stockUnite ?? ""}{medicament.stockSeuilAlert != null && <> · <b>Alerte :</b> {medicament.stockSeuilAlert} {medicament.stockUnite ?? ""}</>}</span></div>
       </div>
 
-      <Link href={hrefWithOrigin(`/sanitaire/nouvel-evenement?medicament=${medicament.id}`)}
-          className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700">
-          <Stethoscope size={14} /> Créer un événement sanitaire avec ce médicament
-      </Link>
+      <div className="flex justify-end">
+        <Link href={hrefWithOrigin(`/sanitaire/nouvel-evenement?medicament=${medicament.id}`)}
+          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-center text-sm font-semibold text-blue-700 hover:bg-blue-100">
+          <Stethoscope size={14} /> Créer un événement sanitaire
+        </Link>
+      </div>
+
+      {/* Préconisations prioritaires */}
+      <section className="space-y-3">
+        <h3 className="px-1 font-semibold text-gray-800">Préconisations</h3>
+        {preconisationsVisibles.length === 0 && (
+          <p className="text-sm text-gray-400 text-center py-3">Aucune préconisation enregistrée</p>
+        )}
+        <div className="space-y-2">
+          {preconisationsVisibles.map((p) => <PreconisationCard key={p.id} p={p} medicamentId={medicament.id} />)}
+        </div>
+      </section>
 
       {/* Actions / En savoir + */}
       {actionsList.length > 0 && (
@@ -246,17 +259,6 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
       )}
 
       <ConditionnementsSection medicamentId={medicament.id} initialConditionnements={conditionnements} />
-
-      {/* Préconisations */}
-      <section className="space-y-3">
-        <h3 className="px-1 font-semibold text-gray-800">Préconisations</h3>
-        {preconisationsVisibles.length === 0 && (
-          <p className="text-sm text-gray-400 text-center py-3">Aucune préconisation enregistrée</p>
-        )}
-        <div className="space-y-2">
-          {preconisationsVisibles.map((p) => <PreconisationCard key={p.id} p={p} medicamentId={medicament.id} />)}
-        </div>
-      </section>
 
       <ConservationOuvertureSection
         medicamentId={medicament.id}
