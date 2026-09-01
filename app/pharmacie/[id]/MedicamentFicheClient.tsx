@@ -7,6 +7,7 @@ import { Star, Pencil, ChevronDown, ChevronUp, Stethoscope, ArrowLeft, Package, 
 import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 import {
   getCategorieMedicament,
+  abregerVoie,
   formatVoie,
   formatDoseBase,
   formatPrecautions,
@@ -136,13 +137,13 @@ function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicame
   if (editing) return <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 space-y-3"><PreconisationFields form={form} onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))} /><div className="flex gap-2"><button type="button" onClick={() => void enregistrer()} className="min-h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white">Enregistrer</button><button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg border bg-white px-4 text-sm">Annuler</button></div></div>;
 
   return (
-    <div className="relative min-h-32 border border-gray-200 bg-white rounded-xl py-3 pr-3 pl-24 text-sm shadow-sm space-y-2">
-      <div className={`absolute bottom-3 left-3 top-3 flex w-16 flex-col items-center justify-center rounded-xl text-lg font-bold ${p.voie === "SC" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"}`}><Syringe size={24} /><span className="mt-1">{p.voie || "—"}</span></div>
+    <div className="relative min-h-32 overflow-hidden rounded-xl border border-gray-200 bg-white py-3 pl-20 pr-3 text-sm shadow-sm space-y-2 sm:pl-24">
+      <div className={`absolute bottom-3 left-3 top-3 flex w-14 flex-col items-center justify-center overflow-hidden rounded-xl font-bold sm:w-16 ${p.voie === "SC" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"}`}><Syringe size={24} /><span className="mt-1 max-w-full text-center text-2xl leading-none tracking-tight">{abregerVoie(p.voie)}</span></div>
       <div className="flex items-start justify-between gap-2">
-        <span className="font-medium text-gray-800">{p.indicationMotif || "Sans indication précisée"}</span>
+        <span className="min-w-0 break-words font-medium text-gray-800">{p.indicationMotif || "Sans indication précisée"}</span>
         <div className="flex items-center"><span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${STATUT_CLASSES[statutLabel]}`}>{statutLabel}</span><RecordActionsMenu onEdit={() => setEditing(true)} actions={[{ label: "Dupliquer", onSelect: dupliquer }, ...(p.statut !== "ARCHIVE" ? [{ label: "Archiver", onSelect: archiver }] : []), { label: "Supprimer", tone: "danger", confirmMessage: "Supprimer cette préconisation ?", onSelect: supprimer }]} /></div>
       </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-gray-600 sm:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 break-words text-xs text-gray-600 sm:grid-cols-3">
         {animauxTexte && <span>{animauxTexte}</span>}
         {p.dose != null && <span><b className="block text-gray-400 font-medium">Dose</b>{p.dose} {p.unite} {formatDoseBase(p.doseBase)}</span>}
         {p.voie && <span><b className="block text-gray-400 font-medium">Voie</b>{formatVoie(p.voie)}</span>}
@@ -245,11 +246,6 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
       )}
 
       <ConditionnementsSection medicamentId={medicament.id} initialConditionnements={conditionnements} />
-      <ConservationOuvertureSection
-        medicamentId={medicament.id}
-        initialMedicament={medicament}
-        initialConditionnements={conditionnements}
-      />
 
       {/* Préconisations */}
       <section className="space-y-3">
@@ -261,6 +257,12 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
           {preconisationsVisibles.map((p) => <PreconisationCard key={p.id} p={p} medicamentId={medicament.id} />)}
         </div>
       </section>
+
+      <ConservationOuvertureSection
+        medicamentId={medicament.id}
+        initialMedicament={medicament}
+        initialConditionnements={conditionnements}
+      />
 
       {/* Ordonnances associées */}
       <div className="bg-white rounded-xl shadow p-4 space-y-1">

@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  abregerVoie,
   valeurCategoriePersonnalisee,
   getCategoriesMedicamentUtilisees,
   getCategorieMedicament,
   trouverCategorieProche,
 } from "./medicament-categories.ts";
+
+test("abrège les voies longues pour les pavés mobiles", () => {
+  assert.equal(abregerVoie("INTRANASALE"), "IN");
+  assert.equal(abregerVoie("INTRAMUSCULAIRE"), "IM");
+  assert.equal(abregerVoie("SOUS-CUTANEE"), "SC");
+  assert.equal(abregerVoie("INTRAVEINEUSE"), "IV");
+  assert.equal(abregerVoie(null), "—");
+});
 
 test("retrouve une categorie existante malgre casse accents et espaces", () => {
   const categories = getCategoriesMedicamentUtilisees([]);

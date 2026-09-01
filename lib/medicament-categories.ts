@@ -129,10 +129,41 @@ const VOIE_LABELS: Record<string, string> = {
   "SOUS-CUTANEE": "Sous-cutanée",
   "SOUS CUTANEE": "Sous-cutanée",
   NASALE: "Nasale",
+  INTRANASALE: "Intranasale",
   POUR_ON: "Pour-on",
   "POUR-ON": "Pour-on",
   AUTRE: "Autre",
 };
+
+const VOIE_ABREVIATIONS: Record<string, string> = {
+  IN: "IN",
+  NASALE: "IN",
+  INTRANASALE: "IN",
+  IM: "IM",
+  INTRAMUSCULAIRE: "IM",
+  SC: "SC",
+  "SOUS-CUTANEE": "SC",
+  "SOUS CUTANEE": "SC",
+  IV: "IV",
+  INTRAVEINEUSE: "IV",
+  PO: "PO",
+  ORALE: "PO",
+  IMM: "IMM",
+  INTRAMAMMAIRE: "IMM",
+  IU: "IU",
+  "INTRA-UTERINE": "IU",
+  TOPIQUE: "TOP",
+  POUR_ON: "POUR",
+  "POUR-ON": "POUR",
+  AUTRE: "—",
+};
+
+/** Abréviation compacte réservée aux pavés visuels de voie. */
+export function abregerVoie(voie: string | null | undefined): string {
+  if (!voie?.trim()) return "—";
+  const key = voie.trim().toUpperCase();
+  return VOIE_ABREVIATIONS[key] || (key.length <= 4 ? key : key.slice(0, 3));
+}
 
 /** Voies d'administration proposées à la sélection (menu déroulant), code + libellé. */
 export const VOIES_ADMINISTRATION: { code: string; label: string }[] = [
