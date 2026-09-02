@@ -4,11 +4,13 @@ import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/cesam-auth";
 
 // Routes accessibles sans session valide.
 // - login / accès refusé : pages publiques
+// - prototype espace de travail : démonstration isolée avec données fictives
 // - /api/auth/* : établit ou vérifie la session elle-même
 // - /api/cron/* : appelées par Vercel Cron, s'authentifient via CRON_SECRET
 const PUBLIC_PATHS = [
   "/login",
   "/acces-refuse",
+  "/prototype-espace-travail",
   "/api/auth/session",
   "/api/auth/unauthorized",
   "/api/cron/",
