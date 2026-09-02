@@ -2,44 +2,61 @@ import {
   AlertTriangle,
   Baby,
   Check,
-  ChevronRight,
   HeartPulse,
-  MapPin,
+  Scale,
+  ScanLine,
+  Stethoscope,
+  Syringe,
 } from "lucide-react";
-import type { WorkspaceAnimal } from "./types";
-import { formatAge, KIND_LABELS } from "./workspace-utils";
+import type {
+  ReproductionStatus,
+  WorkspaceAction,
+  WorkspaceColumn,
+  WorkspaceCompletedState,
+  WorkspaceRow,
+  WorkspaceSort,
+} from "./types";
+import {
+  ACTION_LABELS,
+  completedActionsForAnimal,
+  formatAge,
+  KIND_LABELS,
+  REPRODUCTION_LABELS,
+} from "./workspace-utils";
 
 type WorkspaceAnimalListProps = {
-  animals: WorkspaceAnimal[];
+  rows: WorkspaceRow[];
   selectedIds: Set<string>;
-  treatedIds: Set<string>;
-  weanedIds: Set<string>;
-  echoedIds: Set<string>;
+  completed: WorkspaceCompletedState;
+  visibleColumns: WorkspaceColumn[];
+  sort: WorkspaceSort;
   onToggle: (animalId: string) => void;
-  onSelectAllVisible: () => void;
+  onAddVisible: () => void;
+  onReplaceWithVisible: () => void;
+  onSort: (sort: WorkspaceSort) => void;
 };
 
 export default function WorkspaceAnimalList({
-  animals,
+  rows,
   selectedIds,
-  treatedIds,
-  weanedIds,
-  echoedIds,
+  completed,
+  visibleColumns,
+  sort,
   onToggle,
-  onSelectAllVisible,
+  onAddVisible,
+  onReplaceWithVisible,
+  onSort,
 }: WorkspaceAnimalListProps) {
-  const visibleSelected = animals.filter((animal) =>
-    selectedIds.has(animal.id),
-  ).length;
-  const allVisibleSelected =
-    animals.length > 0 && visibleSelected === animals.length;
+  const columns = new Set(visibleColumns);
+  const visiblePrimaryIds = rows.map((row) => row.primary.id);
+  const visibleSelected = visiblePrimaryIds.filter((id) => selectedIds.has(id)).length;
 
-  if (!animals.length) {
+  if (!rows.length) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-14 text-center">
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-14 text-center">
         <p className="font-black text-slate-800">Aucun animal dans cette vue</p>
         <p className="mt-1 text-sm text-slate-500">
-          Modifiez la recherche ou choisissez une autre vue.
+          Modifiez les filtres ou choisissez une autre vue de travail.
         </p>
       </div>
     );
@@ -47,137 +64,392 @@ export default function WorkspaceAnimalList({
 
   return (
     <section
-      className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-      aria-label="Liste des animaux"
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      aria-label="Tableau de travail des animaux"
     >
-      <div className="flex min-h-12 items-center justify-between border-b border-slate-200 bg-slate-50 px-3 sm:px-4">
-        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-          {animals.length} animal{animals.length > 1 ? "aux" : ""}
-        </span>
-        <button
-          type="button"
-          onClick={onSelectAllVisible}
-          className="min-h-10 rounded-lg px-3 text-sm font-black text-green-800 hover:bg-green-50"
-        >
-          {allVisibleSelected ? "Désélectionner la vue" : "Tout sélectionner"}
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 sm:px-4">
+        <div>
+          <strong className="text-sm font-black text-slate-900">
+            {rows.length} ligne{rows.length > 1 ? "s" : ""} de travail
+          </strong>
+          <span className="ml-2 text-xs font-bold text-slate-500">
+            {visibleSelected} sélectionnée{visibleSelected > 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={onAddVisible}
+            className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-black text-slate-700 hover:bg-slate-100"
+          >
+            Ajouter la vue
+          </button>
+          <button
+            type="button"
+            onClick={onReplaceWithVisible}
+            className="min-h-9 rounded-lg bg-green-800 px-2.5 text-xs font-black text-white hover:bg-green-900"
+          >
+            Garder la vue
+          </button>
+        </div>
       </div>
 
-      <div className="divide-y divide-slate-100">
-        {animals.map((animal) => {
-          const selected = selectedIds.has(animal.id);
-          const treated = treatedIds.has(animal.id);
-          const weaned = weanedIds.has(animal.id);
-          const echoed = echoedIds.has(animal.id);
-
-          return (
-            <button
-              key={animal.id}
-              type="button"
-              onClick={() => onToggle(animal.id)}
-              aria-pressed={selected}
-              className={`group grid min-h-[78px] w-full grid-cols-[32px_minmax(0,1fr)_22px] items-center gap-2 px-3 py-2.5 text-left transition sm:grid-cols-[36px_minmax(150px,0.8fr)_minmax(190px,1.2fr)_24px] sm:gap-3 sm:px-4 ${
-                selected
-                  ? "bg-green-50/80 shadow-[inset_4px_0_0_#15803d]"
-                  : "hover:bg-slate-50"
-              }`}
-            >
-              <span
-                className={`flex size-6 items-center justify-center rounded-md border-2 ${
-                  selected
-                    ? "border-green-700 bg-green-700 text-white"
-                    : "border-slate-300 bg-white"
-                }`}
-                aria-hidden="true"
-              >
-                {selected && <Check size={16} strokeWidth={3} />}
-              </span>
-
-              <span className="min-w-0">
-                <span className="flex min-w-0 items-baseline gap-2">
-                  <strong className="text-base font-black text-slate-950">
-                    {animal.nutrav}
-                  </strong>
-                  {animal.name && (
-                    <span className="truncate text-sm font-bold text-slate-600">
-                      {animal.name}
-                    </span>
-                  )}
-                </span>
-                <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-slate-500">
-                  <span>{KIND_LABELS[animal.kind]}</span>
-                  <span>·</span>
-                  <span>{formatAge(animal.birthDate)}</span>
-                  {animal.groupName && (
-                    <span className="inline-flex min-w-0 items-center gap-1 sm:hidden">
-                      <MapPin size={12} />
-                      <span className="truncate">{animal.groupName}</span>
-                    </span>
-                  )}
-                </span>
-
-                <AnimalSignals animal={animal} treated={treated} weaned={weaned} echoed={echoed} mobile />
-              </span>
-
-              <span className="hidden min-w-0 sm:block">
-                {animal.groupName && (
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-                    <MapPin size={13} />
-                    <span className="truncate">{animal.groupName}</span>
-                  </span>
-                )}
-                <AnimalSignals animal={animal} treated={treated} weaned={weaned} echoed={echoed} />
-              </span>
-
-              <ChevronRight
-                size={18}
-                className={selected ? "text-green-700" : "text-slate-300"}
-                aria-hidden="true"
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[860px] border-collapse text-left">
+          <thead className="bg-white text-[11px] uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-slate-200">
+              <th className="w-12 px-3 py-3"><span className="sr-only">Sélection</span></th>
+              <SortableHeader
+                label="Animal"
+                active={sort === "primary-number"}
+                onClick={() => onSort("primary-number")}
               />
-            </button>
-          );
-        })}
+              {columns.has("age") && (
+                <SortableHeader
+                  label="Âge"
+                  active={sort === "oldest" || sort === "youngest"}
+                  onClick={() => onSort(sort === "oldest" ? "youngest" : "oldest")}
+                />
+              )}
+              {columns.has("group") && <th className="px-3 py-3">Lot</th>}
+              {columns.has("related") && (
+                <SortableHeader
+                  label="Animal lié"
+                  active={sort === "related-number"}
+                  onClick={() => onSort("related-number")}
+                />
+              )}
+              {columns.has("reproduction") && <th className="px-3 py-3">Reproduction</th>}
+              {columns.has("alerts") && <th className="min-w-52 px-3 py-3">À voir maintenant</th>}
+              {columns.has("work") && <th className="min-w-40 px-3 py-3">Fait dans la séance</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((row) => (
+              <DesktopRow
+                key={row.id}
+                row={row}
+                selectedIds={selectedIds}
+                completed={completed}
+                columns={columns}
+                onToggle={onToggle}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="divide-y divide-slate-100 md:hidden">
+        {rows.map((row) => (
+          <MobileRow
+            key={row.id}
+            row={row}
+            selectedIds={selectedIds}
+            completed={completed}
+            onToggle={onToggle}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
-function AnimalSignals({
-  animal,
-  treated,
-  weaned,
-  echoed,
-  mobile = false,
+function SortableHeader({
+  label,
+  active,
+  onClick,
 }: {
-  animal: WorkspaceAnimal;
-  treated: boolean;
-  weaned: boolean;
-  echoed: boolean;
-  mobile?: boolean;
+  label: string;
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
-    <span
-      className={`mt-1.5 flex flex-wrap gap-1.5 ${mobile ? "sm:hidden" : ""}`}
+    <th className="px-3 py-2">
+      <button
+        type="button"
+        onClick={onClick}
+        className={`min-h-8 rounded-lg px-1.5 text-[11px] font-black uppercase tracking-wide ${
+          active ? "bg-green-50 text-green-900" : "hover:bg-slate-50 hover:text-slate-900"
+        }`}
+      >
+        {label} ↕
+      </button>
+    </th>
+  );
+}
+
+function DesktopRow({
+  row,
+  selectedIds,
+  completed,
+  columns,
+  onToggle,
+}: {
+  row: WorkspaceRow;
+  selectedIds: Set<string>;
+  completed: WorkspaceCompletedState;
+  columns: Set<WorkspaceColumn>;
+  onToggle: (animalId: string) => void;
+}) {
+  const primarySelected = selectedIds.has(row.primary.id);
+  const relatedSelected = row.related ? selectedIds.has(row.related.id) : false;
+  const reproductionAnimal =
+    row.primary.reproductionStatus !== "NOT_APPLICABLE" ? row.primary : row.related;
+
+  return (
+    <tr className={primarySelected ? "bg-green-50/70" : "hover:bg-slate-50/70"}>
+      <td className="px-3 py-3 align-top">
+        <SelectionBox
+          selected={primarySelected}
+          label={`Sélectionner ${row.primary.nutrav}`}
+          onClick={() => onToggle(row.primary.id)}
+        />
+      </td>
+      <td className="px-3 py-3 align-top">
+        <AnimalIdentity animal={row.primary} />
+      </td>
+      {columns.has("age") && (
+        <td className="whitespace-nowrap px-3 py-3 align-top text-sm font-bold text-slate-700">
+          {formatAge(row.primary.birthDate)}
+        </td>
+      )}
+      {columns.has("group") && (
+        <td className="px-3 py-3 align-top text-xs font-bold text-slate-600">
+          {row.primary.groupName ?? "—"}
+        </td>
+      )}
+      {columns.has("related") && (
+        <td className="px-3 py-3 align-top">
+          {row.related ? (
+            <div className={`flex items-start gap-2 rounded-xl p-2 ${relatedSelected ? "bg-emerald-100" : "bg-slate-50"}`}>
+              <SelectionBox
+                selected={relatedSelected}
+                label={`Sélectionner l’animal lié ${row.related.nutrav}`}
+                onClick={() => onToggle(row.related!.id)}
+                compact
+              />
+              <div className="min-w-0">
+                <span className="block text-[10px] font-black uppercase tracking-wide text-slate-500">
+                  {row.primary.motherId ? "Mère" : "Veau lié"}
+                </span>
+                <AnimalIdentity animal={row.related} compact />
+              </div>
+            </div>
+          ) : (
+            <span className="text-sm text-slate-400">—</span>
+          )}
+        </td>
+      )}
+      {columns.has("reproduction") && (
+        <td className="px-3 py-3 align-top">
+          {reproductionAnimal ? <ReproductionBadge animal={reproductionAnimal} /> : <span className="text-slate-400">—</span>}
+        </td>
+      )}
+      {columns.has("alerts") && (
+        <td className="px-3 py-3 align-top">
+          <RowAlerts row={row} />
+        </td>
+      )}
+      {columns.has("work") && (
+        <td className="px-3 py-3 align-top">
+          <CompletedBadges row={row} completed={completed} />
+        </td>
+      )}
+    </tr>
+  );
+}
+
+function MobileRow({
+  row,
+  selectedIds,
+  completed,
+  onToggle,
+}: {
+  row: WorkspaceRow;
+  selectedIds: Set<string>;
+  completed: WorkspaceCompletedState;
+  onToggle: (animalId: string) => void;
+}) {
+  const primarySelected = selectedIds.has(row.primary.id);
+  const relatedSelected = row.related ? selectedIds.has(row.related.id) : false;
+  const reproductionAnimal =
+    row.primary.reproductionStatus !== "NOT_APPLICABLE" ? row.primary : row.related;
+
+  return (
+    <article className={`p-3 ${primarySelected ? "bg-green-50/80 shadow-[inset_4px_0_0_#15803d]" : ""}`}>
+      <div className="flex items-start gap-2.5">
+        <SelectionBox
+          selected={primarySelected}
+          label={`Sélectionner ${row.primary.nutrav}`}
+          onClick={() => onToggle(row.primary.id)}
+        />
+        <div className="min-w-0 flex-1">
+          <AnimalIdentity animal={row.primary} />
+          <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs font-semibold text-slate-500">
+            <span>{formatAge(row.primary.birthDate)}</span>
+            {row.primary.groupName && <span>· {row.primary.groupName}</span>}
+            {row.primary.lastWeightKg && <span>· {row.primary.lastWeightKg} kg</span>}
+          </div>
+        </div>
+      </div>
+
+      {row.related && (
+        <div className={`ml-8 mt-2 flex items-start gap-2 rounded-xl border p-2.5 ${
+          relatedSelected ? "border-emerald-300 bg-emerald-100" : "border-slate-200 bg-slate-50"
+        }`}>
+          <SelectionBox
+            selected={relatedSelected}
+            label={`Sélectionner l’animal lié ${row.related.nutrav}`}
+            onClick={() => onToggle(row.related!.id)}
+            compact
+          />
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+              {row.primary.motherId ? "Mère associée" : "Veau associé"}
+            </span>
+            <AnimalIdentity animal={row.related} compact />
+          </div>
+          {reproductionAnimal && reproductionAnimal.id === row.related.id && (
+            <ReproductionBadge animal={reproductionAnimal} compact />
+          )}
+        </div>
+      )}
+
+      {reproductionAnimal && reproductionAnimal.id === row.primary.id && (
+        <div className="ml-8 mt-2"><ReproductionBadge animal={reproductionAnimal} /></div>
+      )}
+      <div className="ml-8 mt-2"><RowAlerts row={row} /></div>
+      <div className="ml-8 mt-1.5"><CompletedBadges row={row} completed={completed} /></div>
+    </article>
+  );
+}
+
+function SelectionBox({
+  selected,
+  label,
+  onClick,
+  compact = false,
+}: {
+  selected: boolean;
+  label: string;
+  onClick: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      aria-label={label}
+      className={`flex shrink-0 items-center justify-center rounded-md border-2 ${
+        compact ? "size-6" : "size-7"
+      } ${selected ? "border-green-700 bg-green-700 text-white" : "border-slate-300 bg-white"}`}
     >
-      {animal.echoDue && !echoed && (
-        <Signal tone="amber" icon={HeartPulse} label="Écho à faire" />
-      )}
-      {animal.weaningDue && !weaned && (
-        <Signal tone="blue" icon={Baby} label="À sevrer" />
-      )}
-      {animal.saleBlocked && (
-        <Signal tone="red" icon={AlertTriangle} label="Ne pas sortir" />
-      )}
-      {treated && <Signal tone="green" icon={Check} label="Traité aujourd’hui" />}
-      {weaned && <Signal tone="green" icon={Check} label="Sevré aujourd’hui" />}
-      {echoed && <Signal tone="green" icon={Check} label="Écho enregistrée" />}
-      {animal.motherNutrav && (
-        <Signal tone="neutral" icon={HeartPulse} label={`Mère ${animal.motherNutrav}`} />
-      )}
-      {animal.calfNutrav && (
-        <Signal tone="neutral" icon={Baby} label={`Veau ${animal.calfNutrav}`} />
-      )}
+      {selected && <Check size={compact ? 14 : 17} strokeWidth={3} />}
+    </button>
+  );
+}
+
+function AnimalIdentity({
+  animal,
+  compact = false,
+}: {
+  animal: WorkspaceRow["primary"];
+  compact?: boolean;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="flex min-w-0 items-baseline gap-1.5">
+        <strong className={`${compact ? "text-sm" : "text-base"} font-black text-slate-950`}>
+          {animal.nutrav}
+        </strong>
+        {animal.name && <span className="truncate text-xs font-bold text-slate-600">{animal.name}</span>}
+      </div>
+      <span className="block text-[11px] font-bold text-slate-500">
+        {KIND_LABELS[animal.kind]} · {animal.sex}
+      </span>
+    </div>
+  );
+}
+
+function ReproductionBadge({
+  animal,
+  compact = false,
+}: {
+  animal: WorkspaceRow["primary"];
+  compact?: boolean;
+}) {
+  const tones: Record<ReproductionStatus, string> = {
+    PREGNANT: "bg-green-100 text-green-950 ring-green-300",
+    EMPTY: "bg-red-100 text-red-950 ring-red-300",
+    TO_CHECK: "bg-amber-100 text-amber-950 ring-amber-300",
+    NOT_APPLICABLE: "bg-slate-100 text-slate-600 ring-slate-200",
+  };
+  const detail = animal.pregnantMonths ? ` · ${animal.pregnantMonths} mois` : "";
+
+  return (
+    <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 font-black ring-1 ring-inset ${
+      compact ? "text-[10px]" : "text-xs"
+    } ${tones[animal.reproductionStatus]}`}>
+      {REPRODUCTION_LABELS[animal.reproductionStatus]}{detail}
     </span>
+  );
+}
+
+function RowAlerts({ row }: { row: WorkspaceRow }) {
+  const mother = row.primary.motherId ? row.related : null;
+  const alerts: Array<{ label: string; tone: "red" | "amber" | "blue" | "rose" | "slate"; icon: typeof Baby }> = [];
+
+  if (row.primary.weaningDue) alerts.push({ label: "À sevrer", tone: "blue", icon: Baby });
+  if (row.primary.treatmentDue) alerts.push({ label: "Traitement prévu", tone: "rose", icon: Stethoscope });
+  if (row.primary.vaccinationDue) alerts.push({ label: "Vaccin à faire", tone: "amber", icon: Syringe });
+  if (row.primary.weightDue) alerts.push({ label: "Poids à relever", tone: "slate", icon: Scale });
+  if (row.primary.echoDue || mother?.echoDue) alerts.push({ label: "Écho à faire", tone: "amber", icon: ScanLine });
+  if (mother?.reproductionStatus === "EMPTY" && row.primary.weaningDue) {
+    alerts.unshift({ label: "Mère vide · arbitrer le sevrage", tone: "red", icon: AlertTriangle });
+  }
+  if (row.primary.saleBlocked || row.related?.saleBlocked) {
+    alerts.unshift({ label: "Ne pas sortir", tone: "red", icon: AlertTriangle });
+  }
+
+  if (!alerts.length) return <span className="text-xs font-semibold text-slate-400">Rien à signaler</span>;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {alerts.slice(0, 3).map(({ label, tone, icon: Icon }) => (
+        <Signal key={label} tone={tone} icon={Icon} label={label} />
+      ))}
+    </div>
+  );
+}
+
+function CompletedBadges({
+  row,
+  completed,
+}: {
+  row: WorkspaceRow;
+  completed: WorkspaceCompletedState;
+}) {
+  const primaryDone = completedActionsForAnimal(row.primary.id, completed);
+  const relatedDone = row.related ? completedActionsForAnimal(row.related.id, completed) : [];
+  if (!primaryDone.length && !relatedDone.length) {
+    return <span className="text-xs font-semibold text-slate-400">—</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {primaryDone.map((action) => (
+        <Signal key={`primary-${action}`} tone="green" icon={Check} label={ACTION_LABELS[action]} />
+      ))}
+      {relatedDone.map((action) => (
+        <Signal
+          key={`related-${action}`}
+          tone="green"
+          icon={HeartPulse}
+          label={`${ACTION_LABELS[action]} ${row.related!.nutrav}`}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -186,22 +458,21 @@ function Signal({
   icon: Icon,
   label,
 }: {
-  tone: "amber" | "blue" | "red" | "green" | "neutral";
-  icon: typeof Check;
+  tone: "red" | "amber" | "blue" | "rose" | "green" | "slate";
+  icon: typeof Baby;
   label: string;
 }) {
   const tones = {
+    red: "bg-red-100 text-red-950 ring-red-300",
     amber: "bg-amber-100 text-amber-950 ring-amber-300",
     blue: "bg-blue-100 text-blue-950 ring-blue-300",
-    red: "bg-red-100 text-red-950 ring-red-300",
+    rose: "bg-rose-100 text-rose-950 ring-rose-300",
     green: "bg-green-100 text-green-950 ring-green-300",
-    neutral: "bg-slate-100 text-slate-700 ring-slate-200",
+    slate: "bg-slate-100 text-slate-700 ring-slate-200",
   };
 
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black ring-1 ring-inset ${tones[tone]}`}
-    >
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 ring-inset ${tones[tone]}`}>
       <Icon size={11} strokeWidth={2.5} />
       {label}
     </span>

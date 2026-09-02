@@ -1,9 +1,10 @@
 import type { WorkspaceAnimal } from "./types";
 
 const DAY = 24 * 60 * 60 * 1000;
+const DEMO_REFERENCE_DATE = new Date("2026-09-02T08:00:00.000Z");
 
 function isoDaysAgo(days: number): string {
-  return new Date(Date.now() - days * DAY).toISOString();
+  return new Date(DEMO_REFERENCE_DATE.getTime() - days * DAY).toISOString();
 }
 
 const motherNames = [
@@ -24,6 +25,12 @@ const motherNames = [
   "Salsa",
 ];
 
+const motherStatuses = motherNames.map((_, index) => {
+  if (index < 3) return "TO_CHECK" as const;
+  if (index < 5) return "EMPTY" as const;
+  return "PREGNANT" as const;
+});
+
 const mothers: WorkspaceAnimal[] = motherNames.map((name, index) => ({
   id: `demo-mother-${index + 1}`,
   nutrav: String(6201 + index),
@@ -34,30 +41,53 @@ const mothers: WorkspaceAnimal[] = motherNames.map((name, index) => ({
   groupName: index < 8 ? "Lot des mères" : "Pâture du haut",
   motherId: null,
   motherNutrav: null,
+  calfId: `demo-calf-${index + 1}`,
   calfNutrav: String(8101 + index),
-  echoDue: index < 3,
+  reproductionStatus: motherStatuses[index],
+  pregnantMonths: motherStatuses[index] === "PREGNANT" ? 2 + (index % 6) : null,
+  echoDue: motherStatuses[index] === "TO_CHECK",
   weaningDue: false,
-  saleBlocked: false,
+  treatmentDue: false,
+  vaccinationDue: false,
+  weightDue: false,
+  saleBlocked: index === 3,
+  lastWeightKg: null,
+  priority: motherStatuses[index] === "EMPTY" ? 3 : motherStatuses[index] === "TO_CHECK" ? 2 : 0,
 }));
 
-const calves: WorkspaceAnimal[] = Array.from({ length: 15 }, (_, index) => ({
-  id: `demo-calf-${index + 1}`,
-  nutrav: String(8101 + index),
-  name:
-    index % 4 === 0
-      ? ["Ulysse", "Uma", "Uno", "Uriel"][Math.floor(index / 4)]
-      : null,
-  birthDate: isoDaysAgo(182 + index * 8),
-  sex: index % 3 === 0 ? "F" : "M",
-  kind: index % 3 === 0 ? "VELLE" : "VEAU",
-  groupName: "Lot des veaux 2026",
-  motherId: mothers[index].id,
-  motherNutrav: mothers[index].nutrav,
-  calfNutrav: null,
-  echoDue: false,
-  weaningDue: index < 8,
-  saleBlocked: false,
-}));
+const calves: WorkspaceAnimal[] = Array.from({ length: 15 }, (_, index) => {
+  const mother = mothers[index];
+  const weaningDue = index < 8;
+  const motherNeedsAttention =
+    mother.reproductionStatus === "EMPTY" || mother.reproductionStatus === "TO_CHECK";
+
+  return {
+    id: `demo-calf-${index + 1}`,
+    nutrav: String(8101 + index),
+    name:
+      index % 4 === 0
+        ? ["Ulysse", "Uma", "Uno", "Uriel"][Math.floor(index / 4)]
+        : null,
+    birthDate: isoDaysAgo(188 + index * 8),
+    sex: index % 3 === 0 ? "F" : "M",
+    kind: index % 3 === 0 ? "VELLE" : "VEAU",
+    groupName: "Lot des veaux 2026",
+    motherId: mother.id,
+    motherNutrav: mother.nutrav,
+    calfId: null,
+    calfNutrav: null,
+    reproductionStatus: "NOT_APPLICABLE",
+    pregnantMonths: null,
+    echoDue: false,
+    weaningDue,
+    treatmentDue: true,
+    vaccinationDue: index === 2 || index === 9,
+    weightDue: index >= 8,
+    saleBlocked: false,
+    lastWeightKg: 305 + index * 9,
+    priority: weaningDue && motherNeedsAttention ? 3 : weaningDue ? 2 : 1,
+  } satisfies WorkspaceAnimal;
+});
 
 const heifers: WorkspaceAnimal[] = Array.from({ length: 6 }, (_, index) => ({
   id: `demo-heifer-${index + 1}`,
@@ -69,10 +99,18 @@ const heifers: WorkspaceAnimal[] = Array.from({ length: 6 }, (_, index) => ({
   groupName: index < 3 ? "Génisses 2025" : "Génisses 2024",
   motherId: null,
   motherNutrav: null,
+  calfId: null,
   calfNutrav: null,
+  reproductionStatus: index === 4 ? "TO_CHECK" : index < 2 ? "PREGNANT" : "EMPTY",
+  pregnantMonths: index < 2 ? 3 + index : null,
   echoDue: index === 4,
   weaningDue: false,
+  treatmentDue: false,
+  vaccinationDue: false,
+  weightDue: index === 2 || index === 3,
   saleBlocked: index === 1,
+  lastWeightKg: 438 + index * 17,
+  priority: index === 4 ? 3 : index >= 2 ? 2 : 0,
 }));
 
 export const DEMO_WORKSPACE_ANIMALS: WorkspaceAnimal[] = [
