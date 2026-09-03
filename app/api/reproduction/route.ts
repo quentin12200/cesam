@@ -97,12 +97,20 @@ export async function GET() {
     const activeRequest = v.demandesEchographie[0] ?? null;
     const daysSinceBreeding = currentBreeding ? differenceInDays(now, currentBreeding.date) : null;
     const explicitControl = activeRequest?.origine === "MANUELLE";
+
+    // Une demande manuelle est un ordre utilisateur explicite : elle doit toujours
+    // apparaître dans « À écho », même sans saillie/IA courante ou hors délai auto.
+    // Les règles de délai et l’activation de l’alerte ne concernent que l’ajout automatique.
     const belongsToEchoList = Boolean(
-      echoListEnabled
-      && activeRequest
-      && currentBreeding
-      && (explicitControl || !currentBreeding.gestation?.dateEcho)
-      && (explicitControl || (daysSinceBreeding !== null && daysSinceBreeding >= echoEntryDays))
+      explicitControl
+      || (
+        echoListEnabled
+        && activeRequest
+        && currentBreeding
+        && !currentBreeding.gestation?.dateEcho
+        && daysSinceBreeding !== null
+        && daysSinceBreeding >= echoEntryDays
+      )
     );
     const echoStatus = belongsToEchoList && daysSinceBreeding !== null
       ? getEchoListStatus(daysSinceBreeding, rules.echoTiming.dueFromDays)
