@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { buildManualEchoRequestData, findActiveManualEchoRequest } from "@/lib/echo-request-state";
 
 export interface ManualEchoRequestInput {
   nutrav: string;
@@ -34,8 +35,7 @@ export async function createManualEchoRequest(
       sexbov: true,
       demandesEchographie: {
         where: { etat: "A_FAIRE" },
-        take: 1,
-        select: { id: true },
+        select: { id: true, origine: true, etat: true },
       },
       saillies: {
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -51,8 +51,9 @@ export async function createManualEchoRequest(
 
   if (!animal) return { status: "NOT_FOUND" };
   if (animal.sexbov !== "F") return { status: "NOT_FEMALE" };
-  if (animal.demandesEchographie[0]) {
-    return { status: "ALREADY_ACTIVE", request: animal.demandesEchographie[0] };
+  const activeManualRequest = findActiveManualEchoRequest(animal.demandesEchographie);
+  if (activeManualRequest) {
+    return { status: "ALREADY_ACTIVE", request: activeManualRequest };
   }
 
   const lastCalving = animal.velagesVache[0]?.date ?? null;
@@ -70,22 +71,19 @@ export async function createManualEchoRequest(
   try {
     return await prisma.$transaction(async (tx) => {
       const existing = await tx.demandeEchographie.findFirst({
-        where: { animalId: animal.id, etat: "A_FAIRE" },
+        where: { animalId: animal.id, etat: "A_FAIRE", origine: "MANUELLE" },
         select: { id: true },
       });
       if (existing) return { status: "ALREADY_ACTIVE" as const, request: existing };
 
       const request = await tx.demandeEchographie.create({
-        data: {
+        data: buildManualEchoRequestData({
           animalId: animal.id,
           saillieId: requestedBreedingId,
-          origine: "MANUELLE",
-          etat: "A_FAIRE",
-          motif: input.motif?.trim() || null,
-          planifieeAt: input.datePlanification ? new Date(input.datePlanification) : new Date(),
-          observation: input.observation?.trim() || null,
-          requestKey: `MANUAL_ACTIVE:${animal.id}`,
-        },
+          motif: input.motif,
+          datePlanification: input.datePlanification,
+          observation: input.observation,
+        }),
         select: { id: true },
       });
       await tx.animal.update({
@@ -97,7 +95,7 @@ export async function createManualEchoRequest(
   } catch (error) {
     if (!isUniqueConstraintError(error)) throw error;
     const existing = await prisma.demandeEchographie.findFirst({
-      where: { animalId: animal.id, etat: "A_FAIRE" },
+      where: { animalId: animal.id, etat: "A_FAIRE", origine: "MANUELLE" },
       select: { id: true },
     });
     if (existing) return { status: "ALREADY_ACTIVE", request: existing };

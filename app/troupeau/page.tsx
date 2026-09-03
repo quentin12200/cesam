@@ -16,6 +16,7 @@ import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
 import { getCurrentReproductionSummary } from "@/lib/current-reproduction-summary";
 import {
   buildTroupeauWhere,
+  belongsToEchoActionList,
   filtrerAnimauxParCriteresLocaux,
   normalizeTroupeauFilters,
   type TroupeauFilterParams,
@@ -88,7 +89,7 @@ async function getAnimaux(params: TroupeauFilterParams) {
           where: { etat: "A_FAIRE" },
           orderBy: { createdAt: "desc" as const },
           take: 1,
-          select: { origine: true, motif: true },
+          select: { origine: true, motif: true, etat: true },
         },
         reproductionEtatManuel: true,
         reproductionEtatPrecedent: true,
@@ -240,7 +241,11 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       danais: animal.danais.toISOString(),
       sexbov: animal.sexbov,
       estGenisse: animal.estGenisse,
-      aEchographier: animal.demandesEchographie.length > 0,
+      aEchographier: belongsToEchoActionList({
+        aEchographier: animal.aEchographier,
+        reproductionEtatManuel: animal.reproductionEtatManuel,
+        demandesEchographie: animal.demandesEchographie,
+      }),
       reproductionEtatManuel: animal.reproductionEtatManuel as AnimalRow["reproductionEtatManuel"],
       reproductionEtatPrecedent: animal.reproductionEtatPrecedent as AnimalRow["reproductionEtatPrecedent"],
       categorie: animal.categorie,
