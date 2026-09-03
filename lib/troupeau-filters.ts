@@ -97,6 +97,7 @@ export function buildTroupeauWhere(params: TroupeauFilterParams): Prisma.AnimalW
   } else if (filters.repro === "A_ECO") {
     where.sexbov = "F";
     where.OR = [
+      { reproductionEtatManuel: "JAUNE" },
       { aEchographier: true },
       { demandesEchographie: { some: { etat: "A_FAIRE" } } },
     ];
