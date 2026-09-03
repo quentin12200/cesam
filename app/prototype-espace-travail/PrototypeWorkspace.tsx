@@ -5,36 +5,31 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
-  Columns3,
   Filter,
   Home,
   LayoutList,
   Menu,
   ScanLine,
   Search,
-  SlidersHorizontal,
   Sparkles,
   Users,
   WalletCards,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { DEMO_SCENARIO_CALF_IDS } from "./demo-data";
 import type {
   WorkspaceAction,
   WorkspaceActivity,
   WorkspaceAnimal,
-  WorkspaceColumn,
   WorkspaceCompletedState,
   WorkspaceRow,
-  WorkspaceSessionStatus,
   WorkspaceSort,
   WorkspaceView,
 } from "./types";
 import WorkspaceActionModal from "./WorkspaceActionModal";
 import WorkspaceAnimalList from "./WorkspaceAnimalList";
+import WorkspaceBulkBar from "./WorkspaceBulkBar";
 import WorkspaceSelectionPanel from "./WorkspaceSelectionPanel";
-import WorkspaceSessionBar from "./WorkspaceSessionBar";
 import {
   ACTION_LABELS,
   animalActionsDue,
@@ -49,19 +44,17 @@ type PrototypeWorkspaceProps = {
 
 type TaskFilter = "all" | "treatment" | "vaccination" | "echo" | "weaning" | "weight";
 
-type StoredSession = {
+type StoredWorkspace = {
   selectedIds: string[];
   completed: WorkspaceCompletedState;
   activity: WorkspaceActivity[];
-  status: WorkspaceSessionStatus;
   view: WorkspaceView;
   sort: WorkspaceSort;
   group: string;
   taskFilter: TaskFilter;
-  visibleColumns: WorkspaceColumn[];
 };
 
-const SESSION_KEY = "cesam:prototype-workspace-session:v2";
+const WORKSPACE_KEY = "cesam:prototype-workspace:v3";
 const ALL_ACTIONS: WorkspaceAction[] = [
   "treatment",
   "vaccination",
@@ -70,14 +63,6 @@ const ALL_ACTIONS: WorkspaceAction[] = [
   "move",
   "weight",
   "sale",
-];
-const ALL_COLUMNS: WorkspaceColumn[] = [
-  "age",
-  "group",
-  "related",
-  "reproduction",
-  "alerts",
-  "work",
 ];
 const VIEWS: Array<{ id: WorkspaceView; label: string; icon: typeof Users }> = [
   { id: "today", label: "Travail du jour", icon: ClipboardCheck },
@@ -89,47 +74,38 @@ const VIEWS: Array<{ id: WorkspaceView; label: string; icon: typeof Users }> = [
 ];
 
 export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspaceProps) {
-  const [view, setView] = useState<WorkspaceView>("today");
+  const [view, setView] = useState<WorkspaceView>("weaning");
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<WorkspaceSort>("priority");
+  const [sort, setSort] = useState<WorkspaceSort>("primary-number");
   const [group, setGroup] = useState("all");
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("all");
-  const [visibleColumns, setVisibleColumns] = useState<WorkspaceColumn[]>(ALL_COLUMNS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [completed, setCompleted] = useState<WorkspaceCompletedState>(EMPTY_COMPLETED_STATE);
   const [activity, setActivity] = useState<WorkspaceActivity[]>([]);
-  const [status, setStatus] = useState<WorkspaceSessionStatus>("active");
   const [activeAction, setActiveAction] = useState<WorkspaceAction | null>(null);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [mobileViewsOpen, setMobileViewsOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [hydrated, setHydrated] = useState(false);
-  const [restored, setRestored] = useState(false);
 
   const validIds = useMemo(() => new Set(initialAnimals.map((animal) => animal.id)), [initialAnimals]);
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(SESSION_KEY);
+      const raw = window.localStorage.getItem(WORKSPACE_KEY);
       if (raw) {
-        const saved = JSON.parse(raw) as Partial<StoredSession>;
+        const saved = JSON.parse(raw) as Partial<StoredWorkspace>;
         if (Array.isArray(saved.selectedIds)) {
           setSelectedIds(new Set(saved.selectedIds.filter((id) => validIds.has(id))));
         }
         if (saved.completed) setCompleted(normalizeCompleted(saved.completed, validIds));
         if (Array.isArray(saved.activity)) setActivity(saved.activity.slice(0, 12));
-        if (saved.status === "active" || saved.status === "paused") setStatus(saved.status);
         if (VIEWS.some((item) => item.id === saved.view)) setView(saved.view as WorkspaceView);
         if (isWorkspaceSort(saved.sort)) setSort(saved.sort);
         if (typeof saved.group === "string") setGroup(saved.group);
         if (isTaskFilter(saved.taskFilter)) setTaskFilter(saved.taskFilter);
-        if (Array.isArray(saved.visibleColumns)) {
-          const columns = saved.visibleColumns.filter((column): column is WorkspaceColumn => ALL_COLUMNS.includes(column as WorkspaceColumn));
-          if (columns.length) setVisibleColumns(columns);
-        }
-        setRestored(true);
       }
     } catch {
-      window.localStorage.removeItem(SESSION_KEY);
+      window.localStorage.removeItem(WORKSPACE_KEY);
     } finally {
       setHydrated(true);
     }
@@ -137,19 +113,17 @@ export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspac
 
   useEffect(() => {
     if (!hydrated) return;
-    const snapshot: StoredSession = {
+    const snapshot: StoredWorkspace = {
       selectedIds: Array.from(selectedIds),
       completed,
       activity,
-      status,
       view,
       sort,
       group,
       taskFilter,
-      visibleColumns,
     };
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(snapshot));
-  }, [activity, completed, group, hydrated, selectedIds, sort, status, taskFilter, view, visibleColumns]);
+    window.localStorage.setItem(WORKSPACE_KEY, JSON.stringify(snapshot));
+  }, [activity, completed, group, hydrated, selectedIds, sort, taskFilter, view]);
 
   const groups = useMemo(
     () => Array.from(new Set(initialAnimals.map((animal) => animal.groupName).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b, "fr")),
@@ -215,23 +189,23 @@ export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspac
     });
   }
 
-  function addVisible() {
-    setSelectedIds((current) => new Set([...current, ...rows.map((row) => row.primary.id)]));
-    showFeedback(`${rows.length} animaux de la vue ajoutés à la sélection.`);
-  }
-
-  function replaceWithVisible() {
-    setSelectedIds(new Set(rows.map((row) => row.primary.id)));
-    showFeedback(`Groupe de travail remplacé par les ${rows.length} animaux visibles.`);
+  function toggleVisibleAnimals() {
+    const visibleIds = rows.map((row) => row.primary.id);
+    const allSelected = visibleIds.every((id) => selectedIds.has(id));
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of visibleIds) {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+    showFeedback(allSelected ? `${rows.length} animaux retirés.` : `${rows.length} animaux sélectionnés.`);
   }
 
   function openAction(action: WorkspaceAction) {
-    if (status === "paused") {
-      showFeedback("Reprenez la séance pour enregistrer une action.");
-      return;
-    }
     if (!compatibleByAction[action].length) {
-      showFeedback("Aucun animal compatible dans la sélection.");
+      showFeedback(action === "echo" ? "Sélectionnez au moins une vache ou une génisse." : action === "weaning" ? "Sélectionnez au moins un veau." : "Sélectionnez d’abord les animaux.");
       return;
     }
     setMobilePanelOpen(false);
@@ -255,38 +229,27 @@ export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspac
     showFeedback(`${label}. La sélection est conservée.`);
   }
 
-  function selectRelatedMothers(onlyEchoDue: boolean, replace: boolean) {
-    const mothers = onlyEchoDue ? relatedEchoMothers : relatedMothers;
-    const motherIds = mothers.map((mother) => mother.id);
-    setSelectedIds((current) => replace ? new Set(motherIds) : new Set([...current, ...motherIds]));
-    if (onlyEchoDue) setView("reproduction");
-    setGroup("all");
-    setQuery("");
-    setMobilePanelOpen(false);
-    showFeedback(`${mothers.length} mère${mothers.length > 1 ? "s" : ""} ${replace ? "gardée" : "ajoutée"}${mothers.length > 1 ? "s" : ""}.`);
-  }
-
-  function toggleColumn(column: WorkspaceColumn) {
-    setVisibleColumns((current) => current.includes(column) ? current.filter((item) => item !== column) : [...current, column]);
-  }
-
-  function prepareDemo() {
-    setSelectedIds(new Set(DEMO_SCENARIO_CALF_IDS));
-    setView("young-related");
+  function showRelatedMothers() {
+    const motherIds = relatedMothers.map((mother) => mother.id);
+    setSelectedIds((current) => new Set([...current, ...motherIds]));
+    setView("cows");
+    setSort("primary-number");
     setGroup("all");
     setTaskFilter("all");
     setQuery("");
-    showFeedback("15 veaux préparés. Leurs mères restent visibles et triables.");
+    setMobilePanelOpen(false);
+    showFeedback(`${relatedMothers.length} mère${relatedMothers.length > 1 ? "s" : ""} affichée${relatedMothers.length > 1 ? "s" : ""}, triée${relatedMothers.length > 1 ? "s" : ""} par numéro.`);
   }
 
-  function startNewSession() {
-    setSelectedIds(new Set());
-    setCompleted(EMPTY_COMPLETED_STATE);
-    setActivity([]);
-    setStatus("active");
-    setActiveAction(null);
-    setRestored(false);
-    showFeedback("Nouvelle séance prête.");
+  function selectEchoMothers() {
+    setSelectedIds(new Set(relatedEchoMothers.map((mother) => mother.id)));
+    setView("reproduction");
+    setSort("primary-number");
+    setGroup("all");
+    setTaskFilter("all");
+    setQuery("");
+    setMobilePanelOpen(false);
+    showFeedback(`${relatedEchoMothers.length} mère${relatedEchoMothers.length > 1 ? "s" : ""} à échographier sélectionnée${relatedEchoMothers.length > 1 ? "s" : ""}.`);
   }
 
   const selectionPanel = (
@@ -300,7 +263,8 @@ export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspac
       onRemove={toggleAnimal}
       onClear={() => setSelectedIds(new Set())}
       onAction={openAction}
-      onSelectRelatedMothers={selectRelatedMothers}
+      onShowMothers={showRelatedMothers}
+      onSelectEchoMothers={selectEchoMothers}
     />
   );
 
@@ -308,19 +272,10 @@ export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspac
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#f2f4f1] text-slate-950">
       <WorkspaceHeader />
 
-      <main className="mx-auto w-full max-w-[1600px] px-3 pb-28 pt-3 sm:px-5 sm:pt-5 lg:pb-8">
+      <main className="mx-auto w-full max-w-[1800px] px-3 pb-28 pt-3 sm:px-5 sm:pt-5 lg:pb-8">
         <PrototypeNotice />
-        <WorkspaceSessionBar
-          status={status}
-          selectedCount={selectedIds.size}
-          activity={activity}
-          restored={restored}
-          onTogglePause={() => setStatus((current) => current === "active" ? "paused" : "active")}
-          onNewSession={startNewSession}
-          onPrepareDemo={prepareDemo}
-        />
 
-        <div className="mt-4 grid items-start gap-4 lg:grid-cols-[210px_minmax(0,1fr)_330px]">
+        <div className="mt-4 grid items-start gap-4 lg:grid-cols-[200px_minmax(0,1fr)_300px]">
           <aside className="hidden lg:block">
             <ViewNavigation animals={initialAnimals} completed={completed} activeView={view} onView={setView} />
           </aside>
@@ -331,7 +286,7 @@ export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspac
                 <p className="text-xs font-black uppercase tracking-wide text-green-800">Espace de travail général</p>
                 <h1 id="workspace-title" className="text-2xl font-black tracking-tight sm:text-3xl">Troupeau</h1>
                 <p className="mt-1 max-w-2xl text-sm text-slate-600">
-                  Une table modulable, des relations visibles et une sélection qui survit à chaque action.
+                  Triez directement le tableau, sélectionnez les animaux, puis lancez l’action au même endroit.
                 </p>
               </div>
               <button
@@ -359,15 +314,8 @@ export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspac
             )}
 
             <div className="mb-3 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(190px,1fr)_155px_170px_160px_auto]">
+              <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_180px_180px]">
                 <SearchInput query={query} onQuery={setQuery} />
-                <SelectControl icon={SlidersHorizontal} label="Trier" value={sort} onChange={(value) => setSort(value as WorkspaceSort)}>
-                  <option value="priority">Priorités d’abord</option>
-                  <option value="primary-number">Numéro animal</option>
-                  <option value="related-number">Numéro mère / lié</option>
-                  <option value="youngest">Plus jeunes</option>
-                  <option value="oldest">Plus âgés</option>
-                </SelectControl>
                 <SelectControl icon={Users} label="Lot" value={group} onChange={setGroup}>
                   <option value="all">Tous les lots</option>
                   {groups.map((groupName) => <option key={groupName} value={groupName}>{groupName}</option>)}
@@ -380,30 +328,34 @@ export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspac
                   <option value="vaccination">Vaccination</option>
                   <option value="weight">Pesée</option>
                 </SelectControl>
-                <ColumnPicker visibleColumns={visibleColumns} onToggle={toggleColumn} />
               </div>
             </div>
 
-            {hiddenSelectedCount > 0 && (
-              <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950">
-                La sélection est conservée : {hiddenSelectedCount} animal{hiddenSelectedCount > 1 ? "aux" : ""} hors de cette vue.
-              </div>
-            )}
+            <WorkspaceBulkBar
+              selectedAnimals={selectedAnimals}
+              hiddenSelectedCount={hiddenSelectedCount}
+              compatibleCounts={compatibleCounts}
+              relatedMothers={relatedMothers}
+              relatedEchoMothers={relatedEchoMothers}
+              onClear={() => setSelectedIds(new Set())}
+              onAction={openAction}
+              onShowMothers={showRelatedMothers}
+              onSelectEchoMothers={selectEchoMothers}
+            />
 
             <WorkspaceAnimalList
               rows={rows}
+              view={view}
               selectedIds={selectedIds}
               completed={completed}
-              visibleColumns={visibleColumns}
               sort={sort}
               onToggle={toggleAnimal}
-              onAddVisible={addVisible}
-              onReplaceWithVisible={replaceWithVisible}
+              onToggleVisible={toggleVisibleAnimals}
               onSort={setSort}
             />
           </section>
 
-          <aside className="sticky top-[76px] hidden lg:block" aria-label="Sélection et actions">{selectionPanel}</aside>
+          <aside className="hidden lg:block" aria-label="Sélection et actions">{selectionPanel}</aside>
         </div>
       </main>
 
@@ -492,36 +444,10 @@ function SelectControl({
   );
 }
 
-function ColumnPicker({ visibleColumns, onToggle }: { visibleColumns: WorkspaceColumn[]; onToggle: (column: WorkspaceColumn) => void }) {
-  const labels: Record<WorkspaceColumn, string> = {
-    age: "Âge",
-    group: "Lot",
-    related: "Animal lié",
-    reproduction: "Reproduction",
-    alerts: "Alertes",
-    work: "Travail fait",
-  };
-  return (
-    <details className="relative sm:col-span-2 xl:col-span-1">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-black text-slate-700 hover:bg-slate-100">
-        <Columns3 size={17} /> Colonnes
-      </summary>
-      <div className="absolute right-0 top-12 z-30 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-        {ALL_COLUMNS.map((column) => (
-          <label key={column} className="flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-bold hover:bg-slate-50">
-            <input type="checkbox" checked={visibleColumns.includes(column)} onChange={() => onToggle(column)} className="size-4 accent-green-700" />
-            {labels[column]}
-          </label>
-        ))}
-      </div>
-    </details>
-  );
-}
-
 function WorkspaceHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex min-h-16 w-full max-w-[1600px] items-center gap-3 px-3 sm:px-5">
+      <div className="mx-auto flex min-h-16 w-full max-w-[1800px] items-center gap-3 px-3 sm:px-5">
         <div className="flex size-10 items-center justify-center rounded-xl bg-green-800 text-lg font-black text-white">C</div>
         <strong className="text-lg font-black tracking-tight">CESAM</strong>
         <span className="hidden rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-violet-900 sm:inline-flex">Prototype espace de travail</span>
@@ -548,7 +474,7 @@ function PrototypeNotice() {
   return (
     <div className="flex gap-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-violet-950 sm:px-4">
       <Sparkles className="mt-0.5 shrink-0" size={18} />
-      <p className="text-xs font-semibold leading-5 sm:text-sm"><strong>Maquette cliquable.</strong> Les animaux sont fictifs ; la séance est conservée sur cet appareil mais rien n’est enregistré dans CESAM.</p>
+      <p className="text-xs font-semibold leading-5 sm:text-sm"><strong>Maquette cliquable.</strong> Les animaux sont fictifs ; votre sélection et le travail simulé restent visibles sur cet appareil, mais rien n’est enregistré dans CESAM.</p>
     </div>
   );
 }
@@ -582,7 +508,7 @@ function ViewNavigation({
       </div>
       <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
         <strong className="block text-slate-900">Comme un tableau dynamique</strong>
-        Les vues, tris et colonnes changent. La sélection, elle, reste.
+        Une vue filtre les lignes. Les titres du tableau trient les numéros, les mères et l’âge.
       </div>
     </nav>
   );

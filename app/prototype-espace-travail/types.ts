@@ -59,14 +59,6 @@ export type WorkspaceSort =
   | "youngest"
   | "oldest";
 
-export type WorkspaceColumn =
-  | "age"
-  | "group"
-  | "related"
-  | "reproduction"
-  | "alerts"
-  | "work";
-
 export type WorkspaceRow = {
   id: string;
   primary: WorkspaceAnimal;
@@ -80,7 +72,5 @@ export type WorkspaceActivity = {
   animalIds: string[];
   time: string;
 };
-
-export type WorkspaceSessionStatus = "active" | "paused";
 
 export type WorkspaceCompletedState = Record<WorkspaceAction, string[]>;

@@ -134,24 +134,15 @@ export function compatibleAnimals(
   completedIds: Set<string>,
 ): WorkspaceAnimal[] {
   return animals.filter((animal) => {
-    if (completedIds.has(animal.id)) return false;
     if (action === "weaning") {
       return (
         (animal.kind === "VEAU" || animal.kind === "VELLE") &&
-        animal.weaningDue
+        !completedIds.has(animal.id)
       );
     }
     if (action === "echo") {
-      return (
-        (animal.kind === "VACHE" || animal.kind === "GENISSE") &&
-        animal.echoDue
-      );
+      return animal.kind === "VACHE" || animal.kind === "GENISSE";
     }
-    if (action === "vaccination") {
-      return animal.vaccinationDue;
-    }
-    if (action === "weight") return true;
-    if (action === "sale") return !animal.saleBlocked;
     return true;
   });
 }
