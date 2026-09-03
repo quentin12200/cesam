@@ -25,6 +25,7 @@ async function performAutomaticEchoSync() {
       },
       select: {
         id: true,
+        aEchographier: true,
         saillies: {
           orderBy: [{ date: "desc" }, { createdAt: "desc" }],
           select: { id: true, date: true, gestation: { select: { dateEcho: true } } },
@@ -98,6 +99,45 @@ async function performAutomaticEchoSync() {
             requestKey: `AUTO:${saillieId}`,
           },
           update: {},
+        }),
+      ),
+    );
+  }
+
+  // Compatibilité avec les anciens parcours : certaines actions mobiles historiques
+  // ont pu poser uniquement aEchographier=true sans créer de DemandeEchographie.
+  // On convertit ce marquage en vraie demande MANUELLE au lieu de l'effacer.
+  const activeAnimalIdsBeforeLegacyMigration = await prisma.demandeEchographie.findMany({
+    where: { etat: "A_FAIRE" },
+    distinct: ["animalId"],
+    select: { animalId: true },
+  });
+  const activeIdsBeforeLegacyMigration = new Set(
+    activeAnimalIdsBeforeLegacyMigration.map((request) => request.animalId),
+  );
+  const legacyManualFlags = females.filter(
+    (female) => female.aEchographier && !activeIdsBeforeLegacyMigration.has(female.id),
+  );
+
+  for (let index = 0; index < legacyManualFlags.length; index += UPSERT_BATCH_SIZE) {
+    const batch = legacyManualFlags.slice(index, index + UPSERT_BATCH_SIZE);
+    await Promise.all(
+      batch.map((female) =>
+        prisma.demandeEchographie.upsert({
+          where: { requestKey: `MANUAL_ACTIVE:${female.id}` },
+          create: {
+            animalId: female.id,
+            saillieId: currentAttemptByAnimal.get(female.id) ?? null,
+            origine: "MANUELLE",
+            etat: "A_FAIRE",
+            motif: "CONTROLE_SUPPLEMENTAIRE",
+            planifieeAt: new Date(),
+            requestKey: `MANUAL_ACTIVE:${female.id}`,
+          },
+          update: {
+            etat: "A_FAIRE",
+            clotureeAt: null,
+          },
         }),
       ),
     );
