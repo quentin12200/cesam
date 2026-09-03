@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [page, table, mobile, summary, batchRoute, singleRoute, manualRequests, filters] = await Promise.all([
+const [page, table, mobile, summary, batchRoute, singleRoute, manualRequests, requestState, filters] = await Promise.all([
   readFile(new URL("../app/troupeau/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/troupeau/TroupeauTableau.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/troupeau/TroupeauMobileList.tsx", import.meta.url), "utf8"),
@@ -10,6 +10,7 @@ const [page, table, mobile, summary, batchRoute, singleRoute, manualRequests, fi
   readFile(new URL("../app/api/animaux/echo-requests/batch/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/api/animaux/[nutrav]/echo-request/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../lib/manual-echo-requests.ts", import.meta.url), "utf8"),
+  readFile(new URL("../lib/echo-request-state.ts", import.meta.url), "utf8"),
   readFile(new URL("../lib/troupeau-filters.ts", import.meta.url), "utf8"),
 ]);
 
@@ -44,7 +45,8 @@ test("le batch et la route individuelle partagent la règle anti-doublon", () =>
   assert.match(singleRoute, /createManualEchoRequest/);
   assert.match(manualRequests, /etat: "A_FAIRE"/);
   assert.match(manualRequests, /status: "ALREADY_ACTIVE"/);
-  assert.match(manualRequests, /requestKey: `MANUAL_ACTIVE:\$\{animal\.id\}`/);
+  assert.match(manualRequests, /buildManualEchoRequestData/);
+  assert.match(requestState, /requestKey: `MANUAL_ACTIVE:\$\{input\.animalId\}`/);
   assert.match(batchRoute, /new Set/);
   assert.match(table, /alreadyActive/);
   assert.match(table, /router\.refresh\(\)/);

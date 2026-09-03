@@ -2,6 +2,9 @@ import type { Prisma } from "@prisma/client";
 import { filtrerAnimauxParCategorie, type AnimalCategorieFilterable } from "./troupeau-category-filter.ts";
 import { shouldDisplayNonWeaned } from "./troupeau-display.ts";
 import { CATEGORIES_FEMELLES, CATEGORIES_LABELS, CATEGORIES_MALES, type CategorieAnimal } from "./utils.ts";
+import { belongsToEchoActionList } from "./echo-request-state.ts";
+
+export { belongsToEchoActionList } from "./echo-request-state.ts";
 
 export type TroupeauSexFilter = "F" | "M";
 export type TroupeauReproductionFilter = "PLEINE" | "VIDE" | "A_ECO" | "IMMINENTE";
@@ -93,13 +96,17 @@ export function buildTroupeauWhere(params: TroupeauFilterParams): Prisma.AnimalW
     where.saillies = { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } };
   } else if (filters.repro === "VIDE") {
     where.sexbov = "F";
-    where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } };
+    where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } } };
   } else if (filters.repro === "A_ECO") {
     where.sexbov = "F";
-    where.OR = [
-      { reproductionEtatManuel: "JAUNE" },
-      { aEchographier: true },
-      { demandesEchographie: { some: { etat: "A_FAIRE" } } },
+    where.AND = [
+      {
+        OR: [
+          { reproductionEtatManuel: "JAUNE" },
+          { aEchographier: true },
+          { demandesEchographie: { some: { etat: "A_FAIRE" } } },
+        ],
+      },
     ];
   } else if (filters.repro === "IMMINENTE") {
     where.sexbov = "F";

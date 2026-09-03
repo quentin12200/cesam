@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildTroupeauWhere,
+  belongsToEchoActionList,
   filtrerAnimauxParCriteresLocaux,
   getActiveTroupeauFilters,
   impliedSexForCategory,
@@ -88,4 +89,41 @@ test("une catégorie mâle retire les filtres féminins incohérents", () => {
   assert.equal(next.get("categorie"), "TAUREAU");
   assert.equal(next.has("repro"), false);
   assert.equal(next.has("tarie"), false);
+});
+
+test("une vache vide avec demande manuelle active appartient aux listes Vides et À écho", () => {
+  const vide = buildTroupeauWhere({ repro: "VIDE" });
+  assert.ok(vide.NOT);
+  assert.equal(belongsToEchoActionList({
+    aEchographier: true,
+    reproductionEtatManuel: "ROUGE",
+    demandesEchographie: [{ etat: "A_FAIRE" }],
+  }), true);
+});
+
+test("une vache pleine avec demande manuelle active appartient aux listes Pleines et À écho", () => {
+  const pleine = buildTroupeauWhere({ repro: "PLEINE" });
+  assert.ok(pleine.saillies);
+  assert.equal(belongsToEchoActionList({
+    aEchographier: true,
+    reproductionEtatManuel: "VERT",
+    demandesEchographie: [{ etat: "A_FAIRE" }],
+  }), true);
+});
+
+test("la liste À écho accepte une demande automatique active mais pas une demande clôturée", () => {
+  assert.equal(belongsToEchoActionList({
+    aEchographier: false,
+    demandesEchographie: [{ etat: "A_FAIRE" }],
+  }), true);
+  assert.equal(belongsToEchoActionList({
+    aEchographier: false,
+    demandesEchographie: [{ etat: "REALISEE" }, { etat: "RETIREE" }],
+  }), false);
+});
+
+test("le filtre À écho reste une contrainte indépendante de la recherche", () => {
+  const where = buildTroupeauWhere({ repro: "A_ECO", q: "926" });
+  assert.ok(where.OR);
+  assert.ok(where.AND);
 });

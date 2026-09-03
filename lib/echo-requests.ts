@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { parseReproductionRules } from "@/lib/reproduction-rules";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
 import { getEchoListEntryDays } from "@/lib/echo-list-status";
+import { getObsoleteAutomaticEchoRequestIds } from "@/lib/echo-request-state";
 
 export const ACTIVE_ECHO_REQUEST_WHERE = { etat: "A_FAIRE" } as const;
 
@@ -39,7 +40,7 @@ async function performAutomaticEchoSync() {
     }),
     prisma.demandeEchographie.findMany({
       where: { origine: "AUTOMATIQUE", etat: "A_FAIRE" },
-      select: { id: true, animalId: true, saillieId: true },
+      select: { id: true, animalId: true, saillieId: true, origine: true },
     }),
   ]);
 
@@ -65,9 +66,10 @@ async function performAutomaticEchoSync() {
     }
   }
 
-  const obsoleteRequestIds = activeAutomaticRequests
-    .filter((request) => currentAttemptByAnimal.get(request.animalId) !== request.saillieId)
-    .map((request) => request.id);
+  const obsoleteRequestIds = getObsoleteAutomaticEchoRequestIds(
+    activeAutomaticRequests,
+    currentAttemptByAnimal,
+  );
   if (obsoleteRequestIds.length > 0) {
     await prisma.demandeEchographie.updateMany({
       where: { id: { in: obsoleteRequestIds } },
