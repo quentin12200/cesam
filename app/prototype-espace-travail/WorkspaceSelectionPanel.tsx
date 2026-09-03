@@ -63,7 +63,7 @@ export default function WorkspaceSelectionPanel({
           <p className="text-xs font-black uppercase tracking-wide text-green-800">Actions rapides</p>
           <h2 className="text-lg font-black text-slate-950">Que voulez-vous faire ?</h2>
           <p className="mt-0.5 text-xs font-semibold text-slate-500">
-            {count ? `Appliqué à votre sélection de ${count} animal${count > 1 ? "aux" : ""}.` : "Cochez d’abord les animaux dans le tableau."}
+            {count ? `Appliqué à votre sélection de ${count} ${count > 1 ? "animaux" : "animal"}.` : "Cochez d’abord les animaux dans le tableau."}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-1.5">
@@ -147,7 +147,7 @@ export default function WorkspaceSelectionPanel({
             {activity.slice(0, 4).map((item) => (
               <li key={item.id} className="rounded-lg bg-slate-50 px-2.5 py-2 text-xs">
                 <strong className="block text-slate-900">{item.label}</strong>
-                <span className="font-semibold text-slate-500">{item.time} · {item.animalIds.length} animal{item.animalIds.length > 1 ? "aux" : ""}</span>
+                <span className="font-semibold text-slate-500">{item.time} · {item.animalIds.length} {item.animalIds.length > 1 ? "animaux" : "animal"}</span>
               </li>
             ))}
           </ol>

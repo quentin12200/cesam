@@ -215,7 +215,7 @@ export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspac
   function completeAction() {
     if (!activeAction || !actionCompatibleAnimals.length) return;
     const ids = actionCompatibleAnimals.map((animal) => animal.id);
-    const label = `${ACTION_LABELS[activeAction]} · ${ids.length} animal${ids.length > 1 ? "aux" : ""}`;
+    const label = `${ACTION_LABELS[activeAction]} · ${ids.length} ${ids.length > 1 ? "animaux" : "animal"}`;
     const item: WorkspaceActivity = {
       id: `${Date.now()}-${activeAction}`,
       action: activeAction,
@@ -367,7 +367,7 @@ export default function PrototypeWorkspace({ initialAnimals }: PrototypeWorkspac
         >
           <span className="flex size-9 items-center justify-center rounded-full bg-white/15 font-black">{selectedIds.size}</span>
           <span className="min-w-0 flex-1">
-            <strong className="block text-sm font-black">{selectedIds.size ? `${selectedIds.size} animal${selectedIds.size > 1 ? "aux" : ""} sélectionné${selectedIds.size > 1 ? "s" : ""}` : "Sélection et actions"}</strong>
+            <strong className="block text-sm font-black">{selectedIds.size ? `${selectedIds.size} ${selectedIds.size > 1 ? "animaux sélectionnés" : "animal sélectionné"}` : "Sélection et actions"}</strong>
             <span className="block truncate text-xs font-semibold opacity-75">
               {selectedAnimals.length ? selectedAnimals.map((animal) => animal.nutrav).join(" · ") : "Le groupe reste actif entre les actions"}
             </span>

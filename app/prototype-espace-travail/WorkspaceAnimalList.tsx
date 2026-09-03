@@ -60,7 +60,7 @@ export default function WorkspaceAnimalList({
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Tableau de travail des animaux">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 sm:px-4">
         <div>
-          <strong className="text-sm font-black text-slate-900">{rows.length} animal{rows.length > 1 ? "aux" : ""}</strong>
+          <strong className="text-sm font-black text-slate-900">{rows.length} {rows.length > 1 ? "animaux" : "animal"}</strong>
           <span className="ml-2 text-xs font-bold text-slate-500">{visibleSelected} sélectionné{visibleSelected > 1 ? "s" : ""}</span>
         </div>
         <button

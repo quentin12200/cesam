@@ -43,7 +43,7 @@ export default function WorkspaceBulkBar({
       <div className="flex flex-wrap items-center gap-2 p-2.5 sm:p-3">
         <div className="min-w-40 flex-1">
           <p className="text-sm font-black">
-            {selectedAnimals.length} animal{selectedAnimals.length > 1 ? "aux" : ""} sélectionné{selectedAnimals.length > 1 ? "s" : ""}
+            {selectedAnimals.length} {selectedAnimals.length > 1 ? "animaux sélectionnés" : "animal sélectionné"}
           </p>
           <p className="truncate text-xs font-semibold text-green-100">
             {selectedAnimals.slice(0, 8).map((animal) => animal.nutrav).join(" · ")}

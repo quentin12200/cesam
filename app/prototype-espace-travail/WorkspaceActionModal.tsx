@@ -107,7 +107,7 @@ export default function WorkspaceActionModal({ action, selectedCount, compatible
           <div className="min-w-0 flex-1">
             <p className="text-xs font-black uppercase tracking-wide text-green-800">Aperçu du formulaire CESAM</p>
             <h2 id="action-dialog-title" className="mt-0.5 text-xl font-black text-slate-950">
-              {ACTION_LABELS[action]} · {compatibleAnimals.length} animal{compatibleAnimals.length > 1 ? "aux" : ""}
+              {ACTION_LABELS[action]} · {compatibleAnimals.length} {compatibleAnimals.length > 1 ? "animaux" : "animal"}
             </h2>
           </div>
           <button type="button" onClick={onClose} className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100" aria-label="Fermer"><X size={21} /></button>
@@ -197,5 +197,5 @@ function AnimalSummary({ animals }: { animals: WorkspaceAnimal[] }) {
 function getConcernedLabel(action: WorkspaceAction, count: number) {
   if (action === "weaning") return `${count} veau${count > 1 ? "x" : ""}`;
   if (action === "echo") return `${count} femelle${count > 1 ? "s" : ""}`;
-  return `${count} animal${count > 1 ? "aux" : ""}`;
+  return `${count} ${count > 1 ? "animaux" : "animal"}`;
 }
