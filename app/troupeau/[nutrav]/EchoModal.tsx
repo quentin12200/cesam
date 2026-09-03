@@ -158,7 +158,9 @@ export default function EchoModal({
         }
       }
 
-      if (mode === "ENREGISTRER" && !originSaillieId) throw new Error("Aucune saillie ou IA n’est disponible pour enregistrer cette échographie.");
+      if (mode === "ENREGISTRER" && resultat === "PLEINE" && !originSaillieId) {
+        throw new Error("Une saillie ou une IA est nécessaire pour enregistrer une échographie pleine.");
+      }
       const response = await fetch(
         mode === "PLANIFIER" ? `/api/animaux/${nutrav}/echo-request` : "/api/echographies",
         {
@@ -170,7 +172,8 @@ export default function EchoModal({
             observation: observation.trim() || undefined,
             motif: "CONTROLE_SUPPLEMENTAIRE",
           } : {
-            saillieId: originSaillieId,
+            animalId,
+            saillieId: originSaillieId || null,
             date,
             resultat,
             joursGestation: resultat === "PLEINE" ? joursGestation : undefined,
