@@ -93,10 +93,13 @@ export function buildTroupeauWhere(params: TroupeauFilterParams): Prisma.AnimalW
     where.saillies = { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } };
   } else if (filters.repro === "VIDE") {
     where.sexbov = "F";
-    where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } } };
+    where.NOT = { saillies: { some: { gestation: { etat: { in: ["VERT", "ROSE"] } } } };
   } else if (filters.repro === "A_ECO") {
     where.sexbov = "F";
-    where.demandesEchographie = { some: { etat: "A_FAIRE" } };
+    where.OR = [
+      { aEchographier: true },
+      { demandesEchographie: { some: { etat: "A_FAIRE" } } },
+    ];
   } else if (filters.repro === "IMMINENTE") {
     where.sexbov = "F";
     where.saillies = { some: { gestation: { etat: "ROSE" } } };
