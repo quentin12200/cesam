@@ -250,6 +250,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       reproductionEtatPrecedent: animal.reproductionEtatPrecedent as AnimalRow["reproductionEtatPrecedent"],
       categorie: animal.categorie,
       groupeNom: animal.groupe?.nom ?? null,
+      tarieFaite: animal.tarieFaite,
       saillieDate: currentBreeding?.date.toISOString() ?? null,
       gestationEtat: currentBreeding?.gestation?.etat ?? null,
       gestationVelagePrevue: currentBreeding?.gestation?.dateVelagePrevue?.toISOString() ?? null,
@@ -359,7 +360,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
 
-      {/* Cartes sur téléphone */}
+      {/* Tableau tactile sur téléphone */}
       <div className="md:hidden">
         <TroupeauMobileList animaux={tableauAnimaux} postCalvingRestDays={postCalvingRestDays} />
       </div>

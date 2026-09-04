@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Check, ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
+import { Check, ChevronDown, Search, Settings2, SlidersHorizontal, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   getActiveTroupeauFilters,
@@ -31,6 +31,21 @@ const SEX_OPTIONS: FilterChoice[] = [
   { value: "F", label: "♀ Femelles" },
   { value: "M", label: "♂ Mâles" },
 ];
+
+type ShortcutKey = "calves" | "heifers" | "females" | "smallHeifers" | "dry" | "echo" | "bulls";
+
+const SHORTCUTS: { key: ShortcutKey; label: string; filters: Partial<TroupeauFilterParams> }[] = [
+  { key: "calves", label: "Veaux", filters: { categorie: "VEAU_M" } },
+  { key: "heifers", label: "Velles", filters: { categorie: "VELLE" } },
+  { key: "females", label: "Femelles", filters: { sexe: "F" } },
+  { key: "smallHeifers", label: "Petites génisses", filters: { categorie: "PETITE_GENISSE" } },
+  { key: "dry", label: "Taries", filters: { tarie: "oui" } },
+  { key: "echo", label: "À écho", filters: { repro: "A_ECO" } },
+  { key: "bulls", label: "Taureaux", filters: { categorie: "TAUREAU" } },
+];
+
+const DEFAULT_SHORTCUTS: ShortcutKey[] = ["calves", "heifers", "females", "dry", "echo"];
+const SHORTCUTS_STORAGE_KEY = "cesam:troupeau-shortcuts:v1";
 
 function filterUrl(params: URLSearchParams): string {
   const query = params.toString();
@@ -118,10 +133,33 @@ export default function TroupeauFilters({ total, groups, params }: Props) {
   const searchParams = useSearchParams();
   const filters = normalizeTroupeauFilters(params);
   const [query, setQuery] = useState(params.q ?? "");
+  const [visibleShortcuts, setVisibleShortcuts] = useState<ShortcutKey[]>(DEFAULT_SHORTCUTS);
+  const [shortcutSettingsOpen, setShortcutSettingsOpen] = useState(false);
   const mobileOpen = searchParams.get("filtres") === "1";
   const active = getActiveTroupeauFilters(filters, groups);
 
   useEffect(() => setQuery(params.q ?? ""), [params.q]);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(SHORTCUTS_STORAGE_KEY) ?? "null");
+      if (Array.isArray(stored)) {
+        setVisibleShortcuts(stored.filter((key): key is ShortcutKey => SHORTCUTS.some((shortcut) => shortcut.key === key)));
+      }
+    } catch {
+      setVisibleShortcuts(DEFAULT_SHORTCUTS);
+    }
+  }, []);
+
+  useEffect(() => {
+    const nextQuery = query.trim();
+    if (nextQuery === (filters.q ?? "")) return;
+    const timer = window.setTimeout(() => {
+      const next = updateTroupeauSearchParams(new URLSearchParams(searchParams.toString()), "q", nextQuery || undefined);
+      router.replace(filterUrl(next), { scroll: false });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [filters.q, query, router, searchParams]);
 
   function navigate(next: URLSearchParams) {
     router.push(filterUrl(next), { scroll: false });
@@ -150,6 +188,30 @@ export default function TroupeauFilters({ total, groups, params }: Props) {
 
   function reset() {
     navigate(resetTroupeauSearchParams(new URLSearchParams(searchParams.toString())));
+  }
+
+  function shortcutActive(shortcut: (typeof SHORTCUTS)[number]) {
+    return Object.entries(shortcut.filters).every(([key, value]) => {
+      if (key === "sexe" && value === "F" && filters.categorie) {
+        return !["VEAU_M", "TAUREAU"].includes(filters.categorie);
+      }
+      return filters[key as keyof TroupeauFilterParams] === value;
+    });
+  }
+
+  function toggleShortcut(shortcut: (typeof SHORTCUTS)[number]) {
+    let next = new URLSearchParams(searchParams.toString());
+    const activeShortcut = shortcutActive(shortcut);
+    for (const [key, value] of Object.entries(shortcut.filters)) {
+      next = updateTroupeauSearchParams(next, key as keyof TroupeauFilterParams, activeShortcut ? undefined : value);
+    }
+    navigate(next);
+  }
+
+  function toggleShortcutVisibility(key: ShortcutKey) {
+    const next = visibleShortcuts.includes(key) ? visibleShortcuts.filter((item) => item !== key) : [...visibleShortcuts, key];
+    setVisibleShortcuts(next);
+    localStorage.setItem(SHORTCUTS_STORAGE_KEY, JSON.stringify(next));
   }
 
   const search = (
@@ -199,6 +261,26 @@ export default function TroupeauFilters({ total, groups, params }: Props) {
           <SlidersHorizontal size={17} />
           Filtres{active.length ? ` · ${active.length}` : ""}
         </button>
+      </div>
+
+      <div className="lg:hidden">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1" aria-label="Raccourcis de filtres">
+          {SHORTCUTS.filter((shortcut) => visibleShortcuts.includes(shortcut.key)).map((shortcut) => {
+            const isActive = shortcutActive(shortcut);
+            return <button key={shortcut.key} type="button" onClick={() => toggleShortcut(shortcut)} aria-pressed={isActive} className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-semibold ${isActive ? "border-green-700 bg-green-700 text-white" : "border-gray-200 bg-white text-gray-700"}`}>
+              {isActive ? "✓ " : ""}{shortcut.label}
+            </button>;
+          })}
+          <button type="button" onClick={() => setShortcutSettingsOpen((open) => !open)} className="grid min-h-9 min-w-9 shrink-0 place-items-center rounded-full border border-gray-200 bg-white text-gray-600" aria-label="Personnaliser les raccourcis" aria-expanded={shortcutSettingsOpen}>
+            <Settings2 size={15} />
+          </button>
+        </div>
+        {shortcutSettingsOpen && <div className="mt-1 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+          <p className="mb-2 text-xs font-bold text-gray-700">Raccourcis visibles</p>
+          <div className="flex flex-wrap gap-2">{SHORTCUTS.map((shortcut) => <button key={shortcut.key} type="button" onClick={() => toggleShortcutVisibility(shortcut.key)} className={`min-h-9 rounded-full border px-3 text-xs font-semibold ${visibleShortcuts.includes(shortcut.key) ? "border-green-700 bg-green-50 text-green-800" : "border-gray-200 text-gray-500"}`}>
+            {visibleShortcuts.includes(shortcut.key) ? "✓ " : ""}{shortcut.label}
+          </button>)}</div>
+        </div>}
       </div>
 
       {active.length > 0 && (

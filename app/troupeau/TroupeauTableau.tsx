@@ -28,6 +28,7 @@ export interface AnimalRow {
   reproductionEtatPrecedent: EtatGestation | null;
   categorie: string | null;
   groupeNom: string | null;
+  tarieFaite: boolean;
   saillieDate: string | null;
   gestationEtat: string | null;
   gestationVelagePrevue: string | null;
