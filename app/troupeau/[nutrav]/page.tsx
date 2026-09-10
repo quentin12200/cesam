@@ -274,7 +274,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     dueDate: currentBreeding?.gestation?.dateVelagePrevue ?? null,
     echoDate: currentBreeding?.gestation?.dateEcho ?? null,
     echoResult: currentBreeding?.gestation?.resultatEcho ?? null,
-    echoObservation: currentBreeding?.gestation?.sousResultat ?? null,
+    echoObservation: currentBreeding?.gestation?.observationEcho ?? currentBreeding?.gestation?.sousResultat ?? null,
     lastCalvingDate: animal.velagesVache[0]?.date ?? null,
     calfNumber: animal.velagesVache[0]?.veau?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.nutrav ?? animal.velagesVache[0]?.veauxDetails[0]?.nutrav ?? null,
     calfSex: animal.velagesVache[0]?.veau?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.animal?.sexbov ?? animal.velagesVache[0]?.veauxDetails[0]?.sexe ?? null,

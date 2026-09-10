@@ -56,7 +56,7 @@ async function getDashboardData() {
     capteurs,
     vachesAvecSaillies,
     veauxPourVaccins,
-    evenementsSanitairesUrgents,
+    interventionsSanitairesUrgentes,
     velagesSemaine,
     velagesPrevus,
     vaccinationPreVelage,
@@ -92,7 +92,15 @@ async function getDashboardData() {
       where: { statut: "ACTIF", danais: { gte: addDays(now, -730) } },
       include: { vaccinations: { select: { vaccin: true, date: true } } },
     }),
-    prisma.evenementSanitaire.count({ where: { resolu: false } }),
+    prisma.evenementSanitaire.findMany({
+      where: { resolu: false },
+      orderBy: { date: "desc" },
+      select: {
+        id: true,
+        type: true,
+        animal: { select: { nutrav: true } },
+      },
+    }),
     prisma.gestation.count({
       where: {
         etat: { in: ["VERT", "ROSE"] },
@@ -316,6 +324,8 @@ async function getDashboardData() {
     };
   });
 
+  const evenementsSanitairesUrgents = interventionsSanitairesUrgentes.length;
+
   return {
     vachesActives,
     capteurs,
@@ -327,6 +337,7 @@ async function getDashboardData() {
     velagesSemaine,
     vachesVidesEnRetard,
     evenementsSanitairesUrgents,
+    interventionsSanitairesUrgentes,
     vaccinationPreVelage,
     bolusPreVelage,
     bouclageItems,
@@ -783,13 +794,23 @@ export default async function Dashboard({ searchParams }: PageProps) {
     data.bolusPreVelage +
     data.veauxAVacciner;
   if (santeTotal > 0) {
-    const santeSummary = data.evenementsSanitairesUrgents > 0
+    const suivisEcho = data.interventionsSanitairesUrgentes.filter((intervention) =>
+      ["Métrite", "Metrabol à prévoir", "Bolus à prévoir"].includes(intervention.type)
+    );
+    const resumeSuivisEcho = ["Métrite", "Metrabol à prévoir", "Bolus à prévoir"]
+      .map((type) => {
+        const numeros = suivisEcho.filter((intervention) => intervention.type === type).map((intervention) => intervention.animal.nutrav);
+        return numeros.length > 0 ? `${type} : ${numeros.join(", ")}` : null;
+      })
+      .filter(Boolean)
+      .join(" · ");
+    const santeSummary = resumeSuivisEcho || (data.evenementsSanitairesUrgents > 0
       ? `${data.evenementsSanitairesUrgents} intervention${data.evenementsSanitairesUrgents > 1 ? "s" : ""} urgente${data.evenementsSanitairesUrgents > 1 ? "s" : ""}`
       : data.vaccinationPreVelage > 0
         ? `${data.vaccinationPreVelage} vaccination${data.vaccinationPreVelage > 1 ? "s" : ""} pré-vêlage à prévoir`
         : data.bolusPreVelage > 0
           ? `${data.bolusPreVelage} bolus pré-vêlage à prévoir`
-          : `${data.veauxAVacciner} vaccin${data.veauxAVacciner > 1 ? "s" : ""} à prévoir`;
+          : `${data.veauxAVacciner} vaccin${data.veauxAVacciner > 1 ? "s" : ""} à prévoir`);
     todoGroups.push({
       id: "sante",
       title: "Santé",

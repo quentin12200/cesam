@@ -21,6 +21,7 @@ import {
 import { normalizeSearch } from "@/lib/fuzzy-search";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
+import EchoFieldSessionModal, { type EchoSessionCow } from "./EchoFieldSessionModal";
 
 type EtatGestation = "GRIS" | "JAUNE" | "VERT" | "ROUGE" | "ROSE" | "REPOS";
 
@@ -75,7 +76,6 @@ const reproductionCardStates: Record<EtatGestation, { label: string; border: str
   GRIS: { label: "Saillie récente", border: "border-slate-300", text: "text-slate-600" },
 };
 
-const DUREE_GESTATION = 285;
 const ChaleurIcon = ACTION_VISUALS.chaleur.icon;
 const SaillieIcon = ACTION_VISUALS.saillieIA.icon;
 
@@ -356,14 +356,8 @@ function ReproductionContent() {
   const [chaleurTime, setChaleurTime] = useState("");
   const [chaleurNotes, setChaleurNotes] = useState("");
 
-  // ── Echo form state ──
-  const [showEchoForm, setShowEchoForm] = useState(false);
-  const [selectedVache, setSelectedVache] = useState<VacheRepro | null>(null);
-  const [echoSaillieId, setEchoSaillieId] = useState("");
-  const [echoDate, setEchoDate] = useState(new Date().toISOString().split("T")[0]);
-  const [echoResultat, setEchoResultat] = useState("PLEINE");
-  const [echoJours, setEchoJours] = useState(45);
-  const [echoUnite, setEchoUnite] = useState<"jours" | "mois">("jours");
+  // ── Séance d’échographies ──
+  const [echoSessionCows, setEchoSessionCows] = useState<EchoSessionCow[]>([]);
 
   // ── Groupage form state ──
   const [showGroupageForm, setShowGroupageForm] = useState(false);
@@ -508,15 +502,7 @@ function ReproductionContent() {
   }
 
   function openEchoForm(vache: VacheRepro) {
-    setSelectedVache(vache);
-    setEchoSaillieId(vache.saillieId!);
-    setEchoResultat("PLEINE");
-    setEchoDate(today);
-    const j = vache.derniereSaillie
-      ? differenceInDays(new Date(), new Date(vache.derniereSaillie)) : 45;
-    setEchoJours(Math.max(1, j));
-    setEchoUnite("jours");
-    setShowEchoForm(true);
+    setEchoSessionCows([vache]);
   }
 
   function openGroupageForm() {
@@ -566,14 +552,6 @@ function ReproductionContent() {
     ? [iaSelectedBull, ...iaBulls]
     : iaBulls;
   const now = new Date();
-
-  const echoJoursEffectifs = echoUnite === "mois" ? Math.round(echoJours * 30.5) : echoJours;
-  const echoDateConception = echoResultat === "PLEINE" && echoJoursEffectifs > 0
-    ? addDays(new Date(echoDate), -echoJoursEffectifs) : null;
-  const echoDateVelagePrevue = echoResultat === "PLEINE" && echoJoursEffectifs > 0
-    ? addDays(new Date(echoDate), DUREE_GESTATION - echoJoursEffectifs) : null;
-  const joursAvantVelage = echoDateVelagePrevue
-    ? differenceInDays(echoDateVelagePrevue, new Date(echoDate)) : null;
 
   // ── Handlers ──
   function toggleSelection(animalId: string) {
@@ -695,29 +673,6 @@ function ReproductionContent() {
     }
   }
 
-  async function handleEchoSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const joursGestationFinal = echoUnite === "mois" ? Math.round(echoJours * 30.5) : echoJours;
-      const res = await fetch("/api/echographies", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          saillieId: echoSaillieId, date: echoDate, resultat: echoResultat,
-          joursGestation: echoResultat === "PLEINE" ? joursGestationFinal : undefined,
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      setMessage("✓ Échographie enregistrée !");
-      setShowEchoForm(false);
-      await fetchData();
-    } catch (err) {
-      setMessage("Erreur: " + String(err));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function marquerVide(vache: VacheRepro) {
     if (!vache.saillieId) return;
     setSaving(true);
@@ -813,15 +768,25 @@ function ReproductionContent() {
         </div>
       </div>
 
-      {/* Action spécifique au module */}
-      <div>
+      {/* Actions de travail */}
+      <div className="flex flex-wrap gap-2">
+        {vachesAvecEtat.some((vache) => vache.aEchographier) && (
+          <button
+            type="button"
+            onClick={() => setEchoSessionCows(vachesAvecEtat.filter((vache) => vache.aEchographier))}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-2 text-sm font-extrabold text-amber-950 shadow-sm transition hover:bg-amber-500"
+          >
+            <RefreshCw size={18} />
+            Saisir les échographies ({vachesAvecEtat.filter((vache) => vache.aEchographier).length})
+          </button>
+        )}
         <button
           type="button"
           onClick={openGroupageForm}
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
         >
           <Users size={18} />
-          Groupage
+          Saillie groupée
         </button>
       </div>
 
@@ -872,16 +837,31 @@ function ReproductionContent() {
           onClick={() => { setSelectionMode((active) => !active); setSelectedAnimalIds([]); }}
           className={`min-h-10 rounded-xl border px-3 text-sm font-semibold ${selectionMode ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 bg-white text-gray-700"}`}
         >
-          {selectionMode ? "Annuler la sélection" : "Sélectionner plusieurs animaux"}
+          {selectionMode ? "Annuler la sélection" : filterEtat === "JAUNE" ? "Choisir une partie de la liste" : "Sélectionner plusieurs animaux"}
         </button>
+        {selectionMode && filtered.length > 0 && selectedAnimalIds.length !== filtered.length && (
+          <button
+            type="button"
+            onClick={() => setSelectedAnimalIds(filtered.map((vache) => vache.id))}
+            className="min-h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700"
+          >
+            Tout sélectionner ({filtered.length})
+          </button>
+        )}
         {selectionMode && selectedAnimalIds.length > 0 && (
           <button
             type="button"
             disabled={saving}
-            onClick={passerSelectionAEcho}
+            onClick={() => {
+              if (filterEtat === "JAUNE") {
+                setEchoSessionCows(filtered.filter((vache) => selectedAnimalIds.includes(vache.id)));
+              } else {
+                void passerSelectionAEcho();
+              }
+            }}
             className="min-h-10 rounded-xl bg-amber-500 px-3 text-sm font-bold text-white disabled:opacity-50"
           >
-            Passer à écho ({selectedAnimalIds.length})
+            {filterEtat === "JAUNE" ? `Saisir les échos (${selectedAnimalIds.length})` : `Ajouter à « À écho » (${selectedAnimalIds.length})`}
           </button>
         )}
       </div>
@@ -897,6 +877,15 @@ function ReproductionContent() {
               return (
                 <article key={vache.id} className={`rounded-xl border bg-white p-3 shadow-sm ${isLate ? "border-red-300" : "border-yellow-300"}`}>
                   <div className="flex items-start gap-3">
+                    {selectionMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedAnimalIds.includes(vache.id)}
+                        onChange={() => toggleSelection(vache.id)}
+                        aria-label={`Sélectionner ${vache.nutrav}`}
+                        className="mt-1 h-6 w-6 shrink-0 accent-green-700"
+                      />
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-baseline gap-2">
                         <Link href={`/troupeau/${vache.nutrav}`} className="shrink-0 font-mono text-lg font-extrabold text-green-800 hover:underline">{vache.nutrav}</Link>
@@ -912,14 +901,16 @@ function ReproductionContent() {
                   </div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                     <p className={`min-w-0 flex-1 text-sm font-bold ${isLate ? "text-red-700" : "text-yellow-800"}`}>{vache.echoCountdown}</p>
-                    <button
-                      type="button"
-                      onClick={() => openEchoForm(vache)}
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 px-4 text-sm font-extrabold text-yellow-950 hover:bg-yellow-500 sm:w-auto"
-                    >
-                      <RefreshCw size={17} />
-                      Saisir l’écho
-                    </button>
+                    {!selectionMode && (
+                      <button
+                        type="button"
+                        onClick={() => openEchoForm(vache)}
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 px-4 text-sm font-extrabold text-yellow-950 hover:bg-yellow-500 sm:w-auto"
+                      >
+                        <RefreshCw size={17} />
+                        Saisir l’écho
+                      </button>
+                    )}
                   </div>
                 </article>
               );
@@ -1452,99 +1443,18 @@ function ReproductionContent() {
         </div>
       )}
 
-      {/* ── Modal Échographie ───────────────────────────────────────────── */}
-      {showEchoForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
-          <div className="bg-white rounded-t-2xl w-full p-5 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-800">
-                Résultat échographie
-                {selectedVache && <span className="text-sm font-normal text-gray-500 ml-2">— {selectedVache.nutrav} {selectedVache.nobovi ?? ""}</span>}
-              </h3>
-              <button onClick={() => setShowEchoForm(false)} className="text-gray-400 text-2xl leading-none">×</button>
-            </div>
-            <form onSubmit={handleEchoSubmit} className="space-y-4">
-              {!selectedVache && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Vache</label>
-                  <select value={echoSaillieId}
-                    onChange={(e) => { setEchoSaillieId(e.target.value); const v = vachesAvecEtat.find((x) => x.saillieId === e.target.value); if (v) openEchoForm(v); }}
-                    required className="w-full border border-gray-200 rounded-xl p-3 text-sm">
-                    <option value="">Sélectionner…</option>
-                    {vachesAvecEtat.filter((v) => v.saillieId && (v.etat === "JAUNE" || v.etat === "GRIS")).map((v) => (
-                      <option key={v.saillieId} value={v.saillieId!}>{v.nutrav} – {v.nobovi ?? "Sans nom"} (saillie {formatDate(new Date(v.derniereSaillie!))})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date de l&apos;écho</label>
-                <DateInput value={echoDate} onChange={setEchoDate} required
-                  className="w-full border border-gray-200 rounded-xl p-3 text-sm" />
-                {selectedVache?.derniereSaillie && (() => {
-                  const j = differenceInDays(new Date(echoDate), new Date(selectedVache.derniereSaillie));
-                  return j > 0 ? <p className="text-xs text-gray-400 mt-1">Saillie le {formatDate(new Date(selectedVache.derniereSaillie))} · {j} j avant l&apos;écho</p> : null;
-                })()}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Résultat</label>
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setEchoResultat("PLEINE")}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 ${echoResultat === "PLEINE" ? "bg-green-500 text-white border-green-500" : "border-gray-200 text-gray-700"}`}>
-                    ✓ Pleine
-                  </button>
-                  <button type="button" onClick={() => setEchoResultat("VIDE")}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 ${echoResultat === "VIDE" ? "bg-red-500 text-white border-red-500" : "border-gray-200 text-gray-700"}`}>
-                    ✗ Vide
-                  </button>
-                </div>
-              </div>
-              {echoResultat === "PLEINE" && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Jours de gestation à la date de l&apos;écho</label>
-                    <div className="flex gap-2">
-                      <input type="number" value={echoJours} onChange={(e) => setEchoJours(Math.max(1, parseInt(e.target.value) || 1))}
-                        min={1} max={echoUnite === "mois" ? 9 : 284} required
-                        className="flex-1 border border-gray-200 rounded-xl p-3 text-sm text-center font-bold text-lg" />
-                      <div className="flex rounded-xl border border-gray-200 overflow-hidden">
-                        {(["jours", "mois"] as const).map((u) => (
-                          <button key={u} type="button" onClick={() => setEchoUnite(u)}
-                            className={`px-3 py-2 text-sm font-medium ${echoUnite === u ? "bg-green-700 text-white" : "text-gray-600 hover:bg-gray-50"}`}>
-                            {u}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    {echoUnite === "mois" && <p className="text-xs text-gray-400 mt-1">≈ {echoJoursEffectifs} jours</p>}
-                  </div>
-                  {echoDateConception && echoDateVelagePrevue && (
-                    <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Début de gestation</span>
-                        <span className="font-semibold text-gray-800">{echoDateConception.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</span>
-                      </div>
-                      <div className="h-px bg-gray-200" />
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Terme prévu (285j)</span>
-                        <span className="font-bold text-green-700">{echoDateVelagePrevue.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</span>
-                      </div>
-                      {joursAvantVelage !== null && (
-                        <div className={`text-center text-xs font-semibold py-1 px-2 rounded-lg ${joursAvantVelage <= 30 ? `${VELAGE_IMMINENT_COLORS.surface} ${VELAGE_IMMINENT_COLORS.text}` : joursAvantVelage <= 60 ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>
-                          dans {joursAvantVelage} jours
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-              <button type="submit" disabled={saving}
-                className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50">
-                {saving ? "Enregistrement…" : "Enregistrer résultat"}
-              </button>
-            </form>
-          </div>
-        </div>
+      {echoSessionCows.length > 0 && (
+        <EchoFieldSessionModal
+          vaches={echoSessionCows}
+          onClose={() => setEchoSessionCows([])}
+          onDone={async (count, actionsCount) => {
+            setEchoSessionCows([]);
+            setSelectedAnimalIds([]);
+            setSelectionMode(false);
+            setMessage(`✓ ${count} résultat${count > 1 ? "s" : ""} enregistré${count > 1 ? "s" : ""}${actionsCount > 0 ? ` · ${actionsCount} action${actionsCount > 1 ? "s" : ""} ajoutée${actionsCount > 1 ? "s" : ""}` : ""}`);
+            await fetchData();
+          }}
+        />
       )}
     </div>
   );
