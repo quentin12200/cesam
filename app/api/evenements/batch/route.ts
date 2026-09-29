@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { normaliserPattes } from "@/lib/parage";
+import { gestationIdAEnregistrer } from "@/lib/vaccination-session";
 
 interface TraitementDraft {
   medicamentId?: string | null;
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
           medicamentId: vaccinationConfig.session.medicamentId,
           protocoleId: vaccinationConfig.session.protocoleId,
           etapeProtocoleId: animal.etapeProtocoleId,
-          gestationId: vaccinationConfig.etapes.find((etape) => etape.id === animal.etapeProtocoleId)?.reference === "VELAGE" ? animal.gestationId || null : null,
+          gestationId: gestationIdAEnregistrer(vaccinationConfig.etapes, animal.gestationId),
           typeInjection: vaccinationConfig.etapes.find((etape) => etape.id === animal.etapeProtocoleId)?.cycle === "ENTRETIEN"
             ? "ENTRETIEN"
             : vaccinationConfig.etapes.filter((etape) => etape.cycle !== "ENTRETIEN").sort((a, b) => a.ordre - b.ordre)[0]?.id === animal.etapeProtocoleId ? "PRIMO_1" : "RAPPEL",

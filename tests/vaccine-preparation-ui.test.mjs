@@ -141,7 +141,7 @@ test("la validation sanitaire crée aussi les vaccinations liées", () => {
   assert.match(route, /prisma\.\$transaction/);
   assert.match(route, /tx\.vaccination\.create/);
   assert.match(route, /etapeProtocoleId: animal\.etapeProtocoleId/);
-  assert.match(route, /gestationId: vaccinationConfig\.etapes\.find/);
+  assert.match(route, /gestationId: gestationIdAEnregistrer\(vaccinationConfig\.etapes, animal\.gestationId\)/);
   assert.match(route, /tx\.statutProtocoleVaccinal\.upsert/);
 });
 

@@ -12,6 +12,7 @@ import {
 } from "@/lib/vaccine-planner";
 import { statutPlanningVaccin, type StatutPlanningVaccin } from "@/lib/vaccine-planning-status";
 import { rattacherPrimoNonLiee, vaccinationsSansEtapeFiable } from "@/lib/vaccine-history";
+import { vaccinationAppartientAuCycleCourant } from "@/lib/vaccination-session";
 
 export interface LignePreparationVaccin {
   animalId: string;
@@ -190,7 +191,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       const dejaRattachees = animal.vaccinations.filter((vaccination) =>
         vaccination.statut === "FAIT" &&
         vaccination.protocoleId === protocole.id
-        && (!protocoleLieAuVelage || vaccination.gestationId === gestation?.id)
+        && vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, vaccination.gestationId, gestation?.id)
       );
       const inference = !protocoleLieAuVelage && !medicamentPartage && protocole.etapes.length === etapesInitiales.length
         ? rattacherPrimoNonLiee(animal.vaccinations, protocole)

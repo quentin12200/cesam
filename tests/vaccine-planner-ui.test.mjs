@@ -21,7 +21,7 @@ test("la première vue du planificateur reste factuelle et rattachée à la gest
   const loader = read("lib/vaccine-preparation-data.ts");
   const page = read("app/sanitaire/vaccins/page.tsx");
   const card = read("app/sanitaire/vaccins/PreparationVaccinCard.tsx");
-  assert.match(loader, /vaccination\.gestationId === gestation\?\.id/);
+  assert.match(loader, /vaccinationAppartientAuCycleCourant\(protocoleLieAuVelage, vaccination\.gestationId, gestation\?\.id\)/);
   assert.match(loader, /calculerActionVaccinale/);
   assert.match(`${page}\n${card}`, /dateMin/);
   assert.match(`${page}\n${card}`, /dateMax/);

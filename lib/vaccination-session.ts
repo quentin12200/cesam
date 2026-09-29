@@ -20,3 +20,18 @@ export function nutravsSelectionnes<T extends { animalId: string; nutrav: string
 ): string[] {
   return lignes.filter((ligne) => selection.has(ligne.animalId)).map((ligne) => ligne.nutrav);
 }
+
+export function gestationIdAEnregistrer(
+  etapes: ReadonlyArray<{ reference: string }>,
+  gestationId: string | null | undefined,
+): string | null {
+  return etapes.some((etape) => etape.reference === "VELAGE") ? gestationId || null : null;
+}
+
+export function vaccinationAppartientAuCycleCourant(
+  protocoleLieAuVelage: boolean,
+  vaccinationGestationId: string | null,
+  gestationIdCourante: string | null | undefined,
+): boolean {
+  return !protocoleLieAuVelage || vaccinationGestationId === gestationIdCourante;
+}
