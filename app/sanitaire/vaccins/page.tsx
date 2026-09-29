@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { PackageOpen } from "lucide-react";
 import { getPreparationsVaccinales } from "@/lib/vaccine-preparation-data";
+import { trierInterventionsVaccinales } from "@/lib/vaccine-schedule";
 import PreparationVaccinCard from "./PreparationVaccinCard";
 
 const dateCourte = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -16,6 +17,13 @@ function achatConseille(achats: Array<{ doses: number; nombre: number }>, perte:
 
 export default async function VaccinsPage() {
   const groupes = await getPreparationsVaccinales();
+  const interventions = trierInterventionsVaccinales(groupes.flatMap((groupe) =>
+    groupe.lignes.map((ligne) => ({
+      ...ligne,
+      protocoleId: groupe.protocoleId,
+    }))
+  ));
+  const aVerifier = groupes.reduce((total, groupe) => total + groupe.aConfirmer.length, 0);
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-4 pb-24">
       <header><h1 className="text-2xl font-black text-gray-900">Vaccins</h1><p className="text-sm text-gray-500">Le travail à préparer, vaccin par vaccin.</p></header>
@@ -24,6 +32,30 @@ export default async function VaccinsPage() {
         <Link href="/config/protocoles" className="rounded-lg px-2 py-2.5 text-gray-600">Protocoles</Link>
         <Link href="#stock" className="rounded-lg px-2 py-2.5 text-gray-600">Stock / flacons</Link>
       </nav>
+      <section className="overflow-hidden rounded-2xl bg-white shadow-sm">
+        <div className="border-b p-4">
+          <h2 className="text-lg font-bold text-gray-950">Vaccinations à prévoir par date</h2>
+          <p className="mt-1 text-sm text-gray-600">Prochaine injection calculée depuis les vaccinations faites et les étapes des protocoles actifs.</p>
+          {aVerifier > 0 && <p className="mt-2 text-sm font-semibold text-amber-800">{aVerifier} statut(s) à vérifier dans les fiches ci-dessous : aucune date de rappel n’est inventée pour eux.</p>}
+        </div>
+        {interventions.length === 0 ? <p className="p-4 text-sm text-gray-500">Aucune intervention datée à afficher.</p> : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[650px] text-left text-sm">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-600"><tr><th className="p-3">À partir du</th><th className="p-3">Jusqu’au</th><th className="p-3">Vaccin</th><th className="p-3">Veau / animal</th><th className="p-3">Injection</th><th className="p-3">État</th></tr></thead>
+              <tbody className="divide-y">
+                {interventions.map((ligne) => <tr key={`${ligne.protocoleId}-${ligne.animalId}`}>
+                  <td className="whitespace-nowrap p-3 font-bold">{dateCourte.format(ligne.dateMin)}</td>
+                  <td className="whitespace-nowrap p-3">{dateCourte.format(ligne.dateMax)}</td>
+                  <td className="p-3 font-semibold">{ligne.vaccin}</td>
+                  <td className="p-3"><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono underline">{ligne.nutrav}</Link>{ligne.nom ? ` · ${ligne.nom}` : ""}</td>
+                  <td className="p-3">{ligne.injection}</td>
+                  <td className="p-3">{ligne.statut === "EN_RETARD" || ligne.statut === "EN_RETARD_LEGER" ? "En retard" : ligne.statut === "A_FAIRE" ? "À faire" : "À venir"}</td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
       {groupes.length === 0 && <section className="rounded-xl bg-white p-8 text-center text-sm text-gray-500 shadow-sm">Aucun protocole vaccinal actif.</section>}
       {groupes.map((groupe) => <PreparationVaccinCard key={groupe.protocoleId} groupe={{
         ...groupe,
