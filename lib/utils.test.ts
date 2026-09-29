@@ -38,6 +38,19 @@ test("un Bovigrip saisi via Vaccination structurée reste reconnu comme fait (no
   assert.equal(steps[0].status, "done");
 });
 
+test("le nom interne du protocole (underscore) et le nom du médicament/traitement (espace) sont reconnus comme le même vaccin", () => {
+  // Cas réel constaté en production : ProtocoleVaccin.nom = "BOVILIS_BOVIGRIP", alors que le
+  // Traitement/medicament s'appelle "BOVILIS BOVIGRIP".
+  const protocoleReel: ProtocoleVaccinConfig = { ...protocoleBovigrip, nom: "BOVILIS_BOVIGRIP" };
+  const danais = new Date("2026-06-21T12:00:00Z");
+  const acteFusionne = unifierActesVaccinaux([], [
+    { dateDebut: new Date("2026-09-21T12:00:00Z"), medicamentNom: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip" },
+  ]);
+  const steps = getVaccinProtocolSteps(danais, acteFusionne, [protocoleReel]);
+  assert.equal(steps[0].status, "done");
+  assert.equal(steps[0].isUrgent, false);
+});
+
 test("MHE vendable même quand primo et rappel ont été saisis en Traitement, pas en Vaccination", () => {
   const acteFusionne = unifierActesVaccinaux([], [
     { dateDebut: new Date("2026-01-01T12:00:00Z"), medicamentNom: "MHE", medicamentId: "med-mhe" },

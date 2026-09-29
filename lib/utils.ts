@@ -312,6 +312,16 @@ export type VaccinInfo = {
   urgent: boolean;
 };
 
+/**
+ * Le `nom` interne d'un protocole (ex: "BOVILIS_BOVIGRIP") ne suit pas toujours la même
+ * convention que le nom affiché du médicament / traitement (ex: "BOVILIS BOVIGRIP") : la
+ * comparaison stricte doit ignorer espaces/underscores/casse, sous peine de considérer à tort
+ * un vaccin pourtant bien enregistré comme "jamais fait".
+ */
+function normaliserNomVaccin(value: string): string {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().replace(/[_\s]+/g, " ").toUpperCase();
+}
+
 export function getVaccinsManquants(
   danais: Date,
   vaccinations: { vaccin: string; date: Date }[],
@@ -320,12 +330,12 @@ export function getVaccinsManquants(
   const now = new Date();
   const ageJours = differenceInDays(now, danais);
   const manquants: VaccinInfo[] = [];
-  const aVaccin = (nom: string) => vaccinations.some((v) => v.vaccin === nom);
+  const aVaccin = (nom: string) => vaccinations.some((v) => normaliserNomVaccin(v.vaccin) === normaliserNomVaccin(nom));
   const actifs = protocoles.filter((p) => p.actif).sort((a, b) => a.ordre - b.ordre);
 
   for (const proto of actifs) {
     if (proto.estRappel) {
-      const primo = proto.primoNom ? vaccinations.find((v) => v.vaccin === proto.primoNom) : null;
+      const primo = proto.primoNom ? vaccinations.find((v) => normaliserNomVaccin(v.vaccin) === normaliserNomVaccin(proto.primoNom!)) : null;
       if (!primo || aVaccin(proto.nom)) continue;
       const joursDepuis = differenceInDays(now, primo.date);
       const delai = proto.delaiRappelJours ?? 21;
@@ -348,8 +358,8 @@ export function isMheVendable(vaccinations: { vaccin: string; date: Date }[]): {
   vendable: boolean;
   reason: string;
 } {
-  const mhe = vaccinations.find((v) => v.vaccin === "MHE");
-  const mheRappel = vaccinations.find((v) => v.vaccin === "MHE_RAPPEL");
+  const mhe = vaccinations.find((v) => normaliserNomVaccin(v.vaccin) === normaliserNomVaccin("MHE"));
+  const mheRappel = vaccinations.find((v) => normaliserNomVaccin(v.vaccin) === normaliserNomVaccin("MHE_RAPPEL"));
 
   if (!mhe) return { vendable: false, reason: "MHE primo manquant" };
   if (!mheRappel) return { vendable: false, reason: "MHE rappel manquant" };
@@ -385,7 +395,7 @@ export function getVaccinProtocolSteps(
   const now = new Date();
   const ageJours = differenceInDays(now, danais);
   const steps: ProtocolStep[] = [];
-  const get = (nom: string) => vaccinations.find((v) => v.vaccin === nom);
+  const get = (nom: string) => vaccinations.find((v) => normaliserNomVaccin(v.vaccin) === normaliserNomVaccin(nom));
   const actifs = protocoles.filter((p) => p.actif).sort((a, b) => a.ordre - b.ordre);
 
   for (const proto of actifs) {
