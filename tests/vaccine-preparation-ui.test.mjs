@@ -11,7 +11,7 @@ test("l'écran Vaccins ouvre sur le tableau par animal et garde la préparation 
   assert.match(page, /<TableauVaccinal/);
   assert.match(tableau, /Vaccins par animal/);
   assert.match(tableau, /Numéro ou nom de l’animal/);
-  assert.match(tableau, /Tous les vaccins/);
+  assert.match(tableau, /Vaccins affichés/);
   assert.match(tableau, /À faire/);
   assert.match(tableau, /Faits/);
   assert.match(page, /Préparer une séance de vaccination/);
@@ -24,6 +24,29 @@ test("l'écran Vaccins ouvre sur le tableau par animal et garde la préparation 
   assert.match(card, /Besoin maintenant/);
   assert.match(page, /Achat conseillé/);
   assert.match(card, /Reliquat utilisable/);
+});
+
+test("le tableau vaccinal permet la sélection multiple des vaccins, le tri et les filtres compacts", () => {
+  const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
+  // Sélection multiple par cases à cocher, plus "Tous"/"Effacer" (remplace le <select> simple).
+  assert.match(tableau, /type="checkbox" checked=\{selection\.has\(v\.cle\)\}/);
+  assert.match(tableau, /setSelection\(new Set\(vaccins\.map/);
+  assert.match(tableau, /setSelection\(new Set\(\)\)/);
+  // Tri numéro / âge / sexe, avec sens croissant/décroissant.
+  assert.match(tableau, /"numero".*"Âge".*"Sexe"/s);
+  assert.match(tableau, /triDesc/);
+  assert.match(tableau, /ageJours = \(danaisIso: string\)/);
+  // Filtre sexe et statut "En retard" distinct de "À faire".
+  assert.match(tableau, /Femelles/);
+  assert.match(tableau, /Mâles/);
+  assert.match(tableau, /En retard/);
+  // Cellules compactes : coche + date, pas de phrase longue "Fait le…".
+  assert.match(tableau, /☑ \{afficherDate\(fait\.date\)\}/);
+  assert.match(tableau, /🔴 ☐/);
+  assert.doesNotMatch(tableau, /Fait le/);
+  // L'ambiguïté historique est discrète, pas présentée comme une action vaccinale normale.
+  assert.match(tableau, /⚠ À vérifier/);
+  assert.doesNotMatch(tableau, /Étape à valider/);
 });
 
 test("la feuille A4 est une lecture seule et contient les colonnes terrain", () => {

@@ -24,7 +24,7 @@ export default async function VaccinsPage() {
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
       select: {
-        id: true, nutrav: true, nobovi: true,
+        id: true, nutrav: true, nobovi: true, sexbov: true, danais: true,
         vaccinations: { where: { statut: "FAIT" }, select: { vaccin: true, date: true, statut: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true }, orderBy: { date: "asc" } },
         // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
         // quand même remonter comme fait dans le tableau. Voir lib/vaccine-acts.ts.
@@ -50,11 +50,14 @@ export default async function VaccinsPage() {
     groupes,
     medicamentsVaccin.map((m) => ({ medicamentId: m.id, nom: m.nom, voie: m.voie })),
   );
+  // Pur affichage (tri/filtre) : l'âge se calcule depuis danais, jamais stocké en double.
+  const infosParAnimal = new Map(animaux.map((a) => [a.id, { sexe: a.sexbov, danaisIso: a.danais.toISOString() }]));
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-4 pb-24">
       <header><h1 className="text-2xl font-black text-gray-900">Tableau vaccinal</h1></header>
       <TableauVaccinal vaccins={matrice.vaccins} lignes={matrice.lignes.map((ligne) => ({
         ...ligne,
+        ...infosParAnimal.get(ligne.animalId)!,
         cases: Object.fromEntries(Object.entries(ligne.cases).map(([cle, cellule]) => [cle, {
           ...cellule,
           faits: cellule.faits.map((fait) => ({ ...fait, date: fait.date.toISOString() })),
