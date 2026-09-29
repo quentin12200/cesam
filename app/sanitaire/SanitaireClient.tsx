@@ -698,8 +698,8 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
         <div className="space-y-4">
           <div className="rounded-xl bg-white p-4 shadow-sm">
             <h2 className="font-bold text-gray-900">Enregistrer une vaccination faite</h2>
-            <p className="mt-1 text-sm text-gray-500">Le pilotage et la préparation des séances se trouvent dans l’espace Vaccins.</p>
-            <Link href="/sanitaire/vaccins" className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl bg-green-700 px-4 text-sm font-semibold text-white">Ouvrir Vaccins · À préparer</Link>
+            <p className="mt-1 text-sm text-gray-500">Les vaccinations faites et les rappels à faire sont dans le tableau vaccinal.</p>
+            <Link href="/sanitaire/vaccins" className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl bg-green-700 px-4 text-sm font-semibold text-white">Ouvrir le tableau vaccinal</Link>
           </div>
           <VaccinationFormWrapper />
           {vaccinationsRecentes.length > 0 && <RecentSection items={vaccinationsRecentes} onRefresh={() => router.refresh()} />}

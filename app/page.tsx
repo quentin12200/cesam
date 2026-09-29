@@ -415,9 +415,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
 
   const hasSante =
     data.evenementsSanitairesUrgents > 0 ||
-    data.vaccinationPreVelage > 0 ||
-    data.bolusPreVelage > 0 ||
-    data.veauxAVacciner > 0;
+    data.bolusPreVelage > 0;
 
   const annee = new Date().getFullYear();
 
@@ -557,22 +555,6 @@ export default async function Dashboard({ searchParams }: PageProps) {
             </span>
           </Link>
         )}
-        {data.vaccinationPreVelage > 0 && (
-          <Link
-            href="/sanitaire"
-            className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200"
-          >
-            <div className="flex items-center gap-2">
-              <Syringe size={16} className="text-orange-600" />
-              <span className="text-sm font-medium text-orange-800">
-                Vaccins pré-vélage (Crypto / Rotavec)
-              </span>
-            </div>
-            <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-              {data.vaccinationPreVelage}
-            </span>
-          </Link>
-        )}
         {data.bolusPreVelage > 0 && (
           <Link
             href="/sanitaire"
@@ -589,20 +571,9 @@ export default async function Dashboard({ searchParams }: PageProps) {
             </span>
           </Link>
         )}
-        {data.veauxAVacciner > 0 && (
-          <Link
-            href="/sanitaire"
-            className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200"
-          >
-            <div className="flex items-center gap-2">
-              <Syringe size={16} className="text-red-600" />
-              <span className="text-sm font-medium text-red-800">Veaux à vacciner</span>
-            </div>
-            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-              {data.veauxAVacciner}
-            </span>
-          </Link>
-        )}
+        <Link href="/sanitaire/vaccins" className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm font-semibold text-green-900">
+          <Syringe size={16} /> Ouvrir le tableau vaccinal
+        </Link>
       </div>
     </div>
   ) : null;
@@ -639,11 +610,10 @@ export default async function Dashboard({ searchParams }: PageProps) {
           <div className="text-xs text-gray-600 mt-1">À échographier</div>
           <div className="text-xs text-gray-400">Saillies 35-45j</div>
         </div>
-        <div className="text-center p-3 bg-blue-50 rounded-lg">
-          <div className="text-2xl font-bold text-blue-600">{data.veauxAVacciner}</div>
-          <div className="text-xs text-gray-600 mt-1">Vaccins en retard</div>
-          <div className="text-xs text-gray-400">Protocoles</div>
-        </div>
+        <Link href="/sanitaire/vaccins" className="rounded-lg bg-blue-50 p-3 text-center">
+          <div className="text-sm font-bold text-blue-700">Tableau vaccinal</div>
+          <div className="mt-1 text-xs text-gray-600">Faits et à faire par animal</div>
+        </Link>
       </div>
     </Collapsible>
   );
@@ -790,9 +760,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
 
   const santeTotal =
     data.evenementsSanitairesUrgents +
-    data.vaccinationPreVelage +
-    data.bolusPreVelage +
-    data.veauxAVacciner;
+    data.bolusPreVelage;
   if (santeTotal > 0) {
     const suivisEcho = data.interventionsSanitairesUrgentes.filter((intervention) =>
       ["Métrite", "Metrabol à prévoir", "Bolus à prévoir"].includes(intervention.type)
@@ -806,11 +774,9 @@ export default async function Dashboard({ searchParams }: PageProps) {
       .join(" · ");
     const santeSummary = resumeSuivisEcho || (data.evenementsSanitairesUrgents > 0
       ? `${data.evenementsSanitairesUrgents} intervention${data.evenementsSanitairesUrgents > 1 ? "s" : ""} urgente${data.evenementsSanitairesUrgents > 1 ? "s" : ""}`
-      : data.vaccinationPreVelage > 0
-        ? `${data.vaccinationPreVelage} vaccination${data.vaccinationPreVelage > 1 ? "s" : ""} pré-vêlage à prévoir`
-        : data.bolusPreVelage > 0
+      : data.bolusPreVelage > 0
           ? `${data.bolusPreVelage} bolus pré-vêlage à prévoir`
-          : `${data.veauxAVacciner} vaccin${data.veauxAVacciner > 1 ? "s" : ""} à prévoir`);
+          : "Ouvrir le suivi sanitaire");
     todoGroups.push({
       id: "sante",
       title: "Santé",
@@ -1032,9 +998,9 @@ export default async function Dashboard({ searchParams }: PageProps) {
               <div className={`text-xl font-bold ${VELAGE_IMMINENT_COLORS.text}`}>{data.velagesPrevus}</div>
               <div className="text-xs text-gray-600">Vêlages sous 30 j</div>
             </Link>
-            <Link href="/sanitaire" className="rounded-xl bg-blue-50 p-3 text-center">
-              <div className="text-xl font-bold text-blue-700">{data.veauxAVacciner}</div>
-              <div className="text-xs text-gray-600">Vaccins à prévoir</div>
+            <Link href="/sanitaire/vaccins" className="rounded-xl bg-blue-50 p-3 text-center">
+              <div className="text-sm font-bold text-blue-700">Tableau vaccinal</div>
+              <div className="text-xs text-gray-600">Faits et à faire</div>
             </Link>
           </div>
 

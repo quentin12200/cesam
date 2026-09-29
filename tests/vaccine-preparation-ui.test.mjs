@@ -4,12 +4,19 @@ import { readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("l'écran Vaccins ouvre sur la préparation et expose les trois espaces", () => {
+test("l'écran Vaccins ouvre sur le tableau par animal et garde la préparation accessible", () => {
   const page = read("app/sanitaire/vaccins/page.tsx");
+  const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
   const card = read("app/sanitaire/vaccins/PreparationVaccinCard.tsx");
-  assert.match(page, />À préparer</);
-  assert.match(page, />Protocoles</);
-  assert.match(page, />Stock \/ flacons</);
+  assert.match(page, /<TableauVaccinal/);
+  assert.match(tableau, /Vaccins par animal/);
+  assert.match(tableau, /Numéro ou nom de l’animal/);
+  assert.match(tableau, /Tous les vaccins/);
+  assert.match(tableau, /À faire/);
+  assert.match(tableau, /Faits/);
+  assert.match(page, /Préparer une séance de vaccination/);
+  assert.match(page, /Modifier les protocoles/);
+  assert.match(page, /Stock \/ flacons/);
   assert.match(card, /Préparer \/ imprimer/);
   assert.match(card, /<details ref={detailsRef} className="group">/);
   assert.match(card, /Voir les animaux/);

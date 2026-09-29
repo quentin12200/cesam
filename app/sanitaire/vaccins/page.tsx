@@ -2,9 +2,11 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { PackageOpen } from "lucide-react";
+import { prisma } from "@/lib/prisma";
 import { getPreparationsVaccinales } from "@/lib/vaccine-preparation-data";
-import { trierInterventionsVaccinales } from "@/lib/vaccine-schedule";
+import { construireMatriceVaccinale } from "@/lib/vaccine-matrix";
 import PreparationVaccinCard from "./PreparationVaccinCard";
+import TableauVaccinal from "./TableauVaccinal";
 
 const dateCourte = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
@@ -16,53 +18,48 @@ function achatConseille(achats: Array<{ doses: number; nombre: number }>, perte:
 }
 
 export default async function VaccinsPage() {
-  const groupes = await getPreparationsVaccinales();
-  const interventions = trierInterventionsVaccinales(groupes.flatMap((groupe) =>
-    groupe.lignes.map((ligne) => ({
-      ...ligne,
-      protocoleId: groupe.protocoleId,
-    }))
-  ));
-  const aVerifier = groupes.reduce((total, groupe) => total + groupe.aConfirmer.length, 0);
+  const [groupes, animaux] = await Promise.all([
+    getPreparationsVaccinales(),
+    prisma.animal.findMany({
+      where: { statut: "ACTIF" },
+      select: {
+        id: true, nutrav: true, nobovi: true,
+        vaccinations: { where: { statut: "FAIT" }, select: { vaccin: true, date: true, statut: true }, orderBy: { date: "asc" } },
+      },
+      orderBy: { nutrav: "asc" },
+    }),
+  ]);
+  const matrice = construireMatriceVaccinale(
+    animaux.map((a) => ({ id: a.id, nutrav: a.nutrav, nom: a.nobovi, vaccinations: a.vaccinations })),
+    groupes,
+  );
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-4 pb-24">
-      <header><h1 className="text-2xl font-black text-gray-900">Vaccins</h1><p className="text-sm text-gray-500">Le travail à préparer, vaccin par vaccin.</p></header>
-      <nav className="grid grid-cols-3 rounded-xl bg-gray-100 p-1 text-center text-sm font-semibold">
-        <Link href="/sanitaire/vaccins" className="rounded-lg bg-white px-2 py-2.5 text-green-800 shadow-sm">À préparer</Link>
-        <Link href="/config/protocoles" className="rounded-lg px-2 py-2.5 text-gray-600">Protocoles</Link>
-        <Link href="#stock" className="rounded-lg px-2 py-2.5 text-gray-600">Stock / flacons</Link>
-      </nav>
-      <section className="overflow-hidden rounded-2xl bg-white shadow-sm">
-        <div className="border-b p-4">
-          <h2 className="text-lg font-bold text-gray-950">Vaccinations à prévoir par date</h2>
-          <p className="mt-1 text-sm text-gray-600">Prochaine injection calculée depuis les vaccinations faites et les étapes des protocoles actifs.</p>
-          {aVerifier > 0 && <p className="mt-2 text-sm font-semibold text-amber-800">{aVerifier} statut(s) à vérifier dans les fiches ci-dessous : aucune date de rappel n’est inventée pour eux.</p>}
-        </div>
-        {interventions.length === 0 ? <p className="p-4 text-sm text-gray-500">Aucune intervention datée à afficher.</p> : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[650px] text-left text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-600"><tr><th className="p-3">À partir du</th><th className="p-3">Jusqu’au</th><th className="p-3">Vaccin</th><th className="p-3">Veau / animal</th><th className="p-3">Injection</th><th className="p-3">État</th></tr></thead>
-              <tbody className="divide-y">
-                {interventions.map((ligne) => <tr key={`${ligne.protocoleId}-${ligne.animalId}`}>
-                  <td className="whitespace-nowrap p-3 font-bold">{dateCourte.format(ligne.dateMin)}</td>
-                  <td className="whitespace-nowrap p-3">{dateCourte.format(ligne.dateMax)}</td>
-                  <td className="p-3 font-semibold">{ligne.vaccin}</td>
-                  <td className="p-3"><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono underline">{ligne.nutrav}</Link>{ligne.nom ? ` · ${ligne.nom}` : ""}</td>
-                  <td className="p-3">{ligne.injection}</td>
-                  <td className="p-3">{ligne.statut === "EN_RETARD" || ligne.statut === "EN_RETARD_LEGER" ? "En retard" : ligne.statut === "A_FAIRE" ? "À faire" : "À venir"}</td>
-                </tr>)}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <header><h1 className="text-2xl font-black text-gray-900">Tableau vaccinal</h1></header>
+      <TableauVaccinal vaccins={matrice.vaccins} lignes={matrice.lignes.map((ligne) => ({
+        ...ligne,
+        cases: Object.fromEntries(Object.entries(ligne.cases).map(([cle, cellule]) => [cle, {
+          ...cellule,
+          faits: cellule.faits.map((fait) => ({ ...fait, date: fait.date.toISOString() })),
+          aFaire: cellule.aFaire && {
+            ...cellule.aFaire,
+            dateMin: cellule.aFaire.dateMin.toISOString(),
+            dateMax: cellule.aFaire.dateMax.toISOString(),
+          },
+        }])),
+      }))} />
       {groupes.length === 0 && <section className="rounded-xl bg-white p-8 text-center text-sm text-gray-500 shadow-sm">Aucun protocole vaccinal actif.</section>}
-      {groupes.map((groupe) => <PreparationVaccinCard key={groupe.protocoleId} groupe={{
-        ...groupe,
-        lignes: groupe.lignes.map((ligne) => ({ ...ligne, dateMin: ligne.dateMin.toISOString(), dateMax: ligne.dateMax.toISOString() })),
-        flacons: { ...groupe.flacons, prochaineLimite: groupe.flacons.prochaineLimite?.toISOString() ?? null },
-      }} />)}
-      <section id="stock" className="rounded-2xl bg-white p-4 shadow-sm">
+      <details className="rounded-2xl bg-white p-4 shadow-sm">
+        <summary className="cursor-pointer font-bold text-gray-900">Préparer une séance de vaccination</summary>
+        <Link href="/config/protocoles" className="mt-3 inline-block text-sm font-semibold text-green-800 underline">Modifier les protocoles</Link>
+        <div className="mt-4 space-y-4">
+          {groupes.map((groupe) => <PreparationVaccinCard key={groupe.protocoleId} groupe={{
+            ...groupe,
+            lignes: groupe.lignes.map((ligne) => ({ ...ligne, dateMin: ligne.dateMin.toISOString(), dateMax: ligne.dateMax.toISOString() })),
+            flacons: { ...groupe.flacons, prochaineLimite: groupe.flacons.prochaineLimite?.toISOString() ?? null },
+          }} />)}
+        </div>
+      <section id="stock" className="mt-4 rounded-2xl border p-4">
         <h2 className="flex items-center gap-2 font-bold text-gray-900"><PackageOpen size={18} /> Stock / flacons</h2>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {groupes.map((groupe) => (
@@ -80,6 +77,7 @@ export default async function VaccinsPage() {
           ))}
         </div>
       </section>
+      </details>
     </main>
   );
 }
