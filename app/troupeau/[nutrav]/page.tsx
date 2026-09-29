@@ -64,6 +64,7 @@ import ChaleursHistory from "./ChaleursHistory";
 import VelageActions from "./VelageActions";
 import { resolveBiologicalMother, resolveParentWorkNumber } from "@/lib/animal-genealogy";
 import { findAnimalsByExactNational, normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
+import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -194,6 +195,13 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   ]);
 
   if (!animal) notFound();
+  // Même vérité historique que /sanitaire/vaccins : un vaccin saisi comme simple Traitement
+  // (médicament catégorie VACCIN) compte comme fait ici aussi. Voir lib/vaccine-acts.ts.
+  const traitementsVaccinAnimal = await prisma.traitement.findMany({
+    where: { animalId: animal.id, medicament: { categorie: "VACCIN" } },
+    select: { dateDebut: true, medicamentNom: true, medicamentId: true },
+  });
+  const actesVaccinaux = unifierActesVaccinaux(animal.vaccinations, traitementsVaccinAnimal);
   const birthVelage = animal.velageVeau ?? animal.veauxVelage[0]?.velage ?? null;
   const fatherNational = animal.taureau?.nupere
     ?? birthVelage?.gestation?.saillie?.taureau?.nupere
@@ -263,8 +271,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     ? Math.round(ivvList.reduce((s, x) => s + x.ivv, 0) / ivvList.length)
     : null;
 
-  const protocolSteps = getVaccinProtocolSteps(animal.danais, animal.vaccinations, protocoles);
-  const mheStatus = isMheVendable(animal.vaccinations);
+  const protocolSteps = getVaccinProtocolSteps(animal.danais, actesVaccinaux, protocoles);
+  const mheStatus = isMheVendable(actesVaccinaux);
   const affichageDelaiAttente = configAffichage.affichageDelaiAttente;
   const testReproEnabled = animal.nutrav === "0000" && testRepro === "1";
   const reproductiveCycleProps = {
