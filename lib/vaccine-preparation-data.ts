@@ -11,6 +11,7 @@ import {
   type StatutProtocoleVaccinal,
 } from "@/lib/vaccine-planner";
 import { statutPlanningVaccin, type StatutPlanningVaccin } from "@/lib/vaccine-planning-status";
+import { vaccinationsSansEtapeFiable } from "@/lib/vaccine-history";
 
 export interface LignePreparationVaccin {
   animalId: string;
@@ -41,7 +42,7 @@ export interface GroupePreparationVaccin {
   dose: string;
   voie: string;
   lignes: LignePreparationVaccin[];
-  aConfirmer: Array<{ animalId: string; nutrav: string; nom: string | null; groupe: string; categorie: string; ageJours: number }>;
+  aConfirmer: Array<{ animalId: string; nutrav: string; nom: string | null; groupe: string; categorie: string; ageJours: number; historique: Array<{ vaccin: string; date: string }> }>;
   tropTot: number;
   bientot: number;
   aFaire: number;
@@ -148,7 +149,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
           take: 1,
           select: { gestation: { select: { id: true, dateVelagePrevue: true } } },
         },
-        vaccinations: { select: { date: true, protocoleId: true, etapeProtocoleId: true, gestationId: true } },
+        vaccinations: { select: { date: true, vaccin: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true } },
         statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true } },
       },
     }),
@@ -162,6 +163,13 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
     const lignes: LignePreparationVaccin[] = [];
     const aConfirmer: GroupePreparationVaccin["aConfirmer"] = [];
     let medicamentReference = protocole.etapes.flatMap((etape) => etape.medicaments)[0]?.medicament ?? null;
+    const medicamentsProtocole = protocole.etapes.flatMap((etape) => etape.medicaments.map((liaison) => liaison.medicament));
+    const correspondanceHistorique = {
+      id: protocole.id,
+      noms: [protocole.nom, protocole.label, ...medicamentsProtocole.map((medicament) => medicament.nom)],
+      medicamentIds: medicamentsProtocole.map((medicament) => medicament.id),
+      etapeIds: protocole.etapes.map((etape) => etape.id),
+    };
 
     for (const animal of animaux) {
       const categorie = getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
@@ -190,7 +198,9 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         vaccinations,
         statutProtocole: (animal.statutsProtocolesVaccinaux.find((statut) => statut.protocoleId === protocole.id)?.statut ?? null) as StatutProtocoleVaccinal | null,
       });
-      if (action.statut === "A_CONFIRMER") {
+      const historique = action.statut === "TERMINE" ? [] : vaccinationsSansEtapeFiable(animal.vaccinations, correspondanceHistorique)
+        .map((vaccination) => ({ vaccin: vaccination.vaccin, date: vaccination.date.toISOString() }));
+      if (action.statut === "A_CONFIRMER" || historique.length > 0) {
         aConfirmer.push({
           animalId: animal.id,
           nutrav: animal.nutrav,
@@ -198,6 +208,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
           groupe: animal.groupe?.nom || "Sans groupe",
           categorie: getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie),
           ageJours: differenceInCalendarDays(date, animal.danais),
+          historique,
         });
         continue;
       }

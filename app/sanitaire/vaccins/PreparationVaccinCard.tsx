@@ -40,6 +40,8 @@ export default function PreparationVaccinCard({ groupe }: { groupe: GroupePrepar
   const [selection, setSelection] = useState<Set<string>>(() => new Set());
   const lignes = groupe.lignes;
   const selectionnables = lignes.filter((ligne) => STATUTS_SELECTIONNABLES.has(ligne.statut));
+  const historiqueNonRattache = groupe.aConfirmer.filter((animal) => animal.historique.length > 0);
+  const sansHistorique = groupe.aConfirmer.filter((animal) => animal.historique.length === 0);
 
   function basculer(animalId: string) {
     if (!selectionnables.some((ligne) => ligne.animalId === animalId)) return;
@@ -94,7 +96,18 @@ export default function PreparationVaccinCard({ groupe }: { groupe: GroupePrepar
         </summary>
 
         <div className="border-t bg-gray-50 p-3 sm:p-4">
-          {groupe.aConfirmer.length > 0 && <div className="mb-3 overflow-hidden rounded-xl border bg-white"><StatutsAConfirmer protocoleId={groupe.protocoleId} animaux={groupe.aConfirmer} /></div>}
+          {historiqueNonRattache.length > 0 && (
+            <div className="mb-3 rounded-xl border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
+              <b>{historiqueNonRattache.length} animal(s) avec une injection enregistrée à vérifier</b>
+              <p className="mt-1">Ces injections ne sont pas reliées à une étape de ce protocole. Vérifie leur historique avant de décider d’un rappel.</p>
+              <ul className="mt-2 space-y-1">
+                {historiqueNonRattache.map((animal) => (
+                  <li key={animal.animalId}><Link href={`/troupeau/${animal.nutrav}`} className="font-mono font-bold underline">{animal.nutrav}</Link> · {animal.historique.map((vaccination) => `${vaccination.vaccin} le ${dateCourte.format(new Date(vaccination.date))}`).join(" ; ")}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {sansHistorique.length > 0 && <div className="mb-3 overflow-hidden rounded-xl border bg-white"><StatutsAConfirmer protocoleId={groupe.protocoleId} animaux={sansHistorique} /></div>}
           {selectionnables.length > 0 && <div className="mb-3 flex gap-2"><button type="button" onClick={() => setSelection(new Set(selectionnables.map((ligne) => ligne.animalId)))} className="min-h-10 rounded-lg border bg-white px-3 text-xs font-semibold">Tout sélectionner à faire</button><button type="button" onClick={() => setSelection(new Set())} className="min-h-10 rounded-lg border bg-white px-3 text-xs font-semibold">Tout désélectionner</button></div>}
           {sections.map((section) => {
             const lignesSection = lignes.filter((ligne) => ligne.statut === section.statut);

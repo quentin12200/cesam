@@ -40,6 +40,14 @@ export default async function ImpressionVaccinsPage({ searchParams }: { searchPa
                 <tbody>{lignes.map((ligne) => <tr key={`${ligne.animalId}-${ligne.injection}`}><td className="text-lg">☐</td><td><b className="font-mono text-sm">{ligne.nutrav}</b>{ligne.nom ? ` ${ligne.nom}` : ""}{ligne.mere && <small className="block">{ligne.mere}</small>}</td><td>{ligne.injection}</td><td><b>{libelleStatut(ligne.statut)}</b></td><td>{ligne.repere}</td><td>{dateCourte.format(ligne.dateMin)} → {dateCourte.format(ligne.dateMax)}</td><td>{ligne.groupe}</td><td>{ligne.dose} · {ligne.voie}</td><td /></tr>)}</tbody>
               </table>
             )}
+            {groupe.aConfirmer.some((animal) => animal.historique.length > 0) && (
+              <div className="mt-4 border-2 border-black p-2 text-sm">
+                <b>Historique à vérifier avant toute injection</b>
+                <ul className="mt-1">{groupe.aConfirmer.filter((animal) => animal.historique.length > 0).map((animal) => (
+                  <li key={animal.animalId}><b>{animal.nutrav}</b> · {animal.historique.map((vaccination) => `${vaccination.vaccin} le ${dateLongue.format(new Date(vaccination.date))}`).join(" ; ")}</li>
+                ))}</ul>
+              </div>
+            )}
             <p className="mt-2 text-xs">Flacons : {!groupe.conditionnementRenseigne ? "Impossible de calculer — conditionnement non renseigné" : <>{groupe.flacons.reliquatUtilise > 0 ? `reliquat valide ${groupe.flacons.reliquatUtilise} dose(s) + ` : ""}{achatConseille(groupe.flacons.achats, groupe.flacons.perte, groupe.flacons.conservationConnue) || "Reliquat suffisant"}</>}</p>
           </section>
         );
