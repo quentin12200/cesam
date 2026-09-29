@@ -5,7 +5,7 @@ import Link from "next/link";
 
 interface CaseVaccin {
   faits: { date: string; rappel: boolean }[];
-  aFaire: { dateMin: string; dateMax: string; injection: string } | null;
+  aFaire: { dateMin: string; dateMax: string; injection: string; enRetard: boolean } | null;
   aValider: boolean;
 }
 
@@ -20,7 +20,7 @@ const dateCourte = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-
 const afficherDate = (date: string) => dateCourte.format(new Date(date));
 
 export default function TableauVaccinal({ vaccins, lignes }: {
-  vaccins: { cle: string; nom: string }[];
+  vaccins: { cle: string; nom: string; voie?: string | null }[];
   lignes: Ligne[];
 }) {
   const [recherche, setRecherche] = useState("");
@@ -61,7 +61,7 @@ export default function TableauVaccinal({ vaccins, lignes }: {
           <table className="w-full min-w-max border-collapse text-left text-sm">
             <thead className="bg-gray-50"><tr>
               <th scope="col" className="sticky left-0 z-20 min-w-32 border-r bg-gray-50 p-3">Animal</th>
-              {colonnes.map((v) => <th scope="col" key={v.cle} className="min-w-44 max-w-56 border-r p-3">{v.nom}</th>)}
+              {colonnes.map((v) => <th scope="col" key={v.cle} className="min-w-44 max-w-56 border-r p-3">{v.nom}{v.voie && <span className="ml-1 font-normal text-gray-500">— {v.voie}</span>}</th>)}
             </tr></thead>
             <tbody className="divide-y">
               {resultat.map((ligne) => <tr key={ligne.animalId}>
@@ -73,8 +73,10 @@ export default function TableauVaccinal({ vaccins, lignes }: {
                   const cellule = ligne.cases[v.cle];
                   return <td key={v.cle} className="min-w-44 max-w-56 border-r p-2 align-top">
                     {!cellule && <span className="text-gray-300">—</span>}
-                    {cellule?.faits.map((fait, index) => <p key={`${fait.date}-${index}`} className="mb-1 rounded bg-green-50 px-2 py-1 text-xs text-green-900"><b>{fait.rappel ? "Rappel fait" : "Fait"}</b> le {afficherDate(fait.date)}</p>)}
-                    {cellule?.aFaire && <p className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-950"><b>{cellule.aFaire.injection}</b> à faire {afficherDate(cellule.aFaire.dateMin)}{cellule.aFaire.dateMax !== cellule.aFaire.dateMin && `–${afficherDate(cellule.aFaire.dateMax)}`}</p>}
+                    {cellule?.faits.map((fait, index) => <p key={`${fait.date}-${index}`} className="mb-1 rounded bg-green-50 px-2 py-1 text-xs text-green-900">☑ <b>{fait.rappel ? "Rappel fait" : "Fait"}</b> le {afficherDate(fait.date)}</p>)}
+                    {cellule?.aFaire && (cellule.aFaire.enRetard
+                      ? <p className="rounded bg-red-50 px-2 py-1 text-xs text-red-950">☐ <b>{cellule.aFaire.injection}</b> en retard depuis le {afficherDate(cellule.aFaire.dateMax)}</p>
+                      : <p className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-950">☐ <b>{cellule.aFaire.injection}</b> à faire {afficherDate(cellule.aFaire.dateMin)}{cellule.aFaire.dateMax !== cellule.aFaire.dateMin && `–${afficherDate(cellule.aFaire.dateMax)}`}</p>)}
                     {cellule?.aValider && !cellule.aFaire && <p className="mt-1 text-xs font-semibold text-amber-800">Étape à valider</p>}
                   </td>;
                 })}

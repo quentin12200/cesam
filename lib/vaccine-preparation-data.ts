@@ -13,6 +13,7 @@ import {
 import { statutPlanningVaccin, type StatutPlanningVaccin } from "@/lib/vaccine-planning-status";
 import { rattacherPrimoNonLiee, vaccinationsSansEtapeFiable } from "@/lib/vaccine-history";
 import { vaccinationAppartientAuCycleCourant } from "@/lib/vaccination-session";
+import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
 
 export interface LignePreparationVaccin {
   animalId: string;
@@ -152,6 +153,9 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
           select: { gestation: { select: { id: true, dateVelagePrevue: true } } },
         },
         vaccinations: { select: { date: true, vaccin: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true, statut: true } },
+        // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
+        // quand même compter comme fait. Voir lib/vaccine-acts.ts.
+        traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { dateDebut: true, medicamentNom: true, medicamentId: true } },
         statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true } },
       },
     }),
@@ -187,14 +191,17 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       if (protocole.rangVelageMax != null && animal._count.velagesVache > protocole.rangVelageMax) continue;
       if (protocole.lotCible && animal.groupe?.nom !== protocole.lotCible) continue;
 
+      // Un vaccin peut avoir été saisi comme Traitement libre (hors séance) : il compte quand
+      // même comme fait, au même titre qu'une Vaccination structurée. Voir lib/vaccine-acts.ts.
+      const actes = unifierActesVaccinaux(animal.vaccinations, animal.traitements);
       const protocoleLieAuVelage = protocole.etapes.some((etape) => etape.reference === "VELAGE");
-      const dejaRattachees = animal.vaccinations.filter((vaccination) =>
+      const dejaRattachees = actes.filter((vaccination) =>
         vaccination.statut === "FAIT" &&
         vaccination.protocoleId === protocole.id
         && vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, vaccination.gestationId, gestation?.id)
       );
       const inference = !protocoleLieAuVelage && !medicamentPartage && protocole.etapes.length === etapesInitiales.length
-        ? rattacherPrimoNonLiee(animal.vaccinations, protocole)
+        ? rattacherPrimoNonLiee(actes, protocole)
         : null;
       const vaccinations = inference?.rattachee
         ? [...dejaRattachees, { ...inference.rattachee, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0].id }]
@@ -215,7 +222,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         vaccinations,
         statutProtocole: (inference?.rattachee ? null : statutProtocole) as StatutProtocoleVaccinal | null,
       });
-      const historique = action.statut === "TERMINE" ? [] : vaccinationsSansEtapeFiable(animal.vaccinations, correspondanceHistorique)
+      const historique = action.statut === "TERMINE" ? [] : vaccinationsSansEtapeFiable(actes, correspondanceHistorique)
         .filter((vaccination) => vaccination.statut === "FAIT")
         .filter((vaccination) => vaccination !== inference?.rattachee)
         .map((vaccination) => ({ vaccin: vaccination.vaccin, date: vaccination.date.toISOString() }));

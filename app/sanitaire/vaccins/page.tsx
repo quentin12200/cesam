@@ -5,6 +5,7 @@ import { PackageOpen } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getPreparationsVaccinales } from "@/lib/vaccine-preparation-data";
 import { construireMatriceVaccinale } from "@/lib/vaccine-matrix";
+import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
 import PreparationVaccinCard from "./PreparationVaccinCard";
 import TableauVaccinal from "./TableauVaccinal";
 
@@ -18,20 +19,36 @@ function achatConseille(achats: Array<{ doses: number; nombre: number }>, perte:
 }
 
 export default async function VaccinsPage() {
-  const [groupes, animaux] = await Promise.all([
+  const [groupes, animaux, medicamentsVaccin] = await Promise.all([
     getPreparationsVaccinales(),
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
       select: {
         id: true, nutrav: true, nobovi: true,
-        vaccinations: { where: { statut: "FAIT" }, select: { vaccin: true, date: true, statut: true }, orderBy: { date: "asc" } },
+        vaccinations: { where: { statut: "FAIT" }, select: { vaccin: true, date: true, statut: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true }, orderBy: { date: "asc" } },
+        // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
+        // quand même remonter comme fait dans le tableau. Voir lib/vaccine-acts.ts.
+        traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { dateDebut: true, medicamentNom: true, medicamentId: true } },
       },
       orderBy: { nutrav: "asc" },
     }),
+    // Les colonnes du tableau viennent de la pharmacie, pas seulement des protocoles configurés :
+    // un vaccin comme Bovigrip doit avoir sa colonne même sans protocole actif.
+    prisma.medicament.findMany({
+      where: { categorie: "VACCIN", actif: true },
+      select: { id: true, nom: true, voie: true },
+      orderBy: { nom: "asc" },
+    }),
   ]);
   const matrice = construireMatriceVaccinale(
-    animaux.map((a) => ({ id: a.id, nutrav: a.nutrav, nom: a.nobovi, vaccinations: a.vaccinations })),
+    animaux.map((a) => ({
+      id: a.id,
+      nutrav: a.nutrav,
+      nom: a.nobovi,
+      vaccinations: unifierActesVaccinaux(a.vaccinations, a.traitements),
+    })),
     groupes,
+    medicamentsVaccin.map((m) => ({ medicamentId: m.id, nom: m.nom, voie: m.voie })),
   );
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-4 pb-24">
