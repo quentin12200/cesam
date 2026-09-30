@@ -151,14 +151,14 @@ function celluleProtocole(
 ): Map<string, CelluleGrille> {
   const cellules = new Map<string, CelluleGrille>();
   const etapes = [...protocole.etapes].sort((a, b) => a.ordre - b.ordre);
+  // L'éligibilité ne sert qu'à ne pas INVENTER une recommandation "à faire"/"en retard" pour un
+  // animal que le protocole ne cible plus (ex : catégorie recalculée depuis). Une vaccination
+  // réellement faite reste toujours affichée comme faite, quelle que soit l'éligibilité
+  // actuelle : « une vaccination réellement enregistrée doit toujours être visible comme faite ».
   const eligible = estAnimalConcerneParProtocole(
     { categorie: animal.categorie, sexbov: animal.sexe, groupeNom: animal.groupeNom, nombreVelages: animal.nombreVelages, gestation: Boolean(animal.gestationId) },
     protocole
   );
-  if (!eligible) {
-    for (const etape of etapes) cellules.set(etape.id, celluleVide());
-    return cellules;
-  }
 
   const protocoleLieAuVelage = etapes.some((etape) => etape.reference === "VELAGE");
   const actesDuProtocole = animal.actes.filter(
@@ -183,6 +183,7 @@ function celluleProtocole(
       if (etape.cycle !== "ENTRETIEN") dateEtapePrecedente = faites[0].date;
       continue;
     }
+    if (!eligible) { cellules.set(etape.id, celluleVide()); continue; }
     const fenetre = calculerFenetreEtape({
       etape,
       dateNaissance: new Date(animal.danaisIso),

@@ -93,12 +93,23 @@ test("deux injections non rattachables au même produit déclenchent ⚠ À vér
   assert.equal(primo.aValider, true);
 });
 
-test("un animal non concerné (mauvais sexe) reste vide sur toutes les étapes, quels que soient ses actes", () => {
+test("un animal non concerné (mauvais sexe) n'a jamais de recommandation inventée, mais une vaccination réellement faite reste visible", () => {
+  // Règle absolue posée précédemment : une vaccination réellement enregistrée doit toujours
+  // être visible comme faite, même si le protocole ne cible plus cet animal aujourd'hui
+  // (ex : catégorie recalculée, changement de règle de ciblage...).
   const protocoleFemelles: ProtocoleGrille = { ...protocoleBovigrip, sexeCible: "F" };
-  const a = animal({ sexe: "M", actes: [{ date: jours(20), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: "proto-bovigrip", etapeProtocoleId: "bovigrip-primo", gestationId: null, statut: "FAIT" }] });
-  const { lignes } = construireGrilleVaccinale([a], [protocoleFemelles], [], AUJOURDHUI);
-  assert.equal(lignes[0].cellules["bovigrip-primo"].statut, "VIDE");
-  assert.equal(lignes[0].cellules["bovigrip-rappel"].statut, "VIDE");
+
+  const sansActe = animal({ sexe: "M" });
+  const { lignes: sansHistorique } = construireGrilleVaccinale([sansActe], [protocoleFemelles], [], AUJOURDHUI);
+  assert.equal(sansHistorique[0].cellules["bovigrip-primo"].statut, "VIDE", "pas de recommandation inventée pour un animal non concerné");
+  assert.equal(sansHistorique[0].cellules["bovigrip-rappel"].statut, "VIDE");
+
+  const dateActe = jours(20);
+  const avecActe = animal({ sexe: "M", actes: [{ date: dateActe, vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: "proto-bovigrip", etapeProtocoleId: "bovigrip-primo", gestationId: null, statut: "FAIT" }] });
+  const { lignes: avecHistorique } = construireGrilleVaccinale([avecActe], [protocoleFemelles], [], AUJOURDHUI);
+  assert.equal(avecHistorique[0].cellules["bovigrip-primo"].statut, "FAIT", "un fait réel reste visible même si l'animal n'est plus éligible aujourd'hui");
+  assert.equal(avecHistorique[0].cellules["bovigrip-primo"].date?.toISOString(), dateActe.toISOString());
+  assert.equal(avecHistorique[0].cellules["bovigrip-rappel"].statut, "VIDE", "le rappel, lui, n'est pas inventé pour un animal non concerné");
 });
 
 test("un vaccin de pharmacie sans protocole affiche fait dès qu'un acte existe, sans inventer d'échéance", () => {
