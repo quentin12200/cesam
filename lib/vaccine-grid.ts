@@ -169,10 +169,30 @@ function celluleProtocole(
   const medicamentPartage = medicament
     ? protocoles.some((autre) => autre.id !== protocole.id && autre.etapes.some((etape) => etape.medicamentId === medicament.id))
     : false;
+  // Ambiguïté historique (acte sans étape fiable, ex: saisi en Traitement libre) : calculée avant
+  // la boucle pour pouvoir rattacher automatiquement ce qui n'est pas ambigu (voir ci-dessous) et
+  // avertir discrètement sur le reste.
+  const correspondanceHistorique = {
+    id: protocole.id,
+    noms: [protocole.nom, protocole.label, medicament?.nom].filter((n): n is string => Boolean(n)),
+    medicamentIds: medicament ? [medicament.id] : [],
+    etapeIds: etapes.map((e) => e.id),
+  };
   const peutInferer = !protocoleLieAuVelage && !medicamentPartage && etapes.length === etapesInitiales.length && etapesInitiales.length > 0;
-  const inference = peutInferer ? rattacherPrimoNonLiee(animal.actes.filter((a) => !a.protocoleId || a.protocoleId === protocole.id), protocole) : null;
-  const actesUtiles = inference?.rattachee
-    ? [...actesDuProtocole, { ...inference.rattachee, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0]?.id ?? null }]
+  let acteInfere: (typeof animal.actes)[number] | null = null;
+  if (peutInferer && etapesInitiales.length === 2 && etapesInitiales[1].reference === "ETAPE_PRECEDENTE") {
+    // Deux étapes (ex: primo + rappel) : ambiguïté possible, on ne rattache que si une seule
+    // injection orpheline est plausible (voir lib/vaccine-history.ts).
+    acteInfere = rattacherPrimoNonLiee(animal.actes.filter((a) => !a.protocoleId || a.protocoleId === protocole.id), protocole).rattachee;
+  } else if (peutInferer && etapesInitiales.length === 1) {
+    // Une seule étape : aucune ambiguïté possible sur QUELLE étape (il n'y en a qu'une). On
+    // rattache la plus récente injection orpheline correspondant à ce vaccin. (Cast sûr : la
+    // fonction ne fait que filtrer animal.actes, sans jamais reconstruire les objets.)
+    const candidats = vaccinationsSansEtapeFiable(animal.actes, correspondanceHistorique) as ActeVaccination[];
+    acteInfere = [...candidats].sort((a, b) => b.date.getTime() - a.date.getTime())[0] ?? null;
+  }
+  const actesUtiles = acteInfere
+    ? [...actesDuProtocole, { ...acteInfere, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0]?.id ?? null }]
     : actesDuProtocole;
 
   let dateEtapePrecedente: Date | null = null;
@@ -195,16 +215,10 @@ function celluleProtocole(
     cellules.set(etape.id, fenetre ? celluleDepuisPlanning(date, fenetre) : celluleVide());
   }
 
-  // Ambiguïté historique (acte sans étape fiable, ex: saisi en Traitement libre) : avertissement
-  // discret sur la première sous-colonne, seulement si elle n'est pas déjà cochée faite.
-  const correspondanceHistorique = {
-    id: protocole.id,
-    noms: [protocole.nom, protocole.label, medicament?.nom].filter((n): n is string => Boolean(n)),
-    medicamentIds: medicament ? [medicament.id] : [],
-    etapeIds: etapes.map((e) => e.id),
-  };
+  // Avertissement discret sur la première sous-colonne pour ce qui reste ambigu après le
+  // rattachement automatique ci-dessus, seulement si elle n'est pas déjà cochée faite.
   const aVerifier = vaccinationsSansEtapeFiable(animal.actes, correspondanceHistorique)
-    .filter((acte) => acte !== inference?.rattachee).length > 0;
+    .filter((acte) => acte !== acteInfere).length > 0;
   const premiereEtape = etapes[0];
   if (aVerifier && premiereEtape) {
     const cellule = cellules.get(premiereEtape.id);

@@ -112,6 +112,26 @@ test("un animal non concerné (mauvais sexe) n'a jamais de recommandation invent
   assert.equal(avecHistorique[0].cellules["bovigrip-rappel"].statut, "VIDE", "le rappel, lui, n'est pas inventé pour un animal non concerné");
 });
 
+test("un protocole à une seule étape (ex: Nasalgen sans rappel configuré) rattache automatiquement un acte orphelin, sans ambiguïté possible", () => {
+  const etapeUnique = {
+    id: "nasalgen-primo", label: "Primo", ordre: 0, cycle: "INITIAL", reference: "NAISSANCE",
+    debutValeur: 0, debutUnite: "JOUR", debutPosition: "APRES", finValeur: 30, finUnite: "JOUR", finPosition: "APRES",
+    medicamentId: "med-nasalgen", medicamentNom: "NASALGEN",
+    medicaments: [{ medicament: { id: "med-nasalgen", nom: "NASALGEN" } }],
+  };
+  const protocoleNasalgen: ProtocoleGrille = { ...protocoleBovigrip, id: "proto-nasalgen", nom: "NASALGEN", label: "Nasalgen", etapes: [etapeUnique] };
+  const dateActe = jours(5);
+  const a = animal({
+    danaisIso: jours(0).toISOString(),
+    actes: [{ date: dateActe, vaccin: "NASALGEN", medicamentId: "med-nasalgen", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT" }],
+  });
+  const { lignes } = construireGrilleVaccinale([a], [protocoleNasalgen], [], AUJOURDHUI);
+  const cellule = lignes[0].cellules["nasalgen-primo"];
+  assert.equal(cellule.statut, "FAIT", "une seule étape possible : le rattachement est automatique, pas ambigu");
+  assert.equal(cellule.date?.toISOString(), dateActe.toISOString());
+  assert.equal(cellule.aValider, false);
+});
+
 test("un vaccin de pharmacie sans protocole affiche fait dès qu'un acte existe, sans inventer d'échéance", () => {
   const vaccin: VaccinPharmacieGrille = { medicamentId: "med-nasym", nom: "NASYM", voie: "IN" };
   const dateActe = jours(10);
