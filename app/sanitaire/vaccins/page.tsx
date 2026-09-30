@@ -3,9 +3,10 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { PackageOpen } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { getCategorie } from "@/lib/utils";
 import { getPreparationsVaccinales } from "@/lib/vaccine-preparation-data";
-import { construireMatriceVaccinale } from "@/lib/vaccine-matrix";
 import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
+import { construireGrilleVaccinale, type AnimalGrille, type ProtocoleGrille } from "@/lib/vaccine-grid";
 import PreparationVaccinCard from "./PreparationVaccinCard";
 import TableauVaccinal from "./TableauVaccinal";
 
@@ -19,53 +20,92 @@ function achatConseille(achats: Array<{ doses: number; nombre: number }>, perte:
 }
 
 export default async function VaccinsPage() {
-  const [groupes, animaux, medicamentsVaccin] = await Promise.all([
+  const [groupes, protocolesDb, animauxDb, medicamentsVaccin] = await Promise.all([
     getPreparationsVaccinales(),
+    prisma.protocoleVaccin.findMany({
+      where: { actif: true },
+      orderBy: { ordre: "asc" },
+      include: {
+        etapes: {
+          orderBy: { ordre: "asc" },
+          include: {
+            medicaments: {
+              where: { alternative: false },
+              select: { medicamentId: true, medicament: { select: { id: true, nom: true } } },
+            },
+          },
+        },
+      },
+    }),
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
       select: {
-        id: true, nutrav: true, nobovi: true, sexbov: true, danais: true,
+        id: true, nutrav: true, nobovi: true, sexbov: true, danais: true, estGenisse: true, categorie: true,
+        groupe: { select: { nom: true } },
+        _count: { select: { velagesVache: true } },
+        saillies: {
+          where: { gestation: { is: { dateVelagePrevue: { not: null }, etat: { in: ["VERT", "ROSE"] } } } },
+          orderBy: { date: "desc" },
+          take: 1,
+          select: { gestation: { select: { id: true, dateVelagePrevue: true } } },
+        },
         vaccinations: { where: { statut: "FAIT" }, select: { vaccin: true, date: true, statut: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true }, orderBy: { date: "asc" } },
         // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
-        // quand même remonter comme fait dans le tableau. Voir lib/vaccine-acts.ts.
+        // quand même remonter comme fait dans la grille. Voir lib/vaccine-acts.ts.
         traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { dateDebut: true, medicamentNom: true, medicamentId: true } },
       },
       orderBy: { nutrav: "asc" },
     }),
-    // Les colonnes du tableau viennent de la pharmacie, pas seulement des protocoles configurés :
-    // un vaccin comme Bovigrip doit avoir sa colonne même sans protocole actif.
+    // Les blocs de la grille viennent de la pharmacie, pas seulement des protocoles configurés :
+    // un vaccin comme Bovigrip doit avoir son bloc même sans protocole actif.
     prisma.medicament.findMany({
       where: { categorie: "VACCIN", actif: true },
       select: { id: true, nom: true, voie: true },
       orderBy: { nom: "asc" },
     }),
   ]);
-  const matrice = construireMatriceVaccinale(
-    animaux.map((a) => ({
-      id: a.id,
-      nutrav: a.nutrav,
-      nom: a.nobovi,
-      vaccinations: unifierActesVaccinaux(a.vaccinations, a.traitements),
+
+  const protocolesGrille: ProtocoleGrille[] = protocolesDb.map((protocole) => ({
+    id: protocole.id, nom: protocole.nom, label: protocole.label,
+    ageMinJours: protocole.ageMinJours, ageMaxJours: protocole.ageMaxJours,
+    categoriesJson: protocole.categoriesJson, sexeCible: protocole.sexeCible, gestante: protocole.gestante,
+    rangVelageMin: protocole.rangVelageMin, rangVelageMax: protocole.rangVelageMax, lotCible: protocole.lotCible,
+    etapes: protocole.etapes.map((etape) => ({
+      id: etape.id, label: etape.label, ordre: etape.ordre, cycle: etape.cycle, reference: etape.reference,
+      debutValeur: etape.debutValeur, debutUnite: etape.debutUnite, debutPosition: etape.debutPosition,
+      finValeur: etape.finValeur, finUnite: etape.finUnite, finPosition: etape.finPosition,
+      dateFixe: etape.dateFixe, recurrenceMois: etape.recurrenceMois, obligatoire: etape.obligatoire,
+      medicamentId: etape.medicaments[0]?.medicamentId ?? null,
+      medicamentNom: etape.medicaments[0]?.medicament.nom ?? null,
+      medicaments: etape.medicaments.map((liaison) => ({ medicament: { id: liaison.medicament.id, nom: liaison.medicament.nom } })),
     })),
-    groupes,
-    medicamentsVaccin.map((m) => ({ medicamentId: m.id, nom: m.nom, voie: m.voie })),
+  }));
+
+  const animauxGrille: AnimalGrille[] = animauxDb.map((animal) => {
+    const categorie = getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
+    const gestation = animal.saillies[0]?.gestation ?? null;
+    return {
+      id: animal.id, nutrav: animal.nutrav, nom: animal.nobovi, sexe: animal.sexbov, danaisIso: animal.danais.toISOString(),
+      categorie, nombreVelages: animal._count.velagesVache, groupeNom: animal.groupe?.nom ?? null,
+      gestationId: gestation?.id ?? null, dateVelagePrevueIso: gestation?.dateVelagePrevue?.toISOString() ?? null,
+      actes: unifierActesVaccinaux(animal.vaccinations, animal.traitements),
+    };
+  });
+
+  const grille = construireGrilleVaccinale(
+    animauxGrille,
+    protocolesGrille,
+    medicamentsVaccin.map((m) => ({ medicamentId: m.id, nom: m.nom, voie: m.voie }))
   );
-  // Pur affichage (tri/filtre) : l'âge se calcule depuis danais, jamais stocké en double.
-  const infosParAnimal = new Map(animaux.map((a) => [a.id, { sexe: a.sexbov, danaisIso: a.danais.toISOString() }]));
+
   return (
-    <main className="mx-auto max-w-5xl space-y-4 p-4 pb-24">
-      <header><h1 className="text-2xl font-black text-gray-900">Tableau vaccinal</h1></header>
-      <TableauVaccinal vaccins={matrice.vaccins} lignes={matrice.lignes.map((ligne) => ({
+    <main className="mx-auto max-w-6xl space-y-3 p-3 pb-24">
+      <header><h1 className="text-xl font-black text-gray-900">Tableau vaccinal</h1></header>
+      <TableauVaccinal blocs={grille.blocs} lignes={grille.lignes.map((ligne) => ({
         ...ligne,
-        ...infosParAnimal.get(ligne.animalId)!,
-        cases: Object.fromEntries(Object.entries(ligne.cases).map(([cle, cellule]) => [cle, {
+        cellules: Object.fromEntries(Object.entries(ligne.cellules).map(([cle, cellule]) => [cle, {
           ...cellule,
-          faits: cellule.faits.map((fait) => ({ ...fait, date: fait.date.toISOString() })),
-          aFaire: cellule.aFaire && {
-            ...cellule.aFaire,
-            dateMin: cellule.aFaire.dateMin.toISOString(),
-            dateMax: cellule.aFaire.dateMax.toISOString(),
-          },
+          date: cellule.date ? cellule.date.toISOString() : null,
         }])),
       }))} />
       {groupes.length === 0 && <section className="rounded-xl bg-white p-8 text-center text-sm text-gray-500 shadow-sm">Aucun protocole vaccinal actif.</section>}

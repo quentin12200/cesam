@@ -1,0 +1,116 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { construireBlocsVaccinaux, construireGrilleVaccinale, type AnimalGrille, type ProtocoleGrille, type VaccinPharmacieGrille } from "./vaccine-grid.ts";
+
+const AUJOURDHUI = new Date("2026-09-29T12:00:00Z");
+const jours = (n: number) => new Date(new Date("2026-01-01T12:00:00Z").getTime() + n * 86_400_000);
+
+const etapePrimo = {
+  id: "bovigrip-primo", label: "Primo", ordre: 0, cycle: "INITIAL", reference: "NAISSANCE",
+  debutValeur: 14, debutUnite: "JOUR", debutPosition: "APRES", finValeur: 45, finUnite: "JOUR", finPosition: "APRES",
+  medicamentId: "med-bovigrip", medicamentNom: "BOVILIS BOVIGRIP",
+  medicaments: [{ medicament: { id: "med-bovigrip", nom: "BOVILIS BOVIGRIP" } }],
+};
+const etapeRappel = {
+  id: "bovigrip-rappel", label: "Rappel", ordre: 1, cycle: "INITIAL", reference: "ETAPE_PRECEDENTE",
+  debutValeur: 28, debutUnite: "JOUR", debutPosition: "APRES", finValeur: 35, finUnite: "JOUR", finPosition: "APRES",
+  medicamentId: "med-bovigrip", medicamentNom: "BOVILIS BOVIGRIP",
+  medicaments: [{ medicament: { id: "med-bovigrip", nom: "BOVILIS BOVIGRIP" } }],
+};
+const protocoleBovigrip: ProtocoleGrille = {
+  id: "proto-bovigrip", nom: "BOVILIS_BOVIGRIP", label: "Bovigrip", ageMinJours: 0, ageMaxJours: null,
+  categoriesJson: null, sexeCible: null, gestante: null, rangVelageMin: null, rangVelageMax: null, lotCible: null,
+  etapes: [etapePrimo, etapeRappel],
+};
+
+function animal(partiel: Partial<AnimalGrille> = {}): AnimalGrille {
+  return {
+    id: "a1", nutrav: "7494", nom: "Bafouille", sexe: "F", danaisIso: jours(0).toISOString(),
+    categorie: "VELLE", nombreVelages: 0, groupeNom: null, gestationId: null, dateVelagePrevueIso: null,
+    actes: [], ...partiel,
+  };
+}
+
+test("les sous-colonnes viennent des étapes réelles du protocole, rien n'est inventé", () => {
+  const blocs = construireBlocsVaccinaux([protocoleBovigrip], []);
+  assert.equal(blocs.length, 1);
+  assert.deepEqual(blocs[0].sousColonnes.map((s) => s.label), ["Primo", "Rappel"]);
+});
+
+test("un vaccin de pharmacie sans protocole garde une seule sous-colonne (pas d'étape inventée)", () => {
+  const vaccin: VaccinPharmacieGrille = { medicamentId: "med-nasym", nom: "NASYM", voie: "IN" };
+  const blocs = construireBlocsVaccinaux([], [vaccin]);
+  assert.equal(blocs.length, 1);
+  assert.equal(blocs[0].sousColonnes.length, 1);
+  assert.equal(blocs[0].sousColonnes[0].label, "");
+});
+
+test("primo non fait et hors fenêtre => en retard (rouge) ; rappel non atteignable => vide", () => {
+  const a = animal({ danaisIso: jours(-100).toISOString() }); // 100j : primo (14-45j) en retard
+  const { lignes } = construireGrilleVaccinale([a], [protocoleBovigrip], [], AUJOURDHUI);
+  const cellules = lignes[0].cellules;
+  assert.equal(cellules["bovigrip-primo"].statut, "EN_RETARD");
+  assert.equal(cellules["bovigrip-rappel"].statut, "VIDE", "l'étape précédente n'étant pas faite, le rappel n'a pas de fenêtre calculable");
+});
+
+test("un Bovigrip saisi en simple Traitement (sans étape) est rattaché automatiquement au primo", () => {
+  const datePrimo = jours(20); // dans la fenêtre 14-45j
+  const a = animal({
+    danaisIso: jours(0).toISOString(),
+    actes: [{ date: datePrimo, vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT" }],
+  });
+  const { lignes } = construireGrilleVaccinale([a], [protocoleBovigrip], [], AUJOURDHUI);
+  const cellules = lignes[0].cellules;
+  assert.equal(cellules["bovigrip-primo"].statut, "FAIT");
+  assert.equal(cellules["bovigrip-primo"].date?.toISOString(), datePrimo.toISOString());
+  assert.equal(cellules["bovigrip-primo"].aValider, false, "rattaché sans ambiguïté : pas d'avertissement");
+});
+
+test("le rappel calculé après un primo fait peut être à faire (orange) ou en retard (rouge)", () => {
+  const datePrimo = jours(-40); // primo fait il y a 40 j (rappel : 28 à 35 j après => déjà dépassé)
+  const a = animal({
+    danaisIso: jours(-100).toISOString(),
+    actes: [{ date: datePrimo, vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: "proto-bovigrip", etapeProtocoleId: "bovigrip-primo", gestationId: null, statut: "FAIT" }],
+  });
+  const { lignes } = construireGrilleVaccinale([a], [protocoleBovigrip], [], AUJOURDHUI);
+  const cellules = lignes[0].cellules;
+  assert.equal(cellules["bovigrip-primo"].statut, "FAIT");
+  assert.equal(cellules["bovigrip-rappel"].statut, "EN_RETARD");
+  assert.ok(cellules["bovigrip-rappel"].date, "la date affichée est l'échéance de la fenêtre");
+});
+
+test("deux injections non rattachables au même produit déclenchent ⚠ À vérifier sur la 1re sous-colonne, jamais sur une case déjà cochée", () => {
+  const a = animal({
+    danaisIso: jours(0).toISOString(),
+    actes: [
+      { date: jours(20), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT" },
+      { date: jours(50), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT" },
+    ],
+  });
+  const { lignes } = construireGrilleVaccinale([a], [protocoleBovigrip], [], AUJOURDHUI);
+  const primo = lignes[0].cellules["bovigrip-primo"];
+  assert.notEqual(primo.statut, "FAIT", "ambiguïté : aucune des deux injections n'est affectée automatiquement");
+  assert.equal(primo.aValider, true);
+});
+
+test("un animal non concerné (mauvais sexe) reste vide sur toutes les étapes, quels que soient ses actes", () => {
+  const protocoleFemelles: ProtocoleGrille = { ...protocoleBovigrip, sexeCible: "F" };
+  const a = animal({ sexe: "M", actes: [{ date: jours(20), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: "proto-bovigrip", etapeProtocoleId: "bovigrip-primo", gestationId: null, statut: "FAIT" }] });
+  const { lignes } = construireGrilleVaccinale([a], [protocoleFemelles], [], AUJOURDHUI);
+  assert.equal(lignes[0].cellules["bovigrip-primo"].statut, "VIDE");
+  assert.equal(lignes[0].cellules["bovigrip-rappel"].statut, "VIDE");
+});
+
+test("un vaccin de pharmacie sans protocole affiche fait dès qu'un acte existe, sans inventer d'échéance", () => {
+  const vaccin: VaccinPharmacieGrille = { medicamentId: "med-nasym", nom: "NASYM", voie: "IN" };
+  const dateActe = jours(10);
+  const a = animal({ actes: [{ date: dateActe, vaccin: "NASYM", medicamentId: "med-nasym", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT" }] });
+  const { lignes } = construireGrilleVaccinale([a], [], [vaccin], AUJOURDHUI);
+  const cellule = lignes[0].cellules["med-nasym"];
+  assert.equal(cellule.statut, "FAIT");
+  assert.equal(cellule.date?.toISOString(), dateActe.toISOString());
+
+  const sansActe = animal({ actes: [] });
+  const { lignes: lignes2 } = construireGrilleVaccinale([sansActe], [], [vaccin], AUJOURDHUI);
+  assert.equal(lignes2[0].cellules["med-nasym"].statut, "VIDE");
+});

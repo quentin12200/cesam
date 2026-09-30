@@ -14,6 +14,7 @@ import { statutPlanningVaccin, type StatutPlanningVaccin } from "@/lib/vaccine-p
 import { rattacherPrimoNonLiee, vaccinationsSansEtapeFiable } from "@/lib/vaccine-history";
 import { vaccinationAppartientAuCycleCourant } from "@/lib/vaccination-session";
 import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
+import { estAnimalConcerneParProtocole } from "@/lib/vaccine-eligibility";
 
 export interface LignePreparationVaccin {
   animalId: string;
@@ -66,25 +67,6 @@ export interface GroupePreparationVaccin {
     achats: Array<{ doses: number; nombre: number }>;
   };
   stockPharmacie: string;
-}
-
-function categoriesCibles(raw: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const value = JSON.parse(raw);
-    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function correspondCategorie(cibles: string[], categorie: string): boolean {
-  if (cibles.length === 0) return true;
-  return cibles.some((cible) => {
-    if (cible === "VEAU") return categorie === "VEAU_M" || categorie === "VELLE";
-    if (cible === "GENISSE") return categorie.includes("GENISSE");
-    return cible === categorie;
-  });
 }
 
 function libelleInjection(label: string, ordre: number, totalInitial: number, cycle: string): string {
@@ -162,7 +144,6 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
   ]);
 
   return protocoles.map((protocole) => {
-    const cibles = categoriesCibles(protocole.categoriesJson);
     const etapesInitiales = protocole.etapes.filter((etape) => etape.cycle !== "ENTRETIEN");
     const totalInitial = etapesInitiales.length;
     let termines = 0;
@@ -183,13 +164,10 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
     for (const animal of animaux) {
       const categorie = getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie);
       const gestation = animal.saillies[0]?.gestation ?? null;
-      if (!correspondCategorie(cibles, categorie)) continue;
-      if (protocole.sexeCible && protocole.sexeCible !== animal.sexbov) continue;
-      if (protocole.gestante === true && !gestation) continue;
-      if (protocole.gestante === false && gestation) continue;
-      if (protocole.rangVelageMin != null && animal._count.velagesVache < protocole.rangVelageMin) continue;
-      if (protocole.rangVelageMax != null && animal._count.velagesVache > protocole.rangVelageMax) continue;
-      if (protocole.lotCible && animal.groupe?.nom !== protocole.lotCible) continue;
+      if (!estAnimalConcerneParProtocole(
+        { categorie, sexbov: animal.sexbov, groupeNom: animal.groupe?.nom ?? null, nombreVelages: animal._count.velagesVache, gestation: Boolean(gestation) },
+        protocole
+      )) continue;
 
       // Un vaccin peut avoir été saisi comme Traitement libre (hors séance) : il compte quand
       // même comme fait, au même titre qu'une Vaccination structurée. Voir lib/vaccine-acts.ts.
