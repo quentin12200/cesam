@@ -63,10 +63,10 @@ export default async function VaccinsPage() {
           take: 1,
           select: { gestation: { select: { id: true, dateVelagePrevue: true } } },
         },
-        vaccinations: { where: { statut: "FAIT" }, select: { vaccin: true, date: true, statut: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true }, orderBy: { date: "asc" } },
+        vaccinations: { where: { statut: "FAIT" }, select: { id: true, vaccin: true, date: true, statut: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true }, orderBy: { date: "asc" } },
         // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
         // quand même remonter comme fait dans la grille. Voir lib/vaccine-acts.ts.
-        traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { dateDebut: true, medicamentNom: true, medicamentId: true } },
+        traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { id: true, dateDebut: true, medicamentNom: true, medicamentId: true } },
       },
       orderBy: { nutrav: "asc" },
     }),
@@ -122,7 +122,10 @@ export default async function VaccinsPage() {
       id: animal.id, nutrav: animal.nutrav, nom: animal.nobovi, sexe: animal.sexbov, danaisIso: animal.danais.toISOString(),
       categorie, nombreVelages: animal._count.velagesVache, groupeNom: animal.groupe?.nom ?? null,
       gestationId: gestation?.id ?? null, dateVelagePrevueIso: gestation?.dateVelagePrevue?.toISOString() ?? null,
-      actes: unifierActesVaccinaux(animal.vaccinations, animal.traitements),
+      actes: unifierActesVaccinaux(
+        animal.vaccinations.map((vaccination) => ({ ...vaccination, sourceType: "VACCINATION" as const, sourceId: vaccination.id })),
+        animal.traitements,
+      ),
     };
   });
 
@@ -140,6 +143,7 @@ export default async function VaccinsPage() {
         cellules: Object.fromEntries(Object.entries(ligne.cellules).map(([cle, cellule]) => [cle, {
           ...cellule,
           date: cellule.date ? cellule.date.toISOString() : null,
+          historiquesAValider: cellule.historiquesAValider.map((historique) => ({ ...historique, date: historique.date.toISOString() })),
         }])),
       }))} />
       {groupes.length === 0 && <section className="rounded-xl bg-white p-8 text-center text-sm text-gray-500 shadow-sm">Aucun protocole vaccinal actif.</section>}

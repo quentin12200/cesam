@@ -1,9 +1,12 @@
 export interface VaccinationHistorique {
+  sourceType?: "VACCINATION" | "TRAITEMENT";
+  sourceId?: string | null;
   date: Date;
   vaccin: string;
   medicamentId: string | null;
   protocoleId: string | null;
   etapeProtocoleId: string | null;
+  gestationId?: string | null;
   statut?: string;
 }
 
@@ -96,10 +99,10 @@ export function rattacherInjectionOrpheline<T extends VaccinationHistorique>(
 }
 
 /** Un vaccin ancien sans étape ne prouve pas quelle injection du protocole a été faite. */
-export function vaccinationsSansEtapeFiable(
-  vaccinations: readonly VaccinationHistorique[],
+export function vaccinationsSansEtapeFiable<T extends VaccinationHistorique>(
+  vaccinations: readonly T[],
   protocole: { id: string; noms: readonly string[]; medicamentIds: readonly string[]; etapeIds: readonly string[] },
-): VaccinationHistorique[] {
+): T[] {
   const noms = new Set(protocole.noms.map(nomComparable));
   const medicamentIds = new Set(protocole.medicamentIds);
   const etapeIds = new Set(protocole.etapeIds);

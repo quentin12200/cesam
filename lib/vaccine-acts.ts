@@ -8,6 +8,8 @@
  */
 
 export interface ActeVaccination {
+  sourceType?: "VACCINATION" | "TRAITEMENT";
+  sourceId?: string | null;
   date: Date;
   vaccin: string;
   medicamentId: string | null;
@@ -18,6 +20,7 @@ export interface ActeVaccination {
 }
 
 export interface ActeTraitementVaccin {
+  id?: string;
   dateDebut: Date;
   medicamentNom: string;
   medicamentId: string | null;
@@ -39,7 +42,9 @@ export function unifierActesVaccinaux(
   vaccinations: readonly ActeVaccination[],
   traitements: readonly ActeTraitementVaccin[]
 ): ActeVaccination[] {
-  const faites = vaccinations.filter((vaccination) => vaccination.statut === "FAIT");
+  const faites = vaccinations
+    .filter((vaccination) => vaccination.statut === "FAIT")
+    .map((vaccination) => ({ ...vaccination, sourceType: vaccination.sourceType ?? "VACCINATION" as const }));
   const couverts = new Set(
     faites
       .filter((vaccination) => vaccination.medicamentId)
@@ -49,6 +54,8 @@ export function unifierActesVaccinaux(
     .filter((traitement) => traitement.medicamentId)
     .filter((traitement) => !couverts.has(`${traitement.medicamentId}|${cleJour(traitement.dateDebut)}`))
     .map((traitement): ActeVaccination => ({
+      sourceType: "TRAITEMENT",
+      sourceId: traitement.id ?? null,
       date: traitement.dateDebut,
       vaccin: traitement.medicamentNom,
       medicamentId: traitement.medicamentId,

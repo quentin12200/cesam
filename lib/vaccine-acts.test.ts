@@ -25,12 +25,14 @@ test("un vaccin enregistré uniquement via Traitement + médicament VACCIN appar
   assert.equal(actes.length, 1);
   assert.equal(actes[0].vaccin, "BOVILIS BOVIGRIP");
   assert.equal(actes[0].statut, "FAIT");
+  assert.equal(actes[0].sourceType, "TRAITEMENT");
 });
 
 test("un vaccin enregistré via Vaccination apparaît comme fait", () => {
   const actes = unifierActesVaccinaux([vaccination()], []);
   assert.equal(actes.length, 1);
   assert.equal(actes[0].medicamentId, "med-bovigrip");
+  assert.equal(actes[0].sourceType, "VACCINATION");
 });
 
 test("le même acte présent dans les deux sources n'est affiché qu'une seule fois, la Vaccination gagne", () => {

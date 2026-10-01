@@ -47,6 +47,15 @@ test("un vaccin de pharmacie sans protocole garde une seule sous-colonne (pas d'
   assert.equal(blocs[0].sousColonnes[0].label, "");
 });
 
+test("un vaccin actif de pharmacie comme ROTAVEC reste représenté même sans protocole", () => {
+  const vaccin: VaccinPharmacieGrille = { medicamentId: "med-rotavec", nom: "ROTAVEC", voie: "IM" };
+  const { blocs, lignes } = construireGrilleVaccinale([animal()], [], [vaccin], AUJOURDHUI);
+  assert.equal(blocs[0].nom, "ROTAVEC");
+  assert.equal(blocs[0].sousColonnes[0].protocoleId, null);
+  assert.equal(lignes[0].cellules["med-rotavec"].statut, "VIDE");
+  assert.equal(lignes[0].cellules["med-rotavec"].rattachementProtocoleAutorise, false);
+});
+
 test("primo non fait et hors fenêtre => en retard (rouge) ; rappel non atteignable => vide", () => {
   const a = animal({ danaisIso: jours(-100).toISOString() }); // 100j : primo (14-45j) en retard
   const { lignes } = construireGrilleVaccinale([a], [protocoleBovigrip], [], AUJOURDHUI);
@@ -115,6 +124,7 @@ test("un animal non concerné (mauvais sexe) n'a jamais de recommandation invent
   const { lignes: sansHistorique } = construireGrilleVaccinale([sansActe], [protocoleFemelles], [], AUJOURDHUI);
   assert.equal(sansHistorique[0].cellules["bovigrip-primo"].statut, "VIDE", "pas de recommandation inventée pour un animal non concerné");
   assert.equal(sansHistorique[0].cellules["bovigrip-rappel"].statut, "VIDE");
+  assert.equal(sansHistorique[0].cellules["bovigrip-primo"].rattachementProtocoleAutorise, false, "une saisie volontaire restera un traitement factuel sans faux rattachement au protocole");
 
   const dateActe = jours(20);
   const avecActe = animal({ sexe: "M", actes: [{ date: dateActe, vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: "proto-bovigrip", etapeProtocoleId: "bovigrip-primo", gestationId: null, statut: "FAIT" }] });
@@ -122,6 +132,27 @@ test("un animal non concerné (mauvais sexe) n'a jamais de recommandation invent
   assert.equal(avecHistorique[0].cellules["bovigrip-primo"].statut, "FAIT", "un fait réel reste visible même si l'animal n'est plus éligible aujourd'hui");
   assert.equal(avecHistorique[0].cellules["bovigrip-primo"].date?.toISOString(), dateActe.toISOString());
   assert.equal(avecHistorique[0].cellules["bovigrip-rappel"].statut, "VIDE", "le rappel, lui, n'est pas inventé pour un animal non concerné");
+});
+
+test("une étape connue sans échéance calculable reste saisissable et peut conserver son rattachement", () => {
+  const rappelSansPrimo = animal({ danaisIso: jours(-100).toISOString() });
+  const { lignes } = construireGrilleVaccinale([rappelSansPrimo], [protocoleBovigrip], [], AUJOURDHUI);
+  assert.equal(lignes[0].cellules["bovigrip-rappel"].statut, "VIDE");
+  assert.equal(lignes[0].cellules["bovigrip-rappel"].rattachementProtocoleAutorise, true);
+});
+
+test("un historique ambigu expose sa source sans modifier le fait réel", () => {
+  const a = animal({
+    actes: [
+      { sourceType: "VACCINATION", sourceId: "vaccination-1", date: jours(20), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT" },
+      { sourceType: "VACCINATION", sourceId: "vaccination-2", date: jours(50), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT" },
+    ],
+  });
+  const { lignes } = construireGrilleVaccinale([a], [protocoleBovigrip], [], AUJOURDHUI);
+  const historiques = lignes[0].cellules["bovigrip-primo"].historiquesAValider;
+  assert.deepEqual(historiques.map((historique) => historique.sourceId), ["vaccination-1", "vaccination-2"]);
+  assert.ok(historiques.every((historique) => historique.sourceType === "VACCINATION"));
+  assert.deepEqual(historiques.map((historique) => historique.date), [jours(20), jours(50)]);
 });
 
 test("rappel sans médicament lié en base (cas réel Bovigrip) : une seule injection orpheline est quand même rattachée au primo", () => {
