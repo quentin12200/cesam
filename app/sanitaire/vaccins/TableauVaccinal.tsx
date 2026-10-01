@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import ExecutantSelect, { type Intervenant } from "@/app/sanitaire/nouvel-evenement/ExecutantSelect";
+import { formatAgeTerrain } from "@/lib/animal-age";
 import { regrouperActesVaccinaux } from "@/lib/vaccination-session";
 
 interface CelluleGrille {
@@ -41,9 +43,10 @@ interface Bloc {
   medicamentId: string | null;
 }
 
-type Sexe = "tous" | "M" | "F";
 type Statut = "aFaire" | "enRetard" | "faits";
 type Tri = "numero" | "age" | "sexe";
+type DirectionTri = "asc" | "desc";
+type ColonneAnimal = "numero" | "nom" | "age" | "sexe";
 
 interface ActeSelectionne {
   cle: string;
@@ -68,6 +71,12 @@ interface AjustementGroupe {
 const dateCourte = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 const afficherDate = (date: string) => dateCourte.format(new Date(date));
 const ageJours = (danaisIso: string) => Math.floor((Date.now() - new Date(danaisIso).getTime()) / 86_400_000);
+const colonnesAnimal: { id: ColonneAnimal; label: string }[] = [
+  { id: "numero", label: "N°" },
+  { id: "nom", label: "Nom" },
+  { id: "age", label: "Âge" },
+  { id: "sexe", label: "Sexe" },
+];
 const dateLocaleIso = () => {
   const date = new Date();
   const decalage = date.getTimezoneOffset() * 60_000;
@@ -85,28 +94,44 @@ function correspondStatut(statut: CelluleGrille["statut"], filtres: ReadonlySet<
     || (filtres.has("enRetard") && statut === "EN_RETARD");
 }
 
-function libelleSexe(sexe: Sexe): string {
-  if (sexe === "F") return "Femelles";
-  if (sexe === "M") return "Mâles";
-  return "Tous";
-}
-
 export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lignes: Ligne[] }) {
   const router = useRouter();
   const [recherche, setRecherche] = useState("");
   const [vaccinsAffiches, setVaccinsAffiches] = useState<Set<string>>(() => new Set(blocs.map((bloc) => bloc.cle)));
   const [statuts, setStatuts] = useState<Set<Statut>>(new Set());
-  const [sexe, setSexe] = useState<Sexe>("tous");
-  const [tri, setTri] = useState<Tri>("numero");
-  const [triDesc, setTriDesc] = useState(false);
+  const [tri, setTri] = useState<Tri | null>(null);
+  const [directionTri, setDirectionTri] = useState<DirectionTri | null>(null);
+  const [colonnesMasquees, setColonnesMasquees] = useState<Set<ColonneAnimal>>(new Set());
+  const [menuColonne, setMenuColonne] = useState<{ colonne: ColonneAnimal; x: number; y: number } | null>(null);
+  const menuColonneRef = useRef<HTMLDivElement>(null);
   const [modeSession, setModeSession] = useState(false);
   const [dateSession, setDateSession] = useState(dateLocaleIso);
   const [executant, setExecutant] = useState("");
+  const [intervenants, setIntervenants] = useState<Intervenant[]>([]);
   const [actesSelectionnes, setActesSelectionnes] = useState<Set<string>>(new Set());
   const [verification, setVerification] = useState(false);
   const [ajustements, setAjustements] = useState<Record<string, AjustementGroupe>>({});
   const [enregistrement, setEnregistrement] = useState(false);
   const [erreur, setErreur] = useState("");
+
+  useEffect(() => {
+    fetch("/api/intervenants").then((reponse) => reponse.json()).then(setIntervenants).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    function fermerMenu(event: PointerEvent) {
+      if (!menuColonneRef.current?.contains(event.target as Node)) setMenuColonne(null);
+    }
+    function fermerSurEchap(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuColonne(null);
+    }
+    document.addEventListener("pointerdown", fermerMenu);
+    window.addEventListener("keydown", fermerSurEchap);
+    return () => {
+      document.removeEventListener("pointerdown", fermerMenu);
+      window.removeEventListener("keydown", fermerSurEchap);
+    };
+  }, []);
 
   const blocsAffiches = useMemo(
     () => blocs.filter((bloc) => vaccinsAffiches.has(bloc.cle)),
@@ -117,20 +142,20 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     const terme = recherche.trim().toLocaleLowerCase("fr");
     const filtres = lignes.filter((ligne) => {
       if (!`${ligne.nutrav} ${ligne.nom ?? ""}`.toLocaleLowerCase("fr").includes(terme)) return false;
-      if (sexe !== "tous" && ligne.sexe !== sexe) return false;
       if (statuts.size === 0) return true;
       return blocsAffiches.some((bloc) => bloc.sousColonnes.some((etape) => {
         const cellule = ligne.cellules[etape.id];
         return cellule && correspondStatut(cellule.statut, statuts);
       }));
     });
-    const signe = triDesc ? -1 : 1;
+    if (!tri || !directionTri) return filtres;
+    const signe = directionTri === "desc" ? -1 : 1;
     return [...filtres].sort((a, b) => {
       if (tri === "age") return signe * (ageJours(a.danaisIso) - ageJours(b.danaisIso));
       if (tri === "sexe") return signe * a.sexe.localeCompare(b.sexe) || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
       return signe * a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
     });
-  }, [blocsAffiches, lignes, recherche, sexe, statuts, tri, triDesc]);
+  }, [blocsAffiches, lignes, recherche, statuts, tri, directionTri]);
 
   const actes = useMemo(() => {
     const index = new Map<string, ActeSelectionne>();
@@ -157,9 +182,56 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
 
   const nombreAnimaux = new Set(actes.map((acte) => acte.ligne.animalId)).size;
 
-  function choisirTri(valeur: Tri, desc: boolean) {
-    setTri(valeur);
-    setTriDesc(desc);
+  function basculerTri(valeur: Tri) {
+    if (tri !== valeur || !directionTri) {
+      setTri(valeur);
+      setDirectionTri("asc");
+      return;
+    }
+    if (directionTri === "asc") {
+      setDirectionTri("desc");
+      return;
+    }
+    setTri(null);
+    setDirectionTri(null);
+  }
+
+  function indicateurTri(valeur: Tri) {
+    if (tri !== valeur) return null;
+    return <span aria-hidden="true" className="ml-1 text-[10px] text-gray-500">{directionTri === "asc" ? "↑" : "↓"}</span>;
+  }
+
+  function ouvrirMenuColonne(event: React.MouseEvent, colonne: ColonneAnimal) {
+    event.preventDefault();
+    setMenuColonne({
+      colonne,
+      x: Math.min(event.clientX, window.innerWidth - 240),
+      y: Math.min(event.clientY, window.innerHeight - 220),
+    });
+  }
+
+  function masquerColonne(colonne: ColonneAnimal) {
+    if (colonnesMasquees.size >= colonnesAnimal.length - 1) return;
+    setColonnesMasquees((actuelles) => new Set(actuelles).add(colonne));
+    if (tri === colonne) {
+      setTri(null);
+      setDirectionTri(null);
+    }
+    setMenuColonne(null);
+  }
+
+  function reafficherColonne(colonne: ColonneAnimal) {
+    setColonnesMasquees((actuelles) => {
+      const suivantes = new Set(actuelles);
+      suivantes.delete(colonne);
+      return suivantes;
+    });
+    setMenuColonne(null);
+  }
+
+  function enteteTriable(label: string, valeur: Tri, colonne: ColonneAnimal, classe: string) {
+    if (colonnesMasquees.has(colonne)) return null;
+    return <th rowSpan={2} scope="col" onContextMenu={(event) => ouvrirMenuColonne(event, colonne)} className={classe}><button type="button" onClick={() => basculerTri(valeur)} className="w-full py-0.5 text-left font-bold" aria-label={`Trier par ${label}`}>{label}{indicateurTri(valeur)}</button></th>;
   }
 
   function basculerDansSet<T>(setter: React.Dispatch<React.SetStateAction<Set<T>>>, valeur: T) {
@@ -271,17 +343,18 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
 
   function renduCellule(cellule: CelluleGrille | undefined, ligne: Ligne, etape: SousColonne) {
     if (!cellule || cellule.statut === "VIDE") return <span className="text-gray-300">—</span>;
-    if (cellule.statut === "FAIT") return <span className="block rounded bg-green-50 px-1 py-1 text-[11px] font-bold text-green-900 whitespace-nowrap">☑ {afficherDate(cellule.date!)}</span>;
+    if (cellule.statut === "FAIT") return <span className="block rounded border border-green-500 bg-green-100 px-1.5 py-1 text-xs font-bold text-green-950 whitespace-nowrap">☑ {afficherDate(cellule.date!)}</span>;
     const selectionne = actesSelectionnes.has(cleActe(ligne.animalId, etape.id));
     const classe = cellule.statut === "EN_RETARD"
-      ? "border-red-300 bg-red-50 text-red-950"
+      ? "border-red-700 bg-red-100 text-red-950"
       : cellule.statut === "BIENTOT"
-        ? "border-amber-300 bg-amber-50 text-amber-950"
-        : "border-sky-300 bg-sky-50 text-sky-900";
-    const contenu = `${cellule.statut === "EN_RETARD" ? "● " : ""}${afficherDate(cellule.date!)}`;
-    if (!modeSession) return <span className={`block rounded border px-1 py-1 text-[11px] font-bold whitespace-nowrap ${classe}`}>{contenu}</span>;
+        ? "border-orange-500 bg-orange-100 text-orange-950"
+        : "border-blue-400 bg-blue-50 text-blue-950";
+    const symbole = cellule.statut === "EN_RETARD" ? "! " : cellule.statut === "BIENTOT" ? "◷ " : "☐ ";
+    const contenu = `${symbole}${afficherDate(cellule.date!)}`;
+    if (!modeSession) return <span className={`block rounded border px-1.5 py-1 text-xs font-bold whitespace-nowrap ${classe}`}>{contenu}</span>;
     const disponible = estSelectionnable(cellule, etape);
-    return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title={disponible ? "Ajouter ou retirer de la séance" : "Médicament ou protocole à renseigner"} className={`block w-full rounded border px-1 py-1 text-[11px] font-bold whitespace-nowrap ${classe} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}>{selectionne ? "☑ " : "☐ "}{contenu}</button>;
+    return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title={disponible ? "Ajouter ou retirer de la séance" : "Médicament ou protocole à renseigner"} className={`block w-full rounded border px-1.5 py-1 text-xs font-bold whitespace-nowrap ${classe} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}>{selectionne ? "☑ " : symbole}{afficherDate(cellule.date!)}</button>;
   }
 
   return (
@@ -311,7 +384,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
       {modeSession && <div className="mx-3 mb-3 rounded-xl border border-green-200 bg-green-50 p-3">
         <div className="grid gap-2 sm:grid-cols-[10rem_minmax(12rem,1fr)_auto] sm:items-end">
           <label className="text-xs font-semibold text-green-950">Date de séance<input type="date" value={dateSession} onChange={(event) => setDateSession(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border bg-white px-2 text-sm font-normal text-gray-900" /></label>
-          <label className="text-xs font-semibold text-green-950">Exécutant<input value={executant} onChange={(event) => setExecutant(event.target.value)} placeholder="Nom de l’exécutant" className="mt-1 min-h-10 w-full rounded-lg border bg-white px-3 text-sm font-normal text-gray-900" /></label>
+          <label className="text-xs font-semibold text-green-950">Exécutant<div className="mt-1 font-normal text-gray-900"><ExecutantSelect intervenants={intervenants} value={executant} onChange={setExecutant} onAdded={(intervenant) => setIntervenants((actuels) => [...actuels, intervenant])} /></div></label>
           <button type="button" onClick={() => { setModeSession(false); setActesSelectionnes(new Set()); setErreur(""); }} className="min-h-10 rounded-lg border bg-white px-3 text-sm font-semibold text-gray-600">Annuler la séance</button>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2"><p className="mr-auto text-sm font-semibold text-green-950">Séance du {dateSession ? dateCourte.format(new Date(`${dateSession}T12:00:00`)) : "—"} — {executant.trim() || "exécutant à renseigner"} — {nombreAnimaux} animal(aux) — {actes.length} acte(s)</p>{actes.length > 0 && <button type="button" onClick={() => setActesSelectionnes(new Set())} className="min-h-9 rounded-lg border bg-white px-3 text-xs font-semibold">Vider la sélection</button>}<button type="button" onClick={ouvrirVerification} className="min-h-9 rounded-lg bg-green-800 px-3 text-sm font-bold text-white">Vérifier et valider la séance</button></div>
@@ -319,25 +392,31 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
       </div>}
 
       {blocsAffiches.length === 0 ? <p className="border-t p-3 text-sm text-gray-600">{blocs.length === 0 ? "Aucune vaccination ni protocole à afficher." : "Aucun vaccin sélectionné."}</p> : <div className="overflow-x-auto border-t">
-        <table className="w-full min-w-max border-collapse text-left text-xs">
-          <thead className="bg-gray-50">
+        <table className="w-full min-w-max border-collapse text-left text-sm">
+          <thead className="bg-gray-50 text-[13px]">
             <tr>
-              <th rowSpan={2} scope="col" className="sticky left-0 z-30 min-w-16 border-r bg-gray-50 p-1.5"><details className="relative"><summary className="cursor-pointer list-none font-bold">N° ▾</summary><div className="absolute left-0 z-50 mt-1 min-w-36 rounded-lg border bg-white p-1 shadow-xl"><button type="button" onClick={() => choisirTri("numero", false)} className="block min-h-8 w-full rounded px-2 text-left hover:bg-gray-50">Croissant</button><button type="button" onClick={() => choisirTri("numero", true)} className="block min-h-8 w-full rounded px-2 text-left hover:bg-gray-50">Décroissant</button></div></details></th>
-              <th rowSpan={2} scope="col" className="sticky left-16 z-30 min-w-24 border-r bg-gray-50 p-1.5">Nom</th>
-              <th rowSpan={2} scope="col" className="min-w-14 border-r bg-gray-50 p-1.5"><details className="relative"><summary className="cursor-pointer list-none font-bold">Âge ▾</summary><div className="absolute z-50 mt-1 min-w-36 rounded-lg border bg-white p-1 shadow-xl"><button type="button" onClick={() => choisirTri("age", false)} className="block min-h-8 w-full rounded px-2 text-left hover:bg-gray-50">Croissant</button><button type="button" onClick={() => choisirTri("age", true)} className="block min-h-8 w-full rounded px-2 text-left hover:bg-gray-50">Décroissant</button></div></details></th>
-              <th rowSpan={2} scope="col" className="min-w-16 border-r bg-gray-50 p-1.5"><details className="relative"><summary className="cursor-pointer list-none font-bold">Sexe ▾</summary><div className="absolute z-50 mt-1 min-w-40 rounded-lg border bg-white p-1 shadow-xl">{([['tous', 'Tous'], ['F', 'Femelles'], ['M', 'Mâles']] as const).map(([valeur, label]) => <button key={valeur} type="button" onClick={() => setSexe(valeur)} className={`block min-h-8 w-full rounded px-2 text-left ${sexe === valeur ? "bg-green-50 font-bold" : "hover:bg-gray-50"}`}>{label}</button>)}<div className="mt-1 border-t pt-1"><button type="button" onClick={() => choisirTri("sexe", false)} className="block min-h-8 w-full rounded px-2 text-left hover:bg-gray-50">Trier F → M</button><button type="button" onClick={() => choisirTri("sexe", true)} className="block min-h-8 w-full rounded px-2 text-left hover:bg-gray-50">Trier M → F</button></div></div></details><span className="block text-[9px] font-normal text-gray-400">{libelleSexe(sexe)}</span></th>
-              {blocsAffiches.map((bloc) => <th key={bloc.cle} colSpan={bloc.sousColonnes.length} scope="colgroup" className="border-r border-b p-1 text-center font-bold text-gray-800">{bloc.nom}{bloc.voie && <span className="ml-1 font-normal text-gray-500">{bloc.voie}</span>}</th>)}
+              {enteteTriable("N°", "numero", "numero", "sticky left-0 z-30 min-w-16 border-r bg-gray-50 p-1.5")}
+              {!colonnesMasquees.has("nom") && <th rowSpan={2} scope="col" onContextMenu={(event) => ouvrirMenuColonne(event, "nom")} className={`sticky ${colonnesMasquees.has("numero") ? "left-0" : "left-16"} z-30 min-w-24 border-r bg-gray-50 p-1.5 font-bold`}>Nom</th>}
+              {enteteTriable("Âge", "age", "age", "min-w-20 border-r bg-gray-50 p-1.5")}
+              {enteteTriable("Sexe", "sexe", "sexe", "min-w-16 border-r bg-gray-50 p-1.5")}
+              {blocsAffiches.map((bloc) => <th key={bloc.cle} colSpan={bloc.sousColonnes.length} scope="colgroup" className="border-r border-b p-1.5 text-center font-bold text-gray-800">{bloc.nom}{bloc.voie && <span className="ml-1 font-normal text-gray-500">{bloc.voie}</span>}</th>)}
             </tr>
-            <tr>{blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => <th key={etape.id} scope="col" className="min-w-20 border-r p-1 text-center font-normal text-gray-500"><span>{etape.label}</span>{modeSession && <button type="button" onClick={() => selectionnerVisibles(etape)} className="mt-0.5 block w-full text-[9px] font-semibold text-green-800 underline">Sélectionner visibles à faire</button>}</th>))}</tr>
+            <tr>{blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => <th key={etape.id} scope="col" className="min-w-24 border-r p-1.5 text-center font-medium text-gray-600"><span>{etape.label}</span>{modeSession && <button type="button" onClick={() => selectionnerVisibles(etape)} className="mt-0.5 block w-full text-[10px] font-semibold text-green-800 underline">Sélectionner visibles à faire</button>}</th>))}</tr>
           </thead>
           <tbody className="divide-y">{resultat.map((ligne) => <tr key={ligne.animalId}>
-            <th scope="row" className="sticky left-0 z-20 border-r bg-white p-1.5"><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono font-bold text-green-800 underline">{ligne.nutrav}</Link></th>
-            <td className="sticky left-16 z-20 max-w-28 border-r bg-white p-1.5 text-[10px] text-gray-500"><span className="block truncate">{ligne.nom || "—"}</span></td>
-            <td className="border-r p-1.5 text-gray-600">{ageJours(ligne.danaisIso)}j</td><td className="border-r p-1.5 text-gray-600">{ligne.sexe}</td>
-            {blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cellule = ligne.cellules[etape.id]; return <td key={etape.id} className="border-r p-1 align-top">{renduCellule(cellule, ligne, etape)}{cellule?.aValider && <span className="mt-0.5 block text-[10px] font-medium text-gray-400">⚠ À vérifier</span>}</td>; }))}
+            {!colonnesMasquees.has("numero") && <th scope="row" className="sticky left-0 z-20 border-r bg-white p-1.5"><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono text-sm font-black text-green-800 underline">{ligne.nutrav}</Link></th>}
+            {!colonnesMasquees.has("nom") && <td className={`sticky ${colonnesMasquees.has("numero") ? "left-0" : "left-16"} z-20 max-w-32 border-r bg-white p-1.5 text-xs text-gray-600`}><span className="block truncate">{ligne.nom || "—"}</span></td>}
+            {!colonnesMasquees.has("age") && <td className="border-r p-1.5 font-medium whitespace-nowrap text-gray-700">{formatAgeTerrain(ligne.danaisIso)}</td>}
+            {!colonnesMasquees.has("sexe") && <td className="border-r p-1.5 font-medium text-gray-700">{ligne.sexe}</td>}
+            {blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cellule = ligne.cellules[etape.id]; return <td key={etape.id} className="border-r p-1 align-top">{renduCellule(cellule, ligne, etape)}{cellule?.aValider && <span className="mt-0.5 block text-[10px] font-medium text-gray-500">⚠ À vérifier</span>}</td>; }))}
           </tr>)}</tbody>
         </table>
         {resultat.length === 0 && <p className="p-3 text-sm text-gray-500">Aucun animal avec ces filtres.</p>}
+      </div>}
+
+      {menuColonne && <div ref={menuColonneRef} role="menu" aria-label="Options de colonne" className="fixed z-[70] w-56 rounded-lg border border-gray-200 bg-white p-1 text-sm shadow-xl" style={{ left: menuColonne.x, top: menuColonne.y }}>
+        <button type="button" role="menuitem" disabled={colonnesMasquees.size >= colonnesAnimal.length - 1} onClick={() => masquerColonne(menuColonne.colonne)} className="block min-h-9 w-full rounded px-2 text-left font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300">Masquer cette colonne</button>
+        {colonnesMasquees.size > 0 && <div className="mt-1 border-t pt-1"><p className="px-2 py-1 text-xs font-semibold text-gray-500">Réafficher une colonne</p>{colonnesAnimal.filter((colonne) => colonnesMasquees.has(colonne.id)).map((colonne) => <button key={colonne.id} type="button" role="menuitem" onClick={() => reafficherColonne(colonne.id)} className="block min-h-9 w-full rounded px-2 text-left text-gray-700 hover:bg-gray-50">{colonne.label}</button>)}<button type="button" role="menuitem" onClick={() => { setColonnesMasquees(new Set()); setMenuColonne(null); }} className="mt-1 block min-h-9 w-full rounded border-t px-2 text-left font-semibold text-gray-700 hover:bg-gray-50">Réafficher toutes les colonnes</button></div>}
       </div>}
 
       <p className="border-t px-3 py-2 text-xs text-gray-500">{resultat.length} animal(aux) · Orange = bientôt, inclus dans « À faire ».</p>

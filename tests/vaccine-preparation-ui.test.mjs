@@ -25,7 +25,7 @@ test("l'écran Vaccins ouvre sur le tableau par animal et garde la préparation 
   assert.match(card, /Reliquat utilisable/);
 });
 
-test("le tableau vaccinal permet la sélection multiple de blocs vaccins, le tri et les filtres compacts", () => {
+test("le tableau vaccinal propose un tri cyclique et des colonnes masquables sans barre supplémentaire", () => {
   const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
   assert.match(tableau, /Recherche animal/);
   assert.match(tableau, /Vaccins affichés ▾/);
@@ -33,22 +33,48 @@ test("le tableau vaccinal permet la sélection multiple de blocs vaccins, le tri
   assert.match(tableau, /Nouvelle séance/);
   assert.match(tableau, /Tout sélectionner/);
   assert.match(tableau, /Tout désélectionner/);
-  // Tri et filtre sont portés par les en-têtes, pas par une seconde barre de commandes.
-  assert.match(tableau, /N° ▾/);
-  assert.match(tableau, /Âge ▾/);
-  assert.match(tableau, /Sexe ▾/);
-  assert.match(tableau, /triDesc/);
+  // Le clic d'en-tête fait ascendant, descendant, puis revient à l'ordre initial.
+  assert.match(tableau, /function basculerTri/);
+  assert.match(tableau, /setDirectionTri\("asc"\)/);
+  assert.match(tableau, /setDirectionTri\("desc"\)/);
+  assert.match(tableau, /setTri\(null\)/);
+  assert.match(tableau, /directionTri === "asc" \? "↑" : "↓"/);
+  assert.doesNotMatch(tableau, /Croissant|Décroissant/);
   assert.match(tableau, /ageJours = \(danaisIso: string\)/);
-  assert.match(tableau, /Femelles/);
-  assert.match(tableau, /Mâles/);
+  assert.match(tableau, /onContextMenu/);
+  assert.match(tableau, /Masquer cette colonne/);
+  assert.match(tableau, /Réafficher une colonne/);
+  assert.match(tableau, /Réafficher toutes les colonnes/);
+  assert.doesNotMatch(tableau, /Colonnes affichées/);
   assert.match(tableau, /En retard/);
   // Cellules compactes : coche + date, pas de phrase longue "Fait le…".
   assert.match(tableau, /☑ \{afficherDate\(cellule\.date!\)\}/);
-  assert.match(tableau, /cellule\.statut === "EN_RETARD" \? "● "/);
+  assert.match(tableau, /cellule\.statut === "EN_RETARD" \? "! "/);
   assert.doesNotMatch(tableau, /Fait le/);
   // L'ambiguïté historique est discrète, pas présentée comme une action vaccinale normale.
   assert.match(tableau, /⚠ À vérifier/);
   assert.doesNotMatch(tableau, /Étape à valider/);
+});
+
+test("le tableau réutilise les exécutants sanitaires et présente des âges terrain lisibles", () => {
+  const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
+  const selecteur = read("app/sanitaire/nouvel-evenement/ExecutantSelect.tsx");
+  assert.match(tableau, /fetch\("\/api\/intervenants"\)/);
+  assert.match(tableau, /<ExecutantSelect/);
+  assert.match(tableau, /value=\{executant\}/);
+  assert.match(selecteur, /fetch\("\/api\/intervenants"/);
+  assert.match(tableau, /formatAgeTerrain\(ligne\.danaisIso\)/);
+  assert.doesNotMatch(tableau, /\{ageJours\(ligne\.danaisIso\)\}j/);
+});
+
+test("les menus details CESAM se ferment hors menu, entre eux et avec Échap", () => {
+  const gestion = read("components/GlobalDropdownDismissal.tsx");
+  const layout = read("app/layout.tsx");
+  assert.match(layout, /<GlobalDropdownDismissal \/>/);
+  assert.match(gestion, /document\.addEventListener\("pointerdown"/);
+  assert.match(gestion, /document\.addEventListener\("toggle"/);
+  assert.match(gestion, /event\.key !== "Escape"/);
+  assert.match(gestion, /details\[open\]/);
 });
 
 test("les cellules alimentent une séance puis réutilisent la route sanitaire existante", () => {
@@ -99,9 +125,9 @@ test("la grille vaccinale regroupe les vaccins par bloc avec une sous-colonne pa
   // En-tête à deux niveaux : bloc (colSpan) puis sous-colonnes d'étapes.
   assert.match(tableau, /colSpan=\{bloc\.sousColonnes\.length\}/);
   assert.match(tableau, /blocsAffiches\.flatMap\(\(bloc\) => bloc\.sousColonnes\.map/);
-  // Colonnes fixes (N°, Âge, Sexe) toujours visibles au défilement horizontal.
+  // Les premières colonnes restent fixes tant qu'elles sont visibles.
   assert.match(tableau, /sticky left-0/);
-  assert.match(tableau, /sticky left-16/);
+  assert.match(tableau, /colonnesMasquees\.has\("numero"\) \? "left-0" : "left-16"/);
   // La même grille défilante reste disponible sur mobile, sans seconde interface divergente.
   assert.match(tableau, /overflow-x-auto border-t/);
   // La page fournit les étapes réelles du protocole à la grille, sans en inventer.

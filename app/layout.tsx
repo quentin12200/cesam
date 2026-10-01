@@ -17,6 +17,7 @@ import GlobalSettingsButton from "@/components/GlobalSettingsButton";
 import LayoutPersonalizer from "@/components/LayoutPersonalizer";
 import ReturnNavigationConfirmation from "@/app/components/ReturnNavigationConfirmation";
 import { ReproductionModalProvider } from "@/app/components/ReproductionModalProvider";
+import GlobalDropdownDismissal from "@/components/GlobalDropdownDismissal";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -47,6 +48,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className={`${geist.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-gray-100">
+        <GlobalDropdownDismissal />
         <UserPreferencesProvider>
         <ReproductionModalProvider>
         <header className="print:hidden bg-green-700 text-white shadow-md sticky top-0 z-30">
