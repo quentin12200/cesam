@@ -180,16 +180,21 @@ function celluleProtocole(
   };
   const peutInferer = !protocoleLieAuVelage && !medicamentPartage && etapes.length === etapesInitiales.length && etapesInitiales.length > 0;
   let acteInfere: (typeof animal.actes)[number] | null = null;
-  if (peutInferer && etapesInitiales.length === 2 && etapesInitiales[1].reference === "ETAPE_PRECEDENTE") {
-    // Deux étapes (ex: primo + rappel) : ambiguïté possible, on ne rattache que si une seule
-    // injection orpheline est plausible (voir lib/vaccine-history.ts).
-    acteInfere = rattacherPrimoNonLiee(animal.actes.filter((a) => !a.protocoleId || a.protocoleId === protocole.id), protocole).rattachee;
-  } else if (peutInferer && etapesInitiales.length === 1) {
-    // Une seule étape : aucune ambiguïté possible sur QUELLE étape (il n'y en a qu'une). On
-    // rattache la plus récente injection orpheline correspondant à ce vaccin. (Cast sûr : la
-    // fonction ne fait que filtrer animal.actes, sans jamais reconstruire les objets.)
-    const candidats = vaccinationsSansEtapeFiable(animal.actes, correspondanceHistorique) as ActeVaccination[];
-    acteInfere = [...candidats].sort((a, b) => b.date.getTime() - a.date.getTime())[0] ?? null;
+  if (peutInferer) {
+    if (etapesInitiales.length === 2 && etapesInitiales[1].reference === "ETAPE_PRECEDENTE") {
+      // Deux étapes (ex: primo + rappel) : ambiguïté possible sur laquelle des deux il s'agit.
+      // rattacherPrimoNonLiee exige que les deux étapes partagent le même médicament pour
+      // trancher (voir lib/vaccine-history.ts) ; sinon, le repli ci-dessous prend le relais.
+      acteInfere = rattacherPrimoNonLiee(animal.actes.filter((a) => !a.protocoleId || a.protocoleId === protocole.id), protocole).rattachee;
+    }
+    if (!acteInfere) {
+      // Repli valable quel que soit le nombre d'étapes : s'il n'existe qu'UNE seule injection
+      // orpheline pour ce vaccin, elle ne peut être que la primo (un rappel suppose une primo
+      // déjà faite) — aucune ambiguïté sur le COMPTE, même si l'étape exacte n'était pas fiable.
+      // (Cast sûr : la fonction ne fait que filtrer animal.actes, sans reconstruire les objets.)
+      const candidats = vaccinationsSansEtapeFiable(animal.actes, correspondanceHistorique) as ActeVaccination[];
+      if (candidats.length === 1) acteInfere = candidats[0];
+    }
   }
   const actesUtiles = acteInfere
     ? [...actesDuProtocole, { ...acteInfere, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0]?.id ?? null }]

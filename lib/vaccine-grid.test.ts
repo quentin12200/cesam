@@ -112,6 +112,35 @@ test("un animal non concerné (mauvais sexe) n'a jamais de recommandation invent
   assert.equal(avecHistorique[0].cellules["bovigrip-rappel"].statut, "VIDE", "le rappel, lui, n'est pas inventé pour un animal non concerné");
 });
 
+test("rappel sans médicament lié en base (cas réel Bovigrip) : une seule injection orpheline est quand même rattachée au primo", () => {
+  // rattacherPrimoNonLiee refuse de trancher si les deux étapes ne partagent pas le même
+  // médicament (ids[1] vide ici) ; le repli à une seule candidate doit alors prendre le relais.
+  const rappelSansMedicament = { ...etapeRappel, medicamentId: null, medicamentNom: null, medicaments: [] };
+  const protocole: ProtocoleGrille = { ...protocoleBovigrip, etapes: [etapePrimo, rappelSansMedicament] };
+  const dateActe = jours(20);
+  const a = animal({
+    actes: [{ date: dateActe, vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT" }],
+  });
+  const { lignes } = construireGrilleVaccinale([a], [protocole], [], AUJOURDHUI);
+  assert.equal(lignes[0].cellules["bovigrip-primo"].statut, "FAIT");
+  assert.equal(lignes[0].cellules["bovigrip-primo"].date?.toISOString(), dateActe.toISOString());
+  assert.equal(lignes[0].cellules["bovigrip-primo"].aValider, false);
+});
+
+test("rappel sans médicament lié : deux injections orphelines restent ambiguës (pas de rattachement à l'aveugle)", () => {
+  const rappelSansMedicament = { ...etapeRappel, medicamentId: null, medicamentNom: null, medicaments: [] };
+  const protocole: ProtocoleGrille = { ...protocoleBovigrip, etapes: [etapePrimo, rappelSansMedicament] };
+  const a = animal({
+    actes: [
+      { date: jours(20), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT" },
+      { date: jours(50), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT" },
+    ],
+  });
+  const { lignes } = construireGrilleVaccinale([a], [protocole], [], AUJOURDHUI);
+  assert.notEqual(lignes[0].cellules["bovigrip-primo"].statut, "FAIT");
+  assert.equal(lignes[0].cellules["bovigrip-primo"].aValider, true);
+});
+
 test("un protocole à une seule étape (ex: Nasalgen sans rappel configuré) rattache automatiquement un acte orphelin, sans ambiguïté possible", () => {
   const etapeUnique = {
     id: "nasalgen-primo", label: "Primo", ordre: 0, cycle: "INITIAL", reference: "NAISSANCE",
