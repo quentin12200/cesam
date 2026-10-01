@@ -69,7 +69,7 @@ export interface BlocVaccinGrille {
   sousColonnes: SousColonneGrille[];
 }
 
-export type StatutCelluleGrille = "FAIT" | "A_FAIRE" | "EN_RETARD" | "VIDE";
+export type StatutCelluleGrille = "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "VIDE";
 
 export interface CelluleGrille {
   statut: StatutCelluleGrille;
@@ -139,6 +139,9 @@ function celluleDepuisPlanning(date: Date, fenetre: { debut: Date; fin: Date }):
   const statut = statutPlanningVaccin(date, fenetre.debut, fenetre.fin);
   if (statut === "TROP_TOT") return celluleVide();
   if (statut === "EN_RETARD_LEGER" || statut === "EN_RETARD") return { statut: "EN_RETARD", date: fenetre.fin, aValider: false };
+  // Bientôt (fenêtre pas encore ouverte mais proche) reste distinct d'à faire (fenêtre ouverte,
+  // à faire maintenant) : même donnée du moteur (statutPlanningVaccin), affichage plus fin.
+  if (statut === "A_PREVOIR") return { statut: "BIENTOT", date: fenetre.debut, aValider: false };
   return { statut: "A_FAIRE", date: fenetre.fin, aValider: false };
 }
 

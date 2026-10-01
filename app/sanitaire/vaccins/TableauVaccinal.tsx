@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 
 interface CelluleGrille {
-  statut: "FAIT" | "A_FAIRE" | "EN_RETARD" | "VIDE";
+  statut: "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "VIDE";
   date: string | null;
   aValider: boolean;
 }
@@ -22,7 +22,7 @@ interface SousColonne { id: string; label: string }
 interface Bloc { cle: string; nom: string; voie: string | null; sousColonnes: SousColonne[] }
 
 type Sexe = "tous" | "M" | "F";
-type Statut = "tous" | "aFaire" | "enRetard" | "faits";
+type Statut = "tous" | "bientot" | "aFaire" | "enRetard" | "faits";
 type Tri = "numero" | "age" | "sexe";
 
 const dateCourte = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -39,7 +39,10 @@ function Cellule({ cellule }: { cellule: CelluleGrille | undefined }) {
   if (cellule.statut === "EN_RETARD") {
     return <span className="block rounded bg-red-50 px-1 py-0.5 text-[11px] font-bold text-red-950 whitespace-nowrap">🔴☐ {afficherDate(cellule.date!)}</span>;
   }
-  return <span className="block rounded bg-amber-50 px-1 py-0.5 text-[11px] font-bold text-amber-950 whitespace-nowrap">☐ {afficherDate(cellule.date!)}</span>;
+  if (cellule.statut === "BIENTOT") {
+    return <span className="block rounded bg-amber-50 px-1 py-0.5 text-[11px] font-bold text-amber-950 whitespace-nowrap">☐ {afficherDate(cellule.date!)}</span>;
+  }
+  return <span className="block rounded bg-sky-50 px-1 py-0.5 text-[11px] font-bold text-sky-900 whitespace-nowrap">☐ {afficherDate(cellule.date!)}</span>;
 }
 
 export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lignes: Ligne[] }) {
@@ -71,6 +74,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
       if (!texte.includes(recherche.trim().toLocaleLowerCase("fr"))) return false;
       if (sexe !== "tous" && ligne.sexe !== sexe) return false;
       const cellulesVisibles = blocsAffiches.flatMap((b) => b.sousColonnes.map((s) => ligne.cellules[s.id]));
+      if (statut === "bientot") return cellulesVisibles.some((c) => c?.statut === "BIENTOT");
       if (statut === "aFaire") return cellulesVisibles.some((c) => c?.statut === "A_FAIRE");
       if (statut === "enRetard") return cellulesVisibles.some((c) => c?.statut === "EN_RETARD");
       if (statut === "faits") return cellulesVisibles.some((c) => c?.statut === "FAIT");
@@ -121,7 +125,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5" aria-label="Filtrer par statut">
-          {([["tous", "Tous"], ["aFaire", "À faire"], ["enRetard", "En retard"], ["faits", "Faits"]] as const).map(([valeur, label]) => (
+          {([["tous", "Tous"], ["bientot", "Bientôt"], ["aFaire", "À faire"], ["enRetard", "En retard"], ["faits", "Faits"]] as const).map(([valeur, label]) => (
             <button key={valeur} type="button" onClick={() => setStatut(valeur)} className={`min-h-8 rounded-lg border px-2.5 text-xs font-semibold ${statut === valeur ? "border-green-700 bg-green-50 text-green-900" : "text-gray-600"}`}>{label}</button>
           ))}
           <span className="self-center text-xs text-gray-500">{resultat.length} animal(aux)</span>

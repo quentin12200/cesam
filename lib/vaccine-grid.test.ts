@@ -53,6 +53,16 @@ test("primo non fait et hors fenêtre => en retard (rouge) ; rappel non atteigna
   assert.equal(cellules["bovigrip-rappel"].statut, "VIDE", "l'étape précédente n'étant pas faite, le rappel n'a pas de fenêtre calculable");
 });
 
+test("une échéance pas encore ouverte mais proche (A_PREVOIR du moteur) devient BIENTOT, distinct d'À faire", () => {
+  // Fenêtre primo : 14-45j après naissance. Un veau de 10j est hors fenêtre mais proche
+  // (bientôtJours=30 par défaut dans calculerActionVaccinale, le moteur de planification lui-même
+  // n'est pas modifié : seule la présentation distingue désormais BIENTOT d'A_FAIRE).
+  const a = animal({ danaisIso: new Date(AUJOURDHUI.getTime() - 10 * 86_400_000).toISOString() });
+  const { lignes } = construireGrilleVaccinale([a], [protocoleBovigrip], [], AUJOURDHUI);
+  assert.equal(lignes[0].cellules["bovigrip-primo"].statut, "BIENTOT");
+  assert.ok(lignes[0].cellules["bovigrip-primo"].date, "la date affichée est le début de la fenêtre à venir");
+});
+
 test("un Bovigrip saisi en simple Traitement (sans étape) est rattaché automatiquement au primo", () => {
   const datePrimo = jours(20); // dans la fenêtre 14-45j
   const a = animal({
