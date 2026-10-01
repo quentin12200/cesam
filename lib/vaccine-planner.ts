@@ -261,9 +261,14 @@ export interface ActionVaccinaleCalculee {
 
 type VaccinationEtape = { date: Date; etapeProtocoleId: string | null };
 
+/** Insensible à la casse : des étapes réelles en base portent "semaine"/"mois"/"jour" en
+ * minuscules (saisies hors de ProtocoleEditor, qui n'envoie que du majuscule). Une comparaison
+ * stricte faisait silencieusement tomber "semaine"/"mois" dans le cas par défaut (jours), d'où
+ * des rappels calculés à N jours au lieu de N semaines/mois. */
 function decalageJours(value: number, unite: string): number {
-  if (unite === "SEMAINE") return value * 7;
-  if (unite === "MOIS") return value * 30;
+  const normalisee = unite.trim().toUpperCase();
+  if (normalisee === "SEMAINE") return value * 7;
+  if (normalisee === "MOIS") return value * 30;
   return value;
 }
 

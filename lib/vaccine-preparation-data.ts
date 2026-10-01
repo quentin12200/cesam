@@ -11,7 +11,7 @@ import {
   type StatutProtocoleVaccinal,
 } from "@/lib/vaccine-planner";
 import { statutPlanningVaccin, type StatutPlanningVaccin } from "@/lib/vaccine-planning-status";
-import { rattacherPrimoNonLiee, vaccinationsSansEtapeFiable } from "@/lib/vaccine-history";
+import { rattacherInjectionOrpheline, vaccinationsSansEtapeFiable } from "@/lib/vaccine-history";
 import { vaccinationAppartientAuCycleCourant } from "@/lib/vaccination-session";
 import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
 import { estAnimalConcerneParProtocole } from "@/lib/vaccine-eligibility";
@@ -178,11 +178,15 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         vaccination.protocoleId === protocole.id
         && vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, vaccination.gestationId, gestation?.id)
       );
-      const inference = !protocoleLieAuVelage && !medicamentPartage && protocole.etapes.length === etapesInitiales.length
-        ? rattacherPrimoNonLiee(actes, protocole)
-        : null;
-      const vaccinations = inference?.rattachee
-        ? [...dejaRattachees, { ...inference.rattachee, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0].id }]
+      // Centralisé dans lib/vaccine-history.ts : utilisé identiquement par la préparation de
+      // séance et par la grille (lib/vaccine-grid.ts), pour qu'elles répondent pareil.
+      const acteInfere = rattacherInjectionOrpheline(
+        actes,
+        { ...correspondanceHistorique, etapes: protocole.etapes },
+        { protocoleLieAuVelage, medicamentPartage }
+      );
+      const vaccinations = acteInfere
+        ? [...dejaRattachees, { ...acteInfere, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0].id }]
         : dejaRattachees;
       const statutEnregistre = animal.statutsProtocolesVaccinaux.find((statut) => statut.protocoleId === protocole.id)?.statut ?? null;
       const aUneEtapeFaite = vaccinations.some((vaccination) => vaccination.etapeProtocoleId);
@@ -198,11 +202,11 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         bientotJours: 7,
         etapes: protocole.etapes,
         vaccinations,
-        statutProtocole: (inference?.rattachee ? null : statutProtocole) as StatutProtocoleVaccinal | null,
+        statutProtocole: (acteInfere ? null : statutProtocole) as StatutProtocoleVaccinal | null,
       });
       const historique = action.statut === "TERMINE" ? [] : vaccinationsSansEtapeFiable(actes, correspondanceHistorique)
         .filter((vaccination) => vaccination.statut === "FAIT")
-        .filter((vaccination) => vaccination !== inference?.rattachee)
+        .filter((vaccination) => vaccination !== acteInfere)
         .map((vaccination) => ({ vaccin: vaccination.vaccin, date: vaccination.date.toISOString() }));
       if (action.statut === "A_CONFIRMER" || historique.length > 0) {
         aConfirmer.push({

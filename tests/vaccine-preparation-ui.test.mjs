@@ -48,6 +48,32 @@ test("le tableau vaccinal permet la sélection multiple de blocs vaccins, le tri
   assert.doesNotMatch(tableau, /Étape à valider/);
 });
 
+test("les cases à faire/bientôt/en retard valident l'acte via le flux existant, jamais localement", () => {
+  const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
+  const grille = read("lib/vaccine-grid.ts");
+  // Redirige vers /sanitaire/nouvel-evenement (flux déjà existant, celui de "Nouvelle séance" /
+  // "Préparer une séance"), jamais une mutation locale ou une nouvelle route.
+  assert.match(tableau, /\/sanitaire\/nouvel-evenement\?/);
+  assert.match(tableau, /params\.set\("protocole", bloc\.protocoleId\)/);
+  assert.match(tableau, /params\.set\("vaccination", "1"\)/);
+  assert.doesNotMatch(tableau, /fetch\(.*evenements\/batch/);
+  // Une case déjà cochée n'est jamais un lien (ne peut pas supprimer l'historique au clic).
+  assert.match(tableau, /Non cliquable : une vaccination déjà faite/);
+  assert.doesNotMatch(tableau, /<Link[^>]*\{afficherDate\(cellule\.date!\)\}[\s\S]{0,5}☑/);
+  // Le bloc transporte protocoleId/medicamentId pour préremplir ce flux.
+  assert.match(grille, /protocoleId: string \| null/);
+  assert.match(grille, /medicamentId: string \| null/);
+});
+
+test("le filtre de statut est multi-sélection (OU) avec un repère visuel clair sur les boutons actifs", () => {
+  const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
+  assert.match(tableau, /Set<Statut>/);
+  assert.match(tableau, /statuts\.size === 0\) return true/);
+  assert.match(tableau, /cellulesVisibles\.some\(\(c\) => c && \[\.\.\.statuts\]\.some/);
+  assert.match(tableau, /aria-pressed=\{statuts\.has\(valeur\)\}/);
+  assert.match(tableau, /Filtrer par statut \(plusieurs choix possibles\)/);
+});
+
 test("la grille vaccinale regroupe les vaccins par bloc avec une sous-colonne par étape réelle", () => {
   const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
   const page = read("app/sanitaire/vaccins/page.tsx");

@@ -50,6 +50,51 @@ export function rattacherPrimoNonLiee<T extends VaccinationHistorique>(
   return { vaccinations: [...liees, rattachee], rattachee: candidates[0] };
 }
 
+/**
+ * Rattache une injection orpheline (sans protocoleId/etapeProtocoleId, ex: saisie en Traitement
+ * libre) quand c'est possible sans ambiguïté :
+ * - Primo + rappel (2 étapes partageant le même médicament) : voir rattacherPrimoNonLiee.
+ * - Sinon, s'il n'existe qu'UNE SEULE injection orpheline pour ce protocole, elle ne peut être
+ *   que la primo — un rappel suppose toujours une primo déjà faite, aucune ambiguïté sur le
+ *   compte même quand l'étape exacte n'est pas fiable en base (ex: une étape sans médicament
+ *   lié empêchant rattacherPrimoNonLiee de trancher).
+ * Jamais appliqué à un protocole lié au vêlage ni à un médicament partagé avec un autre
+ * protocole (options à la charge de l'appelant, qui seul connaît les autres protocoles).
+ * Fonction centrale : utilisée à la fois par la grille (lib/vaccine-grid.ts) et par la
+ * préparation de séance (lib/vaccine-preparation-data.ts) pour qu'elles répondent pareil.
+ */
+export function rattacherInjectionOrpheline<T extends VaccinationHistorique>(
+  vaccinations: readonly T[],
+  protocole: {
+    id: string;
+    noms: readonly string[];
+    medicamentIds: readonly string[];
+    etapes: readonly {
+      id: string;
+      ordre: number;
+      cycle: string;
+      reference: string;
+      medicaments: readonly { medicament: { id: string; nom: string } }[];
+    }[];
+  },
+  options: { protocoleLieAuVelage: boolean; medicamentPartage: boolean },
+): T | null {
+  const etapesInitiales = protocole.etapes.filter((e) => e.cycle !== "ENTRETIEN");
+  const peutInferer = !options.protocoleLieAuVelage && !options.medicamentPartage
+    && protocole.etapes.length === etapesInitiales.length && etapesInitiales.length > 0;
+  if (!peutInferer) return null;
+
+  if (etapesInitiales.length === 2 && etapesInitiales[1].reference === "ETAPE_PRECEDENTE") {
+    const rattachee = rattacherPrimoNonLiee(vaccinations.filter((v) => !v.protocoleId || v.protocoleId === protocole.id), protocole).rattachee;
+    if (rattachee) return rattachee;
+  }
+  const candidats = vaccinationsSansEtapeFiable(vaccinations, {
+    id: protocole.id, noms: protocole.noms, medicamentIds: protocole.medicamentIds,
+    etapeIds: protocole.etapes.map((e) => e.id),
+  }) as T[];
+  return candidats.length === 1 ? candidats[0] : null;
+}
+
 /** Un vaccin ancien sans étape ne prouve pas quelle injection du protocole a été faite. */
 export function vaccinationsSansEtapeFiable(
   vaccinations: readonly VaccinationHistorique[],

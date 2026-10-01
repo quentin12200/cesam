@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rattacherPrimoNonLiee, vaccinationsSansEtapeFiable, type VaccinationHistorique } from "./vaccine-history.ts";
+import { rattacherInjectionOrpheline, rattacherPrimoNonLiee, vaccinationsSansEtapeFiable, type VaccinationHistorique } from "./vaccine-history.ts";
 import { calculerActionVaccinale } from "./vaccine-planner.ts";
 
 const protocole = {
@@ -85,4 +85,46 @@ test("Bovigrip du 11 septembre produit un rappel le 9 octobre, absent du carnet"
   });
   assert.equal(action.etape?.id, `${p.id}-2`);
   assert.equal(action.dateMin?.toISOString().slice(0, 10), "2026-10-09");
+});
+
+test("rattacherInjectionOrpheline : utilise rattacherPrimoNonLiee quand les deux étapes partagent le médicament", () => {
+  const p = etapes("BOVILIS BOVIGRIP");
+  const noms = ["BOVILIS BOVIGRIP"];
+  const medicamentIds = ["med-BOVILIS BOVIGRIP"];
+  const bovigrip = vaccination({ vaccin: "BOVILIS BOVIGRIP" });
+  const resultat = rattacherInjectionOrpheline(
+    [bovigrip],
+    { ...p, noms, medicamentIds },
+    { protocoleLieAuVelage: false, medicamentPartage: false }
+  );
+  assert.equal(resultat, bovigrip);
+});
+
+test("rattacherInjectionOrpheline : cas réel Bovigrip — l'étape rappel n'a pas de médicament lié en base, le repli à 1 candidate prend le relais", () => {
+  const primo = { id: "bovigrip-primo", ordre: 0, cycle: "INITIAL", reference: "NAISSANCE", medicaments: [{ medicament: { id: "med-bovigrip", nom: "BOVILIS BOVIGRIP" } }] };
+  const rappelSansMedicament = { id: "bovigrip-rappel", ordre: 1, cycle: "INITIAL", reference: "ETAPE_PRECEDENTE", medicaments: [] };
+  const protocoleReel = { id: "proto-bovigrip", noms: ["BOVILIS BOVIGRIP"], medicamentIds: ["med-bovigrip"], etapes: [primo, rappelSansMedicament] };
+  const acte = vaccination({ vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip" });
+
+  // rattacherPrimoNonLiee seul échoue (noms[1] vide) : c'est exactement ce que
+  // /sanitaire/nouvel-evenement utilisait avant ce correctif, d'où l'incohérence constatée.
+  assert.equal(rattacherPrimoNonLiee([acte], protocoleReel).rattachee, null);
+
+  const resultat = rattacherInjectionOrpheline([acte], protocoleReel, { protocoleLieAuVelage: false, medicamentPartage: false });
+  assert.equal(resultat, acte);
+});
+
+test("rattacherInjectionOrpheline : deux injections orphelines restent ambiguës (pas de rattachement à l'aveugle)", () => {
+  const primo = { id: "bovigrip-primo", ordre: 0, cycle: "INITIAL", reference: "NAISSANCE", medicaments: [{ medicament: { id: "med-bovigrip", nom: "BOVILIS BOVIGRIP" } }] };
+  const rappelSansMedicament = { id: "bovigrip-rappel", ordre: 1, cycle: "INITIAL", reference: "ETAPE_PRECEDENTE", medicaments: [] };
+  const protocoleReel = { id: "proto-bovigrip", noms: ["BOVILIS BOVIGRIP"], medicamentIds: ["med-bovigrip"], etapes: [primo, rappelSansMedicament] };
+  const actes = [vaccination({ vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip" }), vaccination({ vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip" })];
+  assert.equal(rattacherInjectionOrpheline(actes, protocoleReel, { protocoleLieAuVelage: false, medicamentPartage: false }), null);
+});
+
+test("rattacherInjectionOrpheline : jamais appliqué à un protocole lié au vêlage ni à un médicament partagé", () => {
+  const p = { id: "proto", noms: ["X"], medicamentIds: ["med-x"], etapes: etapes("X").etapes };
+  const acte = vaccination({ vaccin: "X", medicamentId: "med-x" });
+  assert.equal(rattacherInjectionOrpheline([acte], p, { protocoleLieAuVelage: true, medicamentPartage: false }), null);
+  assert.equal(rattacherInjectionOrpheline([acte], p, { protocoleLieAuVelage: false, medicamentPartage: true }), null);
 });

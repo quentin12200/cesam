@@ -10,7 +10,7 @@
  */
 import { calculerFenetreEtape, type EtapeVaccinaleConfig } from "./vaccine-planner.ts";
 import { statutPlanningVaccin } from "./vaccine-planning-status.ts";
-import { rattacherPrimoNonLiee, vaccinationsSansEtapeFiable } from "./vaccine-history.ts";
+import { rattacherInjectionOrpheline, vaccinationsSansEtapeFiable } from "./vaccine-history.ts";
 import { vaccinationAppartientAuCycleCourant } from "./vaccination-session.ts";
 import { estAnimalConcerneParProtocole } from "./vaccine-eligibility.ts";
 import type { ActeVaccination } from "./vaccine-acts.ts";
@@ -67,6 +67,11 @@ export interface BlocVaccinGrille {
   nom: string;
   voie: string | null;
   sousColonnes: SousColonneGrille[];
+  /** Pour rediriger vers le flux d'enregistrement existant (/sanitaire/nouvel-evenement) au
+   * clic sur une case à faire : null quand le bloc vient d'un vaccin de pharmacie sans
+   * protocole configuré (le flux générique "medicament" est alors utilisé à la place). */
+  protocoleId: string | null;
+  medicamentId: string | null;
 }
 
 export type StatutCelluleGrille = "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "VIDE";
@@ -114,6 +119,8 @@ export function construireBlocsVaccinaux(
         sousColonnes: [...protocole.etapes]
           .sort((a, b) => a.ordre - b.ordre)
           .map((etape) => ({ id: etape.id, label: etape.label })),
+        protocoleId: protocole.id,
+        medicamentId: medicament?.id ?? null,
       });
     }
   }
@@ -125,6 +132,8 @@ export function construireBlocsVaccinaux(
       nom: vaccin.nom,
       voie: vaccin.voie,
       sousColonnes: [{ id: vaccin.medicamentId, label: "" }],
+      protocoleId: null,
+      medicamentId: vaccin.medicamentId,
     });
   }
 
@@ -181,24 +190,13 @@ function celluleProtocole(
     medicamentIds: medicament ? [medicament.id] : [],
     etapeIds: etapes.map((e) => e.id),
   };
-  const peutInferer = !protocoleLieAuVelage && !medicamentPartage && etapes.length === etapesInitiales.length && etapesInitiales.length > 0;
-  let acteInfere: (typeof animal.actes)[number] | null = null;
-  if (peutInferer) {
-    if (etapesInitiales.length === 2 && etapesInitiales[1].reference === "ETAPE_PRECEDENTE") {
-      // Deux étapes (ex: primo + rappel) : ambiguïté possible sur laquelle des deux il s'agit.
-      // rattacherPrimoNonLiee exige que les deux étapes partagent le même médicament pour
-      // trancher (voir lib/vaccine-history.ts) ; sinon, le repli ci-dessous prend le relais.
-      acteInfere = rattacherPrimoNonLiee(animal.actes.filter((a) => !a.protocoleId || a.protocoleId === protocole.id), protocole).rattachee;
-    }
-    if (!acteInfere) {
-      // Repli valable quel que soit le nombre d'étapes : s'il n'existe qu'UNE seule injection
-      // orpheline pour ce vaccin, elle ne peut être que la primo (un rappel suppose une primo
-      // déjà faite) — aucune ambiguïté sur le COMPTE, même si l'étape exacte n'était pas fiable.
-      // (Cast sûr : la fonction ne fait que filtrer animal.actes, sans reconstruire les objets.)
-      const candidats = vaccinationsSansEtapeFiable(animal.actes, correspondanceHistorique) as ActeVaccination[];
-      if (candidats.length === 1) acteInfere = candidats[0];
-    }
-  }
+  // Centralisé dans lib/vaccine-history.ts : utilisé identiquement par la grille et par la
+  // préparation de séance (lib/vaccine-preparation-data.ts), pour qu'elles répondent pareil.
+  const acteInfere = rattacherInjectionOrpheline(
+    animal.actes,
+    { ...correspondanceHistorique, etapes: protocole.etapes },
+    { protocoleLieAuVelage, medicamentPartage }
+  );
   const actesUtiles = acteInfere
     ? [...actesDuProtocole, { ...acteInfere, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0]?.id ?? null }]
     : actesDuProtocole;

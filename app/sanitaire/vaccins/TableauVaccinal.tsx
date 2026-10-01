@@ -19,37 +19,62 @@ interface Ligne {
 }
 
 interface SousColonne { id: string; label: string }
-interface Bloc { cle: string; nom: string; voie: string | null; sousColonnes: SousColonne[] }
+interface Bloc { cle: string; nom: string; voie: string | null; sousColonnes: SousColonne[]; protocoleId: string | null; medicamentId: string | null }
 
 type Sexe = "tous" | "M" | "F";
-type Statut = "tous" | "bientot" | "aFaire" | "enRetard" | "faits";
+type Statut = "bientot" | "aFaire" | "enRetard" | "faits";
+const STATUT_VERS_CELLULE: Record<Statut, CelluleGrille["statut"]> = { bientot: "BIENTOT", aFaire: "A_FAIRE", enRetard: "EN_RETARD", faits: "FAIT" };
 type Tri = "numero" | "age" | "sexe";
 
 const dateCourte = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 const afficherDate = (date: string) => dateCourte.format(new Date(date));
 const ageJours = (danaisIso: string) => Math.floor((Date.now() - new Date(danaisIso).getTime()) / 86_400_000);
 
-function Cellule({ cellule }: { cellule: CelluleGrille | undefined }) {
+/** Construit l'URL du flux d'enregistrement existant (/sanitaire/nouvel-evenement), déjà
+ * utilisé par "Nouvelle séance" / "Préparer une séance" : on ne crée aucun nouveau flux, on
+ * ne fait que préremplir celui-là (animal, protocole, médicament). */
+function hrefValidation(nutrav: string, bloc: Bloc): string {
+  const params = new URLSearchParams();
+  if (bloc.protocoleId) {
+    params.set("animaux", nutrav);
+    params.set("protocole", bloc.protocoleId);
+    params.set("vaccination", "1");
+    if (bloc.medicamentId) params.set("medicament", bloc.medicamentId);
+  } else {
+    params.set("animal", nutrav);
+    if (bloc.medicamentId) params.set("medicament", bloc.medicamentId);
+  }
+  return `/sanitaire/nouvel-evenement?${params.toString()}`;
+}
+
+function Cellule({ cellule, nutrav, bloc }: { cellule: CelluleGrille | undefined; nutrav: string; bloc: Bloc }) {
   if (!cellule || cellule.statut === "VIDE") {
     return <span className="text-gray-300">—</span>;
   }
   if (cellule.statut === "FAIT") {
+    // Non cliquable : une vaccination déjà faite ne doit jamais pouvoir être effacée d'un clic.
     return <span className="block rounded bg-green-50 px-1 py-0.5 text-[11px] font-bold text-green-900 whitespace-nowrap">☑ {afficherDate(cellule.date!)}</span>;
   }
-  if (cellule.statut === "EN_RETARD") {
-    return <span className="block rounded bg-red-50 px-1 py-0.5 text-[11px] font-bold text-red-950 whitespace-nowrap">🔴☐ {afficherDate(cellule.date!)}</span>;
-  }
-  if (cellule.statut === "BIENTOT") {
-    return <span className="block rounded bg-amber-50 px-1 py-0.5 text-[11px] font-bold text-amber-950 whitespace-nowrap">☐ {afficherDate(cellule.date!)}</span>;
-  }
-  return <span className="block rounded bg-sky-50 px-1 py-0.5 text-[11px] font-bold text-sky-900 whitespace-nowrap">☐ {afficherDate(cellule.date!)}</span>;
+  const classeParStatut = cellule.statut === "EN_RETARD"
+    ? "bg-red-50 text-red-950 hover:bg-red-100"
+    : cellule.statut === "BIENTOT"
+      ? "bg-amber-50 text-amber-950 hover:bg-amber-100"
+      : "bg-sky-50 text-sky-900 hover:bg-sky-100";
+  const prefixe = cellule.statut === "EN_RETARD" ? "🔴☐ " : "☐ ";
+  return (
+    <Link href={hrefValidation(nutrav, bloc)} className={`block rounded px-1 py-0.5 text-[11px] font-bold whitespace-nowrap underline-offset-2 hover:underline ${classeParStatut}`} title="Valider cette injection">
+      {prefixe}{afficherDate(cellule.date!)}
+    </Link>
+  );
 }
 
 export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lignes: Ligne[] }) {
   const [recherche, setRecherche] = useState("");
   const [selection, setSelection] = useState<Set<string>>(() => new Set(blocs.map((b) => b.cle)));
   const [sexe, setSexe] = useState<Sexe>("tous");
-  const [statut, setStatut] = useState<Statut>("tous");
+  // Multi-sélection : vide = "Tous" (aucun filtrage). Sinon, un animal reste visible s'il a au
+  // moins une cellule (parmi les vaccins affichés) dans l'un des statuts cochés (logique OU).
+  const [statuts, setStatuts] = useState<Set<Statut>>(new Set());
   const [tri, setTri] = useState<Tri>("numero");
   const [triDesc, setTriDesc] = useState(false);
 
@@ -74,11 +99,8 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
       if (!texte.includes(recherche.trim().toLocaleLowerCase("fr"))) return false;
       if (sexe !== "tous" && ligne.sexe !== sexe) return false;
       const cellulesVisibles = blocsAffiches.flatMap((b) => b.sousColonnes.map((s) => ligne.cellules[s.id]));
-      if (statut === "bientot") return cellulesVisibles.some((c) => c?.statut === "BIENTOT");
-      if (statut === "aFaire") return cellulesVisibles.some((c) => c?.statut === "A_FAIRE");
-      if (statut === "enRetard") return cellulesVisibles.some((c) => c?.statut === "EN_RETARD");
-      if (statut === "faits") return cellulesVisibles.some((c) => c?.statut === "FAIT");
-      return true;
+      if (statuts.size === 0) return true;
+      return cellulesVisibles.some((c) => c && [...statuts].some((s) => STATUT_VERS_CELLULE[s] === c.statut));
     });
     const signe = triDesc ? -1 : 1;
     return [...filtres].sort((a, b) => {
@@ -86,7 +108,15 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
       if (tri === "sexe") return signe * a.sexe.localeCompare(b.sexe) || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
       return signe * a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
     });
-  }, [lignes, recherche, sexe, statut, blocsAffiches, tri, triDesc]);
+  }, [lignes, recherche, sexe, statuts, blocsAffiches, tri, triDesc]);
+
+  function basculerStatut(valeur: Statut) {
+    setStatuts((actuels) => {
+      const suivants = new Set(actuels);
+      if (suivants.has(valeur)) suivants.delete(valeur); else suivants.add(valeur);
+      return suivants;
+    });
+  }
 
   const boutonClasse = (actif: boolean) =>
     `min-h-8 rounded-lg border px-2.5 text-xs font-semibold ${actif ? "border-green-700 bg-green-50 text-green-900" : "text-gray-600"}`;
@@ -124,9 +154,10 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5" aria-label="Filtrer par statut">
-          {([["tous", "Tous"], ["bientot", "Bientôt"], ["aFaire", "À faire"], ["enRetard", "En retard"], ["faits", "Faits"]] as const).map(([valeur, label]) => (
-            <button key={valeur} type="button" onClick={() => setStatut(valeur)} className={`min-h-8 rounded-lg border px-2.5 text-xs font-semibold ${statut === valeur ? "border-green-700 bg-green-50 text-green-900" : "text-gray-600"}`}>{label}</button>
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="Filtrer par statut (plusieurs choix possibles)">
+          <button type="button" onClick={() => setStatuts(new Set())} className={`min-h-8 rounded-lg border px-2.5 text-xs font-semibold ${statuts.size === 0 ? "border-green-700 bg-green-50 text-green-900" : "text-gray-600"}`}>Tous</button>
+          {([["bientot", "Bientôt"], ["aFaire", "À faire"], ["enRetard", "En retard"], ["faits", "Faits"]] as const).map(([valeur, label]) => (
+            <button key={valeur} type="button" aria-pressed={statuts.has(valeur)} onClick={() => basculerStatut(valeur)} className={`min-h-8 rounded-lg border px-2.5 text-xs font-semibold ${statuts.has(valeur) ? "border-green-700 bg-green-50 text-green-900" : "text-gray-600"}`}>{label}</button>
           ))}
           <span className="self-center text-xs text-gray-500">{resultat.length} animal(aux)</span>
         </div>
@@ -169,7 +200,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
                       const cellule = ligne.cellules[s.id];
                       return (
                         <td key={s.id} className="border-r p-1 align-top">
-                          <Cellule cellule={cellule} />
+                          <Cellule cellule={cellule} nutrav={ligne.nutrav} bloc={b} />
                           {cellule?.aValider && <span className="mt-0.5 block text-[10px] font-medium text-gray-400">⚠ À vérifier</span>}
                         </td>
                       );
@@ -200,7 +231,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
                           return (
                             <span key={s.id} className="inline-flex items-center gap-1">
                               {s.label && <span className="text-[10px] text-gray-400">{s.label}</span>}
-                              <Cellule cellule={cellule} />
+                              <Cellule cellule={cellule} nutrav={ligne.nutrav} bloc={b} />
                               {cellule?.aValider && <span className="text-[10px] font-medium text-gray-400">⚠</span>}
                             </span>
                           );
