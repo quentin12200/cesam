@@ -18,6 +18,9 @@ import type { ActeVaccination } from "./vaccine-acts.ts";
 export interface EtapeGrille extends EtapeVaccinaleConfig {
   medicamentId: string | null;
   medicamentNom: string | null;
+  voie?: string | null;
+  dose?: number | null;
+  uniteDosage?: string | null;
   medicaments: readonly { medicament: { id: string; nom: string } }[];
 }
 
@@ -60,6 +63,12 @@ export interface AnimalGrille {
 export interface SousColonneGrille {
   id: string;
   label: string;
+  protocoleId: string | null;
+  medicamentId: string | null;
+  medicamentNom: string | null;
+  voie: string | null;
+  dose: number | null;
+  uniteDosage: string | null;
 }
 
 export interface BlocVaccinGrille {
@@ -67,9 +76,7 @@ export interface BlocVaccinGrille {
   nom: string;
   voie: string | null;
   sousColonnes: SousColonneGrille[];
-  /** Pour rediriger vers le flux d'enregistrement existant (/sanitaire/nouvel-evenement) au
-   * clic sur une case à faire : null quand le bloc vient d'un vaccin de pharmacie sans
-   * protocole configuré (le flux générique "medicament" est alors utilisé à la place). */
+  /** Contexte transmis au flux sanitaire existant lors d'une séance. */
   protocoleId: string | null;
   medicamentId: string | null;
 }
@@ -88,6 +95,7 @@ export interface LigneGrille {
   nom: string | null;
   sexe: string;
   danaisIso: string;
+  gestationId: string | null;
   cellules: Record<string, CelluleGrille>;
 }
 
@@ -118,7 +126,16 @@ export function construireBlocsVaccinaux(
         voie,
         sousColonnes: [...protocole.etapes]
           .sort((a, b) => a.ordre - b.ordre)
-          .map((etape) => ({ id: etape.id, label: etape.label })),
+          .map((etape) => ({
+            id: etape.id,
+            label: etape.label,
+            protocoleId: protocole.id,
+            medicamentId: etape.medicamentId ?? medicament?.id ?? null,
+            medicamentNom: etape.medicamentNom ?? medicament?.nom ?? null,
+            voie: etape.voie && etape.voie !== "À renseigner" ? etape.voie : voie,
+            dose: etape.dose ?? null,
+            uniteDosage: etape.uniteDosage ?? null,
+          })),
         protocoleId: protocole.id,
         medicamentId: medicament?.id ?? null,
       });
@@ -131,7 +148,16 @@ export function construireBlocsVaccinaux(
       cle: vaccin.medicamentId,
       nom: vaccin.nom,
       voie: vaccin.voie,
-      sousColonnes: [{ id: vaccin.medicamentId, label: "" }],
+      sousColonnes: [{
+        id: vaccin.medicamentId,
+        label: "",
+        protocoleId: null,
+        medicamentId: vaccin.medicamentId,
+        medicamentNom: vaccin.nom,
+        voie: vaccin.voie,
+        dose: null,
+        uniteDosage: null,
+      }],
       protocoleId: null,
       medicamentId: vaccin.medicamentId,
     });
@@ -258,7 +284,15 @@ export function construireGrilleVaccinale(
       const actes = animal.actes.filter((acte) => acte.medicamentId === bloc.cle).sort((a, b) => b.date.getTime() - a.date.getTime());
       cellules[sousColonne.id] = actes[0] ? { statut: "FAIT", date: actes[0].date, aValider: false } : celluleVide();
     }
-    return { animalId: animal.id, nutrav: animal.nutrav, nom: animal.nom, sexe: animal.sexe, danaisIso: animal.danaisIso, cellules };
+    return {
+      animalId: animal.id,
+      nutrav: animal.nutrav,
+      nom: animal.nom,
+      sexe: animal.sexe,
+      danaisIso: animal.danaisIso,
+      gestationId: animal.gestationId,
+      cellules,
+    };
   });
 
   return { blocs, lignes };

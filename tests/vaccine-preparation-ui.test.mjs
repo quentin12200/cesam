@@ -27,51 +27,69 @@ test("l'écran Vaccins ouvre sur le tableau par animal et garde la préparation 
 
 test("le tableau vaccinal permet la sélection multiple de blocs vaccins, le tri et les filtres compacts", () => {
   const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
-  // Sélection multiple par cases à cocher (un bloc vaccin entier), plus "Tous"/"Effacer".
-  assert.match(tableau, /type="checkbox" checked=\{selection\.has\(b\.cle\)\}/);
-  assert.match(tableau, /setSelection\(new Set\(blocs\.map/);
-  assert.match(tableau, /setSelection\(new Set\(\)\)/);
-  // Tri numéro / âge / sexe, avec sens croissant/décroissant.
-  assert.match(tableau, /"numero".*"Âge".*"Sexe"/s);
+  assert.match(tableau, /Recherche animal/);
+  assert.match(tableau, /Vaccins affichés ▾/);
+  assert.match(tableau, /Statuts ▾/);
+  assert.match(tableau, /Nouvelle séance/);
+  assert.match(tableau, /Tout sélectionner/);
+  assert.match(tableau, /Tout désélectionner/);
+  // Tri et filtre sont portés par les en-têtes, pas par une seconde barre de commandes.
+  assert.match(tableau, /N° ▾/);
+  assert.match(tableau, /Âge ▾/);
+  assert.match(tableau, /Sexe ▾/);
   assert.match(tableau, /triDesc/);
   assert.match(tableau, /ageJours = \(danaisIso: string\)/);
-  // Filtre sexe et statut "En retard" distinct de "À faire".
   assert.match(tableau, /Femelles/);
   assert.match(tableau, /Mâles/);
   assert.match(tableau, /En retard/);
   // Cellules compactes : coche + date, pas de phrase longue "Fait le…".
   assert.match(tableau, /☑ \{afficherDate\(cellule\.date!\)\}/);
-  assert.match(tableau, /🔴☐/);
+  assert.match(tableau, /cellule\.statut === "EN_RETARD" \? "● "/);
   assert.doesNotMatch(tableau, /Fait le/);
   // L'ambiguïté historique est discrète, pas présentée comme une action vaccinale normale.
   assert.match(tableau, /⚠ À vérifier/);
   assert.doesNotMatch(tableau, /Étape à valider/);
 });
 
-test("les cases à faire/bientôt/en retard valident l'acte via le flux existant, jamais localement", () => {
+test("les cellules alimentent une séance puis réutilisent la route sanitaire existante", () => {
   const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
   const grille = read("lib/vaccine-grid.ts");
-  // Redirige vers /sanitaire/nouvel-evenement (flux déjà existant, celui de "Nouvelle séance" /
-  // "Préparer une séance"), jamais une mutation locale ou une nouvelle route.
-  assert.match(tableau, /\/sanitaire\/nouvel-evenement\?/);
-  assert.match(tableau, /params\.set\("protocole", bloc\.protocoleId\)/);
-  assert.match(tableau, /params\.set\("vaccination", "1"\)/);
-  assert.doesNotMatch(tableau, /fetch\(.*evenements\/batch/);
-  // Une case déjà cochée n'est jamais un lien (ne peut pas supprimer l'historique au clic).
-  assert.match(tableau, /Non cliquable : une vaccination déjà faite/);
-  assert.doesNotMatch(tableau, /<Link[^>]*\{afficherDate\(cellule\.date!\)\}[\s\S]{0,5}☑/);
-  // Le bloc transporte protocoleId/medicamentId pour préremplir ce flux.
+  const route = read("app/api/evenements/batch/route.ts");
+  assert.match(tableau, /async function validerSession/);
+  assert.match(tableau, /fetch\("\/api\/evenements\/batch"/);
+  assert.match(tableau, /vaccinationSession:/);
+  assert.match(tableau, /traitements:/);
+  assert.match(tableau, /regrouperActesVaccinaux\(actes/);
+  assert.match(tableau, /groupe\.actes\.map\(\(acte\) => acte\.ligne\.animalId\)/);
+  assert.match(route, /prisma\.\$transaction/);
+  assert.match(route, /tx\.evenementSanitaire\.create/);
+  assert.match(route, /tx\.traitement\.create/);
+  assert.match(route, /tx\.vaccination\.create/);
+  assert.match(route, /etapeSansMedicament && medicamentLieAuProtocole/);
   assert.match(grille, /protocoleId: string \| null/);
   assert.match(grille, /medicamentId: string \| null/);
 });
 
-test("le filtre de statut est multi-sélection (OU) avec un repère visuel clair sur les boutons actifs", () => {
+test("le filtre de statut est multi-sélection et Bientôt reste dans À faire", () => {
   const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
   assert.match(tableau, /Set<Statut>/);
-  assert.match(tableau, /statuts\.size === 0\) return true/);
-  assert.match(tableau, /cellulesVisibles\.some\(\(c\) => c && \[\.\.\.statuts\]\.some/);
-  assert.match(tableau, /aria-pressed=\{statuts\.has\(valeur\)\}/);
-  assert.match(tableau, /Filtrer par statut \(plusieurs choix possibles\)/);
+  assert.match(tableau, /statut === "A_FAIRE" \|\| statut === "BIENTOT"/);
+  assert.match(tableau, /filtres\.has\("aFaire"\) && estAFaire\(statut\)/);
+  assert.doesNotMatch(tableau, /\['bientot', 'Bientôt'\]/);
+  assert.match(tableau, /Orange = bientôt, inclus dans « À faire »/);
+});
+
+test("la séance conserve la sélection, propose la sélection rapide et vérifie avant d'écrire", () => {
+  const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
+  assert.match(tableau, /useState<Set<string>>\(new Set\(\)\)/);
+  assert.match(tableau, /Sélectionner visibles à faire/);
+  assert.match(tableau, /Vider la sélection/);
+  assert.match(tableau, /Vérifier et valider la séance/);
+  assert.match(tableau, /Vérifier la séance/);
+  assert.match(tableau, /médicamentId|medicamentId/i);
+  assert.match(tableau, /etapeProtocoleId: groupe\.etape\.id/);
+  assert.match(tableau, /gestationId: acte\.ligne\.gestationId/);
+  assert.match(tableau, /router\.refresh\(\)/);
 });
 
 test("la grille vaccinale regroupe les vaccins par bloc avec une sous-colonne par étape réelle", () => {
@@ -79,20 +97,18 @@ test("la grille vaccinale regroupe les vaccins par bloc avec une sous-colonne pa
   const page = read("app/sanitaire/vaccins/page.tsx");
   const grille = read("lib/vaccine-grid.ts");
   // En-tête à deux niveaux : bloc (colSpan) puis sous-colonnes d'étapes.
-  assert.match(tableau, /colSpan=\{b\.sousColonnes\.length\}/);
-  assert.match(tableau, /blocsAffiches\.flatMap\(\(b\) => b\.sousColonnes\.map/);
+  assert.match(tableau, /colSpan=\{bloc\.sousColonnes\.length\}/);
+  assert.match(tableau, /blocsAffiches\.flatMap\(\(bloc\) => bloc\.sousColonnes\.map/);
   // Colonnes fixes (N°, Âge, Sexe) toujours visibles au défilement horizontal.
   assert.match(tableau, /sticky left-0/);
-  assert.match(tableau, /sticky left-14/);
-  assert.match(tableau, /sticky left-24/);
-  // Vue alternative en cartes sur mobile, même données filtrées/triées.
-  assert.match(tableau, /md:hidden/);
-  assert.match(tableau, /hidden.*md:block/);
+  assert.match(tableau, /sticky left-16/);
+  // La même grille défilante reste disponible sur mobile, sans seconde interface divergente.
+  assert.match(tableau, /overflow-x-auto border-t/);
   // La page fournit les étapes réelles du protocole à la grille, sans en inventer.
   assert.match(page, /construireGrilleVaccinale/);
   assert.match(page, /prisma\.protocoleVaccin\.findMany/);
   assert.match(grille, /sousColonnes: \[\.\.\.protocole\.etapes\]/);
-  assert.match(grille, /sousColonnes: \[\{ id: vaccin\.medicamentId, label: "" \}\]/);
+  assert.match(grille, /id: vaccin\.medicamentId,[\s\S]*label: "",[\s\S]*protocoleId: null/);
 });
 
 test("la feuille A4 est une lecture seule et contient les colonnes terrain", () => {

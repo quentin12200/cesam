@@ -35,6 +35,8 @@ test("les sous-colonnes viennent des étapes réelles du protocole, rien n'est i
   const blocs = construireBlocsVaccinaux([protocoleBovigrip], []);
   assert.equal(blocs.length, 1);
   assert.deepEqual(blocs[0].sousColonnes.map((s) => s.label), ["Primo", "Rappel"]);
+  assert.equal(blocs[0].sousColonnes[0].protocoleId, "proto-bovigrip");
+  assert.equal(blocs[0].sousColonnes[0].medicamentId, "med-bovigrip");
 });
 
 test("un vaccin de pharmacie sans protocole garde une seule sous-colonne (pas d'étape inventée)", () => {

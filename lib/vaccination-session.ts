@@ -35,3 +35,16 @@ export function vaccinationAppartientAuCycleCourant(
 ): boolean {
   return !protocoleLieAuVelage || vaccinationGestationId === gestationIdCourante;
 }
+
+export function regrouperActesVaccinaux<T>(
+  actes: ReadonlyArray<T>,
+  medicamentId: (acte: T) => string | null,
+  etapeProtocoleId: (acte: T) => string,
+): Array<{ cle: string; actes: T[] }> {
+  const groupes = new Map<string, T[]>();
+  for (const acte of actes) {
+    const cle = `${medicamentId(acte) ?? ""}|${etapeProtocoleId(acte)}`;
+    groupes.set(cle, [...(groupes.get(cle) ?? []), acte]);
+  }
+  return [...groupes].map(([cle, actesGroupe]) => ({ cle, actes: actesGroupe }));
+}

@@ -89,7 +89,10 @@ export async function POST(request: NextRequest) {
       if (!protocole || !medicament || vaccinationSession.animaux.some((animal) => {
         const etape = protocole.etapes.find((item) => item.id === animal.etapeProtocoleId);
         const gestationValide = !animal.gestationId || gestations.some((gestation) => gestation.id === animal.gestationId && gestation.saillie.animalId === animal.animalId);
-        return !etape || !gestationValide || !etape.medicaments.some((liaison) => liaison.medicamentId === vaccinationSession.medicamentId);
+        const medicamentLieDirectement = etape?.medicaments.some((liaison) => liaison.medicamentId === vaccinationSession.medicamentId);
+        const etapeSansMedicament = etape?.medicaments.length === 0;
+        const medicamentLieAuProtocole = protocole.etapes.some((item) => item.medicaments.some((liaison) => liaison.medicamentId === vaccinationSession.medicamentId));
+        return !etape || !gestationValide || !(medicamentLieDirectement || (etapeSansMedicament && medicamentLieAuProtocole));
       })) return NextResponse.json({ error: "Étape vaccinale ou médicament invalide" }, { status: 400 });
       vaccinationConfig = { session: vaccinationSession, etapes: protocole.etapes, medicamentNom: medicament.nom };
     }

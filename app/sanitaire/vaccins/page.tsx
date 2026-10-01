@@ -7,6 +7,7 @@ import { getCategorie } from "@/lib/utils";
 import { getPreparationsVaccinales } from "@/lib/vaccine-preparation-data";
 import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
 import { construireGrilleVaccinale, type AnimalGrille, type ProtocoleGrille } from "@/lib/vaccine-grid";
+import { resoudreVoieVaccinale } from "@/lib/vaccine-planner";
 import PreparationVaccinCard from "./PreparationVaccinCard";
 import TableauVaccinal from "./TableauVaccinal";
 
@@ -31,7 +32,20 @@ export default async function VaccinsPage() {
           include: {
             medicaments: {
               where: { alternative: false },
-              select: { medicamentId: true, medicament: { select: { id: true, nom: true } } },
+              select: {
+                medicamentId: true,
+                voie: true,
+                preconisationId: true,
+                medicament: {
+                  select: {
+                    id: true,
+                    nom: true,
+                    voie: true,
+                    uniteDosage: true,
+                    preconisations: { select: { id: true, statut: true, voie: true, dose: true, unite: true } },
+                  },
+                },
+              },
             },
           },
         },
@@ -70,15 +84,35 @@ export default async function VaccinsPage() {
     ageMinJours: protocole.ageMinJours, ageMaxJours: protocole.ageMaxJours,
     categoriesJson: protocole.categoriesJson, sexeCible: protocole.sexeCible, gestante: protocole.gestante,
     rangVelageMin: protocole.rangVelageMin, rangVelageMax: protocole.rangVelageMax, lotCible: protocole.lotCible,
-    etapes: protocole.etapes.map((etape) => ({
-      id: etape.id, label: etape.label, ordre: etape.ordre, cycle: etape.cycle, reference: etape.reference,
-      debutValeur: etape.debutValeur, debutUnite: etape.debutUnite, debutPosition: etape.debutPosition,
-      finValeur: etape.finValeur, finUnite: etape.finUnite, finPosition: etape.finPosition,
-      dateFixe: etape.dateFixe, recurrenceMois: etape.recurrenceMois, obligatoire: etape.obligatoire,
-      medicamentId: etape.medicaments[0]?.medicamentId ?? null,
-      medicamentNom: etape.medicaments[0]?.medicament.nom ?? null,
-      medicaments: etape.medicaments.map((liaison) => ({ medicament: { id: liaison.medicament.id, nom: liaison.medicament.nom } })),
-    })),
+    etapes: protocole.etapes.map((etape) => {
+      const liaison = etape.medicaments[0] ?? null;
+      const medicament = liaison?.medicament ?? null;
+      const preconisationsValides = medicament?.preconisations.filter((item) => item.statut === "VALIDE") ?? [];
+      const preconisationLiee = liaison?.preconisationId
+        ? preconisationsValides.find((item) => item.id === liaison.preconisationId) ?? null
+        : null;
+      const preconisationsDosees = preconisationsValides.filter((item) => item.dose != null);
+      const preconisationDose = preconisationLiee ?? (preconisationsDosees.length === 1 ? preconisationsDosees[0] : null);
+      const preconisationVoie = preconisationLiee?.voie
+        ? preconisationLiee
+        : preconisationsValides.find((item) => item.voie) ?? null;
+      return {
+        id: etape.id, label: etape.label, ordre: etape.ordre, cycle: etape.cycle, reference: etape.reference,
+        debutValeur: etape.debutValeur, debutUnite: etape.debutUnite, debutPosition: etape.debutPosition,
+        finValeur: etape.finValeur, finUnite: etape.finUnite, finPosition: etape.finPosition,
+        dateFixe: etape.dateFixe, recurrenceMois: etape.recurrenceMois, obligatoire: etape.obligatoire,
+        medicamentId: liaison?.medicamentId ?? null,
+        medicamentNom: medicament?.nom ?? null,
+        voie: resoudreVoieVaccinale({
+          voiePreconisation: preconisationVoie?.voie,
+          voieMedicament: medicament?.voie,
+          voieLiaison: liaison?.voie,
+        }),
+        dose: preconisationDose?.dose ?? null,
+        uniteDosage: preconisationDose?.unite || medicament?.uniteDosage || null,
+        medicaments: etape.medicaments.map((item) => ({ medicament: { id: item.medicament.id, nom: item.medicament.nom } })),
+      };
+    }),
   }));
 
   const animauxGrille: AnimalGrille[] = animauxDb.map((animal) => {
