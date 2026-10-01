@@ -186,3 +186,31 @@ test("un vaccin de pharmacie sans protocole affiche fait dès qu'un acte existe,
   const { lignes: lignes2 } = construireGrilleVaccinale([sansActe], [], [vaccin], AUJOURDHUI);
   assert.equal(lignes2[0].cellules["med-nasym"].statut, "VIDE");
 });
+
+test("une étape liée au vêlage suit exclusivement la fenêtre configurée dans le protocole", () => {
+  const velage = new Date("2026-12-01T12:00:00Z");
+  const etapeVelage = {
+    ...etapePrimo,
+    id: "crypto-velage",
+    label: "Injection",
+    reference: "VELAGE",
+    debutValeur: 90,
+    debutUnite: "JOUR",
+    debutPosition: "AVANT",
+    finValeur: 21,
+    finUnite: "JOUR",
+    finPosition: "AVANT",
+  };
+  const protocole = { ...protocoleBovigrip, id: "proto-crypto", etapes: [etapeVelage] };
+  const gestante = animal({ gestationId: "gestation-1", dateVelagePrevueIso: velage.toISOString() });
+
+  const selonFenetreConfiguree = construireGrilleVaccinale([gestante], [protocole], [], AUJOURDHUI);
+  assert.equal(selonFenetreConfiguree.lignes[0].cellules["crypto-velage"].statut, "A_FAIRE");
+
+  const protocoleModifie = {
+    ...protocole,
+    etapes: [{ ...etapeVelage, debutValeur: 10, finValeur: 5 }],
+  };
+  const apresModification = construireGrilleVaccinale([gestante], [protocoleModifie], [], AUJOURDHUI);
+  assert.equal(apresModification.lignes[0].cellules["crypto-velage"].statut, "VIDE");
+});

@@ -96,6 +96,7 @@ export interface LigneGrille {
   sexe: string;
   danaisIso: string;
   gestationId: string | null;
+  dateVelagePrevueIso: string | null;
   cellules: Record<string, CelluleGrille>;
 }
 
@@ -291,6 +292,7 @@ export function construireGrilleVaccinale(
       sexe: animal.sexe,
       danaisIso: animal.danaisIso,
       gestationId: animal.gestationId,
+      dateVelagePrevueIso: animal.dateVelagePrevueIso,
       cellules,
     };
   });

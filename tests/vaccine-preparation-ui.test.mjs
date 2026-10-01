@@ -47,13 +47,58 @@ test("le tableau vaccinal propose un tri cyclique et des colonnes masquables san
   assert.match(tableau, /Réafficher toutes les colonnes/);
   assert.doesNotMatch(tableau, /Colonnes affichées/);
   assert.match(tableau, /En retard/);
-  // Cellules compactes : coche + date, pas de phrase longue "Fait le…".
-  assert.match(tableau, /☑ \{afficherDate\(cellule\.date!\)\}/);
-  assert.match(tableau, /cellule\.statut === "EN_RETARD" \? "! "/);
+  // Cellules compactes : vraie coche + date secondaire, sans symbole décoratif.
+  assert.match(tableau, /text-xl font-black leading-none">☐/);
+  assert.match(tableau, /text-base leading-none">☑/);
+  assert.doesNotMatch(tableau, /◷|cellule\.statut === "EN_RETARD" \? "! "/);
   assert.doesNotMatch(tableau, /Fait le/);
   // L'ambiguïté historique est discrète, pas présentée comme une action vaccinale normale.
   assert.match(tableau, /⚠ À vérifier/);
   assert.doesNotMatch(tableau, /Étape à valider/);
+});
+
+test("la deuxième passe ajoute gestation, vêlage et tri d'urgence sans règle vaccinale codée dans l'UI", () => {
+  const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
+  const grille = read("lib/vaccine-grid.ts");
+  const page = read("app/sanitaire/vaccins/page.tsx");
+  assert.match(tableau, /enteteTriable\("Gestation"/);
+  assert.match(tableau, /enteteTriable\("Avant vêlage"/);
+  assert.match(tableau, /formatTempsAvantVelage\(ligne\.dateVelagePrevueIso\)/);
+  assert.match(tableau, /comparerUrgenceVaccinale/);
+  assert.match(tableau, /`vaccin:\$\{etape\.id\}`/);
+  assert.match(tableau, /ligne\.gestationId \? "Gestante" : "Vide"/);
+  assert.match(grille, /dateVelagePrevueIso: animal\.dateVelagePrevueIso/);
+  assert.match(page, /etat: \{ in: \["VERT", "ROSE"\] \}/);
+  assert.doesNotMatch(tableau, /CRYPTIUM.*(21|90)|ROTAVEC.*(21|90)/i);
+});
+
+test("la sélection animale et l'impression reprennent exactement la vue courante", () => {
+  const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
+  assert.match(tableau, /animauxSelectionnes/);
+  assert.match(tableau, /Tout sélectionner les animaux visibles/);
+  assert.match(tableau, /Afficher uniquement la sélection/);
+  assert.match(tableau, /Afficher tous/);
+  assert.match(tableau, /window\.print\(\)/);
+  assert.match(tableau, /@page \{ size: A4 landscape/);
+  assert.match(tableau, /thead \{ display: table-header-group/);
+  assert.match(tableau, /break-inside: avoid/);
+  assert.match(tableau, /animal-selection-column/);
+});
+
+test("les protocoles s'ouvrent avec un retour explicite au tableau vaccinal", () => {
+  const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
+  const page = read("app/sanitaire/vaccins/page.tsx");
+  assert.match(tableau, /\/config\/protocoles\?returnTo=%2Fsanitaire%2Fvaccins/);
+  assert.match(tableau, /Configurer les protocoles/);
+  assert.match(page, /\/config\/protocoles\?returnTo=%2Fsanitaire%2Fvaccins/);
+});
+
+test("les couleurs différencient nettement à faire, bientôt et retard", () => {
+  const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
+  assert.match(tableau, /border-yellow-700 bg-yellow-300/);
+  assert.match(tableau, /border-orange-700 bg-orange-300/);
+  assert.match(tableau, /border-red-800 bg-red-300/);
+  assert.match(tableau, /statut === "A_FAIRE" \|\| statut === "BIENTOT"/);
 });
 
 test("le tableau réutilise les exécutants sanitaires et présente des âges terrain lisibles", () => {

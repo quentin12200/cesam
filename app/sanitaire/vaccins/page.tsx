@@ -58,7 +58,7 @@ export default async function VaccinsPage() {
         groupe: { select: { nom: true } },
         _count: { select: { velagesVache: true } },
         saillies: {
-          where: { gestation: { is: { dateVelagePrevue: { not: null }, etat: { in: ["VERT", "ROSE"] } } } },
+          where: { gestation: { is: { etat: { in: ["VERT", "ROSE"] } } } },
           orderBy: { date: "desc" },
           take: 1,
           select: { gestation: { select: { id: true, dateVelagePrevue: true } } },
@@ -145,7 +145,7 @@ export default async function VaccinsPage() {
       {groupes.length === 0 && <section className="rounded-xl bg-white p-8 text-center text-sm text-gray-500 shadow-sm">Aucun protocole vaccinal actif.</section>}
       <details className="rounded-2xl bg-white p-4 shadow-sm">
         <summary className="cursor-pointer font-bold text-gray-900">Préparer une séance de vaccination</summary>
-        <Link href="/config/protocoles" className="mt-3 inline-block text-sm font-semibold text-green-800 underline">Modifier les protocoles</Link>
+        <Link href="/config/protocoles?returnTo=%2Fsanitaire%2Fvaccins" className="mt-3 inline-block text-sm font-semibold text-green-800 underline">Modifier les protocoles</Link>
         <div className="mt-4 space-y-4">
           {groupes.map((groupe) => <PreparationVaccinCard key={groupe.protocoleId} groupe={{
             ...groupe,
