@@ -14,6 +14,7 @@ import { rattacherInjectionOrpheline, vaccinationsSansEtapeFiable } from "./vacc
 import { vaccinationAppartientAuCycleCourant } from "./vaccination-session.ts";
 import { estAnimalConcerneParProtocole } from "./vaccine-eligibility.ts";
 import type { ActeVaccination } from "./vaccine-acts.ts";
+import { medicamentCompatibleAvecEtape } from "./vaccine-attachment.ts";
 
 export interface EtapeGrille extends EtapeVaccinaleConfig {
   medicamentId: string | null;
@@ -101,6 +102,10 @@ export interface HistoriqueVaccinalAValider {
   protocoleNom: string;
   gestationId: string | null;
   raison: string;
+  /** Vrai si une etape du protocole depend du velage : seule situation ou la gestation compte. */
+  protocoleLieAuVelage: boolean;
+  /** Etapes reellement configurees et compatibles avec le medicament reel de l'acte. */
+  etapesCompatibles: { id: string; label: string }[];
 }
 
 export interface LigneGrille {
@@ -282,6 +287,14 @@ function celluleProtocole(
         protocoleId: protocole.id,
         protocoleNom: protocole.label || protocole.nom,
         gestationId: acte.gestationId,
+        protocoleLieAuVelage,
+        etapesCompatibles: etapes
+          .filter((etape) => !acte.medicamentId || medicamentCompatibleAvecEtape(
+            { etapes: protocole.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicaments.map((liaison) => ({ medicamentId: liaison.medicament.id })) })) },
+            etape.id,
+            acte.medicamentId,
+          ))
+          .map((etape) => ({ id: etape.id, label: etape.label })),
         raison: acte.sourceType === "TRAITEMENT"
           ? "Cet acte provient d’un traitement vaccinal ancien sans rattachement structuré."
           : "L’étape du protocole n’a pas pu être déterminée avec certitude.",

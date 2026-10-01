@@ -137,7 +137,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         vaccinations: { select: { date: true, vaccin: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true, statut: true } },
         // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
         // quand même compter comme fait. Voir lib/vaccine-acts.ts.
-        traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { dateDebut: true, medicamentNom: true, medicamentId: true } },
+        traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { dateDebut: true, medicamentNom: true, medicamentId: true, protocoleVaccinId: true, etapeProtocoleVaccinId: true, gestationId: true } },
         statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true } },
       },
     }),

@@ -24,6 +24,10 @@ export interface ActeTraitementVaccin {
   dateDebut: Date;
   medicamentNom: string;
   medicamentId: string | null;
+  /** Rattachement structuré optionnel : ne change jamais le fait (date, médicament). */
+  protocoleVaccinId?: string | null;
+  etapeProtocoleVaccinId?: string | null;
+  gestationId?: string | null;
 }
 
 function cleJour(date: Date): string {
@@ -59,9 +63,9 @@ export function unifierActesVaccinaux(
       date: traitement.dateDebut,
       vaccin: traitement.medicamentNom,
       medicamentId: traitement.medicamentId,
-      protocoleId: null,
-      etapeProtocoleId: null,
-      gestationId: null,
+      protocoleId: traitement.protocoleVaccinId ?? null,
+      etapeProtocoleId: traitement.etapeProtocoleVaccinId ?? null,
+      gestationId: traitement.gestationId ?? null,
       statut: "FAIT",
     }));
   return [...faites, ...issus];

@@ -143,6 +143,7 @@ model Gestation {
   velage           Velage?
   vaccinations     Vaccination[]
 
+  traitements      Traitement[]  @relation("TraitementGestation")
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }
@@ -617,6 +618,7 @@ model ProtocoleVaccin {
   vaccinations       Vaccination[]
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  traitements        Traitement[]       @relation("TraitementProtocoleVaccin")
 }
 
 model Medicament {
@@ -678,6 +680,7 @@ model EtapeProtocoleVaccin {
   obligatoire    Boolean  @default(true)
   medicaments    EtapeProtocoleMedicament[]
   vaccinations   Vaccination[]
+  traitements    Traitement[]   @relation("TraitementEtapeProtocoleVaccin")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   @@index([protocoleId, ordre])
@@ -876,10 +879,20 @@ model Traitement {
   ordonnanceAAssocier Boolean @default(false)
   delaiAttenteViandeJ Int?
   delaiAttenteLaitJ   Int?
+  protocoleVaccinId      String?
+  protocoleVaccin        ProtocoleVaccin?      @relation("TraitementProtocoleVaccin", fields: [protocoleVaccinId], references: [id], onDelete: SetNull)
+  etapeProtocoleVaccinId String?
+  etapeProtocoleVaccin   EtapeProtocoleVaccin? @relation("TraitementEtapeProtocoleVaccin", fields: [etapeProtocoleVaccinId], references: [id], onDelete: SetNull)
+  gestationId            String?
+  gestation              Gestation?            @relation("TraitementGestation", fields: [gestationId], references: [id], onDelete: SetNull)
   statut        String      @default("EN_COURS")
   notes         String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@index([protocoleVaccinId])
+  @@index([etapeProtocoleVaccinId])
+  @@index([gestationId])
 }
 
 model ExploitationConfig {

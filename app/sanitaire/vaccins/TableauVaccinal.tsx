@@ -27,6 +27,8 @@ interface HistoriqueAValider {
   protocoleNom: string;
   gestationId: string | null;
   raison: string;
+  protocoleLieAuVelage: boolean;
+  etapesCompatibles: { id: string; label: string }[];
 }
 
 interface Ligne {
@@ -139,6 +141,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
   const [erreur, setErreur] = useState("");
   const [historiqueOuvert, setHistoriqueOuvert] = useState<{ ligne: Ligne; bloc: Bloc; etape: SousColonne; historique: HistoriqueAValider } | null>(null);
   const [rattachementEnCours, setRattachementEnCours] = useState(false);
+  const [etapeChoisie, setEtapeChoisie] = useState("");
 
   useEffect(() => {
     fetch("/api/intervenants").then((reponse) => reponse.json()).then(setIntervenants).catch(() => {});
@@ -413,22 +416,25 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
   }
 
   async function rattacherHistorique(etapeProtocoleId: string) {
-    if (!historiqueOuvert?.historique.sourceId || historiqueOuvert.historique.sourceType !== "VACCINATION") return;
+    if (!historiqueOuvert?.historique.sourceId || !etapeProtocoleId) return;
     setRattachementEnCours(true);
     setErreur("");
     try {
-      const reponse = await fetch(`/api/vaccinations/${historiqueOuvert.historique.sourceId}/rattachement`, {
+      const reponse = await fetch(historiqueOuvert.historique.sourceType === "TRAITEMENT"
+        ? `/api/traitements/${historiqueOuvert.historique.sourceId}/rattachement-vaccinal`
+        : `/api/vaccinations/${historiqueOuvert.historique.sourceId}/rattachement`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           protocoleId: historiqueOuvert.historique.protocoleId,
           etapeProtocoleId,
-          gestationId: historiqueOuvert.ligne.gestationId,
+          gestationId: historiqueOuvert.historique.protocoleLieAuVelage ? historiqueOuvert.ligne.gestationId : null,
         }),
       });
       const detail = await reponse.json().catch(() => ({}));
       if (!reponse.ok) throw new Error(detail.error || "Le rattachement n’a pas pu être enregistré.");
       setHistoriqueOuvert(null);
+      setEtapeChoisie("");
       router.refresh();
     } catch (cause) {
       setErreur(cause instanceof Error ? cause.message : "Le rattachement n’a pas pu être enregistré.");
@@ -520,7 +526,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
             {!colonnesMasquees.has("sexe") && <td className="animal-fixed z-20 border-r bg-white p-1 text-center font-medium text-gray-700" style={{ left: decalageColonne("sexe"), width: largeurColonne.sexe, minWidth: largeurColonne.sexe }}>{ligne.sexe}</td>}
             {!colonnesMasquees.has("gestation") && <td className="animal-fixed z-20 border-r bg-white p-1 text-center" style={{ left: decalageColonne("gestation"), width: largeurColonne.gestation, minWidth: largeurColonne.gestation }}><span className={`mx-auto block h-3 w-3 rounded-full ${ligne.gestationId ? "bg-green-600" : "bg-red-600"}`} title={ligne.gestationId ? "Gestante" : "Vide"}><span className="sr-only">{ligne.gestationId ? "Gestante" : "Vide"}</span></span></td>}
             {!colonnesMasquees.has("velage") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("velage"), width: largeurColonne.velage, minWidth: largeurColonne.velage }}>{ligne.dateVelagePrevueIso ? formatTempsAvantVelage(ligne.dateVelagePrevueIso) : "—"}</td>}
-            {blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cellule = ligne.cellules[etape.id]; const historique = cellule?.historiquesAValider[0]; return <td key={etape.id} className="border-r p-1 align-top">{renduCellule(cellule, ligne, etape)}{historique && <button type="button" title="Historique à rattacher" onClick={() => setHistoriqueOuvert({ ligne, bloc, etape, historique })} className="vaccin-print-hidden mx-auto mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-amber-600 bg-amber-50 text-[11px] font-black text-amber-900">?</button>}</td>; }))}
+            {blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cellule = ligne.cellules[etape.id]; const historique = cellule?.historiquesAValider[0]; return <td key={etape.id} className="border-r p-1 align-top">{renduCellule(cellule, ligne, etape)}{historique && <button type="button" title="Historique à rattacher" onClick={() => { setEtapeChoisie(""); setHistoriqueOuvert({ ligne, bloc, etape, historique }); }} className="vaccin-print-hidden mx-auto mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-amber-600 bg-amber-50 text-[11px] font-black text-amber-900">?</button>}</td>; }))}
           </tr>)}</tbody>
         </table>
         {resultat.length === 0 && <p className="p-3 text-sm text-gray-500">Aucun animal avec ces filtres.</p>}
@@ -542,10 +548,10 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
 
       {historiqueOuvert && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Historique vaccinal à rattacher"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
         <h2 className="text-lg font-black text-gray-900">Historique à rattacher</h2>
-        <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-1 text-sm"><dt className="text-gray-500">Animal</dt><dd className="font-bold">{historiqueOuvert.ligne.nutrav} {historiqueOuvert.ligne.nom}</dd><dt className="text-gray-500">Vaccin</dt><dd>{historiqueOuvert.historique.vaccin}</dd><dt className="text-gray-500">Date réelle</dt><dd>{afficherDate(historiqueOuvert.historique.date)}</dd><dt className="text-gray-500">Protocole</dt><dd>{historiqueOuvert.historique.protocoleNom}</dd><dt className="text-gray-500">Cycle</dt><dd>{historiqueOuvert.historique.gestationId || historiqueOuvert.ligne.gestationId ? "Gestation connue" : "Aucune gestation liée"}</dd><dt className="text-gray-500">Pourquoi ?</dt><dd>{historiqueOuvert.historique.raison}</dd></dl>
-        {historiqueOuvert.historique.sourceType === "VACCINATION" && historiqueOuvert.historique.sourceId ? <div className="mt-4"><p className="mb-2 text-sm font-semibold">Rattacher cet acte à :</p><div className="grid gap-2">{historiqueOuvert.bloc.sousColonnes.map((etape) => <button key={etape.id} type="button" disabled={rattachementEnCours} onClick={() => void rattacherHistorique(etape.id)} className="min-h-10 rounded-lg border px-3 text-left text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">{etape.label || "Injection"}</button>)}</div></div> : <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-950">Cet historique provient uniquement d’un traitement vaccinal. Le modèle actuel ne permet pas de lui ajouter un rattachement sans créer un deuxième acte ; aucune donnée ne sera dupliquée.</p>}
+        <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-1 text-sm"><dt className="text-gray-500">Animal</dt><dd className="font-bold">{historiqueOuvert.ligne.nutrav} {historiqueOuvert.ligne.nom}</dd><dt className="text-gray-500">Vaccin</dt><dd>{historiqueOuvert.historique.vaccin}</dd><dt className="text-gray-500">Date réelle</dt><dd>{afficherDate(historiqueOuvert.historique.date)}</dd><dt className="text-gray-500">Protocole</dt><dd>{historiqueOuvert.historique.protocoleNom}</dd>{historiqueOuvert.historique.protocoleLieAuVelage && <><dt className="text-gray-500">Cycle</dt><dd>{historiqueOuvert.historique.gestationId || historiqueOuvert.ligne.gestationId ? "Gestation connue" : "Aucune gestation liée"}</dd></>}<dt className="text-gray-500">Pourquoi ?</dt><dd>{historiqueOuvert.historique.raison}</dd></dl>
+        {historiqueOuvert.historique.sourceId && (historiqueOuvert.historique.sourceType === "TRAITEMENT" ? historiqueOuvert.historique.etapesCompatibles : historiqueOuvert.bloc.sousColonnes).length > 0 ? <div className="mt-4"><p className="mb-2 text-sm font-semibold">Rattacher cet acte à :</p><div className="grid gap-2">{(historiqueOuvert.historique.sourceType === "TRAITEMENT" ? historiqueOuvert.historique.etapesCompatibles : historiqueOuvert.bloc.sousColonnes).map((etape) => <button key={etape.id} type="button" disabled={rattachementEnCours} aria-pressed={etapeChoisie === etape.id} onClick={() => setEtapeChoisie(etape.id)} className={`min-h-10 rounded-lg border px-3 text-left text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 ${etapeChoisie === etape.id ? "border-green-700 bg-green-50" : ""}`}>{etape.label || "Injection"}</button>)}</div><button type="button" disabled={rattachementEnCours || !etapeChoisie} onClick={() => void rattacherHistorique(etapeChoisie)} className="mt-2 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-50">Enregistrer le rattachement</button></div> : <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-950">{historiqueOuvert.historique.sourceType === "TRAITEMENT" ? "Aucune étape compatible avec ce médicament dans ce protocole" : "Cet acte n’a pas d’identifiant : rattachement impossible."}</p>}
         {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
-        <button type="button" disabled={rattachementEnCours} onClick={() => { setHistoriqueOuvert(null); setErreur(""); }} className="mt-4 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Laisser non rattaché</button>
+        <button type="button" disabled={rattachementEnCours} onClick={() => { setHistoriqueOuvert(null); setEtapeChoisie(""); setErreur(""); }} className="mt-4 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Laisser non rattaché</button>
       </div></div>}
       <style jsx global>{`
         #tableau-vaccinal-impression .animal-fixed { position: sticky; }

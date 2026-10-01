@@ -66,7 +66,7 @@ export default async function VaccinsPage() {
         vaccinations: { where: { statut: "FAIT" }, select: { id: true, vaccin: true, date: true, statut: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true }, orderBy: { date: "asc" } },
         // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
         // quand même remonter comme fait dans la grille. Voir lib/vaccine-acts.ts.
-        traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { id: true, dateDebut: true, medicamentNom: true, medicamentId: true } },
+        traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { id: true, dateDebut: true, medicamentNom: true, medicamentId: true, protocoleVaccinId: true, etapeProtocoleVaccinId: true, gestationId: true } },
       },
       orderBy: { nutrav: "asc" },
     }),

@@ -338,12 +338,17 @@ test("la grille est directement saisissable, y compris hors échéance ou hors p
   assert.match(grille, /protocoleId: null/);
 });
 
-test("l'historique ambigu est discret et ne rattache que la Vaccination existante", () => {
+test("l'historique ambigu est discret et se rattache sans jamais créer de second acte", () => {
   const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
   const route = read("app/api/vaccinations/[id]/rattachement/route.ts");
   assert.match(tableau, /title="Historique à rattacher"/);
-  assert.match(tableau, /sourceType === "VACCINATION"/);
-  assert.match(tableau, /provient uniquement d’un traitement vaccinal/);
+  assert.match(tableau, /rattachement-vaccinal/);
+  assert.match(tableau, /Aucune étape compatible avec ce médicament dans ce protocole/);
+  assert.match(tableau, /Enregistrer le rattachement/);
+  assert.match(tableau, /protocoleLieAuVelage &&/);
+  const routeTraitement = read("app/api/traitements/[id]/rattachement-vaccinal/route.ts");
+  assert.match(routeTraitement, /prisma\.traitement\.update/);
+  assert.doesNotMatch(routeTraitement, /vaccination\.create|traitement\.create/);
   assert.match(route, /prisma\.vaccination\.update/);
   assert.doesNotMatch(route, /vaccination\.create|traitement\.create/);
 });

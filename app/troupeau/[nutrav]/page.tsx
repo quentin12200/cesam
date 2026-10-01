@@ -199,7 +199,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   // (médicament catégorie VACCIN) compte comme fait ici aussi. Voir lib/vaccine-acts.ts.
   const traitementsVaccinAnimal = await prisma.traitement.findMany({
     where: { animalId: animal.id, medicament: { categorie: "VACCIN" } },
-    select: { dateDebut: true, medicamentNom: true, medicamentId: true },
+    select: { dateDebut: true, medicamentNom: true, medicamentId: true, protocoleVaccinId: true, etapeProtocoleVaccinId: true, gestationId: true },
   });
   const actesVaccinaux = unifierActesVaccinaux(animal.vaccinations, traitementsVaccinAnimal);
   const birthVelage = animal.velageVeau ?? animal.veauxVelage[0]?.velage ?? null;
