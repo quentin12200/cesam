@@ -243,5 +243,7 @@ test("une étape liée au vêlage suit exclusivement la fenêtre configurée dan
     etapes: [{ ...etapeVelage, debutValeur: 10, finValeur: 5 }],
   };
   const apresModification = construireGrilleVaccinale([gestante], [protocoleModifie], [], AUJOURDHUI);
-  assert.equal(apresModification.lignes[0].cellules["crypto-velage"].statut, "VIDE");
+  // Échéance encore lointaine : elle reste visible (prévu plus tard), jamais masquée.
+  assert.equal(apresModification.lignes[0].cellules["crypto-velage"].statut, "PREVU");
+  assert.ok(apresModification.lignes[0].cellules["crypto-velage"].date);
 });

@@ -154,7 +154,8 @@ test("le filtre de statut est multi-sélection et Bientôt reste dans À faire",
 test("la saisie directe conserve la sélection et n'écrit qu'à la validation finale", () => {
   const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
   assert.match(tableau, /useState<Set<string>>\(new Set\(\)\)/);
-  assert.match(tableau, /Sélectionner à faire/);
+  assert.doesNotMatch(tableau, /Sélectionner à faire/);
+  assert.match(tableau, /libelleVoieDose\(etape\.voie, etape\.dose, etape\.uniteDosage\)/);
   assert.match(tableau, /Vider la sélection/);
   assert.match(tableau, /Enregistrer \$\{actes\.length\} vaccination\(s\)/);
   assert.doesNotMatch(tableau, /Vérifier la séance/);

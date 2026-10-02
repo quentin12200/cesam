@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { gestationIdAEnregistrer } from "@/lib/vaccination-session";
+import { resynchroniserStatutProtocole } from "@/lib/vaccine-statut-sync";
+import { typeInjectionPourEtape } from "@/lib/vaccine-statut";
 
 export async function PATCH(
   request: NextRequest,
@@ -19,7 +21,7 @@ export async function PATCH(
     const [vaccination, protocole] = await Promise.all([
       prisma.vaccination.findUnique({
         where: { id },
-        select: { id: true, animalId: true, medicamentId: true, gestationId: true },
+        select: { id: true, animalId: true, medicamentId: true, gestationId: true, protocoleId: true },
       }),
       prisma.protocoleVaccin.findUnique({
         where: { id: protocoleId },
@@ -66,8 +68,12 @@ export async function PATCH(
         etapeProtocoleId,
         gestationId: vaccination.gestationId
           ?? gestationIdAEnregistrer(protocole.etapes, gestationId),
+        typeInjection: typeInjectionPourEtape(protocole.etapes, etapeProtocoleId),
       },
     });
+    // Une correction d'étape peut rendre le statut du protocole obsolète (ancien et nouveau protocole).
+    await resynchroniserStatutProtocole(vaccination.animalId, protocoleId);
+    if (vaccination.protocoleId && vaccination.protocoleId !== protocoleId) await resynchroniserStatutProtocole(vaccination.animalId, vaccination.protocoleId);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("PATCH /api/vaccinations/[id]/rattachement error:", error);

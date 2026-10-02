@@ -7,14 +7,28 @@ import { Settings } from "lucide-react";
 import ExecutantSelect, { type Intervenant } from "@/app/sanitaire/nouvel-evenement/ExecutantSelect";
 import { formatAgeTerrain } from "@/lib/animal-age";
 import { regrouperActesVaccinaux } from "@/lib/vaccination-session";
-import { comparerUrgenceVaccinale, formatTempsAvantVelage } from "@/lib/vaccine-table-presentation";
+import { comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose } from "@/lib/vaccine-table-presentation";
 
 interface CelluleGrille {
-  statut: "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "VIDE";
+  statut: "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
   date: string | null;
   aValider: boolean;
   rattachementProtocoleAutorise: boolean;
   historiquesAValider: HistoriqueAValider[];
+  acteFait?: ActeFait | null;
+}
+
+interface ActeFait {
+  sourceType: "VACCINATION" | "TRAITEMENT";
+  sourceId: string;
+  vaccin: string;
+  medicamentId: string | null;
+  protocoleId: string;
+  protocoleNom: string;
+  etapeProtocoleId: string;
+  gestationId: string | null;
+  protocoleLieAuVelage: boolean;
+  etapesCompatibles: { id: string; label: string }[];
 }
 
 interface HistoriqueAValider {
@@ -142,6 +156,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
   const [historiqueOuvert, setHistoriqueOuvert] = useState<{ ligne: Ligne; bloc: Bloc; etape: SousColonne; historique: HistoriqueAValider } | null>(null);
   const [rattachementEnCours, setRattachementEnCours] = useState(false);
   const [etapeChoisie, setEtapeChoisie] = useState("");
+  const [acteOuvert, setActeOuvert] = useState<{ ligne: Ligne; bloc: Bloc; etape: SousColonne; acte: ActeFait; date: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/intervenants").then((reponse) => reponse.json()).then(setIntervenants).catch(() => {});
@@ -311,17 +326,6 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     });
   }
 
-  function selectionnerVisibles(etape: SousColonne) {
-    setActesSelectionnes((actuels) => {
-      const suivants = new Set(actuels);
-      for (const ligne of resultat) {
-        const cellule = ligne.cellules[etape.id];
-        if (cellule && estAFaire(cellule.statut) && estSelectionnable(cellule, etape)) suivants.add(cleActe(ligne.animalId, etape.id));
-      }
-      return suivants;
-    });
-  }
-
   function administrationsParDefaut() {
     return Object.fromEntries(groupesSession.map((groupe) => [groupe.cle, {
       voie: groupe.etape.voie === "À renseigner" ? "" : groupe.etape.voie ?? "",
@@ -415,25 +419,56 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     }
   }
 
+  // Rattachement ET correction d'étape passent par les mêmes deux routes : l'acte existant est
+  // modifié sur place (même id), jamais recréé.
   async function rattacherHistorique(etapeProtocoleId: string) {
-    if (!historiqueOuvert?.historique.sourceId || !etapeProtocoleId) return;
+    if (!historiqueOuvert) return;
+    await enregistrerRattachement({
+      sourceType: historiqueOuvert.historique.sourceType,
+      sourceId: historiqueOuvert.historique.sourceId,
+      protocoleId: historiqueOuvert.historique.protocoleId,
+      protocoleLieAuVelage: historiqueOuvert.historique.protocoleLieAuVelage,
+      gestationId: historiqueOuvert.ligne.gestationId,
+    }, etapeProtocoleId, () => setHistoriqueOuvert(null));
+  }
+
+  async function corrigerEtapeActe(etapeProtocoleId: string) {
+    if (!acteOuvert) return;
+    const { acte } = acteOuvert;
+    await enregistrerRattachement({
+      sourceType: acte.sourceType,
+      sourceId: acte.sourceId,
+      protocoleId: acte.protocoleId,
+      protocoleLieAuVelage: acte.protocoleLieAuVelage,
+      gestationId: acte.gestationId ?? acteOuvert.ligne.gestationId,
+    }, etapeProtocoleId, () => setActeOuvert(null));
+  }
+
+  async function enregistrerRattachement(cible: {
+    sourceType: "VACCINATION" | "TRAITEMENT";
+    sourceId: string | null;
+    protocoleId: string;
+    protocoleLieAuVelage: boolean;
+    gestationId: string | null;
+  }, etapeProtocoleId: string, fermer: () => void) {
+    if (!cible.sourceId || !etapeProtocoleId) return;
     setRattachementEnCours(true);
     setErreur("");
     try {
-      const reponse = await fetch(historiqueOuvert.historique.sourceType === "TRAITEMENT"
-        ? `/api/traitements/${historiqueOuvert.historique.sourceId}/rattachement-vaccinal`
-        : `/api/vaccinations/${historiqueOuvert.historique.sourceId}/rattachement`, {
+      const reponse = await fetch(cible.sourceType === "TRAITEMENT"
+        ? `/api/traitements/${cible.sourceId}/rattachement-vaccinal`
+        : `/api/vaccinations/${cible.sourceId}/rattachement`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          protocoleId: historiqueOuvert.historique.protocoleId,
+          protocoleId: cible.protocoleId,
           etapeProtocoleId,
-          gestationId: historiqueOuvert.historique.protocoleLieAuVelage ? historiqueOuvert.ligne.gestationId : null,
+          gestationId: cible.protocoleLieAuVelage ? cible.gestationId : null,
         }),
       });
       const detail = await reponse.json().catch(() => ({}));
       if (!reponse.ok) throw new Error(detail.error || "Le rattachement n’a pas pu être enregistré.");
-      setHistoriqueOuvert(null);
+      fermer();
       setEtapeChoisie("");
       router.refresh();
     } catch (cause) {
@@ -445,7 +480,14 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
 
   function renduCellule(cellule: CelluleGrille | undefined, ligne: Ligne, etape: SousColonne) {
     if (!cellule) return <span className="text-gray-300">—</span>;
-    if (cellule.statut === "FAIT") return <span className="flex items-center justify-center gap-1 rounded border border-green-600 bg-green-100 px-1.5 py-1 font-bold text-green-950 whitespace-nowrap"><span className="text-base leading-none">☑</span><span className="text-[11px]">{afficherDate(cellule.date!)}</span></span>;
+    if (cellule.statut === "FAIT") {
+      const contenu = <><span className="text-base leading-none">☑</span><span className="text-[11px]">{afficherDate(cellule.date!)}</span></>;
+      const bloc = blocs.find((item) => item.sousColonnes.some((sousColonne) => sousColonne.id === etape.id));
+      const acte = cellule.acteFait;
+      return acte && bloc
+        ? <button type="button" title="Vaccination enregistrée : voir ou corriger l’étape" onClick={() => { setEtapeChoisie(""); setErreur(""); setActeOuvert({ ligne, bloc, etape, acte, date: cellule.date! }); }} className="flex w-full items-center justify-center gap-1 rounded border border-green-600 bg-green-100 px-1.5 py-1 font-bold text-green-950 whitespace-nowrap hover:bg-green-200">{contenu}</button>
+        : <span className="flex items-center justify-center gap-1 rounded border border-green-600 bg-green-100 px-1.5 py-1 font-bold text-green-950 whitespace-nowrap">{contenu}</span>;
+    }
     const selectionne = actesSelectionnes.has(cleActe(ligne.animalId, etape.id));
     const classe = cellule.statut === "EN_RETARD"
       ? "border-red-800 bg-red-300 text-red-950"
@@ -453,7 +495,9 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
         ? "border-orange-700 bg-orange-300 text-orange-950"
         : cellule.statut === "A_FAIRE"
           ? "border-yellow-700 bg-yellow-300 text-yellow-950"
-          : "border-gray-300 bg-gray-50 text-gray-600";
+          : cellule.statut === "PREVU"
+            ? "border-slate-300 bg-slate-50 text-slate-500"
+            : "border-gray-300 bg-gray-50 text-gray-600";
     const disponible = estSelectionnable(cellule, etape);
     return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title={disponible ? "Ajouter ou retirer des vaccinations à enregistrer" : cellule.aValider ? "Résoudre d’abord l’historique à rattacher" : "Médicament à renseigner"} className={`flex w-full items-center justify-center gap-1 rounded border px-1.5 py-1 whitespace-nowrap ${classe} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-xl font-black leading-none">{selectionne ? "☑" : "☐"}</span>{cellule.date && <span className="text-[10px] font-semibold opacity-80">{afficherDate(cellule.date)}</span>}</button>;
   }
@@ -516,7 +560,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
               {enteteTriable("Avant vêlage", "velage", "velage", "top-0 z-40 border-r bg-gray-50 p-1")}
               {blocsAffiches.map((bloc) => <th key={bloc.cle} colSpan={bloc.sousColonnes.length} scope="colgroup" className="sticky top-0 z-30 h-8 border-r border-b bg-gray-50 p-1 text-center font-bold text-gray-800">{bloc.nom}{bloc.voie && <span className="ml-1 font-normal text-gray-500">{bloc.voie}</span>}</th>)}
             </tr>
-            <tr className="vaccin-head-2">{blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cleTri = `vaccin:${etape.id}` as const; return <th key={etape.id} scope="col" className="sticky top-8 z-30 min-w-24 border-r bg-gray-50 p-1 text-center font-medium text-gray-600"><button type="button" onClick={() => basculerTri(cleTri)} className="w-full font-semibold">{etape.label || "Injection"}{indicateurTri(cleTri)}</button><button type="button" onClick={() => selectionnerVisibles(etape)} className="vaccin-print-hidden mt-0.5 block w-full text-[9px] font-semibold text-green-800 underline">Sélectionner à faire</button></th>; }))}</tr>
+            <tr className="vaccin-head-2">{blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cleTri = `vaccin:${etape.id}` as const; return <th key={etape.id} scope="col" className="sticky top-8 z-30 min-w-24 border-r bg-gray-50 p-1 text-center font-medium text-gray-600"><button type="button" onClick={() => basculerTri(cleTri)} className="w-full font-semibold">{etape.label || "Injection"}{indicateurTri(cleTri)}</button><span className="mt-0.5 block text-[9px] font-medium normal-case text-gray-500">{libelleVoieDose(etape.voie, etape.dose, etape.uniteDosage)}</span></th>; }))}</tr>
           </thead>
           <tbody className="divide-y">{resultat.map((ligne) => <tr key={ligne.animalId}>
             <td className="animal-selection-column sticky left-0 z-30 border-r bg-white p-1 text-center"><input type="checkbox" checked={animauxSelectionnes.has(ligne.animalId)} onChange={() => basculerDansSet(setAnimauxSelectionnes, ligne.animalId)} aria-label={`Sélectionner l’animal ${ligne.nutrav}`} className="h-5 w-5 accent-green-700" /></td>
@@ -546,6 +590,14 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
         <div className="mt-4 grid grid-cols-2 gap-2"><button type="button" disabled={enregistrement} onClick={() => { setDonneesManquantes(false); setErreur(""); }} className="min-h-11 rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Annuler</button><button type="button" disabled={enregistrement} onClick={() => void validerSession()} className="min-h-11 rounded-lg bg-green-800 font-bold text-white disabled:opacity-50">{enregistrement ? "Enregistrement…" : "Enregistrer"}</button></div>
       </div></div>}
 
+      {acteOuvert && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Vaccination enregistrée"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
+        <h2 className="text-lg font-black text-gray-900">Vaccination enregistrée</h2>
+        <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-1 text-sm"><dt className="text-gray-500">Animal</dt><dd className="font-bold">{acteOuvert.ligne.nutrav} {acteOuvert.ligne.nom}</dd><dt className="text-gray-500">Vaccin</dt><dd>{acteOuvert.acte.vaccin}</dd><dt className="text-gray-500">Date réelle</dt><dd>{afficherDate(acteOuvert.date)}</dd><dt className="text-gray-500">Étape actuelle</dt><dd className="font-semibold">{acteOuvert.etape.label || "Injection"}</dd><dt className="text-gray-500">Protocole</dt><dd>{acteOuvert.acte.protocoleNom}</dd></dl>
+        <div className="mt-4"><p className="mb-2 text-sm font-semibold">Corriger l’étape</p><div className="grid gap-2">{acteOuvert.acte.etapesCompatibles.map((etape) => <button key={etape.id} type="button" disabled={rattachementEnCours} aria-pressed={etapeChoisie === etape.id} onClick={() => setEtapeChoisie(etape.id)} className={`min-h-10 rounded-lg border px-3 text-left text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 ${etapeChoisie === etape.id ? "border-green-700 bg-green-50" : ""}`}>{etape.label || "Injection"}{etape.id === acteOuvert.acte.etapeProtocoleId ? " (actuelle)" : ""}</button>)}</div>
+          <button type="button" disabled={rattachementEnCours || !etapeChoisie || etapeChoisie === acteOuvert.acte.etapeProtocoleId} onClick={() => void corrigerEtapeActe(etapeChoisie)} className="mt-2 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-50">Enregistrer la correction</button></div>
+        {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
+        <button type="button" disabled={rattachementEnCours} onClick={() => { setActeOuvert(null); setEtapeChoisie(""); setErreur(""); }} className="mt-4 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Fermer</button>
+      </div></div>}
       {historiqueOuvert && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Historique vaccinal à rattacher"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
         <h2 className="text-lg font-black text-gray-900">Historique à rattacher</h2>
         <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-1 text-sm"><dt className="text-gray-500">Animal</dt><dd className="font-bold">{historiqueOuvert.ligne.nutrav} {historiqueOuvert.ligne.nom}</dd><dt className="text-gray-500">Vaccin</dt><dd>{historiqueOuvert.historique.vaccin}</dd><dt className="text-gray-500">Date réelle</dt><dd>{afficherDate(historiqueOuvert.historique.date)}</dd><dt className="text-gray-500">Protocole</dt><dd>{historiqueOuvert.historique.protocoleNom}</dd>{historiqueOuvert.historique.protocoleLieAuVelage && <><dt className="text-gray-500">Cycle</dt><dd>{historiqueOuvert.historique.gestationId || historiqueOuvert.ligne.gestationId ? "Gestation connue" : "Aucune gestation liée"}</dd></>}<dt className="text-gray-500">Pourquoi ?</dt><dd>{historiqueOuvert.historique.raison}</dd></dl>

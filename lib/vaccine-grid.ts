@@ -82,7 +82,7 @@ export interface BlocVaccinGrille {
   medicamentId: string | null;
 }
 
-export type StatutCelluleGrille = "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "VIDE";
+export type StatutCelluleGrille = "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
 
 export interface CelluleGrille {
   statut: StatutCelluleGrille;
@@ -90,6 +90,21 @@ export interface CelluleGrille {
   aValider: boolean;
   rattachementProtocoleAutorise: boolean;
   historiquesAValider: HistoriqueVaccinalAValider[];
+  /** Acte reel derriere une cellule FAIT d'un protocole : permet de corriger son etape. */
+  acteFait?: ActeFaitGrille | null;
+}
+
+export interface ActeFaitGrille {
+  sourceType: "VACCINATION" | "TRAITEMENT";
+  sourceId: string;
+  vaccin: string;
+  medicamentId: string | null;
+  protocoleId: string;
+  protocoleNom: string;
+  etapeProtocoleId: string;
+  gestationId: string | null;
+  protocoleLieAuVelage: boolean;
+  etapesCompatibles: { id: string; label: string }[];
 }
 
 export interface HistoriqueVaccinalAValider {
@@ -192,12 +207,34 @@ function celluleVide(): CelluleGrille {
 
 function celluleDepuisPlanning(date: Date, fenetre: { debut: Date; fin: Date }): CelluleGrille {
   const statut = statutPlanningVaccin(date, fenetre.debut, fenetre.fin);
-  if (statut === "TROP_TOT") return celluleVide();
+  // Une echeance calculee ne disparait jamais parce qu'elle est lointaine : elle reste visible, en
+  // "prevu plus tard" (ni a faire, ni en retard), et la case reste selectionnable.
+  if (statut === "TROP_TOT") return { statut: "PREVU", date: fenetre.debut, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [] };
   if (statut === "EN_RETARD_LEGER" || statut === "EN_RETARD") return { statut: "EN_RETARD", date: fenetre.fin, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [] };
   // Bientôt (fenêtre pas encore ouverte mais proche) reste distinct d'à faire (fenêtre ouverte,
   // à faire maintenant) : même donnée du moteur (statutPlanningVaccin), affichage plus fin.
   if (statut === "A_PREVOIR") return { statut: "BIENTOT", date: fenetre.debut, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [] };
   return { statut: "A_FAIRE", date: fenetre.fin, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [] };
+}
+
+function acteFaitCorrigeable(acte: ActeVaccination, protocole: ProtocoleGrille, protocoleLieAuVelage: boolean): ActeFaitGrille | null {
+  if (!acte.sourceId || !acte.etapeProtocoleId) return null;
+  const etapes = [...protocole.etapes].sort((a, b) => a.ordre - b.ordre);
+  const config = { etapes: protocole.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicaments.map((liaison) => ({ medicamentId: liaison.medicament.id })) })) };
+  return {
+    sourceType: acte.sourceType ?? "VACCINATION",
+    sourceId: acte.sourceId,
+    vaccin: acte.vaccin,
+    medicamentId: acte.medicamentId,
+    protocoleId: protocole.id,
+    protocoleNom: protocole.label || protocole.nom,
+    etapeProtocoleId: acte.etapeProtocoleId,
+    gestationId: acte.gestationId,
+    protocoleLieAuVelage,
+    etapesCompatibles: etapes
+      .filter((etape) => !acte.medicamentId || medicamentCompatibleAvecEtape(config, etape.id, acte.medicamentId))
+      .map((etape) => ({ id: etape.id, label: etape.label })),
+  };
 }
 
 /** Cellules d'un animal pour un protocole : une par étape réelle, dans l'ordre. */
@@ -251,7 +288,7 @@ function celluleProtocole(
   for (const etape of etapes) {
     const faites = actesUtiles.filter((acte) => acte.etapeProtocoleId === etape.id).sort((a, b) => b.date.getTime() - a.date.getTime());
     if (faites.length > 0) {
-      cellules.set(etape.id, { statut: "FAIT", date: faites[0].date, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [] });
+      cellules.set(etape.id, { statut: "FAIT", date: faites[0].date, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], acteFait: acteFaitCorrigeable(faites[0], protocole, protocoleLieAuVelage) });
       if (etape.cycle !== "ENTRETIEN") dateEtapePrecedente = faites[0].date;
       continue;
     }

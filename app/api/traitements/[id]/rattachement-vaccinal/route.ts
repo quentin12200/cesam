@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { gestationIdAEnregistrer } from "@/lib/vaccination-session";
 import { medicamentCompatibleAvecEtape } from "@/lib/vaccine-attachment";
+import { resynchroniserStatutProtocole } from "@/lib/vaccine-statut-sync";
 
 /**
  * Rattache un ancien `Traitement` vaccinal à un protocole/une étape. Le traitement reste le fait
@@ -25,7 +26,7 @@ export async function PATCH(
     const [traitement, protocole] = await Promise.all([
       prisma.traitement.findUnique({
         where: { id },
-        select: { id: true, animalId: true, medicamentId: true, medicament: { select: { categorie: true } } },
+        select: { id: true, animalId: true, medicamentId: true, protocoleVaccinId: true, medicament: { select: { categorie: true } } },
       }),
       prisma.protocoleVaccin.findUnique({
         where: { id: protocoleId },
@@ -66,6 +67,8 @@ export async function PATCH(
         gestationId: gestationAEnregistrer,
       },
     });
+    await resynchroniserStatutProtocole(traitement.animalId, protocoleId);
+    if (traitement.protocoleVaccinId && traitement.protocoleVaccinId !== protocoleId) await resynchroniserStatutProtocole(traitement.animalId, traitement.protocoleVaccinId);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("PATCH /api/traitements/[id]/rattachement-vaccinal error:", error);

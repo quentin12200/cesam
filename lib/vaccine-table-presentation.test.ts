@@ -2,14 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { comparerUrgenceVaccinale, formatTempsAvantVelage, type CelluleVaccinaleTri } from "./vaccine-table-presentation.ts";
 
-test("le tri vaccinal place retard, bientôt, à faire puis sans échéance", () => {
+test("le tri vaccinal place retard, à faire, bientôt, prévu plus tard puis sans échéance", () => {
   const cellules: CelluleVaccinaleTri[] = [
     { statut: "VIDE", date: null },
+    { statut: "PREVU", date: "2026-12-20T00:00:00.000Z" },
+    { statut: "PREVU", date: "2026-11-05T00:00:00.000Z" },
     { statut: "A_FAIRE", date: "2026-12-01T00:00:00.000Z" },
     { statut: "EN_RETARD", date: "2026-09-01T00:00:00.000Z" },
     { statut: "BIENTOT", date: "2026-10-15T00:00:00.000Z" },
   ];
-  assert.deepEqual(cellules.sort(comparerUrgenceVaccinale).map((cellule) => cellule.statut), ["EN_RETARD", "BIENTOT", "A_FAIRE", "VIDE"]);
+  assert.deepEqual(cellules.sort(comparerUrgenceVaccinale).map((cellule) => cellule.statut), ["EN_RETARD", "A_FAIRE", "BIENTOT", "PREVU", "PREVU", "VIDE"]);
+  const prevus = cellules.filter((cellule) => cellule.statut === "PREVU").map((cellule) => cellule.date);
+  assert.deepEqual(prevus, ["2026-11-05T00:00:00.000Z", "2026-12-20T00:00:00.000Z"]);
 });
 
 test("à urgence égale, l'échéance la plus proche vient en premier", () => {
