@@ -56,19 +56,19 @@ export function datesCompactes(
 const normaliser = (valeur: string) => valeur.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().replace(/\s+/g, " ").toLocaleUpperCase("fr");
 
 /**
- * Tous les actes réels (Vaccination + Traitement déjà unifiés) d'un vaccin pour un animal :
- * même médicament que le bloc, ou rattachés à son protocole, ou même nom. Triés par date.
+ * Tous les actes réels (Vaccination + Traitement déjà unifiés) d'UN médicament pour un animal.
+ * L'identité réelle du médicament prime : deux vaccins d'un même protocole (ex. administrés le
+ * même jour) ne partagent JAMAIS leur historique. Le nom ne sert qu'aux anciennes vaccinations
+ * saisies sans medicamentId.
  */
 export function actesDuVaccin<T extends ActeHistorique>(
   actes: readonly T[],
-  bloc: { nom: string; medicamentIds: readonly string[]; protocoleId: string | null },
+  medicament: { id: string | null; nom: string },
 ): T[] {
-  const medicaments = new Set(bloc.medicamentIds);
-  const nom = normaliser(bloc.nom);
+  const nom = normaliser(medicament.nom);
   return actes
-    .filter((acte) =>
-      (acte.medicamentId != null && medicaments.has(acte.medicamentId))
-      || (bloc.protocoleId != null && acte.protocoleId === bloc.protocoleId)
-      || normaliser(acte.vaccin) === nom)
+    .filter((acte) => acte.medicamentId != null
+      ? acte.medicamentId === medicament.id
+      : normaliser(acte.vaccin) === nom)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }

@@ -52,7 +52,7 @@ test("A. historique global : tous les actes réels du vaccin, dans l'ordre, ratt
     ],
   );
   const { lignes, blocs } = grille(actes);
-  const historique = actesDuVaccin(lignes[0].actes.map(enActeHistorique), { nom: blocs[0].nom, medicamentIds: blocs[0].medicamentIds, protocoleId: blocs[0].protocoleId });
+  const historique = actesDuVaccin(lignes[0].actes.map(enActeHistorique), { id: blocs[0].medicamentId, nom: blocs[0].nom });
   assert.deepEqual(historique.map((acte) => acte.date.slice(0, 10)), ["2025-10-01", "2025-10-29", "2026-01-15", "2026-10-02"]);
   assert.deepEqual(historique.map((acte) => acte.etapeProtocoleId), ["primo", "rappel", "annuel", null], "un seul acte reste à rattacher");
   assert.ok(!historique.some((acte) => acte.medicamentId === "med-autre"), "un autre vaccin n'est pas mélangé");
@@ -145,7 +145,7 @@ test("I. correction d'un acte depuis l'historique : même sourceId, routes exist
   assert.match(tableau, /sourceId: acte\.sourceId, protocoleId: bloc\.protocoleId!/);
   assert.match(tableau, /\/api\/traitements\/\$\{cible\.sourceId\}\/rattachement-vaccinal/);
   assert.match(tableau, /\/api\/vaccinations\/\$\{cible\.sourceId\}\/rattachement/);
-  assert.match(tableau, /actesDuVaccin\(ligne\.actes, bloc\)/);
+  assert.match(tableau, /actesDuVaccin\(ligne\.actes, \{ id: medicamentId, nom: nomVaccin \}\)/);
   assert.doesNotMatch(tableau, /method: "POST"[\s\S]{0,120}rattachement/);
   // Le panneau reste ouvert après correction : seule l'édition de la ligne se ferme.
   assert.match(tableau, /\(\) => setActeEnEdition\(null\)\)/);

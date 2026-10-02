@@ -7,13 +7,13 @@ import {
   calculerActionVaccinale,
   proposerConditionnements,
   reliquatFlacon,
-  resoudreVoieVaccinale,
   type StatutProtocoleVaccinal,
 } from "@/lib/vaccine-planner";
 import { statutPlanningVaccin, type StatutPlanningVaccin } from "@/lib/vaccine-planning-status";
 import { rattacherInjectionOrpheline, vaccinationsSansEtapeFiable } from "@/lib/vaccine-history";
 import { vaccinationAppartientAuCycleCourant } from "@/lib/vaccination-session";
 import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
+import { resoudreAdministrationEtape } from "@/lib/vaccine-administration";
 import { estAnimalConcerneParProtocole } from "@/lib/vaccine-eligibility";
 
 export interface LignePreparationVaccin {
@@ -230,23 +230,17 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         : null;
       const medicament = liaison?.medicament ?? null;
       if (medicament) medicamentReference = medicament;
-      const preconisationLiee = liaison?.preconisationId
-        ? medicament?.preconisations.find((item) => item.id === liaison.preconisationId)
-        : null;
-      const preconisationsValides = medicament?.preconisations.filter((item) => item.statut === "VALIDE") ?? [];
-      const preconisationsValidesDosees = preconisationsValides.filter((item) => item.dose != null);
-      const preconisation = preconisationLiee ?? (preconisationsValidesDosees.length === 1 ? preconisationsValidesDosees[0] : null);
-      const preconisationValideeAvecVoie = preconisationLiee?.statut === "VALIDE" && preconisationLiee.voie
-        ? preconisationLiee
-        : preconisationsValides.find((item) => item.voie) ?? null;
-      const voie = resoudreVoieVaccinale({
-        voiePreconisation: preconisationValideeAvecVoie?.voie,
-        voieMedicament: medicament?.voie,
+      const administration = resoudreAdministrationEtape({
+        preconisations: medicament?.preconisations ?? [],
+        preconisationLieeId: liaison?.preconisationId,
         voieLiaison: liaison?.voie,
+        voieMedicament: medicament?.voie,
+        uniteMedicament: medicament?.uniteDosage,
       });
-      const dose = preconisation?.dose == null
+      const voie = administration.voie ?? "À renseigner";
+      const dose = administration.dose == null
         ? "Dose inconnue"
-        : `${preconisation.dose} ${preconisation.unite || medicament?.uniteDosage || ""}`.trim();
+        : `${administration.dose} ${administration.unite || ""}`.trim();
       const joursAvantVelage = gestation?.dateVelagePrevue
         ? differenceInCalendarDays(gestation.dateVelagePrevue, date)
         : null;
@@ -272,8 +266,8 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
             ].filter(Boolean).join(" · ")
           : null,
         dose,
-        doseValeur: preconisation?.dose ?? null,
-        doseUnite: preconisation?.unite || medicament?.uniteDosage || null,
+        doseValeur: administration.dose,
+        doseUnite: administration.unite,
         voie,
         medicamentId: medicament?.id ?? null,
         etapeProtocoleId: action.etape.id,

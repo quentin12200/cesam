@@ -7,7 +7,10 @@ import { Settings } from "lucide-react";
 import ExecutantSelect, { type Intervenant } from "@/app/sanitaire/nouvel-evenement/ExecutantSelect";
 import { formatAgeTerrain } from "@/lib/animal-age";
 import { regrouperActesVaccinaux } from "@/lib/vaccination-session";
+import MedicamentPicker, { type MedicamentOption } from "@/app/sanitaire/nouvel-evenement/MedicamentPicker";
 import { medicamentCompatibleAvecEtape } from "@/lib/vaccine-attachment";
+import { actionsSelectionAnimaux, basculerSelectionVisibles, etatSelectionMaitre, libelleAnimauxSelectionnes } from "@/lib/vaccine-selection";
+import { construireChargeSoin } from "@/lib/vaccine-soin-seance";
 import { actesDuVaccin, anneesDisponibles, datesCompactes, type ActeHistorique } from "@/lib/vaccine-history-view";
 import { comparerDateVelage, comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
 
@@ -115,9 +118,9 @@ const dateLocaleIso = () => {
 };
 const cleActe = (animalId: string, etapeId: string) => `${animalId}|${etapeId}`;
 const estAFaire = (statut: CelluleGrille["statut"]) => statut === "A_FAIRE" || statut === "BIENTOT";
-// Une case déjà faite reste utilisable quand une prochaine échéance existe (rappel récurrent).
+// Une case FAIT n'est jamais verrouillée : une nouvelle administration reste possible (via l'historique).
 const estSelectionnable = (cellule: CelluleGrille | undefined, etape: SousColonne) =>
-  Boolean(cellule && (cellule.statut !== "FAIT" || cellule.prochaine) && !cellule.aValider && etape.medicamentId);
+  Boolean(cellule && !cellule.aValider && etape.medicamentId);
 const statutEffectif = (cellule: CelluleGrille): CelluleGrille["statut"] => cellule.statut === "FAIT" && cellule.prochaine ? cellule.prochaine.statut : cellule.statut;
 const echeanceDeTri = (cellule: CelluleGrille | undefined) =>
   cellule?.prochaine ? { statut: cellule.prochaine.statut, date: cellule.prochaine.date } : cellule;
@@ -154,8 +157,18 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
   const [etapeChoisie, setEtapeChoisie] = useState("");
   const [anneesAffichees, setAnneesAffichees] = useState<Set<number>>(() => new Set([new Date().getFullYear()]));
   const [toutHistorique, setToutHistorique] = useState(false);
-  const [panneauHistorique, setPanneauHistorique] = useState<{ animalId: string; blocCle: string } | null>(null);
+  const [panneauHistorique, setPanneauHistorique] = useState<{ animalId: string; blocCle: string; etapeId: string } | null>(null);
   const [acteEnEdition, setActeEnEdition] = useState<string | null>(null);
+  const [soinOuvert, setSoinOuvert] = useState(false);
+  const [medicamentsSoins, setMedicamentsSoins] = useState<MedicamentOption[]>([]);
+  const [soinMedicament, setSoinMedicament] = useState<MedicamentOption | null>(null);
+  const [soinVoie, setSoinVoie] = useState("");
+  const [soinDose, setSoinDose] = useState("");
+  const [soinUnite, setSoinUnite] = useState("ml");
+  const [soinAnimaux, setSoinAnimaux] = useState<Set<string>>(new Set());
+  const [soinModifierAnimaux, setSoinModifierAnimaux] = useState(false);
+  const [soinEnCours, setSoinEnCours] = useState(false);
+  const [soinMessage, setSoinMessage] = useState("");
 
   useEffect(() => {
     fetch("/api/intervenants").then((reponse) => reponse.json()).then(setIntervenants).catch(() => {});
@@ -212,6 +225,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
   const anneesListe = useMemo(() => anneesDisponibles(lignes.flatMap((ligne) => ligne.actes.map((acte) => acte.date)), anneeCourante), [anneeCourante, lignes]);
   // Filtre d'affichage uniquement : la grille (planner) est toujours calculée sur tout l'historique.
   const anneesFiltre = toutHistorique ? null : anneesAffichees;
+  const etatMaitre = etatSelectionMaitre(resultat.map((ligne) => ligne.animalId), animauxSelectionnes);
 
   const actes = useMemo(() => {
     const index = new Map<string, ActeSelectionne>();
@@ -317,12 +331,8 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     basculerDansSet(setActesSelectionnes, cleActe(ligne.animalId, etape.id));
   }
 
-  function selectionnerAnimauxVisibles() {
-    setAnimauxSelectionnes((actuels) => {
-      const suivants = new Set(actuels);
-      resultat.forEach((ligne) => suivants.add(ligne.animalId));
-      return suivants;
-    });
+  function basculerAnimauxVisibles() {
+    setAnimauxSelectionnes((actuels) => basculerSelectionVisibles(resultat.map((ligne) => ligne.animalId), actuels));
   }
 
   function administrationsParDefaut() {
@@ -452,11 +462,11 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     }
   }
 
-  function ouvrirHistorique(ligne: Ligne, bloc: Bloc) {
+  function ouvrirHistorique(ligne: Ligne, bloc: Bloc, etape: SousColonne) {
     setEtapeChoisie("");
     setActeEnEdition(null);
     setErreur("");
-    setPanneauHistorique({ animalId: ligne.animalId, blocCle: bloc.cle });
+    setPanneauHistorique({ animalId: ligne.animalId, blocCle: bloc.cle, etapeId: etape.id });
   }
 
   const classeStatut = (statut: CelluleGrille["statut"]) => statut === "EN_RETARD"
@@ -486,8 +496,9 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
       const badgeClasse = total > 0 ? "border-green-600 bg-green-100 text-green-950 hover:bg-green-200" : "border-green-300 bg-green-50 text-green-800 hover:bg-green-100";
       return <div className="space-y-0.5">
         {bloc
-          ? <button type="button" title={`Historique : ${tousLesActes} — voir ou corriger l’étape`} onClick={() => ouvrirHistorique(ligne, bloc)} className={`flex w-full flex-wrap items-center justify-center gap-x-1 rounded border px-1 py-0.5 font-bold ${badgeClasse}`}>{contenu}</button>
+          ? <button type="button" title={`Historique : ${tousLesActes} — voir ou corriger l’étape`} onClick={() => ouvrirHistorique(ligne, bloc, etape)} className={`flex w-full flex-wrap items-center justify-center gap-x-1 rounded border px-1 py-0.5 font-bold ${badgeClasse}`}>{contenu}</button>
           : <span className={`flex w-full flex-wrap items-center justify-center gap-x-1 rounded border px-1 py-0.5 font-bold ${badgeClasse}`}>{contenu}</span>}
+        {selectionne && !cellule.prochaine && <span className="block rounded border border-green-700 px-1 text-center text-[10px] font-bold text-green-900 ring-2 ring-green-700">+ nouvelle</span>}
         {cellule.prochaine && <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title="Prochaine échéance : ajouter ou retirer des vaccinations à enregistrer" className={`flex w-full items-center justify-center gap-1 rounded border px-1 py-0.5 whitespace-nowrap ${classeStatut(cellule.prochaine.statut)} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-[11px] font-black">{selectionne ? "☑" : "→"}</span><span className="text-[10px] font-semibold">{afficherDate(cellule.prochaine.date)}</span></button>}
       </div>;
     }
@@ -499,18 +510,30 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     if (!panneauHistorique) return null;
     const ligne = lignes.find((item) => item.animalId === panneauHistorique.animalId);
     const bloc = blocs.find((item) => item.cle === panneauHistorique.blocCle);
-    if (!ligne || !bloc) return null;
+    const etapeCliquee = bloc?.sousColonnes.find((item) => item.id === panneauHistorique.etapeId);
+    if (!ligne || !bloc || !etapeCliquee) return null;
+    // Identité RÉELLE du médicament de la colonne : deux vaccins d'un même protocole ne partagent jamais leur historique.
+    const medicamentId = etapeCliquee.medicamentId ?? bloc.medicamentId;
+    const nomVaccin = etapeCliquee.medicamentNom ?? bloc.nom;
     // Source unique : les actes réels unifiés (Vaccination + Traitement VACCIN) de lib/vaccine-acts.ts.
-    const actesVaccin = actesDuVaccin(ligne.actes, bloc);
-    const configEtapes = { etapes: bloc.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicamentIds.map((medicamentId) => ({ medicamentId })) })) };
+    const actesVaccin = actesDuVaccin(ligne.actes, { id: medicamentId, nom: nomVaccin });
+    const configEtapes = { etapes: bloc.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicamentIds.map((idMedicament) => ({ medicamentId: idMedicament })) })) };
     const etapeDe = (acte: ActeHistorique) => bloc.protocoleId && acte.protocoleId === bloc.protocoleId && acte.etapeProtocoleId
       ? bloc.sousColonnes.find((sousColonne) => sousColonne.id === acte.etapeProtocoleId) ?? null
       : null;
     const nonRattaches = actesVaccin.filter((acte) => !etapeDe(acte)).length;
     const cleEdition = (acte: ActeHistorique) => `${acte.sourceType}:${acte.sourceId}`;
     const fermer = () => { setPanneauHistorique(null); setActeEnEdition(null); setEtapeChoisie(""); setErreur(""); };
-    return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label={`Historique — ${bloc.nom}`}><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
-      <h2 className="text-lg font-black text-gray-900">Historique — {bloc.nom}</h2>
+    // Une étape déjà faite n'est jamais verrouillée : on peut ajouter une nouvelle administration.
+    const etapesNouvelleAdministration = bloc.protocoleId && medicamentId
+      ? bloc.sousColonnes.filter((candidate) => medicamentCompatibleAvecEtape(configEtapes, candidate.id, medicamentId))
+      : [];
+    const ajouterNouvelleAdministration = (etape: SousColonne) => {
+      setActesSelectionnes((actuels) => new Set(actuels).add(cleActe(ligne.animalId, etape.id)));
+      fermer();
+    };
+    return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label={`Historique — ${nomVaccin}`}><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
+      <h2 className="text-lg font-black text-gray-900">Historique — {nomVaccin}</h2>
       <p className="text-sm font-bold text-gray-700">{ligne.nutrav} {ligne.nom}</p>
       {bloc.protocoleNom && <p className="text-xs text-gray-500">Protocole : {bloc.protocoleNom}</p>}
       {nonRattaches > 0 && <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-950">Regarde toutes les dates avant de décider ce que chacune représente : {nonRattaches} acte(s) à rattacher.</p>}
@@ -541,8 +564,99 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
           </li>;
         })}
       </ul>
+      {etapesNouvelleAdministration.length > 0 && <div className="mt-3 rounded-xl border border-green-200 bg-green-50 p-2">
+        <p className="text-sm font-semibold text-green-950">Nouvelle administration</p>
+        <p className="mb-2 text-[11px] text-green-900">Ajoute un nouvel acte à la séance (date et exécutant de la séance) ; les anciennes dates ne changent pas.</p>
+        <div className="flex flex-wrap gap-1">{etapesNouvelleAdministration.map((candidate) => <button key={candidate.id} type="button" onClick={() => ajouterNouvelleAdministration(candidate)} className="min-h-9 rounded-lg border border-green-700 bg-white px-3 text-sm font-semibold text-green-900">+ {candidate.label || "Injection"}</button>)}</div>
+      </div>}
       {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
       <button type="button" disabled={rattachementEnCours} onClick={fermer} className="mt-4 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Fermer</button>
+    </div></div>;
+  }
+
+  // Séance de travail : un soin non vaccinal (ex. bolus) appliqué au même lot, même date, même exécutant.
+  const animauxDuLot = useMemo(() => {
+    const ids = new Set([...animauxSelectionnes, ...actes.map((acte) => acte.ligne.animalId)]);
+    return lignes.filter((ligne) => ids.has(ligne.animalId));
+  }, [actes, animauxSelectionnes, lignes]);
+
+  async function ouvrirSoin() {
+    if (animauxDuLot.length === 0) {
+      setErreur("Sélectionne d’abord des animaux ou des vaccinations.");
+      return;
+    }
+    setErreur("");
+    setSoinMessage("");
+    setSoinMedicament(null);
+    setSoinVoie("");
+    setSoinDose("");
+    setSoinUnite("ml");
+    setSoinModifierAnimaux(false);
+    setSoinAnimaux(new Set(animauxDuLot.map((ligne) => ligne.animalId)));
+    setSoinOuvert(true);
+    if (medicamentsSoins.length === 0) {
+      try {
+        const liste = await fetch("/api/medicaments").then((reponse) => reponse.json()) as (MedicamentOption & { actif: boolean })[];
+        // Un soin n'est jamais un vaccin : les médicaments de catégorie VACCIN restent dans le tableau vaccinal.
+        setMedicamentsSoins(liste.filter((medicament) => medicament.actif && medicament.categorie !== "VACCIN"));
+      } catch {
+        setErreur("Les médicaments n’ont pas pu être chargés.");
+      }
+    }
+  }
+
+  async function enregistrerSoin() {
+    if (!soinMedicament || soinAnimaux.size === 0) return;
+    if (!dateSession || !executant.trim()) {
+      setErreur("Indique la date et l’exécutant de la séance.");
+      return;
+    }
+    setSoinEnCours(true);
+    setErreur("");
+    try {
+      const charge = construireChargeSoin({
+        animalIds: [...soinAnimaux],
+        date: dateSession,
+        executant,
+        medicamentId: soinMedicament.id,
+        medicamentNom: soinMedicament.nom,
+        voie: soinVoie.trim() || null,
+        dose: soinDose === "" ? null : Number(soinDose),
+        uniteDosage: soinUnite || null,
+        delaiAttenteViandeJ: soinMedicament.delaiAttenteViandeJ,
+        delaiAttenteLaitJ: soinMedicament.delaiAttenteLaitJ,
+      });
+      const reponse = await fetch("/api/evenements/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(charge) });
+      const detail = await reponse.json().catch(() => ({}));
+      if (!reponse.ok) throw new Error(detail.error || "Le soin n’a pas pu être enregistré.");
+      setSoinMessage(`${soinMedicament.nom} enregistré pour ${soinAnimaux.size} animal(aux).`);
+      setSoinOuvert(false);
+    } catch (cause) {
+      setErreur(cause instanceof Error ? cause.message : "Le soin n’a pas pu être enregistré.");
+    } finally {
+      setSoinEnCours(false);
+    }
+  }
+
+  function renduPanneauSoin() {
+    if (!soinOuvert) return null;
+    const fermer = () => { setSoinOuvert(false); setErreur(""); };
+    return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Ajouter un soin ou traitement"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
+      <h2 className="text-lg font-black text-gray-900">Ajouter un soin / traitement</h2>
+      <p className="text-xs text-gray-500">Date {afficherDate(dateSession)} · exécutant {executant || "à renseigner"} — enregistré comme un traitement sanitaire normal, jamais comme un vaccin.</p>
+      <div className="mt-3"><MedicamentPicker medicaments={medicamentsSoins} value={soinMedicament} onChange={(medicament) => { setSoinMedicament(medicament); setSoinVoie(medicament?.voie ?? ""); setSoinUnite(medicament?.uniteDosage ?? "ml"); }} /></div>
+      {soinMedicament && <div className="mt-2 grid grid-cols-3 gap-2 text-xs font-semibold text-gray-700">
+        <label>Voie<input value={soinVoie} onChange={(event) => setSoinVoie(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border px-2 text-sm font-normal" /></label>
+        <label>Dose<input type="number" min={0} step="0.1" value={soinDose} onChange={(event) => setSoinDose(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border px-2 text-sm font-normal" /></label>
+        <label>Unité<input value={soinUnite} onChange={(event) => setSoinUnite(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border px-2 text-sm font-normal" /></label>
+      </div>}
+      <div className="mt-3 rounded-lg bg-gray-50 p-2 text-sm">
+        <div className="flex items-center gap-2"><b className="mr-auto">{soinAnimaux.size} animal(aux) du lot</b><button type="button" onClick={() => setSoinModifierAnimaux((actuel) => !actuel)} className="min-h-8 text-xs font-semibold text-green-800 underline">{soinModifierAnimaux ? "Terminé" : "Modifier les animaux"}</button></div>
+        {soinModifierAnimaux && <div className="mt-2 grid max-h-48 gap-1 overflow-y-auto">{animauxDuLot.map((ligne) => <label key={ligne.animalId} className="flex min-h-9 cursor-pointer items-center gap-2"><input type="checkbox" checked={soinAnimaux.has(ligne.animalId)} onChange={() => basculerDansSet(setSoinAnimaux, ligne.animalId)} className="h-5 w-5 accent-green-700" />{ligne.nutrav} {ligne.nom}</label>)}</div>}
+      </div>
+      {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
+      <button type="button" disabled={!soinMedicament || soinAnimaux.size === 0 || soinEnCours} onClick={() => void enregistrerSoin()} className="mt-3 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-40">{soinEnCours ? "Enregistrement…" : `Appliquer aux ${soinAnimaux.size} animaux`}</button>
+      <button type="button" disabled={soinEnCours} onClick={fermer} className="mt-2 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Annuler</button>
     </div></div>;
   }
 
@@ -587,7 +701,8 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
         </details>
       </div>
 
-      <div className="vaccin-print-hidden mx-3 mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs"><b className="mr-auto">{animauxSelectionnes.size} animal(aux) sélectionné(s)</b><button type="button" onClick={selectionnerAnimauxVisibles} className="min-h-8 rounded border bg-white px-2 font-semibold">Tout sélectionner les animaux visibles</button><button type="button" onClick={() => { setAnimauxSelectionnes(new Set()); setUniquementSelection(false); }} className="min-h-8 rounded border bg-white px-2 font-semibold">Tout désélectionner</button><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => setUniquementSelection((actuel) => !actuel)} className="min-h-8 rounded border border-green-700 bg-white px-2 font-semibold text-green-800 disabled:opacity-40">{uniquementSelection ? "Afficher tous" : "Afficher uniquement la sélection"}</button></div>
+      <p className="vaccin-print-hidden mx-3 mb-2 flex flex-wrap items-center gap-x-2 text-xs text-gray-600"><span className="font-semibold">{libelleAnimauxSelectionnes(animauxSelectionnes.size)}</span><span aria-hidden="true">·</span><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => setUniquementSelection((actuel) => !actuel)} className="min-h-9 px-1 font-semibold text-green-800 underline disabled:opacity-40">{actionsSelectionAnimaux(uniquementSelection).basculerVue}</button><span aria-hidden="true">·</span><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => { setAnimauxSelectionnes(new Set()); setUniquementSelection(false); }} className="min-h-9 px-1 font-semibold text-green-800 underline disabled:opacity-40">{actionsSelectionAnimaux(uniquementSelection).vider}</button></p>
+
 
       <div className="vaccin-print-hidden mx-3 mb-3 rounded-xl border border-green-200 bg-green-50 p-3">
         <p className="mb-2 text-sm font-black text-green-950">Saisie des vaccinations</p>
@@ -596,7 +711,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
           <label className="text-xs font-semibold text-green-950">Exécutant<div className="mt-1 font-normal text-gray-900"><ExecutantSelect intervenants={intervenants} value={executant} onChange={setExecutant} onAdded={(intervenant) => setIntervenants((actuels) => [...actuels, intervenant])} /></div></label>
           <button type="button" disabled={actes.length === 0 || enregistrement} onClick={enregistrerSelection} className="min-h-10 rounded-lg bg-green-800 px-3 text-sm font-bold text-white disabled:opacity-40">{enregistrement ? "Enregistrement…" : `Enregistrer ${actes.length} vaccination(s)`}</button>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2"><p className="mr-auto text-xs font-semibold text-green-950">{nombreAnimaux} animal(aux) · {actes.length} vaccination(s) sélectionnée(s)</p>{actes.length > 0 && <button type="button" onClick={() => setActesSelectionnes(new Set())} className="min-h-8 rounded-lg border bg-white px-2 text-xs font-semibold">Vider la sélection</button>}</div>
+        <div className="mt-2 flex flex-wrap items-center gap-2"><p className="mr-auto text-xs font-semibold text-green-950">{nombreAnimaux} animal(aux) · {actes.length} vaccination(s) sélectionnée(s)</p><button type="button" onClick={() => void ouvrirSoin()} className="min-h-8 rounded-lg border border-green-700 bg-white px-2 text-xs font-semibold text-green-900">+ Ajouter un soin / traitement</button>{soinMessage && <span className="text-xs font-semibold text-green-900">{soinMessage}</span>}{actes.length > 0 && <button type="button" onClick={() => setActesSelectionnes(new Set())} className="min-h-8 rounded-lg border bg-white px-2 text-xs font-semibold">Vider la sélection</button>}</div>
         {erreur && !donneesManquantes && <p className="mt-2 text-sm font-semibold text-red-700">{erreur}</p>}
       </div>
 
@@ -604,13 +719,13 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
         <table className="w-full min-w-max border-collapse text-left text-sm">
           <thead className="text-[13px]">
             <tr className="vaccin-head-1">
-              <th rowSpan={2} scope="col" className="animal-selection-column sticky left-0 top-0 z-50 border-r bg-gray-50 p-1 text-center" style={{ width: largeurSelection, minWidth: largeurSelection }}><span className="sr-only">Sélection animal</span></th>
+              <th rowSpan={2} scope="col" className="animal-selection-column sticky left-0 top-0 z-50 border-r bg-gray-50 p-1 text-center" style={{ width: largeurSelection, minWidth: largeurSelection }}><input type="checkbox" aria-label="Sélectionner ou désélectionner les animaux visibles" checked={etatMaitre === "TOUS"} ref={(element) => { if (element) element.indeterminate = etatMaitre === "PARTIEL"; }} onChange={basculerAnimauxVisibles} className="h-5 w-5 accent-green-700" /></th>
               {enteteTriable("N°", "numero", "numero", "top-0 z-40 border-r bg-gray-50 p-1")}
               {!colonnesMasquees.has("nom") && <th rowSpan={2} scope="col" onContextMenu={(event) => ouvrirMenuColonne(event, "nom")} className="animal-fixed top-0 z-40 border-r bg-gray-50 p-1 font-bold" style={{ left: decalageColonne("nom"), width: largeurColonne.nom, minWidth: largeurColonne.nom }}>Nom</th>}
               {enteteTriable("Âge", "age", "age", "top-0 z-40 border-r bg-gray-50 p-1")}
               {enteteTriable("Sexe", "sexe", "sexe", "top-0 z-40 border-r bg-gray-50 p-1")}
               {enteteTriable("Avant vêlage", "velage", "velage", "top-0 z-40 border-r bg-gray-50 p-1")}
-              {blocsAffiches.map((bloc) => <th key={bloc.cle} colSpan={bloc.sousColonnes.length} scope="colgroup" className="sticky top-0 z-30 h-8 border-r border-b bg-gray-50 p-1 text-center font-bold text-gray-800">{bloc.nom}{bloc.voie && <span className="ml-1 font-normal text-gray-500">{bloc.voie}</span>}</th>)}
+              {blocsAffiches.map((bloc) => <th key={bloc.cle} colSpan={bloc.sousColonnes.length} scope="colgroup" className="sticky top-0 z-30 h-8 border-r border-b bg-gray-50 p-1 text-center font-bold text-gray-800">{bloc.nom}</th>)}
             </tr>
             <tr className="vaccin-head-2">{blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cleTri = `vaccin:${etape.id}` as const; return <th key={etape.id} scope="col" className="sticky top-8 z-30 min-w-24 border-r bg-gray-50 p-1 text-center font-medium text-gray-600"><button type="button" onClick={() => basculerTri(cleTri)} className="w-full font-semibold">{etape.label || "Injection"}{indicateurTri(cleTri)}</button><span className="mt-0.5 block text-[9px] font-medium normal-case text-gray-500">{libelleVoieDose(etape.voie, etape.dose, etape.uniteDosage)}</span></th>; }))}</tr>
           </thead>
@@ -621,7 +736,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
             {!colonnesMasquees.has("age") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("age"), width: largeurColonne.age, minWidth: largeurColonne.age }}>{formatAgeTerrain(ligne.danaisIso)}</td>}
             {!colonnesMasquees.has("sexe") && <td className="animal-fixed z-20 border-r bg-white p-1 text-center font-medium text-gray-700" style={{ left: decalageColonne("sexe"), width: largeurColonne.sexe, minWidth: largeurColonne.sexe }}>{ligne.sexe}</td>}
             {!colonnesMasquees.has("velage") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("velage"), width: largeurColonne.velage, minWidth: largeurColonne.velage }}>{ligne.dateVelagePrevueIso ? formatTempsAvantVelage(ligne.dateVelagePrevueIso) : "—"}</td>}
-            {blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cellule = ligne.cellules[etape.id]; const historique = cellule?.historiquesAValider[0]; return <td key={etape.id} className="border-r p-1 align-top">{renduCellule(cellule, ligne, etape)}{historique && <button type="button" title="Historique à rattacher" onClick={() => ouvrirHistorique(ligne, bloc)} className="vaccin-print-hidden mx-auto mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-amber-600 bg-amber-50 text-[11px] font-black text-amber-900">?</button>}</td>; }))}
+            {blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cellule = ligne.cellules[etape.id]; const historique = cellule?.historiquesAValider[0]; return <td key={etape.id} className="border-r p-1 align-top">{renduCellule(cellule, ligne, etape)}{historique && <button type="button" title="Historique à rattacher" onClick={() => ouvrirHistorique(ligne, bloc, etape)} className="vaccin-print-hidden mx-auto mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-amber-600 bg-amber-50 text-[11px] font-black text-amber-900">?</button>}</td>; }))}
           </tr>)}</tbody>
         </table>
         {resultat.length === 0 && <p className="p-3 text-sm text-gray-500">Aucun animal avec ces filtres.</p>}
@@ -642,6 +757,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
       </div></div>}
 
       {renduPanneauHistorique()}
+      {renduPanneauSoin()}
       <style jsx global>{`
         #tableau-vaccinal-impression .animal-fixed { position: sticky; }
         #tableau-vaccinal-impression .vaccin-table-scroll {

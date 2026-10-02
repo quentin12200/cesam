@@ -7,7 +7,7 @@ import { getCategorie } from "@/lib/utils";
 import { getPreparationsVaccinales } from "@/lib/vaccine-preparation-data";
 import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
 import { construireGrilleVaccinale, type AnimalGrille, type ProtocoleGrille } from "@/lib/vaccine-grid";
-import { resoudreVoieVaccinale } from "@/lib/vaccine-planner";
+import { resoudreAdministrationEtape } from "@/lib/vaccine-administration";
 import PreparationVaccinCard from "./PreparationVaccinCard";
 import TableauVaccinal from "./TableauVaccinal";
 
@@ -87,15 +87,14 @@ export default async function VaccinsPage() {
     etapes: protocole.etapes.map((etape) => {
       const liaison = etape.medicaments[0] ?? null;
       const medicament = liaison?.medicament ?? null;
-      const preconisationsValides = medicament?.preconisations.filter((item) => item.statut === "VALIDE") ?? [];
-      const preconisationLiee = liaison?.preconisationId
-        ? preconisationsValides.find((item) => item.id === liaison.preconisationId) ?? null
-        : null;
-      const preconisationsDosees = preconisationsValides.filter((item) => item.dose != null);
-      const preconisationDose = preconisationLiee ?? (preconisationsDosees.length === 1 ? preconisationsDosees[0] : null);
-      const preconisationVoie = preconisationLiee?.voie
-        ? preconisationLiee
-        : preconisationsValides.find((item) => item.voie) ?? null;
+      // Pharmacie = vérité : voie + dose viennent des préconisations du médicament (voir lib/vaccine-administration.ts).
+      const administration = resoudreAdministrationEtape({
+        preconisations: medicament?.preconisations ?? [],
+        preconisationLieeId: liaison?.preconisationId,
+        voieLiaison: liaison?.voie,
+        voieMedicament: medicament?.voie,
+        uniteMedicament: medicament?.uniteDosage,
+      });
       return {
         id: etape.id, label: etape.label, ordre: etape.ordre, cycle: etape.cycle, reference: etape.reference,
         debutValeur: etape.debutValeur, debutUnite: etape.debutUnite, debutPosition: etape.debutPosition,
@@ -103,13 +102,9 @@ export default async function VaccinsPage() {
         dateFixe: etape.dateFixe, recurrenceMois: etape.recurrenceMois, obligatoire: etape.obligatoire,
         medicamentId: liaison?.medicamentId ?? null,
         medicamentNom: medicament?.nom ?? null,
-        voie: resoudreVoieVaccinale({
-          voiePreconisation: preconisationVoie?.voie,
-          voieMedicament: medicament?.voie,
-          voieLiaison: liaison?.voie,
-        }),
-        dose: preconisationDose?.dose ?? null,
-        uniteDosage: preconisationDose?.unite || medicament?.uniteDosage || null,
+        voie: administration.voie ?? "À renseigner",
+        dose: administration.dose,
+        uniteDosage: administration.unite,
         medicaments: etape.medicaments.map((item) => ({ medicament: { id: item.medicament.id, nom: item.medicament.nom } })),
       };
     }),
@@ -145,7 +140,8 @@ export default async function VaccinsPage() {
           ...cellule,
           date: cellule.date ? cellule.date.toISOString() : null,
           actes: cellule.actes.map((acte) => ({ ...acte, date: acte.date.toISOString() })),
-          prochaine: cellule.prochaine ? { ...cellule.prochaine, date: cellule.prochaine.date.toISOString() } : null,
+          prochaine: cellule.prochaine ? { ...cellule.prochaine, date: cellule.prochaine.date.toISOString(), fenetre: { debut: cellule.prochaine.fenetre.debut.toISOString(), fin: cellule.prochaine.fenetre.fin.toISOString() } } : null,
+          fenetre: cellule.fenetre ? { debut: cellule.fenetre.debut.toISOString(), fin: cellule.fenetre.fin.toISOString() } : null,
           historiquesAValider: cellule.historiquesAValider.map((historique) => ({ ...historique, date: historique.date.toISOString() })),
         }])),
       }))} />

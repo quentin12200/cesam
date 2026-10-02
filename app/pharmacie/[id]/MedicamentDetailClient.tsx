@@ -6,6 +6,7 @@ import { Save, CheckCircle2, Plus, AlertTriangle, ShieldCheck } from "lucide-rea
 import { getCategoriesMedicamentUtilisees } from "@/lib/medicament-categories";
 import PreconisationFields, { VoieSelect } from "./PreconisationFields";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
+import { voiesPossibles } from "@/lib/vaccine-administration";
 
 interface MedicamentData {
   id: string;
@@ -215,6 +216,11 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
             onChange={(value) => setForm((f) => ({ ...f, voie: value }))}
           />
         </div>
+        <p className="text-xs text-gray-600" data-testid="voies-possibles">
+          <span className="font-semibold">Voies possibles :</span>{" "}
+          {voiesPossibles(preconisations, form.voie).join(" · ") || "à renseigner dans les préconisations"}
+          <span className="block text-[11px] text-gray-400">Dérivées des préconisations validées ; la voie usuelle ne sert que de repli.</span>
+        </p>
         <div className="flex gap-4">
           <label className="flex items-center gap-1.5 text-sm text-gray-600">
             <input type="checkbox" checked={form.prescriptionRequise} onChange={(e) => setForm((f) => ({ ...f, prescriptionRequise: e.target.checked }))} />

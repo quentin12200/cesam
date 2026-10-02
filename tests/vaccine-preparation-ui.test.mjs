@@ -76,9 +76,8 @@ test("la deuxième passe ajoute gestation, vêlage et tri d'urgence sans règle 
 test("la sélection animale et l'impression reprennent exactement la vue courante", () => {
   const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
   assert.match(tableau, /animauxSelectionnes/);
-  assert.match(tableau, /Tout sélectionner les animaux visibles/);
-  assert.match(tableau, /Afficher uniquement la sélection/);
-  assert.match(tableau, /Afficher tous/);
+  assert.match(tableau, /Sélectionner ou désélectionner les animaux visibles/);
+  assert.match(tableau, /actionsSelectionAnimaux\(uniquementSelection\)/);
   assert.match(tableau, /window\.print\(\)/);
   assert.match(tableau, /@page \{ size: A4 landscape/);
   assert.match(tableau, /thead \{ display: table-header-group/);
@@ -331,7 +330,7 @@ test("la troisième passe compacte les commandes et fige les volets du tableau",
 test("la grille est directement saisissable, y compris hors échéance ou hors protocole", () => {
   const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
   const grille = read("lib/vaccine-grid.ts");
-  assert.match(tableau, /cellule\.statut !== "FAIT"/);
+  assert.match(tableau, /!cellule\.aValider && etape\.medicamentId/);
   assert.match(tableau, /rattachementProtocoleAutorise \? "structure" : "libre"/);
   assert.match(tableau, /groupe\.actes\.every/);
   assert.match(tableau, /\? \{ vaccinationSession:/);
@@ -346,8 +345,8 @@ test("l'historique ambigu est discret et se rattache sans jamais créer de secon
   assert.match(tableau, /rattachement-vaccinal/);
   assert.match(tableau, /Aucune étape compatible avec ce médicament dans ce protocole/);
   assert.match(tableau, /Choisir l’étape/);
-  assert.match(tableau, /Historique — \$\{bloc\.nom\}/);
-  assert.match(tableau, /actesDuVaccin\(ligne\.actes, bloc\)/);
+  assert.match(tableau, /Historique — \$\{nomVaccin\}/);
+  assert.match(tableau, /actesDuVaccin\(ligne\.actes, \{ id: medicamentId, nom: nomVaccin \}\)/);
   const routeTraitement = read("app/api/traitements/[id]/rattachement-vaccinal/route.ts");
   assert.match(routeTraitement, /prisma\.traitement\.update/);
   assert.doesNotMatch(routeTraitement, /vaccination\.create|traitement\.create/);

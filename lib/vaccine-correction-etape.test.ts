@@ -137,7 +137,7 @@ test("l'interface : étapes sans lien « Sélectionner à faire », cellule FAIT
   assert.doesNotMatch(tableau, /Sélectionner à faire/);
   assert.match(tableau, /libelleVoieDose\(etape\.voie, etape\.dose, etape\.uniteDosage\)/);
   assert.match(tableau, /Modifier l’étape/);
-  assert.match(tableau, /Historique — \$\{bloc\.nom\}/);
+  assert.match(tableau, /Historique — \$\{nomVaccin\}/);
   assert.match(tableau, /rattachement-vaccinal/);
   assert.match(tableau, /\/api\/vaccinations\/\$\{cible\.sourceId\}\/rattachement/);
   assert.doesNotMatch(tableau, /method: "POST"[\s\S]{0,200}rattachement/);
@@ -171,5 +171,5 @@ test("dose : la dose affichée dans l'en-tête est celle envoyée au Traitement 
   assert.match(batch, /dose: vaccinationConfig\.session\.dose == null \? null : Number\(vaccinationConfig\.session\.dose\)/);
 
   const page = readFileSync(new URL("../app/sanitaire/vaccins/page.tsx", import.meta.url), "utf8");
-  assert.match(page, /dose: preconisationDose\?\.dose \?\? null/);
+  assert.match(page, /dose: administration\.dose/);
 });

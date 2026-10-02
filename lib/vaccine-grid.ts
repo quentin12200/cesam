@@ -86,7 +86,7 @@ export interface BlocVaccinGrille {
   /** Tous les médicaments liés aux étapes (y compris alternatives) : sert à retrouver l'historique du vaccin. */
   medicamentIds: string[];
   /** Étapes configurées et leurs médicaments, pour proposer uniquement les étapes compatibles. */
-  etapes: { id: string; reference: string; medicamentIds: string[] }[];
+  etapes: { id: string; reference: string; cycle: string; medicamentIds: string[] }[];
 }
 
 export type StatutCelluleGrille = "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
@@ -100,7 +100,9 @@ export interface CelluleGrille {
   /** TOUS les actes réels de cette étape (jamais seulement le dernier), du plus ancien au plus récent. */
   actes: ActeCellule[];
   /** Prochaine échéance quand l'étape a déjà des actes et une récurrence configurée. */
-  prochaine: { statut: Exclude<StatutCelluleGrille, "FAIT" | "VIDE">; date: Date } | null;
+  prochaine: { statut: Exclude<StatutCelluleGrille, "FAIT" | "VIDE">; date: Date; fenetre: { debut: Date; fin: Date } } | null;
+  /** Fenêtre calculée par le planner pour une échéance (jamais pour une case FAIT). */
+  fenetre?: { debut: Date; fin: Date } | null;
 }
 
 /** Acte réel unifié (Vaccination ou Traitement VACCIN) tel que présenté dans la grille. */
@@ -215,6 +217,7 @@ export function construireBlocsVaccinaux(
         etapes: protocole.etapes.map((etape) => ({
           id: etape.id,
           reference: etape.reference,
+          cycle: etape.cycle,
           medicamentIds: etape.medicaments.map((liaison) => liaison.medicament.id),
         })),
       });
@@ -257,12 +260,13 @@ function celluleDepuisPlanning(date: Date, fenetre: { debut: Date; fin: Date }):
   const statut = statutPlanningVaccin(date, fenetre.debut, fenetre.fin);
   // Une echeance calculee ne disparait jamais parce qu'elle est lointaine : elle reste visible, en
   // "prevu plus tard" (ni a faire, ni en retard), et la case reste selectionnable.
-  if (statut === "TROP_TOT") return { statut: "PREVU", date: fenetre.debut, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null };
-  if (statut === "EN_RETARD_LEGER" || statut === "EN_RETARD") return { statut: "EN_RETARD", date: fenetre.fin, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null };
+  const avecFenetre = (cellule: CelluleGrille): CelluleGrille => ({ ...cellule, fenetre: { debut: fenetre.debut, fin: fenetre.fin } });
+  if (statut === "TROP_TOT") return avecFenetre({ statut: "PREVU", date: fenetre.debut, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null });
+  if (statut === "EN_RETARD_LEGER" || statut === "EN_RETARD") return avecFenetre({ statut: "EN_RETARD", date: fenetre.fin, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null });
   // Bientôt (fenêtre pas encore ouverte mais proche) reste distinct d'à faire (fenêtre ouverte,
   // à faire maintenant) : même donnée du moteur (statutPlanningVaccin), affichage plus fin.
-  if (statut === "A_PREVOIR") return { statut: "BIENTOT", date: fenetre.debut, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null };
-  return { statut: "A_FAIRE", date: fenetre.fin, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null };
+  if (statut === "A_PREVOIR") return avecFenetre({ statut: "BIENTOT", date: fenetre.debut, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null });
+  return avecFenetre({ statut: "A_FAIRE", date: fenetre.fin, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null });
 }
 
 /** Cellules d'un animal pour un protocole : une par étape réelle, dans l'ordre. */
@@ -321,11 +325,11 @@ function celluleProtocole(
       let prochaine: CelluleGrille["prochaine"] = null;
       if (etape.cycle !== "ENTRETIEN") {
         dateEtapePrecedente = faites[0].date;
-      } else if (etape.recurrenceMois && eligible) {
+      } else if (etape.recurrenceMois && etape.reference !== "VELAGE" && eligible) {
         const echeance = addMonths(faites[0].date, etape.recurrenceMois);
         const horsAge = protocole.ageMaxJours != null && echeance > addDays(new Date(animal.danaisIso), protocole.ageMaxJours);
         const suite = horsAge ? celluleVide() : celluleDepuisPlanning(date, { debut: echeance, fin: echeance });
-        if (suite.statut !== "VIDE" && suite.statut !== "FAIT" && suite.date) prochaine = { statut: suite.statut, date: suite.date };
+        if (suite.statut !== "VIDE" && suite.statut !== "FAIT" && suite.date) prochaine = { statut: suite.statut, date: suite.date, fenetre: suite.fenetre ?? { debut: suite.date, fin: suite.date } };
       }
       cellules.set(etape.id, { statut: "FAIT", date: faites[0].date, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [...faites].reverse().map(versActeCellule), prochaine });
       continue;
@@ -420,4 +424,69 @@ export function construireGrilleVaccinale(
   });
 
   return { blocs, lignes };
+}
+
+/**
+ * Action vaccinale prévue pour un animal : donnée de base du futur bandeau de travail. Dérivée de
+ * la grille (donc du même planner, sans deuxième logique) ; ne contient aucune règle supplémentaire.
+ */
+export interface ActionPrevue {
+  animalId: string;
+  nutrav: string;
+  nom: string | null;
+  medicamentId: string | null;
+  medicamentNom: string;
+  protocoleId: string | null;
+  etapeId: string;
+  etapeLabel: string;
+  typeEtape: "INITIAL" | "ENTRETIEN";
+  statut: "PREVU" | "BIENTOT" | "A_FAIRE" | "EN_RETARD";
+  dateMin: Date;
+  dateMax: Date;
+  /** Date de vêlage prévue de référence, seulement pour une étape basée sur le vêlage. */
+  dateVelageReference: Date | null;
+  /** Historique réel de CE médicament pour cet animal (tous les actes, aucun filtre d'année). */
+  historique: ActeCellule[];
+  voie: string | null;
+  dose: number | null;
+  unite: string | null;
+}
+
+export function extraireActionsPrevues(grille: { blocs: BlocVaccinGrille[]; lignes: LigneGrille[] }): ActionPrevue[] {
+  const actions: ActionPrevue[] = [];
+  for (const ligne of grille.lignes) {
+    for (const bloc of grille.blocs) {
+      for (const sousColonne of bloc.sousColonnes) {
+        const cellule = ligne.cellules[sousColonne.id];
+        if (!cellule) continue;
+        const planning = cellule.statut === "FAIT"
+          ? cellule.prochaine
+          : cellule.statut === "VIDE" || !cellule.fenetre ? null : { statut: cellule.statut, fenetre: cellule.fenetre };
+        if (!planning) continue;
+        const etape = bloc.etapes.find((item) => item.id === sousColonne.id);
+        const medicamentId = sousColonne.medicamentId ?? bloc.medicamentId;
+        const nom = sousColonne.medicamentNom ?? bloc.nom;
+        actions.push({
+          animalId: ligne.animalId,
+          nutrav: ligne.nutrav,
+          nom: ligne.nom,
+          medicamentId,
+          medicamentNom: nom,
+          protocoleId: sousColonne.protocoleId,
+          etapeId: sousColonne.id,
+          etapeLabel: sousColonne.label,
+          typeEtape: etape?.cycle === "ENTRETIEN" ? "ENTRETIEN" : "INITIAL",
+          statut: planning.statut,
+          dateMin: planning.fenetre.debut,
+          dateMax: planning.fenetre.fin,
+          dateVelageReference: etape?.reference === "VELAGE" && ligne.dateVelagePrevueIso ? new Date(ligne.dateVelagePrevueIso) : null,
+          historique: ligne.actes.filter((acte) => acte.medicamentId != null ? acte.medicamentId === medicamentId : acte.vaccin.trim().toUpperCase() === nom.trim().toUpperCase()),
+          voie: sousColonne.voie,
+          dose: sousColonne.dose,
+          unite: sousColonne.uniteDosage,
+        });
+      }
+    }
+  }
+  return actions;
 }

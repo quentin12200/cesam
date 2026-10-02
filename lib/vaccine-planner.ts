@@ -424,11 +424,14 @@ export function calculerActionVaccinale({
       dateEtapePrecedente = faites[0].date;
       continue;
     }
-    if (faites.length > 0 && etape.cycle === "ENTRETIEN" && !etape.recurrenceMois) continue;
+    // Une étape basée sur le vêlage suit TOUJOURS la date de vêlage concernée : une récurrence en mois
+    // ne s'applique pas (sinon "dernier acte + N mois" écraserait le nouveau vêlage).
+    const recurrenceActive = Boolean(etape.recurrenceMois) && etape.reference !== "VELAGE";
+    if (faites.length > 0 && etape.cycle === "ENTRETIEN" && !recurrenceActive) continue;
 
     let fenetre: FenetreVaccinale | null;
-    if (faites.length > 0 && etape.cycle === "ENTRETIEN" && etape.recurrenceMois) {
-      const rappel = addMonths(faites[0].date, etape.recurrenceMois);
+    if (faites.length > 0 && etape.cycle === "ENTRETIEN" && recurrenceActive) {
+      const rappel = addMonths(faites[0].date, etape.recurrenceMois!);
       fenetre = intersectionFenetre({ debut: rappel, fin: rappel },
         ageMinJours == null ? null : addDays(dateNaissance, ageMinJours),
         ageMaxJours == null ? null : addDays(dateNaissance, ageMaxJours));
