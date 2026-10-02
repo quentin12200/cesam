@@ -7,7 +7,9 @@ import { Settings } from "lucide-react";
 import ExecutantSelect, { type Intervenant } from "@/app/sanitaire/nouvel-evenement/ExecutantSelect";
 import { formatAgeTerrain } from "@/lib/animal-age";
 import { regrouperActesVaccinaux } from "@/lib/vaccination-session";
-import { comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose } from "@/lib/vaccine-table-presentation";
+import { medicamentCompatibleAvecEtape } from "@/lib/vaccine-attachment";
+import { actesDuVaccin, anneesDisponibles, datesCompactes, type ActeHistorique } from "@/lib/vaccine-history-view";
+import { comparerDateVelage, comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
 
 interface CelluleGrille {
   statut: "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
@@ -15,20 +17,8 @@ interface CelluleGrille {
   aValider: boolean;
   rattachementProtocoleAutorise: boolean;
   historiquesAValider: HistoriqueAValider[];
-  acteFait?: ActeFait | null;
-}
-
-interface ActeFait {
-  sourceType: "VACCINATION" | "TRAITEMENT";
-  sourceId: string;
-  vaccin: string;
-  medicamentId: string | null;
-  protocoleId: string;
-  protocoleNom: string;
-  etapeProtocoleId: string;
-  gestationId: string | null;
-  protocoleLieAuVelage: boolean;
-  etapesCompatibles: { id: string; label: string }[];
+  actes: ActeHistorique[];
+  prochaine: { statut: "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU"; date: string } | null;
 }
 
 interface HistoriqueAValider {
@@ -54,6 +44,7 @@ interface Ligne {
   gestationId: string | null;
   dateVelagePrevueIso: string | null;
   cellules: Record<string, CelluleGrille>;
+  actes: ActeHistorique[];
 }
 
 interface SousColonne {
@@ -74,13 +65,16 @@ interface Bloc {
   sousColonnes: SousColonne[];
   protocoleId: string | null;
   medicamentId: string | null;
+  protocoleNom: string | null;
+  protocoleLieAuVelage: boolean;
+  medicamentIds: string[];
+  etapes: { id: string; reference: string; medicamentIds: string[] }[];
 }
 
 type Statut = "aFaire" | "enRetard" | "faits";
-type Tri = "numero" | "age" | "sexe" | "gestation" | "velage" | `vaccin:${string}`;
+type Tri = "numero" | "age" | "sexe" | "velage" | `vaccin:${string}`;
 type DirectionTri = "asc" | "desc";
-type ColonneAnimal = "numero" | "nom" | "age" | "sexe" | "gestation" | "velage";
-type FiltreGestation = "toutes" | "gestantes" | "vides";
+type ColonneAnimal = "numero" | "nom" | "age" | "sexe" | "velage";
 
 interface ActeSelectionne {
   cle: string;
@@ -110,10 +104,9 @@ const colonnesAnimal: { id: ColonneAnimal; label: string }[] = [
   { id: "nom", label: "Nom" },
   { id: "age", label: "Âge" },
   { id: "sexe", label: "Sexe" },
-  { id: "gestation", label: "Gestation" },
   { id: "velage", label: "Avant vêlage" },
 ];
-const largeurColonne: Record<ColonneAnimal, number> = { numero: 64, nom: 92, age: 66, sexe: 42, gestation: 64, velage: 76 };
+const largeurColonne: Record<ColonneAnimal, number> = { numero: 64, nom: 92, age: 66, sexe: 42, velage: 76 };
 const largeurSelection = 38;
 const dateLocaleIso = () => {
   const date = new Date();
@@ -122,12 +115,17 @@ const dateLocaleIso = () => {
 };
 const cleActe = (animalId: string, etapeId: string) => `${animalId}|${etapeId}`;
 const estAFaire = (statut: CelluleGrille["statut"]) => statut === "A_FAIRE" || statut === "BIENTOT";
+// Une case déjà faite reste utilisable quand une prochaine échéance existe (rappel récurrent).
 const estSelectionnable = (cellule: CelluleGrille | undefined, etape: SousColonne) =>
-  Boolean(cellule && cellule.statut !== "FAIT" && !cellule.aValider && etape.medicamentId);
+  Boolean(cellule && (cellule.statut !== "FAIT" || cellule.prochaine) && !cellule.aValider && etape.medicamentId);
+const statutEffectif = (cellule: CelluleGrille): CelluleGrille["statut"] => cellule.statut === "FAIT" && cellule.prochaine ? cellule.prochaine.statut : cellule.statut;
+const echeanceDeTri = (cellule: CelluleGrille | undefined) =>
+  cellule?.prochaine ? { statut: cellule.prochaine.statut, date: cellule.prochaine.date } : cellule;
 
-function correspondStatut(statut: CelluleGrille["statut"], filtres: ReadonlySet<Statut>): boolean {
+function correspondStatut(cellule: CelluleGrille, filtres: ReadonlySet<Statut>): boolean {
   if (filtres.size === 0) return true;
-  return (filtres.has("faits") && statut === "FAIT")
+  const statut = statutEffectif(cellule);
+  return (filtres.has("faits") && cellule.statut === "FAIT")
     || (filtres.has("aFaire") && estAFaire(statut))
     || (filtres.has("enRetard") && statut === "EN_RETARD");
 }
@@ -137,7 +135,6 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
   const [recherche, setRecherche] = useState("");
   const [vaccinsAffiches, setVaccinsAffiches] = useState<Set<string>>(() => new Set(blocs.map((bloc) => bloc.cle)));
   const [statuts, setStatuts] = useState<Set<Statut>>(new Set());
-  const [filtreGestation, setFiltreGestation] = useState<FiltreGestation>("toutes");
   const [tri, setTri] = useState<Tri | null>(null);
   const [directionTri, setDirectionTri] = useState<DirectionTri | null>(null);
   const [colonnesMasquees, setColonnesMasquees] = useState<Set<ColonneAnimal>>(new Set());
@@ -153,10 +150,12 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
   const [ajustements, setAjustements] = useState<Record<string, AjustementGroupe>>({});
   const [enregistrement, setEnregistrement] = useState(false);
   const [erreur, setErreur] = useState("");
-  const [historiqueOuvert, setHistoriqueOuvert] = useState<{ ligne: Ligne; bloc: Bloc; etape: SousColonne; historique: HistoriqueAValider } | null>(null);
   const [rattachementEnCours, setRattachementEnCours] = useState(false);
   const [etapeChoisie, setEtapeChoisie] = useState("");
-  const [acteOuvert, setActeOuvert] = useState<{ ligne: Ligne; bloc: Bloc; etape: SousColonne; acte: ActeFait; date: string } | null>(null);
+  const [anneesAffichees, setAnneesAffichees] = useState<Set<number>>(() => new Set([new Date().getFullYear()]));
+  const [toutHistorique, setToutHistorique] = useState(false);
+  const [panneauHistorique, setPanneauHistorique] = useState<{ animalId: string; blocCle: string } | null>(null);
+  const [acteEnEdition, setActeEnEdition] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/intervenants").then((reponse) => reponse.json()).then(setIntervenants).catch(() => {});
@@ -186,12 +185,10 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     const terme = recherche.trim().toLocaleLowerCase("fr");
     const filtres = lignes.filter((ligne) => {
       if (!`${ligne.nutrav} ${ligne.nom ?? ""}`.toLocaleLowerCase("fr").includes(terme)) return false;
-      if (filtreGestation === "gestantes" && !ligne.gestationId) return false;
-      if (filtreGestation === "vides" && ligne.gestationId) return false;
       if (statuts.size === 0) return true;
       return blocsAffiches.some((bloc) => bloc.sousColonnes.some((etape) => {
         const cellule = ligne.cellules[etape.id];
-        return cellule && correspondStatut(cellule.statut, statuts);
+        return cellule && correspondStatut(cellule, statuts);
       }));
     });
     const lignesFiltrees = uniquementSelection ? filtres.filter((ligne) => animauxSelectionnes.has(ligne.animalId)) : filtres;
@@ -200,19 +197,21 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     return [...lignesFiltrees].sort((a, b) => {
       if (tri === "age") return signe * (ageJours(a.danaisIso) - ageJours(b.danaisIso));
       if (tri === "sexe") return signe * a.sexe.localeCompare(b.sexe) || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
-      if (tri === "gestation") return signe * (Number(Boolean(b.gestationId)) - Number(Boolean(a.gestationId)));
       if (tri === "velage") {
-        const dateA = a.dateVelagePrevueIso ? new Date(a.dateVelagePrevueIso).getTime() : Number.POSITIVE_INFINITY;
-        const dateB = b.dateVelagePrevueIso ? new Date(b.dateVelagePrevueIso).getTime() : Number.POSITIVE_INFINITY;
-        return signe * (dateA - dateB);
+        return comparerDateVelage(a.dateVelagePrevueIso, b.dateVelagePrevueIso, signe) || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
       }
       if (tri.startsWith("vaccin:")) {
         const etapeId = tri.slice("vaccin:".length);
-        return signe * comparerUrgenceVaccinale(a.cellules[etapeId], b.cellules[etapeId]);
+        return signe * comparerUrgenceVaccinale(echeanceDeTri(a.cellules[etapeId]), echeanceDeTri(b.cellules[etapeId]));
       }
       return signe * a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
     });
-  }, [animauxSelectionnes, blocsAffiches, directionTri, filtreGestation, lignes, recherche, statuts, tri, uniquementSelection]);
+  }, [animauxSelectionnes, blocsAffiches, directionTri, lignes, recherche, statuts, tri, uniquementSelection]);
+
+  const anneeCourante = new Date().getFullYear();
+  const anneesListe = useMemo(() => anneesDisponibles(lignes.flatMap((ligne) => ligne.actes.map((acte) => acte.date)), anneeCourante), [anneeCourante, lignes]);
+  // Filtre d'affichage uniquement : la grille (planner) est toujours calculée sur tout l'historique.
+  const anneesFiltre = toutHistorique ? null : anneesAffichees;
 
   const actes = useMemo(() => {
     const index = new Map<string, ActeSelectionne>();
@@ -419,31 +418,6 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     }
   }
 
-  // Rattachement ET correction d'étape passent par les mêmes deux routes : l'acte existant est
-  // modifié sur place (même id), jamais recréé.
-  async function rattacherHistorique(etapeProtocoleId: string) {
-    if (!historiqueOuvert) return;
-    await enregistrerRattachement({
-      sourceType: historiqueOuvert.historique.sourceType,
-      sourceId: historiqueOuvert.historique.sourceId,
-      protocoleId: historiqueOuvert.historique.protocoleId,
-      protocoleLieAuVelage: historiqueOuvert.historique.protocoleLieAuVelage,
-      gestationId: historiqueOuvert.ligne.gestationId,
-    }, etapeProtocoleId, () => setHistoriqueOuvert(null));
-  }
-
-  async function corrigerEtapeActe(etapeProtocoleId: string) {
-    if (!acteOuvert) return;
-    const { acte } = acteOuvert;
-    await enregistrerRattachement({
-      sourceType: acte.sourceType,
-      sourceId: acte.sourceId,
-      protocoleId: acte.protocoleId,
-      protocoleLieAuVelage: acte.protocoleLieAuVelage,
-      gestationId: acte.gestationId ?? acteOuvert.ligne.gestationId,
-    }, etapeProtocoleId, () => setActeOuvert(null));
-  }
-
   async function enregistrerRattachement(cible: {
     sourceType: "VACCINATION" | "TRAITEMENT";
     sourceId: string | null;
@@ -478,28 +452,98 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     }
   }
 
+  function ouvrirHistorique(ligne: Ligne, bloc: Bloc) {
+    setEtapeChoisie("");
+    setActeEnEdition(null);
+    setErreur("");
+    setPanneauHistorique({ animalId: ligne.animalId, blocCle: bloc.cle });
+  }
+
+  const classeStatut = (statut: CelluleGrille["statut"]) => statut === "EN_RETARD"
+    ? "border-red-800 bg-red-300 text-red-950"
+    : statut === "BIENTOT"
+      ? "border-orange-700 bg-orange-300 text-orange-950"
+      : statut === "A_FAIRE"
+        ? "border-yellow-700 bg-yellow-300 text-yellow-950"
+        : statut === "PREVU"
+          ? "border-slate-300 bg-slate-50 text-slate-500"
+          : "border-gray-300 bg-gray-50 text-gray-600";
+
   function renduCellule(cellule: CelluleGrille | undefined, ligne: Ligne, etape: SousColonne) {
     if (!cellule) return <span className="text-gray-300">—</span>;
-    if (cellule.statut === "FAIT") {
-      const contenu = <><span className="text-base leading-none">☑</span><span className="text-[11px]">{afficherDate(cellule.date!)}</span></>;
-      const bloc = blocs.find((item) => item.sousColonnes.some((sousColonne) => sousColonne.id === etape.id));
-      const acte = cellule.acteFait;
-      return acte && bloc
-        ? <button type="button" title="Vaccination enregistrée : voir ou corriger l’étape" onClick={() => { setEtapeChoisie(""); setErreur(""); setActeOuvert({ ligne, bloc, etape, acte, date: cellule.date! }); }} className="flex w-full items-center justify-center gap-1 rounded border border-green-600 bg-green-100 px-1.5 py-1 font-bold text-green-950 whitespace-nowrap hover:bg-green-200">{contenu}</button>
-        : <span className="flex items-center justify-center gap-1 rounded border border-green-600 bg-green-100 px-1.5 py-1 font-bold text-green-950 whitespace-nowrap">{contenu}</span>;
-    }
+    const bloc = blocs.find((item) => item.sousColonnes.some((sousColonne) => sousColonne.id === etape.id));
     const selectionne = actesSelectionnes.has(cleActe(ligne.animalId, etape.id));
-    const classe = cellule.statut === "EN_RETARD"
-      ? "border-red-800 bg-red-300 text-red-950"
-      : cellule.statut === "BIENTOT"
-        ? "border-orange-700 bg-orange-300 text-orange-950"
-        : cellule.statut === "A_FAIRE"
-          ? "border-yellow-700 bg-yellow-300 text-yellow-950"
-          : cellule.statut === "PREVU"
-            ? "border-slate-300 bg-slate-50 text-slate-500"
-            : "border-gray-300 bg-gray-50 text-gray-600";
     const disponible = estSelectionnable(cellule, etape);
+    if (cellule.statut === "FAIT") {
+      // Historique FAIT (badge vert, toutes les dates réelles des années affichées) ET prochaine
+      // échéance (ligne à sa couleur de planning) coexistent dans la même case.
+      const { libelles, reste, total } = datesCompactes(cellule.actes, anneesFiltre);
+      const anneeDerniere = cellule.date ? new Date(cellule.date).getFullYear() : null;
+      const contenu = total > 0
+        ? <><span className="text-base leading-none">☑</span>{libelles.map((libelle, index) => <span key={`${libelle}-${index}`} className="text-[11px]">{libelle}</span>)}{reste > 0 && <span className="text-[10px] font-black">+{reste}</span>}</>
+        : <><span className="text-base leading-none">☑</span><span className="text-[10px] opacity-70">{anneeDerniere}</span></>;
+      const tousLesActes = cellule.actes.map((acte) => afficherDate(acte.date)).join(", ");
+      const badgeClasse = total > 0 ? "border-green-600 bg-green-100 text-green-950 hover:bg-green-200" : "border-green-300 bg-green-50 text-green-800 hover:bg-green-100";
+      return <div className="space-y-0.5">
+        {bloc
+          ? <button type="button" title={`Historique : ${tousLesActes} — voir ou corriger l’étape`} onClick={() => ouvrirHistorique(ligne, bloc)} className={`flex w-full flex-wrap items-center justify-center gap-x-1 rounded border px-1 py-0.5 font-bold ${badgeClasse}`}>{contenu}</button>
+          : <span className={`flex w-full flex-wrap items-center justify-center gap-x-1 rounded border px-1 py-0.5 font-bold ${badgeClasse}`}>{contenu}</span>}
+        {cellule.prochaine && <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title="Prochaine échéance : ajouter ou retirer des vaccinations à enregistrer" className={`flex w-full items-center justify-center gap-1 rounded border px-1 py-0.5 whitespace-nowrap ${classeStatut(cellule.prochaine.statut)} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-[11px] font-black">{selectionne ? "☑" : "→"}</span><span className="text-[10px] font-semibold">{afficherDate(cellule.prochaine.date)}</span></button>}
+      </div>;
+    }
+    const classe = classeStatut(cellule.statut);
     return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title={disponible ? "Ajouter ou retirer des vaccinations à enregistrer" : cellule.aValider ? "Résoudre d’abord l’historique à rattacher" : "Médicament à renseigner"} className={`flex w-full items-center justify-center gap-1 rounded border px-1.5 py-1 whitespace-nowrap ${classe} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-xl font-black leading-none">{selectionne ? "☑" : "☐"}</span>{cellule.date && <span className="text-[10px] font-semibold opacity-80">{afficherDate(cellule.date)}</span>}</button>;
+  }
+
+  function renduPanneauHistorique() {
+    if (!panneauHistorique) return null;
+    const ligne = lignes.find((item) => item.animalId === panneauHistorique.animalId);
+    const bloc = blocs.find((item) => item.cle === panneauHistorique.blocCle);
+    if (!ligne || !bloc) return null;
+    // Source unique : les actes réels unifiés (Vaccination + Traitement VACCIN) de lib/vaccine-acts.ts.
+    const actesVaccin = actesDuVaccin(ligne.actes, bloc);
+    const configEtapes = { etapes: bloc.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicamentIds.map((medicamentId) => ({ medicamentId })) })) };
+    const etapeDe = (acte: ActeHistorique) => bloc.protocoleId && acte.protocoleId === bloc.protocoleId && acte.etapeProtocoleId
+      ? bloc.sousColonnes.find((sousColonne) => sousColonne.id === acte.etapeProtocoleId) ?? null
+      : null;
+    const nonRattaches = actesVaccin.filter((acte) => !etapeDe(acte)).length;
+    const cleEdition = (acte: ActeHistorique) => `${acte.sourceType}:${acte.sourceId}`;
+    const fermer = () => { setPanneauHistorique(null); setActeEnEdition(null); setEtapeChoisie(""); setErreur(""); };
+    return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label={`Historique — ${bloc.nom}`}><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
+      <h2 className="text-lg font-black text-gray-900">Historique — {bloc.nom}</h2>
+      <p className="text-sm font-bold text-gray-700">{ligne.nutrav} {ligne.nom}</p>
+      {bloc.protocoleNom && <p className="text-xs text-gray-500">Protocole : {bloc.protocoleNom}</p>}
+      {nonRattaches > 0 && <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-950">Regarde toutes les dates avant de décider ce que chacune représente : {nonRattaches} acte(s) à rattacher.</p>}
+      <ul className="mt-3 divide-y rounded-xl border">
+        {actesVaccin.length === 0 && <li className="p-3 text-sm text-gray-500">Aucun acte enregistré pour ce vaccin.</li>}
+        {actesVaccin.map((acte) => {
+          const sousColonne = etapeDe(acte);
+          const details = [voieCourte(acte.voie), acte.dose == null ? null : `${String(acte.dose).replace(".", ",")}${acte.uniteDosage ? ` ${acte.uniteDosage}` : ""}`].filter(Boolean).join(" · ");
+          const cle = cleEdition(acte);
+          const enEdition = acteEnEdition === cle;
+          const compatibles = bloc.sousColonnes.filter((candidate) => !acte.medicamentId || medicamentCompatibleAvecEtape(configEtapes, candidate.id, acte.medicamentId));
+          return <li key={`${cle}-${acte.date}`} className="p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <b className="tabular-nums">{afficherDate(acte.date)}</b>
+              {sousColonne
+                ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-900">{sousColonne.label || "Injection"}</span>
+                : <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">À rattacher</span>}
+              {details && <span className="text-xs text-gray-600">{details}</span>}
+              <span className="text-[10px] text-gray-400">{acte.sourceType === "TRAITEMENT" ? "Traitement" : "Vaccination"}</span>
+              {bloc.protocoleId && acte.sourceId && !enEdition && <button type="button" disabled={rattachementEnCours} onClick={() => { setActeEnEdition(cle); setEtapeChoisie(""); setErreur(""); }} className="ml-auto min-h-8 rounded-lg border px-2 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">{sousColonne ? "Modifier l’étape" : "Choisir l’étape"}</button>}
+            </div>
+            {enEdition && <div className="mt-2 rounded-lg bg-gray-50 p-2">
+              {compatibles.length === 0
+                ? <p className="text-sm text-amber-950">Aucune étape compatible avec ce médicament dans ce protocole</p>
+                : <div className="grid gap-1">{compatibles.map((candidate) => <button key={candidate.id} type="button" disabled={rattachementEnCours} aria-pressed={etapeChoisie === candidate.id} onClick={() => setEtapeChoisie(candidate.id)} className={`min-h-9 rounded-lg border bg-white px-3 text-left text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 ${etapeChoisie === candidate.id ? "border-green-700 bg-green-50" : ""}`}>{candidate.label || "Injection"}{sousColonne?.id === candidate.id ? " (actuelle)" : ""}</button>)}</div>}
+              <div className="mt-2 flex gap-2"><button type="button" disabled={rattachementEnCours || !etapeChoisie || etapeChoisie === sousColonne?.id} onClick={() => void enregistrerRattachement({ sourceType: acte.sourceType, sourceId: acte.sourceId, protocoleId: bloc.protocoleId!, protocoleLieAuVelage: bloc.protocoleLieAuVelage, gestationId: acte.gestationId ?? ligne.gestationId }, etapeChoisie, () => setActeEnEdition(null))} className="min-h-9 flex-1 rounded-lg bg-green-800 text-sm font-semibold text-white disabled:opacity-50">Enregistrer</button><button type="button" disabled={rattachementEnCours} onClick={() => { setActeEnEdition(null); setEtapeChoisie(""); }} className="min-h-9 rounded-lg border bg-white px-3 text-sm font-semibold">Annuler</button></div>
+            </div>}
+          </li>;
+        })}
+      </ul>
+      {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
+      <button type="button" disabled={rattachementEnCours} onClick={fermer} className="mt-4 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Fermer</button>
+    </div></div>;
   }
 
   return (
@@ -521,6 +565,15 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
           <div className="absolute right-0 z-40 mt-1 min-w-44 rounded-xl border bg-white p-2 shadow-xl">
             {([['faits', 'Faits'], ['aFaire', 'À faire'], ['enRetard', 'En retard']] as const).map(([valeur, label]) => <label key={valeur} className="flex min-h-9 cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={statuts.has(valeur)} onChange={() => basculerDansSet(setStatuts, valeur)} className="h-4 w-4 accent-green-700" />{label}</label>)}
             <button type="button" onClick={() => setStatuts(new Set())} className="mt-1 text-xs font-semibold underline">Afficher tous les statuts</button>
+          </div>
+        </details>
+
+        <details className="relative">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border px-3 text-sm font-semibold text-gray-700">Années affichées ▾</summary>
+          <div className="absolute right-0 z-40 mt-1 max-h-72 min-w-44 overflow-y-auto rounded-xl border bg-white p-2 shadow-xl">
+            <label className="flex min-h-9 cursor-pointer items-center gap-2 border-b text-sm font-semibold"><input type="checkbox" checked={toutHistorique} onChange={() => setToutHistorique((actuel) => !actuel)} className="h-4 w-4 accent-green-700" />Tout l’historique</label>
+            {anneesListe.map((annee) => <label key={annee} className="flex min-h-9 cursor-pointer items-center gap-2 text-sm"><input type="checkbox" disabled={toutHistorique} checked={toutHistorique || anneesAffichees.has(annee)} onChange={() => basculerDansSet(setAnneesAffichees, annee)} className="h-4 w-4 accent-green-700" />{annee}</label>)}
+            <p className="mt-1 text-[11px] text-gray-500">Affichage seulement : les rappels sont toujours calculés sur tout l’historique.</p>
           </div>
         </details>
 
@@ -556,7 +609,6 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
               {!colonnesMasquees.has("nom") && <th rowSpan={2} scope="col" onContextMenu={(event) => ouvrirMenuColonne(event, "nom")} className="animal-fixed top-0 z-40 border-r bg-gray-50 p-1 font-bold" style={{ left: decalageColonne("nom"), width: largeurColonne.nom, minWidth: largeurColonne.nom }}>Nom</th>}
               {enteteTriable("Âge", "age", "age", "top-0 z-40 border-r bg-gray-50 p-1")}
               {enteteTriable("Sexe", "sexe", "sexe", "top-0 z-40 border-r bg-gray-50 p-1")}
-              {!colonnesMasquees.has("gestation") && <th rowSpan={2} scope="col" onContextMenu={(event) => ouvrirMenuColonne(event, "gestation")} className="animal-fixed top-0 z-40 border-r bg-gray-50 p-1" style={{ left: decalageColonne("gestation"), width: largeurColonne.gestation, minWidth: largeurColonne.gestation }}><button type="button" onClick={() => basculerTri("gestation")} className="w-full text-left font-bold">Gest.{indicateurTri("gestation")}</button><span className="mt-0.5 flex items-center gap-1 text-[9px] font-normal"><i className="h-2 w-2 rounded-full bg-green-600" />/<i className="h-2 w-2 rounded-full bg-red-600" /></span><select value={filtreGestation} onClick={(event) => event.stopPropagation()} onChange={(event) => setFiltreGestation(event.target.value as FiltreGestation)} aria-label="Filtrer la gestation" className="mt-1 w-full rounded border bg-white px-0.5 py-0.5 text-[9px] font-normal"><option value="toutes">Toutes</option><option value="gestantes">Gest.</option><option value="vides">Vides</option></select></th>}
               {enteteTriable("Avant vêlage", "velage", "velage", "top-0 z-40 border-r bg-gray-50 p-1")}
               {blocsAffiches.map((bloc) => <th key={bloc.cle} colSpan={bloc.sousColonnes.length} scope="colgroup" className="sticky top-0 z-30 h-8 border-r border-b bg-gray-50 p-1 text-center font-bold text-gray-800">{bloc.nom}{bloc.voie && <span className="ml-1 font-normal text-gray-500">{bloc.voie}</span>}</th>)}
             </tr>
@@ -568,9 +620,8 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
             {!colonnesMasquees.has("nom") && <td className="animal-fixed z-20 max-w-24 border-r bg-white p-1 text-xs text-gray-600" style={{ left: decalageColonne("nom"), width: largeurColonne.nom, minWidth: largeurColonne.nom }}><span className="block truncate">{ligne.nom || "—"}</span></td>}
             {!colonnesMasquees.has("age") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("age"), width: largeurColonne.age, minWidth: largeurColonne.age }}>{formatAgeTerrain(ligne.danaisIso)}</td>}
             {!colonnesMasquees.has("sexe") && <td className="animal-fixed z-20 border-r bg-white p-1 text-center font-medium text-gray-700" style={{ left: decalageColonne("sexe"), width: largeurColonne.sexe, minWidth: largeurColonne.sexe }}>{ligne.sexe}</td>}
-            {!colonnesMasquees.has("gestation") && <td className="animal-fixed z-20 border-r bg-white p-1 text-center" style={{ left: decalageColonne("gestation"), width: largeurColonne.gestation, minWidth: largeurColonne.gestation }}><span className={`mx-auto block h-3 w-3 rounded-full ${ligne.gestationId ? "bg-green-600" : "bg-red-600"}`} title={ligne.gestationId ? "Gestante" : "Vide"}><span className="sr-only">{ligne.gestationId ? "Gestante" : "Vide"}</span></span></td>}
             {!colonnesMasquees.has("velage") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("velage"), width: largeurColonne.velage, minWidth: largeurColonne.velage }}>{ligne.dateVelagePrevueIso ? formatTempsAvantVelage(ligne.dateVelagePrevueIso) : "—"}</td>}
-            {blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cellule = ligne.cellules[etape.id]; const historique = cellule?.historiquesAValider[0]; return <td key={etape.id} className="border-r p-1 align-top">{renduCellule(cellule, ligne, etape)}{historique && <button type="button" title="Historique à rattacher" onClick={() => { setEtapeChoisie(""); setHistoriqueOuvert({ ligne, bloc, etape, historique }); }} className="vaccin-print-hidden mx-auto mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-amber-600 bg-amber-50 text-[11px] font-black text-amber-900">?</button>}</td>; }))}
+            {blocsAffiches.flatMap((bloc) => bloc.sousColonnes.map((etape) => { const cellule = ligne.cellules[etape.id]; const historique = cellule?.historiquesAValider[0]; return <td key={etape.id} className="border-r p-1 align-top">{renduCellule(cellule, ligne, etape)}{historique && <button type="button" title="Historique à rattacher" onClick={() => ouvrirHistorique(ligne, bloc)} className="vaccin-print-hidden mx-auto mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-amber-600 bg-amber-50 text-[11px] font-black text-amber-900">?</button>}</td>; }))}
           </tr>)}</tbody>
         </table>
         {resultat.length === 0 && <p className="p-3 text-sm text-gray-500">Aucun animal avec ces filtres.</p>}
@@ -590,21 +641,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
         <div className="mt-4 grid grid-cols-2 gap-2"><button type="button" disabled={enregistrement} onClick={() => { setDonneesManquantes(false); setErreur(""); }} className="min-h-11 rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Annuler</button><button type="button" disabled={enregistrement} onClick={() => void validerSession()} className="min-h-11 rounded-lg bg-green-800 font-bold text-white disabled:opacity-50">{enregistrement ? "Enregistrement…" : "Enregistrer"}</button></div>
       </div></div>}
 
-      {acteOuvert && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Vaccination enregistrée"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
-        <h2 className="text-lg font-black text-gray-900">Vaccination enregistrée</h2>
-        <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-1 text-sm"><dt className="text-gray-500">Animal</dt><dd className="font-bold">{acteOuvert.ligne.nutrav} {acteOuvert.ligne.nom}</dd><dt className="text-gray-500">Vaccin</dt><dd>{acteOuvert.acte.vaccin}</dd><dt className="text-gray-500">Date réelle</dt><dd>{afficherDate(acteOuvert.date)}</dd><dt className="text-gray-500">Étape actuelle</dt><dd className="font-semibold">{acteOuvert.etape.label || "Injection"}</dd><dt className="text-gray-500">Protocole</dt><dd>{acteOuvert.acte.protocoleNom}</dd></dl>
-        <div className="mt-4"><p className="mb-2 text-sm font-semibold">Corriger l’étape</p><div className="grid gap-2">{acteOuvert.acte.etapesCompatibles.map((etape) => <button key={etape.id} type="button" disabled={rattachementEnCours} aria-pressed={etapeChoisie === etape.id} onClick={() => setEtapeChoisie(etape.id)} className={`min-h-10 rounded-lg border px-3 text-left text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 ${etapeChoisie === etape.id ? "border-green-700 bg-green-50" : ""}`}>{etape.label || "Injection"}{etape.id === acteOuvert.acte.etapeProtocoleId ? " (actuelle)" : ""}</button>)}</div>
-          <button type="button" disabled={rattachementEnCours || !etapeChoisie || etapeChoisie === acteOuvert.acte.etapeProtocoleId} onClick={() => void corrigerEtapeActe(etapeChoisie)} className="mt-2 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-50">Enregistrer la correction</button></div>
-        {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
-        <button type="button" disabled={rattachementEnCours} onClick={() => { setActeOuvert(null); setEtapeChoisie(""); setErreur(""); }} className="mt-4 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Fermer</button>
-      </div></div>}
-      {historiqueOuvert && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Historique vaccinal à rattacher"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
-        <h2 className="text-lg font-black text-gray-900">Historique à rattacher</h2>
-        <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-1 text-sm"><dt className="text-gray-500">Animal</dt><dd className="font-bold">{historiqueOuvert.ligne.nutrav} {historiqueOuvert.ligne.nom}</dd><dt className="text-gray-500">Vaccin</dt><dd>{historiqueOuvert.historique.vaccin}</dd><dt className="text-gray-500">Date réelle</dt><dd>{afficherDate(historiqueOuvert.historique.date)}</dd><dt className="text-gray-500">Protocole</dt><dd>{historiqueOuvert.historique.protocoleNom}</dd>{historiqueOuvert.historique.protocoleLieAuVelage && <><dt className="text-gray-500">Cycle</dt><dd>{historiqueOuvert.historique.gestationId || historiqueOuvert.ligne.gestationId ? "Gestation connue" : "Aucune gestation liée"}</dd></>}<dt className="text-gray-500">Pourquoi ?</dt><dd>{historiqueOuvert.historique.raison}</dd></dl>
-        {historiqueOuvert.historique.sourceId && (historiqueOuvert.historique.sourceType === "TRAITEMENT" ? historiqueOuvert.historique.etapesCompatibles : historiqueOuvert.bloc.sousColonnes).length > 0 ? <div className="mt-4"><p className="mb-2 text-sm font-semibold">Rattacher cet acte à :</p><div className="grid gap-2">{(historiqueOuvert.historique.sourceType === "TRAITEMENT" ? historiqueOuvert.historique.etapesCompatibles : historiqueOuvert.bloc.sousColonnes).map((etape) => <button key={etape.id} type="button" disabled={rattachementEnCours} aria-pressed={etapeChoisie === etape.id} onClick={() => setEtapeChoisie(etape.id)} className={`min-h-10 rounded-lg border px-3 text-left text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 ${etapeChoisie === etape.id ? "border-green-700 bg-green-50" : ""}`}>{etape.label || "Injection"}</button>)}</div><button type="button" disabled={rattachementEnCours || !etapeChoisie} onClick={() => void rattacherHistorique(etapeChoisie)} className="mt-2 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-50">Enregistrer le rattachement</button></div> : <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-950">{historiqueOuvert.historique.sourceType === "TRAITEMENT" ? "Aucune étape compatible avec ce médicament dans ce protocole" : "Cet acte n’a pas d’identifiant : rattachement impossible."}</p>}
-        {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
-        <button type="button" disabled={rattachementEnCours} onClick={() => { setHistoriqueOuvert(null); setEtapeChoisie(""); setErreur(""); }} className="mt-4 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Laisser non rattaché</button>
-      </div></div>}
+      {renduPanneauHistorique()}
       <style jsx global>{`
         #tableau-vaccinal-impression .animal-fixed { position: sticky; }
         #tableau-vaccinal-impression .vaccin-table-scroll {

@@ -58,3 +58,9 @@ export function libelleVoieDose(voie: string | null | undefined, dose: number | 
   const partieDose = dose == null ? "dose ?" : `${String(dose).replace(".", ",")}${unite?.trim() ? ` ${unite.trim()}` : ""}`;
   return `${voieCourte(voie) ?? "voie ?"} · ${partieDose}`;
 }
+
+/** Tri « Avant vêlage » : les animaux sans date restent regroupés après les dates, dans les deux sens. */
+export function comparerDateVelage(a: string | null | undefined, b: string | null | undefined, signe: 1 | -1 = 1): number {
+  if (!a || !b) return a || b ? (a ? -1 : 1) : 0;
+  return signe * (new Date(a).getTime() - new Date(b).getTime());
+}

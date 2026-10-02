@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { unifierActesVaccinaux, type ActeVaccination } from "./vaccine-acts.ts";
 import { construireGrilleVaccinale, type AnimalGrille, type EtapeGrille, type ProtocoleGrille } from "./vaccine-grid.ts";
+import { medicamentCompatibleAvecEtape } from "./vaccine-attachment.ts";
 import { libelleVoieDose, voieCourte } from "./vaccine-table-presentation.ts";
 import { statutDepuisEtapesFaites, typeInjectionPourEtape } from "./vaccine-statut.ts";
 
@@ -41,26 +42,31 @@ const vaccinationSurEtape = (etapeId: string): ActeVaccination[] => unifierActes
   protocoleId: "proto-somni", etapeProtocoleId: etapeId, gestationId: null, statut: "FAIT",
 }], []);
 
-test("une cellule FAIT expose l'acte réel (source, id, étape, étapes compatibles) pour permettre la correction", () => {
+const etapesCompatibles = (blocs: ReturnType<typeof construireGrilleVaccinale>["blocs"], medicamentId: string) => {
+  const config = { etapes: blocs[0].etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicamentIds.map((id) => ({ medicamentId: id })) })) };
+  return config.etapes.filter((item) => medicamentCompatibleAvecEtape(config, item.id, medicamentId)).map((item) => item.id);
+};
+
+test("une cellule FAIT expose les actes réels (source, id, étape) et l'étape reste corrigeable", () => {
   for (const [actes, type, id] of [[vaccinationSurEtape("annuel"), "VACCINATION", "v1"], [traitementSurEtape("annuel"), "TRAITEMENT", "t1"]] as const) {
-    const { lignes } = construireGrilleVaccinale([animal([...actes])], [protocole], [], new Date("2026-10-02T12:00:00Z"));
+    const { lignes, blocs } = construireGrilleVaccinale([animal([...actes])], [protocole], [], new Date("2026-10-02T12:00:00Z"));
     const cellule = lignes[0].cellules["annuel"];
     assert.equal(cellule.statut, "FAIT");
     assert.equal(cellule.date?.getTime(), DATE_ACTE.getTime());
-    assert.equal(cellule.acteFait?.sourceType, type);
-    assert.equal(cellule.acteFait?.sourceId, id);
-    assert.equal(cellule.acteFait?.protocoleId, "proto-somni");
-    assert.equal(cellule.acteFait?.etapeProtocoleId, "annuel");
-    assert.deepEqual(cellule.acteFait?.etapesCompatibles.map((e) => e.id), ["primo", "rappel", "annuel"]);
+    assert.equal(cellule.actes.length, 1);
+    assert.equal(cellule.actes[0].sourceType, type);
+    assert.equal(cellule.actes[0].sourceId, id);
+    assert.equal(cellule.actes[0].protocoleId, "proto-somni");
+    assert.equal(cellule.actes[0].etapeProtocoleId, "annuel");
+    assert.deepEqual(etapesCompatibles(blocs, "med-somni"), ["primo", "rappel", "annuel"]);
   }
 });
 
 test("seules les étapes compatibles avec le médicament réel sont proposées à la correction", () => {
   const autreVaccin = etape("autre", "Autre vaccin", 3, "INITIAL", 10, 20, "med-autre");
-  const { lignes } = construireGrilleVaccinale([animal(vaccinationSurEtape("annuel"))], [{ ...protocole, etapes: [primo, rappel, annuel, autreVaccin] }], [], new Date("2026-10-02T12:00:00Z"));
-  assert.deepEqual(lignes[0].cellules["annuel"].acteFait?.etapesCompatibles.map((e) => e.id), ["primo", "rappel", "annuel"]);
+  const { blocs } = construireGrilleVaccinale([animal(vaccinationSurEtape("annuel"))], [{ ...protocole, etapes: [primo, rappel, annuel, autreVaccin] }], [], new Date("2026-10-02T12:00:00Z"));
+  assert.deepEqual(etapesCompatibles(blocs, "med-somni"), ["primo", "rappel", "annuel"]);
 });
-
 test("après correction Rappel annuel → Primo : même acte, ancienne étape plus FAIT, primo FAIT à la vraie date, suite recalculée", () => {
   const avant = construireGrilleVaccinale([animal(vaccinationSurEtape("annuel"))], [protocole], [], new Date("2026-10-02T12:00:00Z")).lignes[0].cellules;
   assert.equal(avant["annuel"].statut, "FAIT");
@@ -69,7 +75,7 @@ test("après correction Rappel annuel → Primo : même acte, ancienne étape pl
   const apres = construireGrilleVaccinale([animal(vaccinationSurEtape("primo"))], [protocole], [], new Date("2026-10-02T12:00:00Z")).lignes[0].cellules;
   assert.equal(apres["primo"].statut, "FAIT");
   assert.equal(apres["primo"].date?.getTime(), DATE_ACTE.getTime());
-  assert.equal(apres["primo"].acteFait?.sourceId, avant["annuel"].acteFait?.sourceId, "même acte, même id");
+  assert.equal(apres["primo"].actes[0].sourceId, avant["annuel"].actes[0].sourceId, "même acte, même id");
   assert.notEqual(apres["annuel"].statut, "FAIT");
   assert.notEqual(apres["rappel"].statut, "FAIT");
   assert.equal(apres["rappel"].date?.toISOString().slice(0, 10), "2026-11-05", "le rappel repart de la vraie date de la primo");
@@ -79,7 +85,7 @@ test("un Traitement rattaché reste corrigeable : l'étape change, l'acte reste 
   const actes = traitementSurEtape("primo");
   assert.equal(actes.length, 1);
   const { lignes } = construireGrilleVaccinale([animal([...actes])], [protocole], [], new Date("2026-10-02T12:00:00Z"));
-  assert.equal(lignes[0].cellules["primo"].acteFait?.sourceType, "TRAITEMENT");
+  assert.equal(lignes[0].cellules["primo"].actes[0].sourceType, "TRAITEMENT");
   const corrige = traitementSurEtape("rappel");
   assert.equal(corrige.length, 1);
   assert.equal(corrige[0].sourceId, "t1");
@@ -130,9 +136,8 @@ test("l'interface : étapes sans lien « Sélectionner à faire », cellule FAIT
   const tableau = readFileSync(new URL("../app/sanitaire/vaccins/TableauVaccinal.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(tableau, /Sélectionner à faire/);
   assert.match(tableau, /libelleVoieDose\(etape\.voie, etape\.dose, etape\.uniteDosage\)/);
-  assert.match(tableau, /Vaccination enregistrée/);
-  assert.match(tableau, /Corriger l’étape/);
-  assert.match(tableau, /Enregistrer la correction/);
+  assert.match(tableau, /Modifier l’étape/);
+  assert.match(tableau, /Historique — \$\{bloc\.nom\}/);
   assert.match(tableau, /rattachement-vaccinal/);
   assert.match(tableau, /\/api\/vaccinations\/\$\{cible\.sourceId\}\/rattachement/);
   assert.doesNotMatch(tableau, /method: "POST"[\s\S]{0,200}rattachement/);

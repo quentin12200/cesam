@@ -63,10 +63,10 @@ export default async function VaccinsPage() {
           take: 1,
           select: { gestation: { select: { id: true, dateVelagePrevue: true } } },
         },
-        vaccinations: { where: { statut: "FAIT" }, select: { id: true, vaccin: true, date: true, statut: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true }, orderBy: { date: "asc" } },
+        vaccinations: { where: { statut: "FAIT" }, select: { id: true, vaccin: true, date: true, statut: true, voie: true, dose: true, medicamentId: true, protocoleId: true, etapeProtocoleId: true, gestationId: true }, orderBy: { date: "asc" } },
         // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
         // quand même remonter comme fait dans la grille. Voir lib/vaccine-acts.ts.
-        traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { id: true, dateDebut: true, medicamentNom: true, medicamentId: true, protocoleVaccinId: true, etapeProtocoleVaccinId: true, gestationId: true } },
+        traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { id: true, dateDebut: true, medicamentNom: true, medicamentId: true, voie: true, dose: true, uniteDosage: true, protocoleVaccinId: true, etapeProtocoleVaccinId: true, gestationId: true } },
       },
       orderBy: { nutrav: "asc" },
     }),
@@ -140,9 +140,12 @@ export default async function VaccinsPage() {
       <header><h1 className="text-xl font-black text-gray-900">Tableau vaccinal</h1></header>
       <TableauVaccinal blocs={grille.blocs} lignes={grille.lignes.map((ligne) => ({
         ...ligne,
+        actes: ligne.actes.map((acte) => ({ ...acte, date: acte.date.toISOString() })),
         cellules: Object.fromEntries(Object.entries(ligne.cellules).map(([cle, cellule]) => [cle, {
           ...cellule,
           date: cellule.date ? cellule.date.toISOString() : null,
+          actes: cellule.actes.map((acte) => ({ ...acte, date: acte.date.toISOString() })),
+          prochaine: cellule.prochaine ? { ...cellule.prochaine, date: cellule.prochaine.date.toISOString() } : null,
           historiquesAValider: cellule.historiquesAValider.map((historique) => ({ ...historique, date: historique.date.toISOString() })),
         }])),
       }))} />

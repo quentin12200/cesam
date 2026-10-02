@@ -17,6 +17,10 @@ export interface ActeVaccination {
   etapeProtocoleId: string | null;
   gestationId: string | null;
   statut: string;
+  /** Détails d'administration, quand l'acte réel les porte (affichage de l'historique seulement). */
+  voie?: string | null;
+  dose?: number | null;
+  uniteDosage?: string | null;
 }
 
 export interface ActeTraitementVaccin {
@@ -28,6 +32,9 @@ export interface ActeTraitementVaccin {
   protocoleVaccinId?: string | null;
   etapeProtocoleVaccinId?: string | null;
   gestationId?: string | null;
+  voie?: string | null;
+  dose?: number | null;
+  uniteDosage?: string | null;
 }
 
 function cleJour(date: Date): string {
@@ -66,6 +73,9 @@ export function unifierActesVaccinaux(
       protocoleId: traitement.protocoleVaccinId ?? null,
       etapeProtocoleId: traitement.etapeProtocoleVaccinId ?? null,
       gestationId: traitement.gestationId ?? null,
+      voie: traitement.voie ?? null,
+      dose: traitement.dose ?? null,
+      uniteDosage: traitement.uniteDosage ?? null,
       statut: "FAIT",
     }));
   return [...faites, ...issus];

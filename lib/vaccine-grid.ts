@@ -13,6 +13,7 @@ import { statutPlanningVaccin } from "./vaccine-planning-status.ts";
 import { rattacherInjectionOrpheline, vaccinationsSansEtapeFiable } from "./vaccine-history.ts";
 import { vaccinationAppartientAuCycleCourant } from "./vaccination-session.ts";
 import { estAnimalConcerneParProtocole } from "./vaccine-eligibility.ts";
+import { addDays, addMonths } from "date-fns";
 import type { ActeVaccination } from "./vaccine-acts.ts";
 import { medicamentCompatibleAvecEtape } from "./vaccine-attachment.ts";
 
@@ -80,6 +81,12 @@ export interface BlocVaccinGrille {
   /** Contexte transmis au flux sanitaire existant lors d'une séance. */
   protocoleId: string | null;
   medicamentId: string | null;
+  protocoleNom: string | null;
+  protocoleLieAuVelage: boolean;
+  /** Tous les médicaments liés aux étapes (y compris alternatives) : sert à retrouver l'historique du vaccin. */
+  medicamentIds: string[];
+  /** Étapes configurées et leurs médicaments, pour proposer uniquement les étapes compatibles. */
+  etapes: { id: string; reference: string; medicamentIds: string[] }[];
 }
 
 export type StatutCelluleGrille = "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
@@ -90,22 +97,43 @@ export interface CelluleGrille {
   aValider: boolean;
   rattachementProtocoleAutorise: boolean;
   historiquesAValider: HistoriqueVaccinalAValider[];
-  /** Acte reel derriere une cellule FAIT d'un protocole : permet de corriger son etape. */
-  acteFait?: ActeFaitGrille | null;
+  /** TOUS les actes réels de cette étape (jamais seulement le dernier), du plus ancien au plus récent. */
+  actes: ActeCellule[];
+  /** Prochaine échéance quand l'étape a déjà des actes et une récurrence configurée. */
+  prochaine: { statut: Exclude<StatutCelluleGrille, "FAIT" | "VIDE">; date: Date } | null;
 }
 
-export interface ActeFaitGrille {
+/** Acte réel unifié (Vaccination ou Traitement VACCIN) tel que présenté dans la grille. */
+export interface ActeCellule {
   sourceType: "VACCINATION" | "TRAITEMENT";
-  sourceId: string;
+  sourceId: string | null;
+  date: Date;
   vaccin: string;
   medicamentId: string | null;
-  protocoleId: string;
-  protocoleNom: string;
-  etapeProtocoleId: string;
+  protocoleId: string | null;
+  etapeProtocoleId: string | null;
   gestationId: string | null;
-  protocoleLieAuVelage: boolean;
-  etapesCompatibles: { id: string; label: string }[];
+  voie: string | null;
+  dose: number | null;
+  uniteDosage: string | null;
 }
+
+function versActeCellule(acte: ActeVaccination): ActeCellule {
+  return {
+    sourceType: acte.sourceType ?? "VACCINATION",
+    sourceId: acte.sourceId ?? null,
+    date: acte.date,
+    vaccin: acte.vaccin,
+    medicamentId: acte.medicamentId,
+    protocoleId: acte.protocoleId,
+    etapeProtocoleId: acte.etapeProtocoleId,
+    gestationId: acte.gestationId,
+    voie: acte.voie ?? null,
+    dose: acte.dose ?? null,
+    uniteDosage: acte.uniteDosage ?? null,
+  };
+}
+
 
 export interface HistoriqueVaccinalAValider {
   sourceType: "VACCINATION" | "TRAITEMENT";
@@ -132,6 +160,8 @@ export interface LigneGrille {
   gestationId: string | null;
   dateVelagePrevueIso: string | null;
   cellules: Record<string, CelluleGrille>;
+  /** Historique vaccinal complet de l'animal (aucun filtre d'année : c'est le planner qui l'utilise). */
+  actes: ActeCellule[];
 }
 
 function medicamentPrincipal(protocole: ProtocoleGrille): { id: string; nom: string } | null {
@@ -173,6 +203,20 @@ export function construireBlocsVaccinaux(
           })),
         protocoleId: protocole.id,
         medicamentId: medicament?.id ?? null,
+        protocoleNom: protocole.label || protocole.nom,
+        protocoleLieAuVelage: protocole.etapes.some((etape) => etape.reference === "VELAGE"),
+        medicamentIds: [...new Set([
+          ...(medicament ? [medicament.id] : []),
+          ...protocole.etapes.flatMap((etape) => [
+            ...(etape.medicamentId ? [etape.medicamentId] : []),
+            ...etape.medicaments.map((liaison) => liaison.medicament.id),
+          ]),
+        ])],
+        etapes: protocole.etapes.map((etape) => ({
+          id: etape.id,
+          reference: etape.reference,
+          medicamentIds: etape.medicaments.map((liaison) => liaison.medicament.id),
+        })),
       });
     }
   }
@@ -195,6 +239,10 @@ export function construireBlocsVaccinaux(
       }],
       protocoleId: null,
       medicamentId: vaccin.medicamentId,
+      protocoleNom: null,
+      protocoleLieAuVelage: false,
+      medicamentIds: [vaccin.medicamentId],
+      etapes: [],
     });
   }
 
@@ -202,39 +250,19 @@ export function construireBlocsVaccinaux(
 }
 
 function celluleVide(): CelluleGrille {
-  return { statut: "VIDE", date: null, aValider: false, rattachementProtocoleAutorise: false, historiquesAValider: [] };
+  return { statut: "VIDE", date: null, aValider: false, rattachementProtocoleAutorise: false, historiquesAValider: [], actes: [], prochaine: null };
 }
 
 function celluleDepuisPlanning(date: Date, fenetre: { debut: Date; fin: Date }): CelluleGrille {
   const statut = statutPlanningVaccin(date, fenetre.debut, fenetre.fin);
   // Une echeance calculee ne disparait jamais parce qu'elle est lointaine : elle reste visible, en
   // "prevu plus tard" (ni a faire, ni en retard), et la case reste selectionnable.
-  if (statut === "TROP_TOT") return { statut: "PREVU", date: fenetre.debut, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [] };
-  if (statut === "EN_RETARD_LEGER" || statut === "EN_RETARD") return { statut: "EN_RETARD", date: fenetre.fin, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [] };
+  if (statut === "TROP_TOT") return { statut: "PREVU", date: fenetre.debut, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null };
+  if (statut === "EN_RETARD_LEGER" || statut === "EN_RETARD") return { statut: "EN_RETARD", date: fenetre.fin, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null };
   // Bientôt (fenêtre pas encore ouverte mais proche) reste distinct d'à faire (fenêtre ouverte,
   // à faire maintenant) : même donnée du moteur (statutPlanningVaccin), affichage plus fin.
-  if (statut === "A_PREVOIR") return { statut: "BIENTOT", date: fenetre.debut, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [] };
-  return { statut: "A_FAIRE", date: fenetre.fin, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [] };
-}
-
-function acteFaitCorrigeable(acte: ActeVaccination, protocole: ProtocoleGrille, protocoleLieAuVelage: boolean): ActeFaitGrille | null {
-  if (!acte.sourceId || !acte.etapeProtocoleId) return null;
-  const etapes = [...protocole.etapes].sort((a, b) => a.ordre - b.ordre);
-  const config = { etapes: protocole.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicaments.map((liaison) => ({ medicamentId: liaison.medicament.id })) })) };
-  return {
-    sourceType: acte.sourceType ?? "VACCINATION",
-    sourceId: acte.sourceId,
-    vaccin: acte.vaccin,
-    medicamentId: acte.medicamentId,
-    protocoleId: protocole.id,
-    protocoleNom: protocole.label || protocole.nom,
-    etapeProtocoleId: acte.etapeProtocoleId,
-    gestationId: acte.gestationId,
-    protocoleLieAuVelage,
-    etapesCompatibles: etapes
-      .filter((etape) => !acte.medicamentId || medicamentCompatibleAvecEtape(config, etape.id, acte.medicamentId))
-      .map((etape) => ({ id: etape.id, label: etape.label })),
-  };
+  if (statut === "A_PREVOIR") return { statut: "BIENTOT", date: fenetre.debut, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null };
+  return { statut: "A_FAIRE", date: fenetre.fin, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [], prochaine: null };
 }
 
 /** Cellules d'un animal pour un protocole : une par étape réelle, dans l'ordre. */
@@ -288,8 +316,18 @@ function celluleProtocole(
   for (const etape of etapes) {
     const faites = actesUtiles.filter((acte) => acte.etapeProtocoleId === etape.id).sort((a, b) => b.date.getTime() - a.date.getTime());
     if (faites.length > 0) {
-      cellules.set(etape.id, { statut: "FAIT", date: faites[0].date, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], acteFait: acteFaitCorrigeable(faites[0], protocole, protocoleLieAuVelage) });
-      if (etape.cycle !== "ENTRETIEN") dateEtapePrecedente = faites[0].date;
+      // Une étape peut avoir plusieurs actes réels : ils sont tous conservés. Le DERNIER sert de
+      // référence (étape suivante, ou prochain rappel d'une étape d'entretien à récurrence configurée).
+      let prochaine: CelluleGrille["prochaine"] = null;
+      if (etape.cycle !== "ENTRETIEN") {
+        dateEtapePrecedente = faites[0].date;
+      } else if (etape.recurrenceMois && eligible) {
+        const echeance = addMonths(faites[0].date, etape.recurrenceMois);
+        const horsAge = protocole.ageMaxJours != null && echeance > addDays(new Date(animal.danaisIso), protocole.ageMaxJours);
+        const suite = horsAge ? celluleVide() : celluleDepuisPlanning(date, { debut: echeance, fin: echeance });
+        if (suite.statut !== "VIDE" && suite.statut !== "FAIT" && suite.date) prochaine = { statut: suite.statut, date: suite.date };
+      }
+      cellules.set(etape.id, { statut: "FAIT", date: faites[0].date, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [...faites].reverse().map(versActeCellule), prochaine });
       continue;
     }
     if (!eligible) { cellules.set(etape.id, celluleVide()); continue; }
@@ -365,7 +403,7 @@ export function construireGrilleVaccinale(
       const sousColonne = bloc.sousColonnes[0];
       const actes = animal.actes.filter((acte) => acte.medicamentId === bloc.cle).sort((a, b) => b.date.getTime() - a.date.getTime());
       cellules[sousColonne.id] = actes[0]
-        ? { statut: "FAIT", date: actes[0].date, aValider: false, rattachementProtocoleAutorise: false, historiquesAValider: [] }
+        ? { statut: "FAIT", date: actes[0].date, aValider: false, rattachementProtocoleAutorise: false, historiquesAValider: [], actes: [...actes].reverse().map(versActeCellule), prochaine: null }
         : celluleVide();
     }
     return {
@@ -377,6 +415,7 @@ export function construireGrilleVaccinale(
       gestationId: animal.gestationId,
       dateVelagePrevueIso: animal.dateVelagePrevueIso,
       cellules,
+      actes: animal.actes.map(versActeCellule),
     };
   });
 

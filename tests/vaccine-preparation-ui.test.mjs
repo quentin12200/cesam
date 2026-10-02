@@ -62,12 +62,12 @@ test("la deuxième passe ajoute gestation, vêlage et tri d'urgence sans règle 
   const tableau = read("app/sanitaire/vaccins/TableauVaccinal.tsx");
   const grille = read("lib/vaccine-grid.ts");
   const page = read("app/sanitaire/vaccins/page.tsx");
-  assert.match(tableau, /aria-label="Filtrer la gestation"/);
+  assert.doesNotMatch(tableau, /Filtrer la gestation/);
   assert.match(tableau, /enteteTriable\("Avant vêlage"/);
   assert.match(tableau, /formatTempsAvantVelage\(ligne\.dateVelagePrevueIso\)/);
   assert.match(tableau, /comparerUrgenceVaccinale/);
   assert.match(tableau, /`vaccin:\$\{etape\.id\}`/);
-  assert.match(tableau, /ligne\.gestationId \? "bg-green-600" : "bg-red-600"/);
+  assert.doesNotMatch(tableau, /"bg-green-600" : "bg-red-600"/);
   assert.match(grille, /dateVelagePrevueIso: animal\.dateVelagePrevueIso/);
   assert.match(page, /etat: \{ in: \["VERT", "ROSE"\] \}/);
   assert.doesNotMatch(tableau, /CRYPTIUM.*(21|90)|ROTAVEC.*(21|90)/i);
@@ -345,8 +345,9 @@ test("l'historique ambigu est discret et se rattache sans jamais créer de secon
   assert.match(tableau, /title="Historique à rattacher"/);
   assert.match(tableau, /rattachement-vaccinal/);
   assert.match(tableau, /Aucune étape compatible avec ce médicament dans ce protocole/);
-  assert.match(tableau, /Enregistrer le rattachement/);
-  assert.match(tableau, /protocoleLieAuVelage &&/);
+  assert.match(tableau, /Choisir l’étape/);
+  assert.match(tableau, /Historique — \$\{bloc\.nom\}/);
+  assert.match(tableau, /actesDuVaccin\(ligne\.actes, bloc\)/);
   const routeTraitement = read("app/api/traitements/[id]/rattachement-vaccinal/route.ts");
   assert.match(routeTraitement, /prisma\.traitement\.update/);
   assert.doesNotMatch(routeTraitement, /vaccination\.create|traitement\.create/);
