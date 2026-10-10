@@ -51,6 +51,9 @@ export interface AnimalGrille {
   id: string;
   nutrav: string;
   nom: string | null;
+  mereNutrav?: string | null;
+  mereNom?: string | null;
+  mereLiee?: boolean;
   sexe: string;
   danaisIso: string;
   categorie: string;
@@ -157,6 +160,9 @@ export interface LigneGrille {
   animalId: string;
   nutrav: string;
   nom: string | null;
+  mereNutrav: string | null;
+  mereNom: string | null;
+  mereLiee: boolean;
   sexe: string;
   danaisIso: string;
   gestationId: string | null;
@@ -414,6 +420,9 @@ export function construireGrilleVaccinale(
       animalId: animal.id,
       nutrav: animal.nutrav,
       nom: animal.nom,
+      mereNutrav: animal.mereNutrav ?? null,
+      mereNom: animal.mereNom ?? null,
+      mereLiee: animal.mereLiee === true,
       sexe: animal.sexe,
       danaisIso: animal.danaisIso,
       gestationId: animal.gestationId,
