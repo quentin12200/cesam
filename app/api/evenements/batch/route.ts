@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
         }
       }
       return { evenements, traitementsCrees, paragesCrees, vaccinationsCrees, statutsVaccinauxModifies };
-    });
+    }, { maxWait: 10_000, timeout: 30_000 });
 
     const desc = `Événement sanitaire "${type.trim()}" enregistré pour ${resultat.evenements.length} animal(s)`
       + (resultat.traitementsCrees.length > 0 ? ` avec ${resultat.traitementsCrees.length} traitement(s)` : "")
@@ -234,6 +234,10 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
   } catch (err) {
     console.error("POST /api/evenements/batch error:", err);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    const detail = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { error: detail ? `Erreur serveur : ${detail.slice(0, 300)}` : "Erreur serveur" },
+      { status: 500 },
+    );
   }
 }
