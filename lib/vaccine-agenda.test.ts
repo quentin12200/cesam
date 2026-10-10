@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { libelleFenetreVaccinale, regrouperActionsAgenda, type ActionAgenda } from "./vaccine-agenda.ts";
+import { construireJoursCalendrier, dateAffichageActionAgenda, libelleFenetreVaccinale, regrouperActionsAgenda, selectionDepuisGroupeAgenda, type ActionAgenda } from "./vaccine-agenda.ts";
 
 function action(partiel: Partial<ActionAgenda> = {}): ActionAgenda {
   return {
@@ -46,4 +46,33 @@ test("les animaux ayant même vaccin, étape, statut et fenêtre sont regroupés
   ]);
   assert.equal(groupes.length, 1);
   assert.deepEqual(groupes[0].actions.map((item) => item.nutrav), ["7501", "7502"]);
+});
+
+test("le calendrier mensuel commence un lundi et couvre six semaines", () => {
+  const jours = construireJoursCalendrier(new Date(2026, 10, 1, 12));
+  assert.equal(jours.length, 42);
+  assert.equal(jours[0].cle, "2026-10-26");
+  assert.equal(jours[0].date.getDay(), 1);
+  assert.equal(jours.filter((jour) => jour.dansMois).length, 30);
+});
+
+test("les actions actives sont visibles aujourd'hui et les actions futures à l'ouverture de leur fenêtre", () => {
+  const aujourdHui = new Date(2026, 9, 10, 12);
+  const [aFaire] = regrouperActionsAgenda([action({ statut: "A_FAIRE" })]);
+  const [enRetard] = regrouperActionsAgenda([action({ statut: "EN_RETARD" })]);
+  const [bientot] = regrouperActionsAgenda([action({ statut: "BIENTOT", dateMin: "2026-11-18T12:00:00Z" })]);
+  assert.equal(dateAffichageActionAgenda(aFaire, aujourdHui), "2026-10-10");
+  assert.equal(dateAffichageActionAgenda(enRetard, aujourdHui), "2026-10-10");
+  assert.equal(dateAffichageActionAgenda(bientot, aujourdHui), "2026-11-18");
+});
+
+test("préparer une action transmet exactement les animaux et cellules du groupe au tableau", () => {
+  const [groupe] = regrouperActionsAgenda([
+    action({ animalId: "a1", etapeId: "rappel" }),
+    action({ animalId: "a2", etapeId: "rappel" }),
+  ]);
+  assert.deepEqual(selectionDepuisGroupeAgenda(groupe), {
+    animalIds: ["a1", "a2"],
+    actes: ["a1|rappel", "a2|rappel"],
+  });
 });

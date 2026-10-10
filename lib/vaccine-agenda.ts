@@ -26,6 +26,12 @@ export interface GroupeAgenda {
   actions: ActionAgenda[];
 }
 
+export interface JourCalendrier {
+  cle: string;
+  date: Date;
+  dansMois: boolean;
+}
+
 const ordreStatut: Record<StatutAgenda, number> = {
   EN_RETARD: 0,
   A_FAIRE: 1,
@@ -73,9 +79,42 @@ export function regrouperActionsAgenda(actions: readonly ActionAgenda[]): Groupe
   });
 }
 
-export function semaineDu(dateIso: string): string {
-  const date = new Date(dateIso);
-  const jour = date.getDay() || 7;
-  date.setDate(date.getDate() - jour + 1);
-  return `Semaine du ${new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" }).format(date)}`;
+export function cleJourCalendrier(date: Date): string {
+  const annee = date.getFullYear();
+  const mois = String(date.getMonth() + 1).padStart(2, "0");
+  const jour = String(date.getDate()).padStart(2, "0");
+  return `${annee}-${mois}-${jour}`;
+}
+
+/**
+ * Date de présentation uniquement : une action active/échue reste visible aujourd'hui ;
+ * une action future est placée à l'ouverture de sa fenêtre. Le planner reste inchangé.
+ */
+export function dateAffichageActionAgenda(groupe: GroupeAgenda, aujourdHui: Date): string {
+  if (groupe.statut === "A_FAIRE" || groupe.statut === "EN_RETARD") return cleJourCalendrier(aujourdHui);
+  return cleJourCalendrier(new Date(groupe.dateMin));
+}
+
+export function selectionDepuisGroupeAgenda(groupe: GroupeAgenda): { animalIds: string[]; actes: string[] } {
+  return {
+    animalIds: [...new Set(groupe.actions.map((action) => action.animalId))],
+    actes: groupe.actions.map((action) => `${action.animalId}|${action.etapeId}`),
+  };
+}
+
+/** Grille mensuelle stable de six semaines, lundi en première colonne. */
+export function construireJoursCalendrier(moisAffiche: Date): JourCalendrier[] {
+  const premier = new Date(moisAffiche.getFullYear(), moisAffiche.getMonth(), 1, 12);
+  const recul = (premier.getDay() + 6) % 7;
+  const debut = new Date(premier);
+  debut.setDate(premier.getDate() - recul);
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(debut);
+    date.setDate(debut.getDate() + index);
+    return {
+      cle: cleJourCalendrier(date),
+      date,
+      dansMois: date.getMonth() === moisAffiche.getMonth() && date.getFullYear() === moisAffiche.getFullYear(),
+    };
+  });
 }

@@ -13,8 +13,8 @@ import { actionsSelectionAnimaux, basculerSelectionVisibles, etatSelectionMaitre
 import { construireChargeSoin } from "@/lib/vaccine-soin-seance";
 import { actesDuVaccin, anneesDisponibles, datesCompactes, type ActeHistorique } from "@/lib/vaccine-history-view";
 import { comparerDateVelage, comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
-import { libelleFenetreVaccinale, type ActionAgenda } from "@/lib/vaccine-agenda";
-import AgendaVaccinal from "./AgendaVaccinal";
+import { libelleFenetreVaccinale, selectionDepuisGroupeAgenda, type ActionAgenda, type GroupeAgenda } from "@/lib/vaccine-agenda";
+import CalendrierVaccinal from "./CalendrierVaccinal";
 
 interface CelluleGrille {
   statut: "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
@@ -669,6 +669,16 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     </div></div>;
   }
 
+  function preparerDepuisAgenda(groupe: GroupeAgenda) {
+    const selection = selectionDepuisGroupeAgenda(groupe);
+    setAnimauxSelectionnes(new Set(selection.animalIds));
+    setActesSelectionnes(new Set(selection.actes));
+    setUniquementSelection(true);
+    const bloc = blocs.find((item) => item.sousColonnes.some((etape) => etape.id === groupe.actions[0]?.etapeId));
+    if (bloc) setVaccinsAffiches(new Set([bloc.cle]));
+    setVue("TABLEAU");
+  }
+
   return (
     <section id="tableau-vaccinal-impression" className="rounded-2xl bg-white shadow-sm">
       <h1 className="hidden text-lg font-black print:block">Tableau vaccinal</h1>
@@ -716,7 +726,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         </details>
       </div>
 
-      {vue === "AGENDA" && <AgendaVaccinal actions={actionsPrevues} lignes={lignes} blocs={blocs} anneesFiltre={anneesFiltre} />}
+      {vue === "AGENDA" && <CalendrierVaccinal actions={actionsPrevues} lignes={lignes} blocs={blocs} anneesFiltre={anneesFiltre} onPreparer={preparerDepuisAgenda} />}
       <div className={vue === "TABLEAU" ? "" : "hidden"}>
       <p className="vaccin-print-hidden mx-3 mb-2 flex flex-wrap items-center gap-x-2 text-xs text-gray-600"><span className="font-semibold">{libelleAnimauxSelectionnes(animauxSelectionnes.size)}</span><span aria-hidden="true">·</span><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => setUniquementSelection((actuel) => !actuel)} className="min-h-9 px-1 font-semibold text-green-800 underline disabled:opacity-40">{actionsSelectionAnimaux(uniquementSelection).basculerVue}</button><span aria-hidden="true">·</span><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => { setAnimauxSelectionnes(new Set()); setUniquementSelection(false); }} className="min-h-9 px-1 font-semibold text-green-800 underline disabled:opacity-40">{actionsSelectionAnimaux(uniquementSelection).vider}</button></p>
 
