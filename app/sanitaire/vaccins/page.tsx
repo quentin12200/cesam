@@ -55,6 +55,9 @@ export default async function VaccinsPage() {
       where: { statut: "ACTIF" },
       select: {
         id: true, nutrav: true, nobovi: true, sexbov: true, danais: true, estGenisse: true, categorie: true,
+        mere: { select: { nutrav: true, nobovi: true } },
+        mereTravailManuel: true,
+        mereNomManuel: true,
         groupe: { select: { nom: true } },
         _count: { select: { velagesVache: true } },
         saillies: {
@@ -115,6 +118,9 @@ export default async function VaccinsPage() {
     const gestation = animal.saillies[0]?.gestation ?? null;
     return {
       id: animal.id, nutrav: animal.nutrav, nom: animal.nobovi, sexe: animal.sexbov, danaisIso: animal.danais.toISOString(),
+      mereNutrav: animal.mere?.nutrav ?? animal.mereTravailManuel ?? null,
+      mereNom: animal.mere?.nobovi ?? animal.mereNomManuel ?? null,
+      mereLiee: Boolean(animal.mere),
       categorie, nombreVelages: animal._count.velagesVache, groupeNom: animal.groupe?.nom ?? null,
       gestationId: gestation?.id ?? null, dateVelagePrevueIso: gestation?.dateVelagePrevue?.toISOString() ?? null,
       actes: unifierActesVaccinaux(
