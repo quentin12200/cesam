@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { construireBlocsVaccinaux, construireGrilleVaccinale, type AnimalGrille, type ProtocoleGrille, type VaccinPharmacieGrille } from "./vaccine-grid.ts";
+import { bornerFenetreInitialeAuVelage, construireBlocsVaccinaux, construireGrilleVaccinale, extraireActionsPrevues, type AnimalGrille, type ProtocoleGrille, type VaccinPharmacieGrille } from "./vaccine-grid.ts";
 
 const AUJOURDHUI = new Date("2026-09-29T12:00:00Z");
 const jours = (n: number) => new Date(new Date("2026-01-01T12:00:00Z").getTime() + n * 86_400_000);
@@ -246,4 +246,97 @@ test("une étape liée au vêlage suit exclusivement la fenêtre configurée dan
   // Échéance encore lointaine : elle reste visible (prévu plus tard), jamais masquée.
   assert.equal(apresModification.lignes[0].cellules["crypto-velage"].statut, "PREVU");
   assert.ok(apresModification.lignes[0].cellules["crypto-velage"].date);
+});
+
+test("PROTOCOLE_ACQUIS ne repropose jamais les étapes initiales et planifie l'entretien du cycle courant", () => {
+  const velage = new Date("2027-02-15T12:00:00Z");
+  const entretien = {
+    ...etapePrimo,
+    id: "entretien-annuel",
+    label: "Rappel annuel",
+    ordre: 2,
+    cycle: "ENTRETIEN",
+    reference: "VELAGE",
+    debutValeur: 90,
+    debutPosition: "AVANT",
+    finValeur: 21,
+    finPosition: "AVANT",
+  };
+  const protocole = { ...protocoleBovigrip, etapes: [etapePrimo, etapeRappel, entretien] };
+  const gestante = animal({
+    gestationId: "gestation-courante",
+    dateVelagePrevueIso: velage.toISOString(),
+    statutsProtocoles: [{ protocoleId: protocole.id, statut: "PROTOCOLE_ACQUIS" }],
+    actes: [
+      { date: new Date("2025-01-10T12:00:00Z"), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: protocole.id, etapeProtocoleId: etapePrimo.id, gestationId: "ancienne-gestation", statut: "FAIT" },
+      { date: new Date("2025-02-10T12:00:00Z"), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: protocole.id, etapeProtocoleId: etapeRappel.id, gestationId: "ancienne-gestation", statut: "FAIT" },
+    ],
+  });
+  const grille = construireGrilleVaccinale([gestante], [protocole], [], AUJOURDHUI);
+  assert.equal(grille.lignes[0].cellules[etapePrimo.id].statut, "VIDE");
+  assert.equal(grille.lignes[0].cellules[etapeRappel.id].statut, "VIDE");
+  assert.notEqual(grille.lignes[0].cellules[entretien.id].statut, "VIDE");
+  assert.deepEqual(extraireActionsPrevues(grille).map((action) => action.etapeId), [entretien.id]);
+});
+
+test("PROTOCOLE_ACQUIS avec entretien fait dans la gestation courante reste FAIT sans nouvelle primo", () => {
+  const entretien = { ...etapePrimo, id: "entretien", label: "Entretien", ordre: 2, cycle: "ENTRETIEN", reference: "VELAGE", debutValeur: 90, debutPosition: "AVANT", finValeur: 21, finPosition: "AVANT" };
+  const protocole = { ...protocoleBovigrip, etapes: [etapePrimo, etapeRappel, entretien] };
+  const dateActe = new Date("2026-09-20T12:00:00Z");
+  const gestante = animal({
+    gestationId: "g1",
+    dateVelagePrevueIso: "2026-12-01T12:00:00Z",
+    statutsProtocoles: [{ protocoleId: protocole.id, statut: "PROTOCOLE_ACQUIS" }],
+    actes: [{ date: dateActe, vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: protocole.id, etapeProtocoleId: entretien.id, gestationId: "g1", statut: "FAIT" }],
+  });
+  const { lignes } = construireGrilleVaccinale([gestante], [protocole], [], AUJOURDHUI);
+  assert.equal(lignes[0].cellules[entretien.id].statut, "FAIT");
+  assert.equal(lignes[0].cellules[etapePrimo.id].statut, "VIDE");
+  assert.equal(lignes[0].cellules[etapeRappel.id].statut, "VIDE");
+});
+
+test("PRIMO_EN_COURS continue le rappel initial configuré", () => {
+  const datePrimo = new Date("2026-09-10T12:00:00Z");
+  const enCours = animal({
+    danaisIso: "2026-01-01T12:00:00Z",
+    statutsProtocoles: [{ protocoleId: protocoleBovigrip.id, statut: "PRIMO_EN_COURS" }],
+    actes: [{ date: datePrimo, vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: protocoleBovigrip.id, etapeProtocoleId: etapePrimo.id, gestationId: null, statut: "FAIT" }],
+  });
+  const { lignes } = construireGrilleVaccinale([enCours], [protocoleBovigrip], [], AUJOURDHUI);
+  assert.equal(lignes[0].cellules[etapePrimo.id].statut, "FAIT");
+  assert.notEqual(lignes[0].cellules[etapeRappel.id].statut, "VIDE");
+});
+
+test("PRIMO_A_FAIRE commence au premier initial tandis que A_CONFIRMER ne recommande rien", () => {
+  const aFaire = animal({ statutsProtocoles: [{ protocoleId: protocoleBovigrip.id, statut: "PRIMO_A_FAIRE" }] });
+  const aConfirmer = animal({ id: "a2", statutsProtocoles: [{ protocoleId: protocoleBovigrip.id, statut: "A_CONFIRMER" }] });
+  const { lignes } = construireGrilleVaccinale([aFaire, aConfirmer], [protocoleBovigrip], [], AUJOURDHUI);
+  assert.notEqual(lignes[0].cellules[etapePrimo.id].statut, "VIDE");
+  assert.equal(lignes[0].cellules[etapeRappel.id].statut, "VIDE");
+  assert.equal(extraireActionsPrevues({ blocs: construireBlocsVaccinaux([protocoleBovigrip], []), lignes: [lignes[1]] }).length, 0);
+});
+
+test("une étape initiale calculée entièrement après le vêlage est absente de la grille et de l'Agenda", () => {
+  const primoVelage = { ...etapePrimo, id: "primo-velage", reference: "VELAGE", debutValeur: 60, debutPosition: "AVANT", finValeur: 50, finPosition: "AVANT" };
+  const rappelApres = { ...etapeRappel, id: "rappel-apres", debutValeur: 70, finValeur: 80 };
+  const protocole = { ...protocoleBovigrip, id: "proto-pre-velage", etapes: [primoVelage, rappelApres] };
+  const gestante = animal({
+    gestationId: "g1",
+    dateVelagePrevueIso: "2026-12-01T12:00:00Z",
+    statutsProtocoles: [{ protocoleId: protocole.id, statut: "PRIMO_EN_COURS" }],
+    actes: [{ date: new Date("2026-10-10T12:00:00Z"), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: protocole.id, etapeProtocoleId: primoVelage.id, gestationId: "g1", statut: "FAIT" }],
+  });
+  const grille = construireGrilleVaccinale([gestante], [protocole], [], AUJOURDHUI);
+  assert.equal(grille.lignes[0].cellules[rappelApres.id].statut, "VIDE");
+  assert.equal(extraireActionsPrevues(grille).some((action) => action.etapeId === rappelApres.id), false);
+});
+
+test("une fenêtre initiale qui chevauche le vêlage est bornée au jour du vêlage", () => {
+  const velage = new Date("2026-12-01T12:00:00Z");
+  const fenetre = bornerFenetreInitialeAuVelage({
+    debut: new Date("2026-11-20T12:00:00Z"),
+    fin: new Date("2026-12-10T12:00:00Z"),
+  }, velage, true);
+  assert.equal(fenetre?.debut.toISOString(), "2026-11-20T12:00:00.000Z");
+  assert.equal(fenetre?.fin.toISOString(), velage.toISOString());
 });

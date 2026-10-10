@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { getCategorie } from "@/lib/utils";
 import { getPreparationsVaccinales } from "@/lib/vaccine-preparation-data";
 import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
-import { construireGrilleVaccinale, type AnimalGrille, type ProtocoleGrille } from "@/lib/vaccine-grid";
+import { construireGrilleVaccinale, extraireActionsPrevues, type AnimalGrille, type ProtocoleGrille } from "@/lib/vaccine-grid";
+import type { StatutProtocoleVaccinal } from "@/lib/vaccine-planner";
 import { resoudreAdministrationEtape } from "@/lib/vaccine-administration";
 import PreparationVaccinCard from "./PreparationVaccinCard";
 import TableauVaccinal from "./TableauVaccinal";
@@ -70,6 +71,7 @@ export default async function VaccinsPage() {
         // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
         // quand même remonter comme fait dans la grille. Voir lib/vaccine-acts.ts.
         traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { id: true, dateDebut: true, medicamentNom: true, medicamentId: true, voie: true, dose: true, uniteDosage: true, protocoleVaccinId: true, etapeProtocoleVaccinId: true, gestationId: true } },
+        statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true } },
       },
       orderBy: { nutrav: "asc" },
     }),
@@ -123,6 +125,10 @@ export default async function VaccinsPage() {
       mereLiee: Boolean(animal.mere),
       categorie, nombreVelages: animal._count.velagesVache, groupeNom: animal.groupe?.nom ?? null,
       gestationId: gestation?.id ?? null, dateVelagePrevueIso: gestation?.dateVelagePrevue?.toISOString() ?? null,
+      statutsProtocoles: animal.statutsProtocolesVaccinaux.map((statut) => ({
+        protocoleId: statut.protocoleId,
+        statut: statut.statut as StatutProtocoleVaccinal,
+      })),
       actes: unifierActesVaccinaux(
         animal.vaccinations.map((vaccination) => ({ ...vaccination, sourceType: "VACCINATION" as const, sourceId: vaccination.id })),
         animal.traitements,
@@ -135,11 +141,26 @@ export default async function VaccinsPage() {
     protocolesGrille,
     medicamentsVaccin.map((m) => ({ medicamentId: m.id, nom: m.nom, voie: m.voie }))
   );
+  const actionsPrevues = extraireActionsPrevues(grille).map((action) => ({
+    animalId: action.animalId,
+    nutrav: action.nutrav,
+    nom: action.nom,
+    medicamentId: action.medicamentId,
+    medicamentNom: action.medicamentNom,
+    protocoleId: action.protocoleId,
+    etapeId: action.etapeId,
+    etapeLabel: action.etapeLabel,
+    typeEtape: action.typeEtape,
+    statut: action.statut,
+    dateMin: action.dateMin.toISOString(),
+    dateMax: action.dateMax.toISOString(),
+    dateVelageReference: action.dateVelageReference?.toISOString() ?? null,
+  }));
 
   return (
     <main className="mx-auto max-w-6xl space-y-3 p-3 pb-24">
       <header><h1 className="text-xl font-black text-gray-900">Tableau vaccinal</h1></header>
-      <TableauVaccinal blocs={grille.blocs} lignes={grille.lignes.map((ligne) => ({
+      <TableauVaccinal actionsPrevues={actionsPrevues} blocs={grille.blocs} lignes={grille.lignes.map((ligne) => ({
         ...ligne,
         actes: ligne.actes.map((acte) => ({ ...acte, date: acte.date.toISOString() })),
         cellules: Object.fromEntries(Object.entries(ligne.cellules).map(([cle, cellule]) => [cle, {

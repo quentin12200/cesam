@@ -13,6 +13,8 @@ import { actionsSelectionAnimaux, basculerSelectionVisibles, etatSelectionMaitre
 import { construireChargeSoin } from "@/lib/vaccine-soin-seance";
 import { actesDuVaccin, anneesDisponibles, datesCompactes, type ActeHistorique } from "@/lib/vaccine-history-view";
 import { comparerDateVelage, comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
+import { libelleFenetreVaccinale, type ActionAgenda } from "@/lib/vaccine-agenda";
+import AgendaVaccinal from "./AgendaVaccinal";
 
 interface CelluleGrille {
   statut: "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
@@ -21,7 +23,8 @@ interface CelluleGrille {
   rattachementProtocoleAutorise: boolean;
   historiquesAValider: HistoriqueAValider[];
   actes: ActeHistorique[];
-  prochaine: { statut: "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU"; date: string } | null;
+  prochaine: { statut: "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU"; date: string; fenetre: { debut: string; fin: string } } | null;
+  fenetre: { debut: string; fin: string } | null;
 }
 
 interface HistoriqueAValider {
@@ -137,8 +140,9 @@ function correspondStatut(cellule: CelluleGrille, filtres: ReadonlySet<Statut>):
     || (filtres.has("enRetard") && statut === "EN_RETARD");
 }
 
-export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lignes: Ligne[] }) {
+export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blocs: Bloc[]; lignes: Ligne[]; actionsPrevues: ActionAgenda[] }) {
   const router = useRouter();
+  const [vue, setVue] = useState<"TABLEAU" | "AGENDA">("TABLEAU");
   const [recherche, setRecherche] = useState("");
   const [vaccinsAffiches, setVaccinsAffiches] = useState<Set<string>>(() => new Set(blocs.map((bloc) => bloc.cle)));
   const [statuts, setStatuts] = useState<Set<Statut>>(new Set());
@@ -503,11 +507,12 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
           ? <button type="button" title={`Historique : ${tousLesActes} — voir ou corriger l’étape`} onClick={() => ouvrirHistorique(ligne, bloc, etape)} className={`flex w-full flex-wrap items-center justify-center gap-x-1 rounded border px-1 py-0.5 font-bold ${badgeClasse}`}>{contenu}</button>
           : <span className={`flex w-full flex-wrap items-center justify-center gap-x-1 rounded border px-1 py-0.5 font-bold ${badgeClasse}`}>{contenu}</span>}
         {selectionne && !cellule.prochaine && <span className="block rounded border border-green-700 px-1 text-center text-[10px] font-bold text-green-900 ring-2 ring-green-700">+ nouvelle</span>}
-        {cellule.prochaine && <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title="Prochaine échéance : ajouter ou retirer des vaccinations à enregistrer" className={`flex w-full items-center justify-center gap-1 rounded border px-1 py-0.5 whitespace-nowrap ${classeStatut(cellule.prochaine.statut)} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-[11px] font-black">{selectionne ? "☑" : "→"}</span><span className="text-[10px] font-semibold">{afficherDate(cellule.prochaine.date)}</span></button>}
+        {cellule.prochaine && (() => { const libelle = libelleFenetreVaccinale(cellule.prochaine.statut, cellule.prochaine.fenetre.debut, cellule.prochaine.fenetre.fin); return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title="Prochaine échéance : ajouter ou retirer des vaccinations à enregistrer" className={`flex w-full items-center justify-center gap-1 rounded border px-1 py-0.5 ${classeStatut(cellule.prochaine.statut)} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-[11px] font-black">{selectionne ? "☑" : "→"}</span><span className="text-[10px] font-semibold leading-tight">{libelle.statut && <span className="block">{libelle.statut}</span>}<span className="block">{libelle.date}</span></span></button>; })()}
       </div>;
     }
     const classe = classeStatut(cellule.statut);
-    return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title={disponible ? "Ajouter ou retirer des vaccinations à enregistrer" : cellule.aValider ? "Résoudre d’abord l’historique à rattacher" : "Médicament à renseigner"} className={`flex w-full items-center justify-center gap-1 rounded border px-1.5 py-1 whitespace-nowrap ${classe} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-xl font-black leading-none">{selectionne ? "☑" : "☐"}</span>{cellule.date && <span className="text-[10px] font-semibold opacity-80">{afficherDate(cellule.date)}</span>}</button>;
+    const libelle = cellule.fenetre && cellule.statut !== "VIDE" ? libelleFenetreVaccinale(cellule.statut, cellule.fenetre.debut, cellule.fenetre.fin) : null;
+    return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title={disponible ? "Ajouter ou retirer des vaccinations à enregistrer" : cellule.aValider ? "Résoudre d’abord l’historique à rattacher" : "Médicament à renseigner"} className={`flex w-full items-center justify-center gap-1 rounded border px-1.5 py-1 ${classe} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-xl font-black leading-none">{selectionne ? "☑" : "☐"}</span>{libelle && <span className="text-[10px] font-semibold leading-tight opacity-80">{libelle.statut && <span className="block">{libelle.statut}</span>}<span className="block">{libelle.date}</span></span>}</button>;
   }
 
   function renduPanneauHistorique() {
@@ -668,6 +673,11 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
     <section id="tableau-vaccinal-impression" className="rounded-2xl bg-white shadow-sm">
       <h1 className="hidden text-lg font-black print:block">Tableau vaccinal</h1>
       <div className="vaccin-print-hidden flex flex-wrap items-start gap-2 p-3">
+        <div className="inline-flex min-h-10 rounded-lg border bg-white p-1 text-sm font-semibold">
+          <button type="button" aria-pressed={vue === "TABLEAU"} onClick={() => setVue("TABLEAU")} className={`rounded-md px-3 ${vue === "TABLEAU" ? "bg-green-800 text-white" : "text-gray-700"}`}>Tableau</button>
+          <button type="button" aria-pressed={vue === "AGENDA"} onClick={() => setVue("AGENDA")} className={`rounded-md px-3 ${vue === "AGENDA" ? "bg-green-800 text-white" : "text-gray-700"}`}>Agenda</button>
+        </div>
+        {vue === "TABLEAU" && <>
         <input value={recherche} onChange={(event) => setRecherche(event.target.value)} placeholder="Recherche animal" aria-label="Rechercher un animal" className="min-h-10 min-w-48 flex-1 rounded-lg border px-3 text-sm" />
 
         <details className="relative">
@@ -685,6 +695,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
             <button type="button" onClick={() => setStatuts(new Set())} className="mt-1 text-xs font-semibold underline">Afficher tous les statuts</button>
           </div>
         </details>
+        </>}
 
         <details className="relative">
           <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border px-3 text-sm font-semibold text-gray-700">Années affichées ▾</summary>
@@ -705,6 +716,8 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
         </details>
       </div>
 
+      {vue === "AGENDA" && <AgendaVaccinal actions={actionsPrevues} lignes={lignes} blocs={blocs} anneesFiltre={anneesFiltre} />}
+      <div className={vue === "TABLEAU" ? "" : "hidden"}>
       <p className="vaccin-print-hidden mx-3 mb-2 flex flex-wrap items-center gap-x-2 text-xs text-gray-600"><span className="font-semibold">{libelleAnimauxSelectionnes(animauxSelectionnes.size)}</span><span aria-hidden="true">·</span><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => setUniquementSelection((actuel) => !actuel)} className="min-h-9 px-1 font-semibold text-green-800 underline disabled:opacity-40">{actionsSelectionAnimaux(uniquementSelection).basculerVue}</button><span aria-hidden="true">·</span><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => { setAnimauxSelectionnes(new Set()); setUniquementSelection(false); }} className="min-h-9 px-1 font-semibold text-green-800 underline disabled:opacity-40">{actionsSelectionAnimaux(uniquementSelection).vider}</button></p>
 
 
@@ -754,6 +767,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
       </div>}
 
       <p className="vaccin-print-hidden border-t px-3 py-2 text-xs text-gray-500">{resultat.length} animal(aux) · Jaune = à faire · Orange = bientôt, inclus dans « À faire » · Rouge = en retard.</p>
+      </div>
 
       {donneesManquantes && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Informations vaccinales manquantes"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
         <h2 className="text-lg font-black text-gray-900">Information nécessaire</h2><p className="mt-1 text-sm text-gray-600">Renseignez uniquement la voie absente avant l’enregistrement.</p>

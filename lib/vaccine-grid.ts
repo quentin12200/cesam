@@ -8,7 +8,7 @@
  * vaccinationsSansEtapeFiable, vaccinationAppartientAuCycleCourant, estAnimalConcerneParProtocole)
  * une fois par étape au lieu d'une fois pour « la prochaine action » seulement.
  */
-import { calculerFenetreEtape, type EtapeVaccinaleConfig } from "./vaccine-planner.ts";
+import { calculerFenetreEtape, type EtapeVaccinaleConfig, type StatutProtocoleVaccinal } from "./vaccine-planner.ts";
 import { statutPlanningVaccin } from "./vaccine-planning-status.ts";
 import { rattacherInjectionOrpheline, vaccinationsSansEtapeFiable } from "./vaccine-history.ts";
 import { vaccinationAppartientAuCycleCourant } from "./vaccination-session.ts";
@@ -61,8 +61,34 @@ export interface AnimalGrille {
   groupeNom: string | null;
   gestationId: string | null;
   dateVelagePrevueIso: string | null;
+  /** Statuts existants, lus uniquement : la grille ne les modifie jamais. */
+  statutsProtocoles?: readonly { protocoleId: string; statut: StatutProtocoleVaccinal }[];
   /** Historique déjà fusionné (Vaccination + Traitement VACCIN), voir lib/vaccine-acts.ts. */
   actes: readonly ActeVaccination[];
+}
+
+function etapePlanifiableSelonStatut(
+  etape: EtapeGrille,
+  statut: StatutProtocoleVaccinal | null,
+): boolean {
+  if (statut === "A_CONFIRMER") return false;
+  if (statut === "PROTOCOLE_ACQUIS") return etape.cycle === "ENTRETIEN";
+  if (statut === "PRIMO_A_FAIRE" || statut === "PRIMO_EN_COURS") return etape.cycle !== "ENTRETIEN";
+  return true;
+}
+
+/** Garde générique : une étape initiale d'un parcours pré-vêlage ne déborde jamais après le vêlage. */
+export function bornerFenetreInitialeAuVelage(
+  fenetre: { debut: Date; fin: Date } | null,
+  dateVelagePrevue: Date | null,
+  applicable: boolean,
+): { debut: Date; fin: Date } | null {
+  if (!fenetre || !dateVelagePrevue || !applicable) return fenetre;
+  if (fenetre.debut.getTime() > dateVelagePrevue.getTime()) return null;
+  return {
+    debut: fenetre.debut,
+    fin: fenetre.fin.getTime() > dateVelagePrevue.getTime() ? dateVelagePrevue : fenetre.fin,
+  };
 }
 
 export interface SousColonneGrille {
@@ -294,6 +320,7 @@ function celluleProtocole(
   );
 
   const protocoleLieAuVelage = etapes.some((etape) => etape.reference === "VELAGE");
+  const statutProtocole = animal.statutsProtocoles?.find((statut) => statut.protocoleId === protocole.id)?.statut ?? null;
   const actesDuProtocole = animal.actes.filter(
     (acte) => acte.protocoleId === protocole.id && vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, acte.gestationId, animal.gestationId)
   );
@@ -341,7 +368,11 @@ function celluleProtocole(
       continue;
     }
     if (!eligible) { cellules.set(etape.id, celluleVide()); continue; }
-    const fenetre = calculerFenetreEtape({
+    if (!etapePlanifiableSelonStatut(etape, statutProtocole)) {
+      cellules.set(etape.id, { ...celluleVide(), rattachementProtocoleAutorise: eligible });
+      continue;
+    }
+    const fenetreCalculee = calculerFenetreEtape({
       etape,
       dateNaissance: new Date(animal.danaisIso),
       dateVelagePrevue: animal.dateVelagePrevueIso ? new Date(animal.dateVelagePrevueIso) : null,
@@ -349,6 +380,11 @@ function celluleProtocole(
       ageMinJours: protocole.ageMinJours,
       ageMaxJours: protocole.ageMaxJours,
     });
+    const fenetre = bornerFenetreInitialeAuVelage(
+      fenetreCalculee,
+      animal.dateVelagePrevueIso ? new Date(animal.dateVelagePrevueIso) : null,
+      protocoleLieAuVelage && etape.cycle !== "ENTRETIEN",
+    );
     const cellule = fenetre ? celluleDepuisPlanning(date, fenetre) : celluleVide();
     cellules.set(etape.id, { ...cellule, rattachementProtocoleAutorise: eligible });
   }
@@ -452,7 +488,7 @@ export interface ActionPrevue {
   statut: "PREVU" | "BIENTOT" | "A_FAIRE" | "EN_RETARD";
   dateMin: Date;
   dateMax: Date;
-  /** Date de vêlage prévue de référence, seulement pour une étape basée sur le vêlage. */
+  /** Date de vêlage prévue de référence pour tout le parcours lié au vêlage. */
   dateVelageReference: Date | null;
   /** Historique réel de CE médicament pour cet animal (tous les actes, aucun filtre d'année). */
   historique: ActeCellule[];
@@ -488,7 +524,7 @@ export function extraireActionsPrevues(grille: { blocs: BlocVaccinGrille[]; lign
           statut: planning.statut,
           dateMin: planning.fenetre.debut,
           dateMax: planning.fenetre.fin,
-          dateVelageReference: etape?.reference === "VELAGE" && ligne.dateVelagePrevueIso ? new Date(ligne.dateVelagePrevueIso) : null,
+          dateVelageReference: bloc.protocoleLieAuVelage && ligne.dateVelagePrevueIso ? new Date(ligne.dateVelagePrevueIso) : null,
           historique: ligne.actes.filter((acte) => acte.medicamentId != null ? acte.medicamentId === medicamentId : acte.vaccin.trim().toUpperCase() === nom.trim().toUpperCase()),
           voie: sousColonne.voie,
           dose: sousColonne.dose,
