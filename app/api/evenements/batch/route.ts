@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { normaliserPattes } from "@/lib/parage";
 import { gestationIdAEnregistrer } from "@/lib/vaccination-session";
+import { choisirBrancheAgePrimo, lireConfigurationQuestionnaire } from "@/lib/vaccine-protocol-questionnaire";
 
 interface TraitementDraft {
   medicamentId?: string | null;
@@ -68,6 +69,8 @@ export async function POST(request: NextRequest) {
       session: VaccinationSession;
       etapes: Array<{ id: string; ordre: number; cycle: string; reference: string; obligatoire: boolean; protocoleId: string }>;
       medicamentNom: string;
+      configurationQuestionnaireJson: string | null;
+      datesNaissance: Map<string, Date>;
     } | null = null;
     if (vaccinationSession) {
       const idsSession = vaccinationSession.animaux.map((animal) => animal.animalId);
@@ -78,13 +81,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Contexte vaccinal invalide" }, { status: 400 });
       }
       const gestationIds = vaccinationSession.animaux.map((animal) => animal.gestationId).filter((id): id is string => Boolean(id));
-      const [protocole, medicament, gestations] = await Promise.all([
+      const [protocole, medicament, gestations, animauxSession] = await Promise.all([
         prisma.protocoleVaccin.findUnique({
           where: { id: vaccinationSession.protocoleId },
-          select: { etapes: { select: { id: true, ordre: true, cycle: true, reference: true, obligatoire: true, protocoleId: true, medicaments: { select: { medicamentId: true } } } } },
+          select: { configurationQuestionnaireJson: true, etapes: { select: { id: true, ordre: true, cycle: true, reference: true, obligatoire: true, protocoleId: true, medicaments: { select: { medicamentId: true } } } } },
         }),
         prisma.medicament.findUnique({ where: { id: vaccinationSession.medicamentId }, select: { nom: true } }),
         prisma.gestation.findMany({ where: { id: { in: gestationIds } }, select: { id: true, saillie: { select: { animalId: true } } } }),
+        prisma.animal.findMany({ where: { id: { in: idsSession } }, select: { id: true, danais: true } }),
       ]);
       if (!protocole || !medicament || vaccinationSession.animaux.some((animal) => {
         const etape = protocole.etapes.find((item) => item.id === animal.etapeProtocoleId);
@@ -94,7 +98,13 @@ export async function POST(request: NextRequest) {
         const medicamentLieAuProtocole = protocole.etapes.some((item) => item.medicaments.some((liaison) => liaison.medicamentId === vaccinationSession.medicamentId));
         return !etape || !gestationValide || !(medicamentLieDirectement || (etapeSansMedicament && medicamentLieAuProtocole));
       })) return NextResponse.json({ error: "Étape vaccinale ou médicament invalide" }, { status: 400 });
-      vaccinationConfig = { session: vaccinationSession, etapes: protocole.etapes, medicamentNom: medicament.nom };
+      vaccinationConfig = {
+        session: vaccinationSession,
+        etapes: protocole.etapes,
+        medicamentNom: medicament.nom,
+        configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
+        datesNaissance: new Map(animauxSession.map((animal) => [animal.id, animal.danais])),
+      };
     }
 
     const traitementsList: TraitementDraft[] = Array.isArray(traitements)
@@ -108,7 +118,7 @@ export async function POST(request: NextRequest) {
             protocoleId: vaccinationConfig.session.protocoleId,
             animalId: { in: vaccinationConfig.session.animaux.map((animal) => animal.animalId) },
           },
-          select: { id: true, animalId: true, statut: true, source: true, confirmeAt: true },
+          select: { id: true, animalId: true, statut: true, source: true, confirmeAt: true, brancheInitialeId: true },
         })
       : [];
 
@@ -167,7 +177,7 @@ export async function POST(request: NextRequest) {
           medicamentId: vaccinationConfig.session.medicamentId,
           protocoleId: vaccinationConfig.session.protocoleId,
           etapeProtocoleId: animal.etapeProtocoleId,
-          gestationId: gestationIdAEnregistrer(vaccinationConfig.etapes, animal.gestationId),
+          gestationId: gestationIdAEnregistrer(vaccinationConfig.etapes, animal.gestationId, vaccinationConfig.configurationQuestionnaireJson),
           typeInjection: vaccinationConfig.etapes.find((etape) => etape.id === animal.etapeProtocoleId)?.cycle === "ENTRETIEN"
             ? "ENTRETIEN"
             : vaccinationConfig.etapes.filter((etape) => etape.cycle !== "ENTRETIEN").sort((a, b) => a.ordre - b.ordre)[0]?.id === animal.etapeProtocoleId ? "PRIMO_1" : "RAPPEL",
@@ -186,10 +196,19 @@ export async function POST(request: NextRequest) {
             const realisees = await tx.vaccination.findMany({ where: { animalId: animal.animalId, protocoleId: vaccinationConfig.session.protocoleId, etapeProtocoleId: { in: initialesRequises } }, select: { etapeProtocoleId: true } });
             statut = initialesRequises.every((id) => realisees.some((vaccination) => vaccination.etapeProtocoleId === id)) ? "PROTOCOLE_ACQUIS" : "PRIMO_EN_COURS";
           }
+          const configuration = lireConfigurationQuestionnaire(vaccinationConfig.configurationQuestionnaireJson);
+          const avant = statutsVaccinauxAvant.find((item) => item.animalId === animal.animalId);
+          let brancheInitialeId = avant?.brancheInitialeId ?? null;
+          if (configuration?.demarrage.type === "PRIMO_RAPPEL"
+            && configuration.demarrage.rappel.type === "BRANCHES_AGE_PRIMO"
+            && animal.etapeProtocoleId === configuration.demarrage.etapePrimoId) {
+            const dateNaissance = vaccinationConfig.datesNaissance.get(animal.animalId);
+            brancheInitialeId = dateNaissance ? choisirBrancheAgePrimo(configuration, dateNaissance, resolvedDate)?.id ?? null : null;
+          }
           const statutModifie = await tx.statutProtocoleVaccinal.upsert({
             where: { animalId_protocoleId: { animalId: animal.animalId, protocoleId: vaccinationConfig.session.protocoleId } },
-            create: { animalId: animal.animalId, protocoleId: vaccinationConfig.session.protocoleId, statut, source: "VACCINATION", confirmeAt: now },
-            update: { statut, source: "VACCINATION", confirmeAt: now },
+            create: { animalId: animal.animalId, protocoleId: vaccinationConfig.session.protocoleId, statut, source: "VACCINATION", confirmeAt: now, brancheInitialeId },
+            update: { statut, source: "VACCINATION", confirmeAt: now, brancheInitialeId },
             select: { id: true, animalId: true },
           });
           statutsVaccinauxModifies.push(statutModifie);
@@ -209,7 +228,7 @@ export async function POST(request: NextRequest) {
             op: "update" as const,
             model: "statutProtocoleVaccinal",
             where: { id: statutModifie.id },
-            data: { statut: avant.statut, source: avant.source, confirmeAt: avant.confirmeAt },
+            data: { statut: avant.statut, source: avant.source, confirmeAt: avant.confirmeAt, brancheInitialeId: avant.brancheInitialeId },
           }
         : { op: "delete" as const, model: "statutProtocoleVaccinal", id: statutModifie.id };
     });

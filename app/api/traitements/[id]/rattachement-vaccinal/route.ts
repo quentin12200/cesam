@@ -31,6 +31,7 @@ export async function PATCH(
       prisma.protocoleVaccin.findUnique({
         where: { id: protocoleId },
         select: {
+          configurationQuestionnaireJson: true,
           etapes: {
             select: { id: true, reference: true, medicaments: { select: { medicamentId: true } } },
           },
@@ -50,7 +51,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Le médicament réel ne correspond pas à cette étape" }, { status: 400 });
     }
 
-    const gestationAEnregistrer = gestationIdAEnregistrer(protocole.etapes, gestationId);
+    const gestationAEnregistrer = gestationIdAEnregistrer(protocole.etapes, gestationId, protocole.configurationQuestionnaireJson);
     if (gestationAEnregistrer) {
       const gestation = await prisma.gestation.findFirst({
         where: { id: gestationAEnregistrer, saillie: { animalId: traitement.animalId } },

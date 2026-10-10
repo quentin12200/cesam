@@ -8,7 +8,8 @@
  * vaccinationsSansEtapeFiable, vaccinationAppartientAuCycleCourant, estAnimalConcerneParProtocole)
  * une fois par étape au lieu d'une fois pour « la prochaine action » seulement.
  */
-import { calculerFenetreEtape, type EtapeVaccinaleConfig, type StatutProtocoleVaccinal } from "./vaccine-planner.ts";
+import { calculerActionVaccinale, calculerFenetreEtape, type EtapeVaccinaleConfig, type StatutProtocoleVaccinal } from "./vaccine-planner.ts";
+import { configurationQuestionnaireLieeAuVelage, lireConfigurationQuestionnaire } from "./vaccine-protocol-questionnaire.ts";
 import { statutPlanningVaccin } from "./vaccine-planning-status.ts";
 import { rattacherInjectionOrpheline, vaccinationsSansEtapeFiable } from "./vaccine-history.ts";
 import { vaccinationAppartientAuCycleCourant } from "./vaccination-session.ts";
@@ -23,6 +24,7 @@ export interface EtapeGrille extends EtapeVaccinaleConfig {
   voie?: string | null;
   dose?: number | null;
   uniteDosage?: string | null;
+  preconisations?: readonly { id: string; voie: string | null; dose: number | null; unite: string | null }[];
   medicaments: readonly { medicament: { id: string; nom: string } }[];
 }
 
@@ -30,6 +32,7 @@ export interface ProtocoleGrille {
   id: string;
   nom: string;
   label: string;
+  configurationQuestionnaireJson?: string | null;
   ageMinJours: number;
   ageMaxJours: number | null;
   categoriesJson: string | null;
@@ -62,7 +65,7 @@ export interface AnimalGrille {
   gestationId: string | null;
   dateVelagePrevueIso: string | null;
   /** Statuts existants, lus uniquement : la grille ne les modifie jamais. */
-  statutsProtocoles?: readonly { protocoleId: string; statut: StatutProtocoleVaccinal }[];
+  statutsProtocoles?: readonly { protocoleId: string; statut: StatutProtocoleVaccinal; brancheInitialeId?: string | null }[];
   /** Historique déjà fusionné (Vaccination + Traitement VACCIN), voir lib/vaccine-acts.ts. */
   actes: readonly ActeVaccination[];
 }
@@ -132,6 +135,10 @@ export interface CelluleGrille {
   prochaine: { statut: Exclude<StatutCelluleGrille, "FAIT" | "VIDE">; date: Date; fenetre: { debut: Date; fin: Date } } | null;
   /** Fenêtre calculée par le planner pour une échéance (jamais pour une case FAIT). */
   fenetre?: { debut: Date; fin: Date } | null;
+  /** Administration spécifique à l'animal (branche questionnaire), issue de la Pharmacie. */
+  voie?: string | null;
+  dose?: number | null;
+  uniteDosage?: string | null;
 }
 
 /** Acte réel unifié (Vaccination ou Traitement VACCIN) tel que présenté dans la grille. */
@@ -238,7 +245,11 @@ export function construireBlocsVaccinaux(
         protocoleId: protocole.id,
         medicamentId: medicament?.id ?? null,
         protocoleNom: protocole.label || protocole.nom,
-        protocoleLieAuVelage: protocole.etapes.some((etape) => etape.reference === "VELAGE"),
+        protocoleLieAuVelage: (() => {
+          const configuration = lireConfigurationQuestionnaire(protocole.configurationQuestionnaireJson);
+          if (!configuration) return protocole.etapes.some((etape) => etape.reference === "VELAGE");
+          return configurationQuestionnaireLieeAuVelage(configuration);
+        })(),
         medicamentIds: [...new Set([
           ...(medicament ? [medicament.id] : []),
           ...protocole.etapes.flatMap((etape) => [
@@ -319,8 +330,12 @@ function celluleProtocole(
     protocole
   );
 
-  const protocoleLieAuVelage = etapes.some((etape) => etape.reference === "VELAGE");
-  const statutProtocole = animal.statutsProtocoles?.find((statut) => statut.protocoleId === protocole.id)?.statut ?? null;
+  const configurationQuestionnaire = lireConfigurationQuestionnaire(protocole.configurationQuestionnaireJson);
+  const protocoleLieAuVelage = configurationQuestionnaire
+    ? configurationQuestionnaireLieeAuVelage(configurationQuestionnaire)
+    : etapes.some((etape) => etape.reference === "VELAGE");
+  const statutEnregistre = animal.statutsProtocoles?.find((statut) => statut.protocoleId === protocole.id) ?? null;
+  const statutProtocole = statutEnregistre?.statut ?? null;
   const actesDuProtocole = animal.actes.filter(
     (acte) => acte.protocoleId === protocole.id && vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, acte.gestationId, animal.gestationId)
   );
@@ -348,6 +363,37 @@ function celluleProtocole(
   const actesUtiles = acteInfere
     ? [...actesDuProtocole, { ...acteInfere, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0]?.id ?? null }]
     : actesDuProtocole;
+
+  if (protocole.configurationQuestionnaireJson != null) {
+    for (const etape of etapes) {
+      const faites = actesUtiles.filter((acte) => acte.etapeProtocoleId === etape.id).sort((a, b) => b.date.getTime() - a.date.getTime());
+      cellules.set(etape.id, faites.length > 0
+        ? { statut: "FAIT", date: faites[0].date, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [...faites].reverse().map(versActeCellule), prochaine: null }
+        : { ...celluleVide(), rattachementProtocoleAutorise: eligible });
+    }
+    if (eligible) {
+      const action = calculerActionVaccinale({
+        date,
+        dateNaissance: new Date(animal.danaisIso),
+        dateVelagePrevue: animal.dateVelagePrevueIso ? new Date(animal.dateVelagePrevueIso) : null,
+        etapes,
+        vaccinations: actesUtiles,
+        statutProtocole,
+        configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
+        brancheInitialeId: statutEnregistre?.brancheInitialeId ?? null,
+      });
+      if (action.etape && action.dateMin && action.dateMax) {
+        const existante = cellules.get(action.etape.id) ?? celluleVide();
+        const etapeGrille = etapes.find((item) => item.id === action.etape!.id);
+        const preconisation = etapeGrille?.preconisations?.find((item) => item.id === action.preconisationId);
+        const planning = { ...celluleDepuisPlanning(date, { debut: action.dateMin, fin: action.dateMax }), voie: preconisation?.voie ?? null, dose: preconisation?.dose ?? null, uniteDosage: preconisation?.unite ?? null };
+        if (existante.statut === "FAIT" && planning.date) {
+          cellules.set(action.etape.id, { ...existante, prochaine: { statut: planning.statut as Exclude<StatutCelluleGrille, "FAIT" | "VIDE">, date: planning.date, fenetre: planning.fenetre! } });
+        } else cellules.set(action.etape.id, { ...planning, rattachementProtocoleAutorise: true });
+      }
+    }
+    return cellules;
+  }
 
   let dateEtapePrecedente: Date | null = null;
   for (const etape of etapes) {

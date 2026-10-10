@@ -26,6 +26,7 @@ export async function PATCH(
       prisma.protocoleVaccin.findUnique({
         where: { id: protocoleId },
         select: {
+          configurationQuestionnaireJson: true,
           etapes: {
             select: {
               id: true,
@@ -67,7 +68,7 @@ export async function PATCH(
         protocoleId,
         etapeProtocoleId,
         gestationId: vaccination.gestationId
-          ?? gestationIdAEnregistrer(protocole.etapes, gestationId),
+          ?? gestationIdAEnregistrer(protocole.etapes, gestationId, protocole.configurationQuestionnaireJson),
         typeInjection: typeInjectionPourEtape(protocole.etapes, etapeProtocoleId),
       },
     });

@@ -71,7 +71,7 @@ export default async function VaccinsPage() {
         // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
         // quand même remonter comme fait dans la grille. Voir lib/vaccine-acts.ts.
         traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { id: true, dateDebut: true, medicamentNom: true, medicamentId: true, voie: true, dose: true, uniteDosage: true, protocoleVaccinId: true, etapeProtocoleVaccinId: true, gestationId: true } },
-        statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true } },
+        statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true, brancheInitialeId: true } },
       },
       orderBy: { nutrav: "asc" },
     }),
@@ -86,6 +86,7 @@ export default async function VaccinsPage() {
 
   const protocolesGrille: ProtocoleGrille[] = protocolesDb.map((protocole) => ({
     id: protocole.id, nom: protocole.nom, label: protocole.label,
+    configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
     ageMinJours: protocole.ageMinJours, ageMaxJours: protocole.ageMaxJours,
     categoriesJson: protocole.categoriesJson, sexeCible: protocole.sexeCible, gestante: protocole.gestante,
     rangVelageMin: protocole.rangVelageMin, rangVelageMax: protocole.rangVelageMax, lotCible: protocole.lotCible,
@@ -110,6 +111,7 @@ export default async function VaccinsPage() {
         voie: administration.voie ?? "À renseigner",
         dose: administration.dose,
         uniteDosage: administration.unite,
+        preconisations: medicament?.preconisations.filter((item) => item.statut === "VALIDE" && item.dose != null).map((item) => ({ id: item.id, voie: item.voie, dose: item.dose, unite: item.unite })) ?? [],
         medicaments: etape.medicaments.map((item) => ({ medicament: { id: item.medicament.id, nom: item.medicament.nom } })),
       };
     }),
@@ -128,6 +130,7 @@ export default async function VaccinsPage() {
       statutsProtocoles: animal.statutsProtocolesVaccinaux.map((statut) => ({
         protocoleId: statut.protocoleId,
         statut: statut.statut as StatutProtocoleVaccinal,
+        brancheInitialeId: statut.brancheInitialeId,
       })),
       actes: unifierActesVaccinaux(
         animal.vaccinations.map((vaccination) => ({ ...vaccination, sourceType: "VACCINATION" as const, sourceId: vaccination.id })),

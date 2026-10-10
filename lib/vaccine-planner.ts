@@ -1,4 +1,13 @@
-import { addDays, addMonths, differenceInCalendarDays, subDays } from "date-fns";
+import { addDays, addMonths, differenceInCalendarDays, endOfMonth, subDays } from "date-fns";
+import {
+  ajouterDureeQuestionnaire,
+  choisirBrancheAgePrimo,
+  dureeQuestionnaireEnJours,
+  fenetreRegleQuestionnaire,
+  lireConfigurationQuestionnaire,
+  type ConfigurationQuestionnaireV1,
+  type DureeQuestionnaire,
+} from "./vaccine-protocol-questionnaire.ts";
 
 export const STATUTS_CONSERVATION = ["IMMEDIATE", "CONSERVABLE", "INCONNUE"] as const;
 export type StatutConservation = (typeof STATUTS_CONSERVATION)[number];
@@ -257,9 +266,162 @@ export interface ActionVaccinaleCalculee {
   dateMin: Date | null;
   dateMax: Date | null;
   raison: "AGE" | "VELAGE" | "ETAPE_PRECEDENTE" | "DATE_FIXE" | null;
+  preconisationId?: string | null;
 }
 
 type VaccinationEtape = { date: Date; etapeProtocoleId: string | null };
+
+function statutQuestionnaire(date: Date, fenetre: FenetreVaccinale, bientotJours: number): StatutPreparationVaccin {
+  if (date > fenetre.fin) return "EN_RETARD";
+  if (date >= fenetre.debut) return "A_FAIRE";
+  return differenceInCalendarDays(fenetre.debut, date) <= bientotJours ? "A_PREVOIR" : "TROP_TOT";
+}
+
+function actionQuestionnaire(
+  statut: StatutPreparationVaccin,
+  etape: EtapeVaccinaleConfig | null,
+  fenetre: FenetreVaccinale | null,
+  raison: ActionVaccinaleCalculee["raison"],
+  preconisationId: string | null = null,
+): ActionVaccinaleCalculee {
+  return { statut, etape, dateMin: fenetre?.debut ?? null, dateMax: fenetre?.fin ?? null, raison, preconisationId };
+}
+
+function raisonRegle(type: string): ActionVaccinaleCalculee["raison"] {
+  if (type === "AGE_MINIMUM") return "AGE";
+  if (type === "AVANT_VELAGE") return "VELAGE";
+  return "DATE_FIXE";
+}
+
+function fenetrePonctuelle(date: Date): FenetreVaccinale {
+  return { debut: date, fin: date };
+}
+
+function bornerPrimoPourRappel(
+  configuration: ConfigurationQuestionnaireV1,
+  fenetre: FenetreVaccinale,
+  dateNaissance: Date,
+  dateVelagePrevue: Date | null | undefined,
+  dateCalcul: Date,
+): FenetreVaccinale | null {
+  if (configuration.demarrage.type !== "PRIMO_RAPPEL"
+    || !configuration.demarrage.rappel.resterDansFenetrePrimo
+    || configuration.demarrage.calendrierPrimo.type !== "AVANT_VELAGE"
+    || !dateVelagePrevue) return fenetre;
+  const finAutorisee = subDays(dateVelagePrevue, dureeQuestionnaireEnJours(configuration.demarrage.calendrierPrimo.finAvant));
+  const rappel = configuration.demarrage.rappel;
+  if (rappel.type === "DELAI_FIXE") {
+    const fin = subDays(finAutorisee, dureeQuestionnaireEnJours(rappel.delai));
+    return fenetre.debut <= fin ? { debut: fenetre.debut, fin: fin < fenetre.fin ? fin : fenetre.fin } : null;
+  }
+  const segments = rappel.branches.map((branche) => {
+    const seuil = dureeQuestionnaireEnJours(rappel.seuilAgePrimo);
+    const limiteBranche = branche.position === "AVANT_SEUIL"
+      ? addDays(dateNaissance, seuil - 1)
+      : addDays(dateNaissance, seuil);
+    const debut = branche.position === "AVANT_SEUIL" ? fenetre.debut : (limiteBranche > fenetre.debut ? limiteBranche : fenetre.debut);
+    const finAge = branche.position === "AVANT_SEUIL" && limiteBranche < fenetre.fin ? limiteBranche : fenetre.fin;
+    const finRappel = subDays(finAutorisee, dureeQuestionnaireEnJours(branche.delaiRappel));
+    const fin = finRappel < finAge ? finRappel : finAge;
+    return debut <= fin ? { debut, fin } : null;
+  }).filter((segment): segment is FenetreVaccinale => segment != null);
+  if (segments.length === 0) return null;
+  segments.sort((a, b) => a.debut.getTime() - b.debut.getTime());
+  return segments.find((segment) => dateCalcul >= segment.debut && dateCalcul <= segment.fin)
+    ?? segments.find((segment) => segment.debut > dateCalcul)
+    ?? segments[segments.length - 1];
+}
+
+/** Moteur canonique des protocoles questionnaire. Il ne lit jamais les anciens champs de calendrier. */
+export function calculerActionVaccinaleQuestionnaire({
+  date,
+  dateNaissance,
+  dateVelagePrevue,
+  bientotJours,
+  etapes,
+  vaccinations,
+  statutProtocole,
+  brancheInitialeId,
+  configuration,
+}: {
+  date: Date;
+  dateNaissance: Date;
+  dateVelagePrevue?: Date | null;
+  bientotJours: number;
+  etapes: ReadonlyArray<EtapeVaccinaleConfig>;
+  vaccinations: ReadonlyArray<VaccinationEtape>;
+  statutProtocole?: StatutProtocoleVaccinal | null;
+  brancheInitialeId?: string | null;
+  configuration: ConfigurationQuestionnaireV1;
+}): ActionVaccinaleCalculee {
+  const etapeParId = (id: string) => etapes.find((etape) => etape.id === id) ?? null;
+  if (statutProtocole === "A_CONFIRMER") return actionQuestionnaire("A_CONFIRMER", null, null, null);
+  if (statutProtocole === null && vaccinations.length === 0) return actionQuestionnaire("A_CONFIRMER", null, null, null);
+  const demarrage = configuration.demarrage;
+  const idPrimo = demarrage.type === "DOSE_UNIQUE" ? demarrage.etapeDoseId : demarrage.etapePrimoId;
+  const idRappel = demarrage.type === "PRIMO_RAPPEL" ? demarrage.etapeRappelId : null;
+  const primo = vaccinations.filter((acte) => acte.etapeProtocoleId === idPrimo).sort((a, b) => b.date.getTime() - a.date.getTime())[0] ?? null;
+  const rappel = idRappel ? vaccinations.filter((acte) => acte.etapeProtocoleId === idRappel).sort((a, b) => b.date.getTime() - a.date.getTime())[0] ?? null : null;
+  const initialTermine = demarrage.type === "DOSE_UNIQUE" ? Boolean(primo) : Boolean(primo && rappel);
+
+  if (!initialTermine && statutProtocole !== "PROTOCOLE_ACQUIS") {
+    if (!primo) {
+      const regle = demarrage.type === "DOSE_UNIQUE" ? demarrage.calendrier : demarrage.calendrierPrimo;
+      const brute = fenetreRegleQuestionnaire(regle, dateNaissance, dateVelagePrevue, date);
+      const fenetre = brute && demarrage.type === "PRIMO_RAPPEL"
+        ? bornerPrimoPourRappel(configuration, brute, dateNaissance, dateVelagePrevue, date)
+        : brute;
+      if (!fenetre) return actionQuestionnaire("A_CONFIRMER", null, null, null);
+      const etape = etapeParId(idPrimo);
+      let preconisationId = demarrage.type === "DOSE_UNIQUE" ? demarrage.preconisationId : demarrage.rappel.type === "DELAI_FIXE" ? demarrage.rappel.preconisationPrimoId : null;
+      if (demarrage.type === "PRIMO_RAPPEL" && demarrage.rappel.type === "BRANCHES_AGE_PRIMO") {
+        const datePrimoProbable = date < fenetre.debut ? fenetre.debut : date > fenetre.fin ? fenetre.fin : date;
+        preconisationId = choisirBrancheAgePrimo(configuration, dateNaissance, datePrimoProbable)?.preconisationPrimoId ?? null;
+      }
+      return actionQuestionnaire(statutQuestionnaire(date, fenetre, bientotJours), etape, fenetre, raisonRegle(regle.type), preconisationId);
+    }
+    if (demarrage.type === "PRIMO_RAPPEL" && !rappel) {
+      let delai: DureeQuestionnaire;
+      let preconisationId: string;
+      if (demarrage.rappel.type === "BRANCHES_AGE_PRIMO") {
+        const branche = demarrage.rappel.branches.find((item) => item.id === brancheInitialeId);
+        // La branche ne doit jamais être recalculée à l'âge du rappel.
+        if (!branche) return actionQuestionnaire("A_CONFIRMER", null, null, null);
+        delai = branche.delaiRappel;
+        preconisationId = branche.preconisationRappelId;
+      } else { delai = demarrage.rappel.delai; preconisationId = demarrage.rappel.preconisationRappelId; }
+      const dateRappel = ajouterDureeQuestionnaire(primo.date, delai);
+      let fenetre = fenetrePonctuelle(dateRappel);
+      if (demarrage.rappel.resterDansFenetrePrimo && demarrage.calendrierPrimo.type === "AVANT_VELAGE") {
+        const autorisee = fenetreRegleQuestionnaire(demarrage.calendrierPrimo, dateNaissance, dateVelagePrevue, date);
+        if (!autorisee || dateRappel < autorisee.debut || dateRappel > autorisee.fin) return actionQuestionnaire("A_CONFIRMER", null, null, null);
+        fenetre = { debut: dateRappel, fin: dateRappel };
+      }
+      return actionQuestionnaire(statutQuestionnaire(date, fenetre, bientotJours), etapeParId(demarrage.etapeRappelId), fenetre, "ETAPE_PRECEDENTE", preconisationId);
+    }
+  }
+
+  if (!configuration.entretien.actif) return actionQuestionnaire("TERMINE", null, null, null);
+  const entretien = configuration.entretien;
+  const etape = etapeParId(entretien.etapeId);
+  const actesEntretien = vaccinations.filter((acte) => acte.etapeProtocoleId === entretien.etapeId).sort((a, b) => b.date.getTime() - a.date.getTime());
+  const finInitiale = demarrage.type === "DOSE_UNIQUE" ? primo?.date : rappel?.date;
+  let fenetre: FenetreVaccinale | null = null;
+  if (entretien.calendrier.type === "APRES_DELAI") {
+    const reference = actesEntretien[0]?.date ?? finInitiale;
+    if (!reference) return actionQuestionnaire("A_CONFIRMER", null, null, null);
+    const delai = actesEntretien.length > 0 ? entretien.calendrier.recurrence : entretien.calendrier.premierDelai;
+    fenetre = fenetrePonctuelle(ajouterDureeQuestionnaire(reference, delai));
+  } else if (entretien.calendrier.type === "AVANT_VELAGE") {
+    if (actesEntretien.length > 0) return actionQuestionnaire("TERMINE", null, null, null);
+    fenetre = fenetreRegleQuestionnaire(entretien.calendrier, dateNaissance, dateVelagePrevue, date);
+  } else {
+    const reference = actesEntretien[0] ? addDays(endOfMonth(actesEntretien[0].date), 1) : date;
+    fenetre = fenetreRegleQuestionnaire(entretien.calendrier, dateNaissance, dateVelagePrevue, reference);
+  }
+  if (!fenetre) return actionQuestionnaire("A_CONFIRMER", null, null, null);
+  return actionQuestionnaire(statutQuestionnaire(date, fenetre, bientotJours), etape, fenetre, raisonRegle(entretien.calendrier.type), entretien.preconisationId);
+}
 
 /** Insensible à la casse : des étapes réelles en base portent "semaine"/"mois"/"jour" en
  * minuscules (saisies hors de ProtocoleEditor, qui n'envoie que du majuscule). Une comparaison
@@ -370,6 +532,8 @@ export function calculerActionVaccinale({
   etapes,
   vaccinations,
   statutProtocole,
+  configurationQuestionnaireJson,
+  brancheInitialeId,
 }: {
   date: Date;
   dateNaissance: Date;
@@ -381,7 +545,15 @@ export function calculerActionVaccinale({
   vaccinations: ReadonlyArray<VaccinationEtape>;
   /** undefined conserve l'ancien calcul générique ; null signifie qu'aucun statut n'est renseigné. */
   statutProtocole?: StatutProtocoleVaccinal | null;
+  /** Non-null bascule exclusivement vers le moteur questionnaire. */
+  configurationQuestionnaireJson?: string | null;
+  brancheInitialeId?: string | null;
 }): ActionVaccinaleCalculee {
+  if (configurationQuestionnaireJson != null) {
+    const configuration = lireConfigurationQuestionnaire(configurationQuestionnaireJson);
+    if (!configuration) return { statut: "A_CONFIRMER", etape: null, dateMin: null, dateMax: null, raison: null };
+    return calculerActionVaccinaleQuestionnaire({ date, dateNaissance, dateVelagePrevue, bientotJours, etapes, vaccinations, statutProtocole, brancheInitialeId, configuration });
+  }
   const toutesEtapes = [...etapes].sort((a, b) => a.ordre - b.ordre);
   const initiales = toutesEtapes.filter((etape) => etape.cycle !== "ENTRETIEN");
   const entretiens = toutesEtapes.filter((etape) => etape.cycle === "ENTRETIEN");

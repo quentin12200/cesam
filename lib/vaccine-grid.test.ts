@@ -248,6 +248,29 @@ test("une étape liée au vêlage suit exclusivement la fenêtre configurée dan
   assert.ok(apresModification.lignes[0].cellules["crypto-velage"].date);
 });
 
+test("grille et Agenda utilisent la branche questionnaire et sa préconisation Pharmacie", () => {
+  const date = new Date("2026-03-01T12:00:00Z");
+  const configuration = {
+    version: 1, medicamentId: "med-bovigrip", cible: { tousBovins: true, categories: [] },
+    demarrage: { type: "PRIMO_RAPPEL", etapePrimoId: "bovigrip-primo", etapeRappelId: "bovigrip-rappel", calendrierPrimo: { type: "AGE_MINIMUM", age: { valeur: 0, unite: "JOUR" } }, rappel: { type: "BRANCHES_AGE_PRIMO", seuilAgePrimo: { valeur: 2.5, unite: "MOIS" }, resterDansFenetrePrimo: false, branches: [
+      { id: "avant", position: "AVANT_SEUIL", preconisationPrimoId: "p-in", delaiRappel: { valeur: 8, unite: "SEMAINE" }, preconisationRappelId: "p-im" },
+      { id: "apres", position: "A_PARTIR_SEUIL", preconisationPrimoId: "p-im", delaiRappel: { valeur: 4, unite: "SEMAINE" }, preconisationRappelId: "p-im" },
+    ] } }, entretien: { actif: false },
+  };
+  const protocole: ProtocoleGrille = {
+    ...protocoleBovigrip,
+    configurationQuestionnaireJson: JSON.stringify(configuration),
+    etapes: [
+      { ...etapePrimo, preconisations: [{ id: "p-in", voie: "IN", dose: 2, unite: "ml" }, { id: "p-im", voie: "IM", dose: 2, unite: "ml" }] },
+      { ...etapeRappel, preconisations: [{ id: "p-im", voie: "IM", dose: 2, unite: "ml" }] },
+    ],
+  };
+  const a = animal({ danaisIso: new Date("2026-01-01T12:00:00Z").toISOString(), statutsProtocoles: [{ protocoleId: protocole.id, statut: "PRIMO_A_FAIRE", brancheInitialeId: null }] });
+  const grille = construireGrilleVaccinale([a], [protocole], [], date);
+  assert.equal(grille.lignes[0].cellules["bovigrip-primo"].voie, "IN");
+  assert.equal(extraireActionsPrevues(grille)[0].etapeId, "bovigrip-primo");
+});
+
 test("PROTOCOLE_ACQUIS ne repropose jamais les étapes initiales et planifie l'entretien du cycle courant", () => {
   const velage = new Date("2027-02-15T12:00:00Z");
   const entretien = {

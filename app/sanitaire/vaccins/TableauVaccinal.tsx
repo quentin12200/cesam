@@ -25,6 +25,9 @@ interface CelluleGrille {
   actes: ActeHistorique[];
   prochaine: { statut: "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU"; date: string; fenetre: { debut: string; fin: string } } | null;
   fenetre: { debut: string; fin: string } | null;
+  voie?: string | null;
+  dose?: number | null;
+  uniteDosage?: string | null;
 }
 
 interface HistoriqueAValider {
@@ -252,7 +255,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     return regrouperActesVaccinaux(
       actes,
       (acte) => acte.etape.medicamentId,
-      (acte) => `${acte.etape.id}:${acte.ligne.cellules[acte.etape.id]?.rattachementProtocoleAutorise ? "structure" : "libre"}`,
+      (acte) => { const cellule = acte.ligne.cellules[acte.etape.id]; return `${acte.etape.id}:${cellule?.rattachementProtocoleAutorise ? "structure" : "libre"}:${cellule?.voie ?? acte.etape.voie ?? ""}:${cellule?.dose ?? acte.etape.dose ?? ""}`; },
     )
       .map(({ cle, actes: actesGroupe }): GroupeSession => ({
         cle,
@@ -344,11 +347,11 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   }
 
   function administrationsParDefaut() {
-    return Object.fromEntries(groupesSession.map((groupe) => [groupe.cle, {
-      voie: groupe.etape.voie === "À renseigner" ? "" : groupe.etape.voie ?? "",
-      dose: groupe.etape.dose == null ? "" : String(groupe.etape.dose),
-      uniteDosage: groupe.etape.uniteDosage ?? "ml",
-    }]));
+    return Object.fromEntries(groupesSession.map((groupe) => { const cellule = groupe.actes[0].ligne.cellules[groupe.etape.id]; return [groupe.cle, {
+      voie: (cellule?.voie ?? groupe.etape.voie) === "À renseigner" ? "" : cellule?.voie ?? groupe.etape.voie ?? "",
+      dose: (cellule?.dose ?? groupe.etape.dose) == null ? "" : String(cellule?.dose ?? groupe.etape.dose),
+      uniteDosage: cellule?.uniteDosage ?? groupe.etape.uniteDosage ?? "ml",
+    }]; }));
   }
 
   function enregistrerSelection() {

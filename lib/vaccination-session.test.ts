@@ -33,6 +33,15 @@ test("un protocole sans repère VELAGE n'enregistre pas de gestation", () => {
   assert.equal(gestationIdAEnregistrer([{ reference: "AGE" }], "gestation-courante"), null);
 });
 
+test("un protocole questionnaire avant vêlage conserve la gestation sans dépendre des champs legacy", () => {
+  const configuration = JSON.stringify({
+    version: 1, medicamentId: "med", cible: { tousBovins: true, categories: [] },
+    demarrage: { type: "DOSE_UNIQUE", etapeDoseId: "dose", preconisationId: "p", calendrier: { type: "AVANT_VELAGE", debutAvant: { valeur: 3, unite: "MOIS" }, finAvant: { valeur: 3, unite: "SEMAINE" } } },
+    entretien: { actif: false },
+  });
+  assert.equal(gestationIdAEnregistrer([{ reference: "NAISSANCE" }], "gestation-1", configuration), "gestation-1");
+});
+
 test("la vérification regroupe les actes par médicament et étape sans mélanger les animaux", () => {
   const actes = [
     { animalId: "7518", medicamentId: "bovigrip", etapeId: "primo" },

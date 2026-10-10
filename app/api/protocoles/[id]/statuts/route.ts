@@ -38,8 +38,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const confirmeAt = new Date();
   await prisma.$transaction(animalIds.map((animalId) => prisma.statutProtocoleVaccinal.upsert({
     where: { animalId_protocoleId: { animalId, protocoleId } },
-    create: { animalId, protocoleId, statut: body.statut, source, notes, confirmeAt },
-    update: { statut: body.statut, source, notes, confirmeAt },
+    create: { animalId, protocoleId, statut: body.statut, source, notes, confirmeAt, brancheInitialeId: null },
+    update: { statut: body.statut, source, notes, confirmeAt, ...(["PRIMO_A_FAIRE", "A_CONFIRMER"].includes(body.statut) ? { brancheInitialeId: null } : {}) },
   })));
   return NextResponse.json({ count: animalIds.length }, { status: 201 });
 }

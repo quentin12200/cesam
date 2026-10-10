@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_PROTOCOLES } from "@/lib/utils";
 import Link from "next/link";
 import { Settings, Building2 } from "lucide-react";
-import ProtocoleEditor from "./ProtocoleEditor";
+import ProtocoleQuestionnaire from "./ProtocoleQuestionnaire";
 
 import BackButton from "@/app/components/BackButton";
 async function getProtocoles() {
@@ -33,7 +33,7 @@ async function getProtocoles() {
 
 export default async function ProtocolesConfigPage() {
   const protocoles = await getProtocoles();
-  const medicaments = await prisma.medicament.findMany({ where: { actif: true }, select: { id: true, nom: true, voie: true, conditionnements: { where: { actif: true }, select: { doses: true } }, preconisations: { where: { statut: "VALIDE", dose: { not: null } }, select: { id: true, dose: true, unite: true, voie: true, categorieAnimaux: true } } }, orderBy: { nom: "asc" } });
+  const medicaments = await prisma.medicament.findMany({ where: { actif: true, categorie: "VACCIN" }, select: { id: true, nom: true, voie: true, conditionnements: { where: { actif: true }, select: { doses: true } }, preconisations: { where: { statut: "VALIDE", dose: { not: null } }, select: { id: true, dose: true, unite: true, voie: true, categorieAnimaux: true } } }, orderBy: { nom: "asc" } });
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
@@ -49,11 +49,10 @@ export default async function ProtocolesConfigPage() {
       </div>
 
       <p className="text-sm text-gray-500">
-        Configurez les délais et seuils d&apos;urgence pour chaque protocole vaccinal.
-        Les modifications s&apos;appliquent immédiatement à tous les calculs.
+        Répondez aux questions : CESAM construit la frise et reformule le protocole avant enregistrement.
       </p>
 
-      <ProtocoleEditor protocoles={protocoles} medicaments={medicaments} />
+      <ProtocoleQuestionnaire protocoles={protocoles} medicaments={medicaments} />
     </div>
   );
 }

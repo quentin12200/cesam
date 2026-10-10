@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_PROTOCOLES } from "@/lib/utils";
 import { logAction } from "@/lib/action-log";
+import { etapeIdsConfigurationQuestionnaire, lireConfigurationQuestionnaire } from "@/lib/vaccine-protocol-questionnaire";
+import { referencesPharmacieValides } from "@/lib/vaccine-protocol-validation";
 
 export async function GET() {
   let protocoles = await prisma.protocoleVaccin.findMany({
@@ -35,9 +37,25 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { nom, label, ordre, ageMinJours, ageMaxJours, urgenceJours, estRappel, primoNom, delaiRappelJours, urgenceRappelJours, obligatoireVente, description, categories, sexeCible, stadeReproduction, gestante, rangVelageMin, rangVelageMax, lotCible, etapes } = body;
+  const { nom, label, ordre, ageMinJours, ageMaxJours, urgenceJours, estRappel, primoNom, delaiRappelJours, urgenceRappelJours, obligatoireVente, description, categories, sexeCible, stadeReproduction, gestante, rangVelageMin, rangVelageMax, lotCible, etapes, configurationQuestionnaire } = body;
   if (!nom?.trim() || !label?.trim()) {
     return NextResponse.json({ error: "nom et label requis" }, { status: 400 });
+  }
+  const configurationJson = configurationQuestionnaire == null ? null : JSON.stringify(configurationQuestionnaire);
+  const configuration = lireConfigurationQuestionnaire(configurationJson);
+  if (configurationQuestionnaire != null && !configuration) {
+    return NextResponse.json({ error: "Configuration du questionnaire invalide" }, { status: 400 });
+  }
+  if (configuration && !await referencesPharmacieValides(configuration)) {
+    return NextResponse.json({ error: "Les préconisations doivent être validées dans la Pharmacie pour ce vaccin" }, { status: 400 });
+  }
+  if (configuration) {
+    const etapesRecues = Array.isArray(etapes) ? etapes : [];
+    const idsAttendus = etapeIdsConfigurationQuestionnaire(configuration);
+    if (etapesRecues.length !== idsAttendus.length || idsAttendus.some((id) => !etapesRecues.some((etape: any) => etape.id === id))
+      || etapesRecues.some((etape: any) => (etape.medicaments || []).some((liaison: any) => liaison.medicamentId !== configuration.medicamentId))) {
+      return NextResponse.json({ error: "Les étapes ne correspondent pas au questionnaire" }, { status: 400 });
+    }
   }
   try {
     const protocole = await prisma.protocoleVaccin.create({
@@ -57,7 +75,8 @@ export async function POST(request: NextRequest) {
         categoriesJson: Array.isArray(categories) ? JSON.stringify(categories) : null,
         sexeCible: sexeCible || null, stadeReproduction: stadeReproduction || null, gestante: gestante ?? null,
         rangVelageMin: rangVelageMin ?? null, rangVelageMax: rangVelageMax ?? null, lotCible: lotCible || null,
-        etapes: { create: (Array.isArray(etapes) ? etapes : []).map((e: any, index: number) => ({ label: e.label, ordre: index, cycle: e.cycle || "INITIAL", reference: e.reference || "NAISSANCE", debutValeur: Number(e.debutValeur) || 0, debutUnite: e.debutUnite || "JOUR", debutPosition: e.debutPosition || "APRES", finValeur: Number(e.finValeur) || 0, finUnite: e.finUnite || "JOUR", finPosition: e.finPosition || "APRES", recurrenceMois: e.recurrenceMois ? Number(e.recurrenceMois) : null, obligatoire: e.obligatoire !== false, medicaments: { create: (e.medicaments || []).filter((m: any) => m.medicamentId).map((m: any) => ({ medicamentId: m.medicamentId, voie: m.voie || null, preconisationId: m.preconisationId || null, alternative: Boolean(m.alternative) })) } })) },
+        configurationQuestionnaireJson: configurationJson,
+        etapes: { create: (Array.isArray(etapes) ? etapes : []).map((e: any, index: number) => ({ ...(e.id ? { id: e.id } : {}), label: e.label, ordre: index, cycle: e.cycle || "INITIAL", reference: e.reference || "NAISSANCE", debutValeur: Number(e.debutValeur) || 0, debutUnite: e.debutUnite || "JOUR", debutPosition: e.debutPosition || "APRES", finValeur: Number(e.finValeur) || 0, finUnite: e.finUnite || "JOUR", finPosition: e.finPosition || "APRES", recurrenceMois: e.recurrenceMois ? Number(e.recurrenceMois) : null, obligatoire: e.obligatoire !== false, medicaments: { create: (e.medicaments || []).filter((m: any) => m.medicamentId).map((m: any) => ({ medicamentId: m.medicamentId, voie: m.voie || null, preconisationId: m.preconisationId || null, alternative: Boolean(m.alternative) })) } })) },
         actif: true,
       },
     });

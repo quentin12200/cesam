@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { resynchroniserStatutProtocole } from "@/lib/vaccine-statut-sync";
 
 export async function DELETE(
   _request: NextRequest,
@@ -21,6 +22,9 @@ export async function DELETE(
     }
 
     await prisma.vaccination.delete({ where: { id } });
+    if (vaccination.protocoleId) {
+      await resynchroniserStatutProtocole(vaccination.animalId, vaccination.protocoleId);
+    }
 
     const desc = `Vaccination ${vaccination.vaccin} supprimée pour ${vaccination.animal.nutrav}`;
     let undoId = "";

@@ -15,6 +15,7 @@ import { vaccinationAppartientAuCycleCourant } from "@/lib/vaccination-session";
 import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
 import { resoudreAdministrationEtape } from "@/lib/vaccine-administration";
 import { estAnimalConcerneParProtocole } from "@/lib/vaccine-eligibility";
+import { configurationQuestionnaireLieeAuVelage, lireConfigurationQuestionnaire } from "@/lib/vaccine-protocol-questionnaire";
 
 export interface LignePreparationVaccin {
   animalId: string;
@@ -138,7 +139,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         // Un vaccin peut être saisi comme simple Traitement (hors séance structurée) : il doit
         // quand même compter comme fait. Voir lib/vaccine-acts.ts.
         traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { dateDebut: true, medicamentNom: true, medicamentId: true, protocoleVaccinId: true, etapeProtocoleVaccinId: true, gestationId: true } },
-        statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true } },
+        statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true, brancheInitialeId: true } },
       },
     }),
   ]);
@@ -172,7 +173,10 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       // Un vaccin peut avoir été saisi comme Traitement libre (hors séance) : il compte quand
       // même comme fait, au même titre qu'une Vaccination structurée. Voir lib/vaccine-acts.ts.
       const actes = unifierActesVaccinaux(animal.vaccinations, animal.traitements);
-      const protocoleLieAuVelage = protocole.etapes.some((etape) => etape.reference === "VELAGE");
+      const configurationQuestionnaire = lireConfigurationQuestionnaire(protocole.configurationQuestionnaireJson);
+      const protocoleLieAuVelage = configurationQuestionnaire
+        ? configurationQuestionnaireLieeAuVelage(configurationQuestionnaire)
+        : protocole.etapes.some((etape) => etape.reference === "VELAGE");
       const dejaRattachees = actes.filter((vaccination) =>
         vaccination.statut === "FAIT" &&
         vaccination.protocoleId === protocole.id
@@ -188,11 +192,11 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       const vaccinations = acteInfere
         ? [...dejaRattachees, { ...acteInfere, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0].id }]
         : dejaRattachees;
-      const statutEnregistre = animal.statutsProtocolesVaccinaux.find((statut) => statut.protocoleId === protocole.id)?.statut ?? null;
+      const statutEnregistre = animal.statutsProtocolesVaccinaux.find((statut) => statut.protocoleId === protocole.id) ?? null;
       const aUneEtapeFaite = vaccinations.some((vaccination) => vaccination.etapeProtocoleId);
       const statutProtocole = aUneEtapeFaite && !protocoleLieAuVelage && etapesInitiales.length === 2
         ? null
-        : statutEnregistre;
+        : statutEnregistre?.statut ?? null;
       const action = calculerActionVaccinale({
         date,
         dateNaissance: animal.danais,
@@ -203,6 +207,8 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         etapes: protocole.etapes,
         vaccinations,
         statutProtocole: (acteInfere ? null : statutProtocole) as StatutProtocoleVaccinal | null,
+        configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
+        brancheInitialeId: statutEnregistre?.brancheInitialeId ?? null,
       });
       const historique = action.statut === "TERMINE" ? [] : vaccinationsSansEtapeFiable(actes, correspondanceHistorique)
         .filter((vaccination) => vaccination.statut === "FAIT")
@@ -232,7 +238,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       if (medicament) medicamentReference = medicament;
       const administration = resoudreAdministrationEtape({
         preconisations: medicament?.preconisations ?? [],
-        preconisationLieeId: liaison?.preconisationId,
+        preconisationLieeId: action.preconisationId ?? liaison?.preconisationId,
         voieLiaison: liaison?.voie,
         voieMedicament: medicament?.voie,
         uniteMedicament: medicament?.uniteDosage,

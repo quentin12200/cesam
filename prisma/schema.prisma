@@ -613,6 +613,9 @@ model ProtocoleVaccin {
   rangVelageMax      Int?
   lotCible           String?
   ageMaxJours        Int?
+  /// Source de vérité des protocoles créés avec le questionnaire (JSON versionné).
+  /// Null conserve strictement le moteur historique basé sur EtapeProtocoleVaccin.
+  configurationQuestionnaireJson String?
   etapes             EtapeProtocoleVaccin[]
   statutsAnimaux     StatutProtocoleVaccinal[]
   vaccinations       Vaccination[]
@@ -725,6 +728,8 @@ model StatutProtocoleVaccinal {
   source      String   @default("MANUEL")
   confirmeAt  DateTime?
   notes       String?
+  /// Branche choisie d'après l'âge lors de la Primo réellement effectuée.
+  brancheInitialeId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

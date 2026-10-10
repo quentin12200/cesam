@@ -1,3 +1,5 @@
+import { configurationQuestionnaireLieeAuVelage, lireConfigurationQuestionnaire } from "./vaccine-protocol-questionnaire.ts";
+
 export interface VaccinationSessionPreset {
   protocoleId: string;
   vaccin: string;
@@ -24,8 +26,13 @@ export function nutravsSelectionnes<T extends { animalId: string; nutrav: string
 export function gestationIdAEnregistrer(
   etapes: ReadonlyArray<{ reference: string }>,
   gestationId: string | null | undefined,
+  configurationQuestionnaireJson?: string | null,
 ): string | null {
-  return etapes.some((etape) => etape.reference === "VELAGE") ? gestationId || null : null;
+  const configuration = lireConfigurationQuestionnaire(configurationQuestionnaireJson);
+  const lieAuVelage = configuration
+    ? configurationQuestionnaireLieeAuVelage(configuration)
+    : etapes.some((etape) => etape.reference === "VELAGE");
+  return lieAuVelage ? gestationId || null : null;
 }
 
 export function vaccinationAppartientAuCycleCourant(

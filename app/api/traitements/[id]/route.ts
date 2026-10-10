@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { resynchroniserStatutProtocole } from "@/lib/vaccine-statut-sync";
 
 const EDITABLE_FIELDS = [
   "statut",
@@ -81,6 +82,9 @@ export async function PATCH(
     where: { id },
     data,
   });
+  if (updated.protocoleVaccinId) {
+    await resynchroniserStatutProtocole(updated.animalId, updated.protocoleVaccinId);
+  }
 
   const desc = `Traitement ${prev.medicamentNom} mis à jour`;
   let undoId = "";
@@ -105,6 +109,9 @@ export async function DELETE(
   if (!prev) return NextResponse.json({ error: "Non trouvé" }, { status: 404 });
 
   await prisma.traitement.delete({ where: { id } });
+  if (prev.protocoleVaccinId) {
+    await resynchroniserStatutProtocole(prev.animalId, prev.protocoleVaccinId);
+  }
 
   const desc = `Traitement ${prev.medicamentNom} supprimé`;
   let undoId = "";
