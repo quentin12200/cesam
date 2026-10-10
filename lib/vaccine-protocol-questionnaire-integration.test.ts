@@ -17,6 +17,12 @@ test("suppression et correction d'actes resynchronisent le statut et la branche"
   assert.match(source("lib/vaccine-statut-sync.ts"), /brancheInitialeDepuisActes/);
 });
 
+test("un rattachement de Primo questionnaire mémorise sa branche sans écraser une décision manuelle", () => {
+  const synchronisation = source("lib/vaccine-statut-sync.ts");
+  assert.match(synchronisation, /if \(!statut\) \{[\s\S]*statutProtocoleVaccinal\.create\([\s\S]*brancheInitialeId/);
+  assert.match(synchronisation, /if \(statut\.source !== "VACCINATION"\) \{[\s\S]*data: \{ brancheInitialeId \}/);
+});
+
 test("la migration reste strictement additive", () => {
   const migration = source("prisma/migrations/20261010120000_protocoles_questionnaire/migration.sql");
   assert.match(migration, /ADD COLUMN "configurationQuestionnaireJson" TEXT/);
