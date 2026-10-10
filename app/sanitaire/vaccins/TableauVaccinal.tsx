@@ -42,6 +42,9 @@ interface Ligne {
   animalId: string;
   nutrav: string;
   nom: string | null;
+  mereNutrav: string | null;
+  mereNom: string | null;
+  mereLiee: boolean;
   sexe: string;
   danaisIso: string;
   gestationId: string | null;
@@ -77,7 +80,7 @@ interface Bloc {
 type Statut = "aFaire" | "enRetard" | "faits";
 type Tri = "numero" | "age" | "sexe" | "velage" | `vaccin:${string}`;
 type DirectionTri = "asc" | "desc";
-type ColonneAnimal = "numero" | "nom" | "age" | "sexe" | "velage";
+type ColonneAnimal = "numero" | "nom" | "mere" | "age" | "sexe" | "velage";
 
 interface ActeSelectionne {
   cle: string;
@@ -105,11 +108,12 @@ const ageJours = (danaisIso: string) => Math.floor((Date.now() - new Date(danais
 const colonnesAnimal: { id: ColonneAnimal; label: string }[] = [
   { id: "numero", label: "N°" },
   { id: "nom", label: "Nom" },
+  { id: "mere", label: "Mère" },
   { id: "age", label: "Âge" },
   { id: "sexe", label: "Sexe" },
   { id: "velage", label: "Avant vêlage" },
 ];
-const largeurColonne: Record<ColonneAnimal, number> = { numero: 64, nom: 92, age: 66, sexe: 42, velage: 76 };
+const largeurColonne: Record<ColonneAnimal, number> = { numero: 64, nom: 92, mere: 72, age: 66, sexe: 42, velage: 76 };
 const largeurSelection = 38;
 const dateLocaleIso = () => {
   const date = new Date();
@@ -722,6 +726,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
               <th rowSpan={2} scope="col" className="animal-selection-column sticky left-0 top-0 z-50 border-r bg-gray-50 p-1 text-center" style={{ width: largeurSelection, minWidth: largeurSelection }}><input type="checkbox" aria-label="Sélectionner ou désélectionner les animaux visibles" checked={etatMaitre === "TOUS"} ref={(element) => { if (element) element.indeterminate = etatMaitre === "PARTIEL"; }} onChange={basculerAnimauxVisibles} className="h-5 w-5 accent-green-700" /></th>
               {enteteTriable("N°", "numero", "numero", "top-0 z-40 border-r bg-gray-50 p-1")}
               {!colonnesMasquees.has("nom") && <th rowSpan={2} scope="col" onContextMenu={(event) => ouvrirMenuColonne(event, "nom")} className="animal-fixed top-0 z-40 border-r bg-gray-50 p-1 font-bold" style={{ left: decalageColonne("nom"), width: largeurColonne.nom, minWidth: largeurColonne.nom }}>Nom</th>}
+              {!colonnesMasquees.has("mere") && <th rowSpan={2} scope="col" onContextMenu={(event) => ouvrirMenuColonne(event, "mere")} className="animal-fixed top-0 z-40 border-r bg-gray-50 p-1 font-bold" style={{ left: decalageColonne("mere"), width: largeurColonne.mere, minWidth: largeurColonne.mere }}>Mère</th>}
               {enteteTriable("Âge", "age", "age", "top-0 z-40 border-r bg-gray-50 p-1")}
               {enteteTriable("Sexe", "sexe", "sexe", "top-0 z-40 border-r bg-gray-50 p-1")}
               {enteteTriable("Avant vêlage", "velage", "velage", "top-0 z-40 border-r bg-gray-50 p-1")}
@@ -733,6 +738,7 @@ export default function TableauVaccinal({ blocs, lignes }: { blocs: Bloc[]; lign
             <td className="animal-selection-column sticky left-0 z-30 border-r bg-white p-1 text-center"><input type="checkbox" checked={animauxSelectionnes.has(ligne.animalId)} onChange={() => basculerDansSet(setAnimauxSelectionnes, ligne.animalId)} aria-label={`Sélectionner l’animal ${ligne.nutrav}`} className="h-5 w-5 accent-green-700" /></td>
             {!colonnesMasquees.has("numero") && <th scope="row" className="animal-fixed z-20 border-r bg-white p-1" style={{ left: decalageColonne("numero"), width: largeurColonne.numero, minWidth: largeurColonne.numero }}><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono text-sm font-black text-green-800 underline">{ligne.nutrav}</Link></th>}
             {!colonnesMasquees.has("nom") && <td className="animal-fixed z-20 max-w-24 border-r bg-white p-1 text-xs text-gray-600" style={{ left: decalageColonne("nom"), width: largeurColonne.nom, minWidth: largeurColonne.nom }}><span className="block truncate">{ligne.nom || "—"}</span></td>}
+            {!colonnesMasquees.has("mere") && <td className="animal-fixed z-20 border-r bg-white p-1 text-xs text-gray-700" style={{ left: decalageColonne("mere"), width: largeurColonne.mere, minWidth: largeurColonne.mere }} title={ligne.mereNom ? `${ligne.mereNutrav ?? ""} — ${ligne.mereNom}` : ligne.mereNutrav ?? undefined}>{ligne.mereNutrav ? (ligne.mereLiee ? <Link href={`/troupeau/${ligne.mereNutrav}`} className="font-mono font-bold text-green-800 underline">{ligne.mereNutrav}</Link> : <span className="font-mono font-semibold">{ligne.mereNutrav}</span>) : "—"}</td>}
             {!colonnesMasquees.has("age") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("age"), width: largeurColonne.age, minWidth: largeurColonne.age }}>{formatAgeTerrain(ligne.danaisIso)}</td>}
             {!colonnesMasquees.has("sexe") && <td className="animal-fixed z-20 border-r bg-white p-1 text-center font-medium text-gray-700" style={{ left: decalageColonne("sexe"), width: largeurColonne.sexe, minWidth: largeurColonne.sexe }}>{ligne.sexe}</td>}
             {!colonnesMasquees.has("velage") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("velage"), width: largeurColonne.velage, minWidth: largeurColonne.velage }}>{ligne.dateVelagePrevueIso ? formatTempsAvantVelage(ligne.dateVelagePrevueIso) : "—"}</td>}
