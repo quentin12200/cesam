@@ -7,8 +7,9 @@ import { ArrowLeft, ArrowRight, Check, Pencil, Plus, X } from "lucide-react";
 import type { ConfigurationQuestionnaireV1, DureeQuestionnaire, RegleTemporelleQuestionnaire } from "@/lib/vaccine-protocol-questionnaire";
 import { lireConfigurationQuestionnaire, preconisationAutomatique } from "@/lib/vaccine-protocol-questionnaire";
 import { resumeFriseQuestionnaire } from "@/lib/vaccine-questionnaire-timeline";
+import { classerAdministrations } from "@/lib/vaccine-questionnaire-administration";
 
-type Preconisation = { id: string; dose: number | null; unite: string | null; voie: string | null; categorieAnimaux: string | null };
+type Preconisation = { id: string; dose: number | null; unite: string | null; doseBase: string | null; voie: string | null; categorieAnimaux: string | null; agePoidsConcerne: string | null; statut: string };
 type Medicament = { id: string; nom: string; voie: string | null; preconisations: Preconisation[] };
 type Protocole = { id: string; nom: string; label: string; actif: boolean; description: string | null; configurationQuestionnaireJson: string | null; sexeCible: string | null; gestante: boolean | null; rangVelageMin: number | null; rangVelageMax: number | null; lotCible: string | null };
 type Form = {
@@ -22,6 +23,7 @@ type Form = {
   premier: DureeQuestionnaire; recurrence: DureeQuestionnaire; fenetreEntretien: Extract<RegleTemporelleQuestionnaire, { type: "AVANT_VELAGE" }>; moisEntretien: number[]; preconEntretien: string;
   ids: { dose: string; primo: string; rappel: string; entretien: string };
 };
+type AdministrationForm = { voie: string; dose: string; unite: string; doseBase: string; condition: string };
 
 const CATEGORIES = [["VEAU", "Veaux"], ["GENISSE", "Génisses"], ["VACHE", "Vaches"], ["TAUREAU", "Taureaux"]] as const;
 const MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
@@ -37,6 +39,21 @@ const vide = (): Form => ({
 });
 const texteDuree = (value: DureeQuestionnaire) => `${String(value.valeur).replace(".", ",")} ${value.unite === "JOUR" ? "jour(s)" : value.unite === "SEMAINE" ? "semaine(s)" : "mois"}`;
 const textePrecon = (p?: Preconisation) => p ? `${p.voie || "Voie à renseigner"} · ${p.dose == null ? "Dose à renseigner" : `${p.dose} ${p.unite || ""}`}` : "Préconisation à choisir";
+const administrationVide = (medicament?: Medicament, preconisation?: Preconisation): AdministrationForm => ({
+  voie: preconisation?.voie ?? medicament?.voie ?? "",
+  dose: preconisation?.dose == null ? "" : String(preconisation.dose),
+  unite: preconisation?.unite ?? "ml",
+  doseBase: preconisation?.doseBase ?? "ANIMAL",
+  condition: preconisation?.agePoidsConcerne ?? "",
+});
+const completerPreconisationsVides = (form: Form, preconisationId: string): Form => ({
+  ...form,
+  preconPrimo: form.preconPrimo || preconisationId,
+  preconRappel: form.preconRappel || preconisationId,
+  preconEntretien: form.preconEntretien || preconisationId,
+  avant: { ...form.avant, primo: form.avant.primo || preconisationId, rappel: form.avant.rappel || preconisationId },
+  apres: { ...form.apres, primo: form.apres.primo || preconisationId, rappel: form.apres.rappel || preconisationId },
+});
 
 function Choix({ actif, children, onClick }: { actif: boolean; children: React.ReactNode; onClick: () => void }) {
   return <button type="button" onClick={onClick} className={`min-h-14 rounded-xl border-2 px-3 text-left text-sm font-semibold ${actif ? "border-green-700 bg-green-50 text-green-950" : "border-gray-200 bg-white"}`}>{children}</button>;
@@ -82,12 +99,21 @@ function construire(form: Form, med: Medicament) {
 
 export default function ProtocoleQuestionnaire({ protocoles, medicaments }: { protocoles: Protocole[]; medicaments: Medicament[] }) {
   const router = useRouter();
+  const [medicamentsDisponibles, setMedicamentsDisponibles] = useState(medicaments);
   const [form, setForm] = useState<Form>(vide);
   const [page, setPage] = useState(0);
   const [ouvert, setOuvert] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const med = medicaments.find((item) => item.id === form.medicamentId);
+  const [administrationOuverte, setAdministrationOuverte] = useState(false);
+  const [administrationSaving, setAdministrationSaving] = useState(false);
+  const [administrationErreur, setAdministrationErreur] = useState("");
+  const [preconisationEditionId, setPreconisationEditionId] = useState<string | null>(null);
+  const [administrationForm, setAdministrationForm] = useState<AdministrationForm>(() => administrationVide());
+  const medicamentSelectionne = medicamentsDisponibles.find((item) => item.id === form.medicamentId);
+  const administrations = useMemo(() => classerAdministrations(medicamentSelectionne?.preconisations ?? []), [medicamentSelectionne]);
+  const med = useMemo(() => medicamentSelectionne ? { ...medicamentSelectionne, preconisations: administrations.valides } : undefined, [medicamentSelectionne, administrations]);
+  const preconisationARevoir = administrations.aVerifier[0];
   const preconUnique = med ? preconisationAutomatique(med.preconisations) ?? "" : "";
   const valide = useMemo(() => {
     if (page === 0) return Boolean(med && med.preconisations.length > 0);
@@ -100,12 +126,52 @@ export default function ProtocoleQuestionnaire({ protocoles, medicaments }: { pr
   }, [page, form, med, preconUnique]);
 
   function choisirMedicament(medicamentId: string) {
-    const value = medicaments.find((item) => item.id === medicamentId); if (!value) return;
+    const value = medicamentsDisponibles.find((item) => item.id === medicamentId); if (!value) return;
+    const valides = classerAdministrations(value.preconisations).valides;
     const code = value.nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
-    const p = preconisationAutomatique(value.preconisations) ?? "";
+    const p = preconisationAutomatique(valides) ?? "";
+    setAdministrationOuverte(false); setPreconisationEditionId(null); setAdministrationErreur("");
     setForm((old) => ({ ...old, medicamentId, nom: old.nom || code, label: old.label || value.nom, preconPrimo: p, preconRappel: p, preconEntretien: p, avant: { ...old.avant, primo: p, rappel: p }, apres: { ...old.apres, primo: p, rappel: p } }));
   }
-  function creer() { setForm(vide()); setEditingId(null); setPage(0); setOuvert(true); }
+  function ouvrirAdministration(preconisation?: Preconisation) {
+    setPreconisationEditionId(preconisation?.id ?? null);
+    setAdministrationForm(administrationVide(medicamentSelectionne, preconisation));
+    setAdministrationErreur("");
+    setAdministrationOuverte(true);
+  }
+  async function enregistrerAdministration(event: React.FormEvent) {
+    event.preventDefault();
+    if (!medicamentSelectionne) return;
+    setAdministrationSaving(true); setAdministrationErreur("");
+    const response = await fetch(preconisationEditionId ? `/api/preconisations/${preconisationEditionId}` : "/api/preconisations", {
+      method: preconisationEditionId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        medicamentId: medicamentSelectionne.id,
+        voie: administrationForm.voie,
+        dose: administrationForm.dose,
+        unite: administrationForm.unite,
+        doseBase: administrationForm.doseBase || "ANIMAL",
+        agePoidsConcerne: administrationForm.condition,
+        source: "Saisie depuis protocole", statut: "VALIDE",
+      }),
+    });
+    if (!response.ok) {
+      setAdministrationErreur("L’administration n’a pas pu être enregistrée.");
+      setAdministrationSaving(false);
+      return;
+    }
+    const enregistree = await response.json() as Preconisation;
+    setMedicamentsDisponibles((actuels) => actuels.map((medicament) => medicament.id !== medicamentSelectionne.id ? medicament : {
+      ...medicament,
+      preconisations: preconisationEditionId
+        ? medicament.preconisations.map((preconisation) => preconisation.id === enregistree.id ? enregistree : preconisation)
+        : [...medicament.preconisations, enregistree],
+    }));
+    setForm((ancien) => completerPreconisationsVides(ancien, enregistree.id));
+    setAdministrationOuverte(false); setPreconisationEditionId(null); setAdministrationSaving(false);
+  }
+  function creer() { setForm(vide()); setEditingId(null); setAdministrationOuverte(false); setPreconisationEditionId(null); setPage(0); setOuvert(true); }
   function editer(protocole: Protocole) {
     if (!protocole.configurationQuestionnaireJson) return;
     const cfg = lireConfigurationQuestionnaire(protocole.configurationQuestionnaireJson);
@@ -126,7 +192,7 @@ export default function ProtocoleQuestionnaire({ protocoles, medicaments }: { pr
 
   return <div className="space-y-4"><button onClick={creer} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-700 font-semibold text-white"><Plus size={18} /> Créer un protocole</button>
     {ouvert && <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]"><section className="rounded-2xl bg-gray-50 p-3 shadow-inner"><header className="mb-4 flex items-center gap-2"><div className="flex-1"><p className="text-xs font-bold text-green-800">Question {page + 1} sur 7</p><div className="mt-1 h-1.5 rounded bg-gray-200"><div className="h-full rounded bg-green-700" style={{ width: `${((page + 1) / 7) * 100}%` }} /></div></div><button onClick={() => setOuvert(false)} aria-label="Fermer"><X /></button></header><div className="space-y-4">
-      {page === 0 && <><h3 className="text-xl font-black">Quel vaccin veux-tu programmer ?</h3><select value={form.medicamentId} onChange={(e) => choisirMedicament(e.target.value)} className="min-h-14 w-full rounded-xl border-2 border-green-200 bg-white px-3 font-semibold"><option value="">Choisir dans la Pharmacie</option>{medicaments.map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}</select>{med && med.preconisations.length === 0 && <div className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900"><p>Aucune préconisation validée : complète d’abord la Pharmacie.</p><Link href={`/pharmacie/${med.id}`} className="mt-2 inline-flex min-h-10 items-center rounded-lg border border-amber-700 bg-white px-3 text-amber-900">Compléter la fiche Pharmacie</Link></div>}<details><summary className="cursor-pointer text-sm text-gray-500">Renommer ou ajouter une note</summary><input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} className="mt-2 w-full rounded-lg border p-2" /><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-2 w-full rounded-lg border p-2" placeholder="Note facultative" /></details></>}
+      {page === 0 && <><h3 className="text-xl font-black">Quel vaccin veux-tu programmer ?</h3><select value={form.medicamentId} onChange={(e) => choisirMedicament(e.target.value)} className="min-h-14 w-full rounded-xl border-2 border-green-200 bg-white px-3 font-semibold"><option value="">Choisir dans la Pharmacie</option>{medicaments.map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}</select>{medicamentSelectionne && administrations.valides.length === 0 && <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950"><p className="font-semibold">{preconisationARevoir ? "Une administration existe déjà mais doit être validée" : "Aucune préconisation validée : complète d’abord l’administration."}</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => ouvrirAdministration(preconisationARevoir)} className="min-h-10 rounded-lg bg-amber-800 px-3 font-semibold text-white">{preconisationARevoir ? "Revoir et valider ici" : "Compléter l’administration ici"}</button><Link href={`/pharmacie/${medicamentSelectionne.id}`} className="inline-flex min-h-10 items-center rounded-lg border border-amber-700 bg-white px-3 font-semibold text-amber-900">Compléter la fiche Pharmacie</Link></div>{administrationOuverte && <form onSubmit={(event) => void enregistrerAdministration(event)} className="mt-3 grid gap-3 rounded-xl border border-amber-200 bg-white p-3 sm:grid-cols-2"><label className="font-medium">Voie d’administration<select required value={administrationForm.voie} onChange={(event) => setAdministrationForm({ ...administrationForm, voie: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border px-2"><option value="">Choisir</option>{administrationForm.voie && !["IM", "IV", "SC", "VO", "INTRANASALE", "INTRAMAMMAIRE", "INTRA_UTERINE", "CUTANEE", "POUR_ON", "OCULAIRE"].includes(administrationForm.voie) && <option value={administrationForm.voie}>{administrationForm.voie}</option>}<option value="IM">Intramusculaire (IM)</option><option value="IV">Intraveineuse (IV)</option><option value="SC">Sous-cutanée (SC)</option><option value="VO">Orale (VO)</option><option value="INTRANASALE">Intranasale</option><option value="INTRAMAMMAIRE">Intramammaire</option><option value="INTRA_UTERINE">Intra-utérine</option><option value="CUTANEE">Cutanée / externe</option><option value="POUR_ON">Pour-on</option><option value="OCULAIRE">Oculaire</option></select></label><label className="font-medium">Dose<input required type="number" min="0" step="any" value={administrationForm.dose} onChange={(event) => setAdministrationForm({ ...administrationForm, dose: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label><label className="font-medium">Unité<select required value={administrationForm.unite} onChange={(event) => setAdministrationForm({ ...administrationForm, unite: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border px-2"><option value="ml">ml</option><option value="l">litre</option><option value="g">g</option><option value="mg">mg</option><option value="dose">dose</option><option value="comprimé">comprimé</option><option value="bolus">bolus</option><option value="sachet">sachet</option></select></label><label className="font-medium">Base de dosage<select required value={administrationForm.doseBase} onChange={(event) => setAdministrationForm({ ...administrationForm, doseBase: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border px-2"><option value="ANIMAL">Par animal</option><option value="KG">Par kg</option><option value="100KG">Par 100 kg</option><option value="QUARTIER">Par quartier</option></select></label><label className="font-medium sm:col-span-2">Dans quel cas cette administration s’applique-t-elle ? <span className="font-normal text-gray-500">(facultatif)</span><input value={administrationForm.condition} onChange={(event) => setAdministrationForm({ ...administrationForm, condition: event.target.value })} placeholder="Ex. avant 2,5 mois" className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label>{administrationErreur && <p className="text-red-700 sm:col-span-2">{administrationErreur}</p>}<div className="flex gap-2 sm:col-span-2"><button type="button" onClick={() => setAdministrationOuverte(false)} className="min-h-11 rounded-lg border px-4">Annuler</button><button disabled={administrationSaving} className="ml-auto min-h-11 rounded-lg bg-green-700 px-4 font-semibold text-white disabled:opacity-50">{administrationSaving ? "Enregistrement…" : preconisationEditionId ? "Valider cette administration" : "Enregistrer l’administration"}</button></div></form>}</div>}<details><summary className="cursor-pointer text-sm text-gray-500">Renommer ou ajouter une note</summary><input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} className="mt-2 w-full rounded-lg border p-2" /><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-2 w-full rounded-lg border p-2" placeholder="Note facultative" /></details></>}
       {page === 1 && <><h3 className="text-xl font-black">À quels animaux s’applique ce protocole ?</h3><div className="grid gap-2"><Choix actif={form.tous} onClick={() => setForm({ ...form, tous: true, categories: [] })}>Tous les bovins</Choix><Choix actif={!form.tous} onClick={() => setForm({ ...form, tous: false })}>Seulement certaines catégories</Choix></div>{!form.tous && <div className="grid grid-cols-2 gap-2">{CATEGORIES.map(([code, label]) => <Choix key={code} actif={form.categories.includes(code)} onClick={() => setForm({ ...form, categories: form.categories.includes(code) ? form.categories.filter((item) => item !== code) : [...form.categories, code] })}>{label}</Choix>)}</div>}<p className="rounded-lg bg-blue-50 p-3 text-sm">{form.tous ? "Ce protocole pourra concerner tous les bovins." : `Ce protocole sera proposé aux catégories : ${form.categories.join(", ") || "à choisir"}.`}</p><details className="rounded-lg border bg-white p-3 text-sm"><summary className="cursor-pointer font-semibold text-green-800">Affiner les animaux concernés</summary><div className="mt-3 grid gap-2 sm:grid-cols-2"><select value={form.sexeCible} onChange={(e) => setForm({ ...form, sexeCible: e.target.value })} className="min-h-10 rounded border px-2"><option value="">Tous les sexes</option><option value="F">Femelles</option><option value="M">Mâles</option></select><select value={form.gestante} onChange={(e) => setForm({ ...form, gestante: e.target.value })} className="min-h-10 rounded border px-2"><option value="">Toutes gestations</option><option value="true">Gestantes</option><option value="false">Non gestantes</option></select><input type="number" min="0" value={form.rangVelageMin} onChange={(e) => setForm({ ...form, rangVelageMin: e.target.value })} placeholder="Rang vêlage minimum" className="min-h-10 rounded border px-2" /><input type="number" min="0" value={form.rangVelageMax} onChange={(e) => setForm({ ...form, rangVelageMax: e.target.value })} placeholder="Rang vêlage maximum" className="min-h-10 rounded border px-2" /><input value={form.lotCible} onChange={(e) => setForm({ ...form, lotCible: e.target.value })} placeholder="Lot facultatif" className="min-h-10 rounded border px-2 sm:col-span-2" /></div></details></>}
       {page === 2 && <><h3 className="text-xl font-black">Comment démarre la vaccination ?</h3><div className="grid gap-2"><Choix actif={form.demarrageChoisi && form.type === "DOSE_UNIQUE"} onClick={() => setForm({ ...form, demarrageChoisi: true, type: "DOSE_UNIQUE" })}>Une dose unique</Choix><Choix actif={form.demarrageChoisi && form.type === "PRIMO_RAPPEL"} onClick={() => setForm({ ...form, demarrageChoisi: true, type: "PRIMO_RAPPEL" })}>Une Primo + un Rappel</Choix></div></>}
       {page === 3 && <><h3 className="text-xl font-black">Quand peut-on faire {form.type === "DOSE_UNIQUE" ? "la dose" : "la Primo"} ?</h3><div className="grid gap-2 sm:grid-cols-2"><Choix actif={form.calendrier.type === "AGE_MINIMUM"} onClick={() => setForm({ ...form, calendrier: { type: "AGE_MINIMUM", age: d(0) } })}>À partir d’un certain âge</Choix><Choix actif={form.calendrier.type === "AVANT_VELAGE"} onClick={() => setForm({ ...form, calendrier: fenetreVelage() })}>Pendant une période avant vêlage</Choix><Choix actif={form.calendrier.type === "MOIS_ANNUELS"} onClick={() => setForm({ ...form, calendrier: { type: "MOIS_ANNUELS", mois: [] } })}>À une période de l’année</Choix><Choix actif={form.calendrier.type === "SANS_REGLE"} onClick={() => setForm({ ...form, calendrier: { type: "SANS_REGLE" } })}>Pas de règle particulière</Choix></div>{form.calendrier.type === "AGE_MINIMUM" && <Duree value={form.calendrier.age} decimal onChange={(age) => setForm({ ...form, calendrier: { type: "AGE_MINIMUM", age } })} />}{form.calendrier.type === "AVANT_VELAGE" && <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Début avant vêlage<Duree value={form.calendrier.debutAvant} decimal onChange={(debutAvant) => setForm({ ...form, calendrier: { ...(form.calendrier as typeof form.fenetreEntretien), debutAvant } })} /></label><label className="text-sm">Fin avant vêlage<Duree value={form.calendrier.finAvant} decimal onChange={(finAvant) => setForm({ ...form, calendrier: { ...(form.calendrier as typeof form.fenetreEntretien), finAvant } })} /></label></div>}{form.calendrier.type === "MOIS_ANNUELS" && <Mois value={form.calendrier.mois} onChange={(mois) => setForm({ ...form, calendrier: { type: "MOIS_ANNUELS", mois } })} />}{med && <Precon med={med} value={form.preconPrimo} onChange={(preconPrimo) => setForm({ ...form, preconPrimo })} titre="Voie et dose" />}</>}

@@ -30,6 +30,6 @@ test("la frise décrit la Primo et le Rappel seulement après ce choix", () => {
 test("l'absence de préconisation conserve le blocage et propose la fiche Pharmacie", () => {
   const source = readFileSync(new URL("../app/config/protocoles/ProtocoleQuestionnaire.tsx", import.meta.url), "utf8");
   assert.match(source, /if \(page === 0\) return Boolean\(med && med\.preconisations\.length > 0\)/);
-  assert.match(source, /href=\{`\/pharmacie\/\$\{med\.id\}`\}/);
+  assert.match(source, /href=\{`\/pharmacie\/\$\{medicamentSelectionne\.id\}`\}/);
   assert.match(source, />Compléter la fiche Pharmacie</);
 });
