@@ -61,20 +61,27 @@ jobs:
             },
           ];
 
-          try {
-            for (const ajout of ajouts) {
-              const avant = await colonnes(ajout.table);
-              if (!avant.has(ajout.colonne)) {
-                await client.execute(ajout.sql);
-              }
+          async function main() {
+            try {
+              for (const ajout of ajouts) {
+                const avant = await colonnes(ajout.table);
+                if (!avant.has(ajout.colonne)) {
+                  await client.execute(ajout.sql);
+                }
 
-              const apres = await colonnes(ajout.table);
-              if (!apres.has(ajout.colonne)) {
-                throw new Error(`${ajout.table}.${ajout.colonne} n'a pas été créée.`);
+                const apres = await colonnes(ajout.table);
+                if (!apres.has(ajout.colonne)) {
+                  throw new Error(`${ajout.table}.${ajout.colonne} n'a pas été créée.`);
+                }
+                console.log(`${ajout.table}.${ajout.colonne}: OK`);
               }
-              console.log(`${ajout.table}.${ajout.colonne}: OK`);
+            } finally {
+              client.close();
             }
-          } finally {
-            client.close();
           }
+
+          main().catch((erreur) => {
+            console.error(erreur instanceof Error ? erreur.message : "Échec de la migration.");
+            process.exit(1);
+          });
           NODE
