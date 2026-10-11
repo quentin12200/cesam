@@ -35,3 +35,11 @@ test("la sauvegarde inline utilise les API existantes et conserve l'état du que
   assert.match(source, /doseBase: administrationForm\.doseBase \|\| "ANIMAL"/);
   assert.match(source, /setForm\(\(ancien\) => completerPreconisationsVides\(ancien, enregistree\.id\)\)/);
 });
+
+test("l'éditeur inline regroupe dose et unité et masque l'action d'ouverture", () => {
+  const source = readFileSync(new URL("../app/config/protocoles/ProtocoleQuestionnaire.tsx", import.meta.url), "utf8");
+  assert.match(source, /!administrationOuverte && <button/);
+  assert.match(source, /preconisationARevoir \? "Revoir et valider ici" : "Compléter l’administration ici"/);
+  assert.match(source, /grid-cols-\[minmax\(0,1fr\)_8rem\]/);
+  assert.match(source, /aria-label="Dose"[\s\S]*aria-label="Unité"/);
+});
