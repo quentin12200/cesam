@@ -25,6 +25,15 @@ export type PlanExtractionVaccin =
   | { possible: false; raison: string; actesAmbigus: Array<{ source: "VACCINATION" | "TRAITEMENT"; id: string }> }
   | { possible: true; vaccinations: ActeAExtraire[]; traitements: ActeAExtraire[] };
 
+export function resoudreLegacyParMedicament<T extends { id: string }>(candidats: readonly T[]):
+  | { type: "AUCUN" }
+  | { type: "UNIQUE"; protocole: T }
+  | { type: "AMBIGU"; protocoleIds: string[] } {
+  if (candidats.length === 0) return { type: "AUCUN" };
+  if (candidats.length === 1) return { type: "UNIQUE", protocole: candidats[0] };
+  return { type: "AMBIGU", protocoleIds: candidats.map((protocole) => protocole.id) };
+}
+
 function classerActe(
   acte: ActeExtractionVaccin,
   medicamentId: string,

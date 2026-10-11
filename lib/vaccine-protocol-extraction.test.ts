@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { planifierExtractionVaccin, type EtapeExtractionVaccin } from "./vaccine-protocol-extraction.ts";
+import { planifierExtractionVaccin, resoudreLegacyParMedicament, type EtapeExtractionVaccin } from "./vaccine-protocol-extraction.ts";
 import { statutDepuisEtapesFaites } from "./vaccine-statut.ts";
 
 const CIBLE = "med-cible";
@@ -83,6 +83,18 @@ test("un entretien historique extrait prouve PROTOCOLE_ACQUIS", () => {
   assert.equal(statutDepuisEtapesFaites(etapesNouvelles, new Set(plan.vaccinations.map((acte) => acte.etapeCibleId!).filter(Boolean))), "PROTOCOLE_ACQUIS");
 });
 
+test("après extraction de A, le legacy renommé restant est encore découvert pour B par medicamentId", () => {
+  const legacyRenomme = { id: "legacy-a-b", nom: "PROTOCOLE_AB_LEGACY_LEGACYAB" };
+  assert.deepEqual(resoudreLegacyParMedicament([legacyRenomme]), { type: "UNIQUE", protocole: legacyRenomme });
+});
+
+test("deux legacy contenant le même médicament bloquent tout choix automatique", () => {
+  assert.deepEqual(resoudreLegacyParMedicament([{ id: "legacy-1" }, { id: "legacy-2" }]), {
+    type: "AMBIGU",
+    protocoleIds: ["legacy-1", "legacy-2"],
+  });
+});
+
 test("l'API propose une extraction confirmée, atomique, sans suffixe de protocole vaccin", () => {
   const route = readFileSync(new URL("../app/api/protocoles/route.ts", import.meta.url), "utf8");
   const ui = readFileSync(new URL("../app/config/protocoles/ProtocoleQuestionnaire.tsx", import.meta.url), "utf8");
@@ -92,7 +104,10 @@ test("l'API propose une extraction confirmée, atomique, sans suffixe de protoco
   assert.match(route, /tx\.traitement\.update/);
   assert.match(route, /tx\.statutProtocoleVaccinal\.deleteMany/);
   assert.match(route, /statutDepuisEtapesFaites/);
-  assert.match(route, /medicamentIds\.size > 1[\s\S]*medicamentIds\.has\(configuration!\.medicamentId\)/);
+  assert.match(route, /configurationQuestionnaireJson: null,[\s\S]*medicaments: \{ some: \{ medicamentId: configuration\.medicamentId \}/);
+  assert.match(route, /configurationQuestionnaireJson: \{ not: null \}[\s\S]*Modifie ce protocole au lieu d’en créer un second/);
+  assert.match(route, /resoudreLegacyParMedicament/);
+  assert.match(route, /PROTOCOLES_LEGACY_AMBIGUS/);
   assert.doesNotMatch(route, /BOVILIS_CRYPTIUM_2|nomInterne.*_[23]/);
   assert.doesNotMatch(route, /CRYPTIUM|ROTAVEC/);
   assert.match(ui, /Séparer \{conflitProtocole\.extraction\.medicamentNom\} de l’ancien protocole et créer ce protocole/);

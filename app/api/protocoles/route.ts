@@ -6,7 +6,7 @@ import { logAction } from "@/lib/action-log";
 import { brancheInitialeDepuisActes, etapeIdsConfigurationQuestionnaire, lireConfigurationQuestionnaire } from "@/lib/vaccine-protocol-questionnaire";
 import { referencesPharmacieValides } from "@/lib/vaccine-protocol-validation";
 import { preparerConversionProtocole } from "@/lib/vaccine-protocol-name";
-import { planifierExtractionVaccin } from "@/lib/vaccine-protocol-extraction";
+import { planifierExtractionVaccin, resoudreLegacyParMedicament } from "@/lib/vaccine-protocol-extraction";
 import { statutDepuisEtapesFaites } from "@/lib/vaccine-statut";
 
 function cibleErreurUniqueContientNom(meta: unknown): boolean {
@@ -24,7 +24,8 @@ function normaliserNomInterne(value: string): string {
 class ExtractionVaccinRefusee extends Error {}
 
 function nomInterneLegacy(nom: string, id: string): string {
-  return `${nom}_LEGACY_${normaliserNomInterne(id)}`;
+  const suffixe = `_LEGACY_${normaliserNomInterne(id)}`;
+  return nom.endsWith(suffixe) ? nom : `${nom}${suffixe}`;
 }
 
 export async function GET() {
@@ -107,20 +108,58 @@ export async function POST(request: NextRequest) {
       etapes: { create: (Array.isArray(etapes) ? etapes : []).map((e: any, index: number) => ({ ...(e.id ? { id: e.id } : {}), label: e.label, ordre: index, cycle: e.cycle || "INITIAL", reference: e.reference || "NAISSANCE", debutValeur: Number(e.debutValeur) || 0, debutUnite: e.debutUnite || "JOUR", debutPosition: e.debutPosition || "APRES", finValeur: Number(e.finValeur) || 0, finUnite: e.finUnite || "JOUR", finPosition: e.finPosition || "APRES", recurrenceMois: e.recurrenceMois ? Number(e.recurrenceMois) : null, obligatoire: e.obligatoire !== false, medicaments: { create: (e.medicaments || []).filter((m: any) => m.medicamentId).map((m: any) => ({ medicamentId: m.medicamentId, voie: m.voie || null, preconisationId: m.preconisationId || null, alternative: Boolean(m.alternative) })) } })) },
       actif: true,
     };
-    const existant = await prisma.protocoleVaccin.findUnique({
-      where: { nom: nomInterne },
-      select: {
-        id: true, nom: true, label: true, configurationQuestionnaireJson: true,
-        etapes: {
-          orderBy: { ordre: "asc" },
-          select: {
-            id: true, label: true, cycle: true,
-            medicaments: { select: { medicamentId: true } },
-            _count: { select: { vaccinations: true, traitements: true } },
-          },
+    const selectionConflit = {
+      id: true, nom: true, label: true, configurationQuestionnaireJson: true,
+      etapes: {
+        orderBy: { ordre: "asc" as const },
+        select: {
+          id: true, label: true, cycle: true,
+          medicaments: { select: { medicamentId: true } },
+          _count: { select: { vaccinations: true, traitements: true } },
         },
       },
+    };
+    const existantParNom = await prisma.protocoleVaccin.findUnique({
+      where: { nom: nomInterne },
+      select: selectionConflit,
     });
+    let existant = existantParNom;
+    let decouvertParMedicament = false;
+    if (!existant && configuration) {
+      const questionnaireExistant = await prisma.protocoleVaccin.findFirst({
+        where: {
+          configurationQuestionnaireJson: { not: null },
+          etapes: { some: { medicaments: { some: { medicamentId: configuration.medicamentId } } } },
+        },
+        select: { id: true, nom: true, label: true },
+      });
+      if (questionnaireExistant) {
+        return NextResponse.json({
+          error: `Le protocole questionnaire « ${questionnaireExistant.label} » existe déjà pour ce vaccin. Modifie ce protocole au lieu d’en créer un second.`,
+          code: "PROTOCOLE_EXISTANT",
+          protocoleId: questionnaireExistant.id,
+        }, { status: 409 });
+      }
+      const resolution = resoudreLegacyParMedicament(await prisma.protocoleVaccin.findMany({
+        where: {
+          configurationQuestionnaireJson: null,
+          etapes: { some: { medicaments: { some: { medicamentId: configuration.medicamentId } } } },
+        },
+        select: selectionConflit,
+        take: 2,
+      }));
+      if (resolution.type === "AMBIGU") {
+        return NextResponse.json({
+          error: "Plusieurs protocoles historiques contiennent ce vaccin. Vérifie leurs rattachements avant de choisir lequel séparer.",
+          code: "PROTOCOLES_LEGACY_AMBIGUS",
+          protocoleIds: resolution.protocoleIds,
+        }, { status: 409 });
+      }
+      if (resolution.type === "UNIQUE") {
+        existant = resolution.protocole;
+        decouvertParMedicament = true;
+      }
+    }
     if (existant) {
       const medicament = configuration
         ? await prisma.medicament.findUnique({ where: { id: configuration.medicamentId }, select: { nom: true } })
@@ -129,16 +168,16 @@ export async function POST(request: NextRequest) {
       const memeVaccin = Boolean(configuration && medicament) && (medicamentIds.size > 0
         ? medicamentIds.size === 1 && medicamentIds.has(configuration!.medicamentId)
         : normaliserNomInterne(existant.nom) === normaliserNomInterne(medicament!.nom));
-      const protocoleMultiVaccinsContientLaCible = Boolean(configuration)
+      const protocoleLegacyContientLaCible = Boolean(configuration)
         && existant.configurationQuestionnaireJson == null
-        && medicamentIds.size > 1
-        && medicamentIds.has(configuration!.medicamentId);
+        && medicamentIds.has(configuration!.medicamentId)
+        && (medicamentIds.size > 1 || decouvertParMedicament);
       const etapesExistantes = existant.etapes.map((etape) => ({
         id: etape.id, label: etape.label, cycle: etape.cycle,
         vaccinationsCount: etape._count.vaccinations,
         traitementsCount: etape._count.traitements,
       }));
-      if (protocoleMultiVaccinsContientLaCible && configuration && medicament) {
+      if (protocoleLegacyContientLaCible && configuration && medicament) {
         const [vaccinations, traitements] = await Promise.all([
           prisma.vaccination.findMany({ where: { protocoleId: existant.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleId: true } }),
           prisma.traitement.findMany({ where: { protocoleVaccinId: existant.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleVaccinId: true } }),
@@ -188,8 +227,8 @@ export async function POST(request: NextRequest) {
             tx.traitement.findMany({ where: { protocoleVaccinId: legacy.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleVaccinId: true, dateDebut: true } }),
           ]);
           const medicamentsLegacy = new Set(legacy.etapes.flatMap((etape) => etape.medicaments.map((liaison) => liaison.medicamentId)));
-          if (medicamentsLegacy.size < 2 || !medicamentsLegacy.has(configuration.medicamentId)) {
-            throw new ExtractionVaccinRefusee("Le protocole ne contient plus plusieurs vaccins incluant celui demandé.");
+          if (!medicamentsLegacy.has(configuration.medicamentId)) {
+            throw new ExtractionVaccinRefusee("Le protocole historique ne contient plus le vaccin demandé.");
           }
           const planActuel = planifierExtractionVaccin({
             medicamentId: configuration.medicamentId,

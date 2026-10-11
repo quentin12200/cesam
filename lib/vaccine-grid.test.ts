@@ -301,6 +301,42 @@ test("un entretien historique acquiert l'initial et planifie l'entretien du nouv
   assert.deepEqual(extraireActionsPrevues(grille).map((action) => action.etapeId), [entretien.id]);
 });
 
+test("PALUCHE : l'entretien CRYPTIUM historique reste visible et seul l'entretien de la nouvelle gestation est à faire", () => {
+  const primo = { ...etapePrimo, id: "cryptium-primo", medicamentId: "med-cryptium", medicamentNom: "BOVILIS CRYPTIUM", medicaments: [{ medicament: { id: "med-cryptium", nom: "BOVILIS CRYPTIUM" } }], preconisations: [{ id: "precon-sc", voie: "SC", dose: 2, unite: "ml" }] };
+  const rappel = { ...etapeRappel, id: "cryptium-rappel", medicamentId: "med-cryptium", medicamentNom: "BOVILIS CRYPTIUM", medicaments: [{ medicament: { id: "med-cryptium", nom: "BOVILIS CRYPTIUM" } }], preconisations: [{ id: "precon-sc", voie: "SC", dose: 2, unite: "ml" }] };
+  const entretien = { ...primo, id: "cryptium-entretien", label: "Entretien", ordre: 2, cycle: "ENTRETIEN" };
+  const configuration = {
+    version: 1,
+    medicamentId: "med-cryptium",
+    cible: { tousBovins: false, categories: ["GENISSE", "VACHE"] },
+    demarrage: {
+      type: "PRIMO_RAPPEL", etapePrimoId: primo.id, etapeRappelId: rappel.id,
+      calendrierPrimo: { type: "AVANT_VELAGE", debutAvant: { valeur: 3, unite: "MOIS" }, finAvant: { valeur: 3, unite: "SEMAINE" } },
+      rappel: { type: "DELAI_FIXE", delai: { valeur: 28, unite: "JOUR" }, preconisationPrimoId: "precon-sc", preconisationRappelId: "precon-sc", resterDansFenetrePrimo: true },
+    },
+    entretien: { actif: true, etapeId: entretien.id, preconisationId: "precon-sc", calendrier: { type: "AVANT_VELAGE", debutAvant: { valeur: 3, unite: "MOIS" }, finAvant: { valeur: 3, unite: "SEMAINE" } } },
+  };
+  const protocole: ProtocoleGrille = {
+    ...protocoleBovigrip, id: "proto-cryptium", nom: "BOVILIS_CRYPTIUM", label: "BOVILIS CRYPTIUM",
+    categoriesJson: JSON.stringify(["GENISSE", "VACHE"]), configurationQuestionnaireJson: JSON.stringify(configuration),
+    etapes: [primo, rappel, entretien],
+  };
+  const entretienHistorique = new Date("2025-10-01T12:00:00Z");
+  const paluche = animal({
+    id: "paluche", nutrav: "PALUCHE", nom: "PALUCHE", categorie: "VACHE", nombreVelages: 2,
+    gestationId: "gestation-n-plus-1", dateVelagePrevueIso: "2026-12-01T12:00:00Z",
+    statutsProtocoles: [{ protocoleId: protocole.id, statut: "PRIMO_A_FAIRE", brancheInitialeId: null }],
+    actes: [{ date: entretienHistorique, vaccin: "BOVILIS CRYPTIUM", medicamentId: "med-cryptium", protocoleId: protocole.id, etapeProtocoleId: entretien.id, gestationId: "gestation-n", statut: "FAIT" }],
+  });
+  const grille = construireGrilleVaccinale([paluche], [protocole], [], AUJOURDHUI);
+  const ligne = grille.lignes[0];
+  assert.equal(ligne.cellules[primo.id].statut, "VIDE");
+  assert.equal(ligne.cellules[rappel.id].statut, "VIDE");
+  assert.equal(ligne.cellules[entretien.id].statut, "A_FAIRE");
+  assert.equal(ligne.actes.some((acte) => acte.date.getTime() === entretienHistorique.getTime() && acte.etapeProtocoleId === entretien.id), true);
+  assert.deepEqual(extraireActionsPrevues(grille).map((action) => ({ etapeId: action.etapeId, statut: action.statut })), [{ etapeId: entretien.id, statut: "A_FAIRE" }]);
+});
+
 test("un entretien du cycle courant acquiert l'initial et ne crée aucune nouvelle échéance", () => {
   const entretien = { ...etapePrimo, id: "entretien", label: "Entretien", ordre: 2, cycle: "ENTRETIEN", reference: "VELAGE", debutValeur: 90, debutPosition: "AVANT", finValeur: 21, finPosition: "AVANT" };
   const protocole = { ...protocoleBovigrip, etapes: [etapePrimo, etapeRappel, entretien] };
