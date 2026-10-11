@@ -12,7 +12,7 @@ export type ConversionProtocole =
   | { possible: true; ids: Record<RoleEtapeProtocole, string | null> }
   | { possible: false; raison: string };
 
-function roleEtape(etape: Pick<EtapeProtocoleExistante, "label" | "cycle">): RoleEtapeProtocole | null {
+export function roleEtapeProtocole(etape: Pick<EtapeProtocoleExistante, "label" | "cycle">): RoleEtapeProtocole | null {
   const label = etape.label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
   if (etape.cycle === "ENTRETIEN" || label.includes("ENTRETIEN")) return "entretien";
   if (label.includes("PRIMO")) return "primo";
@@ -34,7 +34,7 @@ export function preparerConversionProtocole(
   const utiliseesParRole = new Map<RoleEtapeProtocole, EtapeProtocoleExistante[]>();
 
   for (const etape of utilisees) {
-    const role = roleEtape(etape);
+    const role = roleEtapeProtocole(etape);
     if (!role || !rolesDemandes.has(role)) {
       return { possible: false, raison: `L’étape historique « ${etape.label} » ne peut pas être associée de façon sûre.` };
     }
@@ -53,7 +53,7 @@ export function preparerConversionProtocole(
       ids[role] = utilisee.id;
       continue;
     }
-    const candidates = etapes.filter((etape) => roleEtape(etape) === role && !utilisees.includes(etape));
+    const candidates = etapes.filter((etape) => roleEtapeProtocole(etape) === role && !utilisees.includes(etape));
     if (candidates.length === 1) ids[role] = candidates[0].id;
   }
   return { possible: true, ids };
