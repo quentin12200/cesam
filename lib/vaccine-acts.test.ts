@@ -44,6 +44,16 @@ test("le même acte présent dans les deux sources n'est affiché qu'une seule f
   assert.equal(actes[0].protocoleId, "proto-1", "la version Vaccination, plus riche, doit être conservée");
 });
 
+test("une Vaccination legacy sans médicament et son unique Traitement VACCIN du jour restent un seul fait", () => {
+  const actes = unifierActesVaccinaux(
+    [vaccination({ medicamentId: null, vaccin: "Ancien protocole combiné", protocoleId: "legacy" })],
+    [traitement({ id: "traitement-source", protocoleVaccinId: null })],
+  );
+  assert.equal(actes.length, 1);
+  assert.equal(actes[0].sourceType, "VACCINATION", "la source structurée reste prioritaire");
+  assert.equal(actes[0].medicamentId, "med-bovigrip", "l'identité certaine vient du Traitement réel sans modifier la base");
+});
+
 test("deux médicaments différents le même jour restent deux actes distincts", () => {
   const actes = unifierActesVaccinaux([], [
     traitement({ medicamentId: "med-bovigrip", medicamentNom: "BOVILIS BOVIGRIP" }),

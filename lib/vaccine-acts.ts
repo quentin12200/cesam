@@ -41,6 +41,48 @@ function cleJour(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+export type TraitementVaccinalIdentifie = {
+  animalId: string;
+  dateDebut: Date;
+  medicamentId: string | null;
+};
+
+function indexerMedicaments<T>(
+  valeurs: readonly T[],
+  cleDe: (valeur: T) => string,
+  medicamentDe: (valeur: T) => string | null,
+): Map<string, Set<string>> {
+  const index = new Map<string, Set<string>>();
+  for (const valeur of valeurs) {
+    const medicamentId = medicamentDe(valeur);
+    if (!medicamentId) continue;
+    const cle = cleDe(valeur);
+    const medicaments = index.get(cle) ?? new Set<string>();
+    medicaments.add(medicamentId);
+    index.set(cle, medicaments);
+  }
+  return index;
+}
+
+/**
+ * Identités médicamenteuses réellement enregistrées comme Traitement VACCIN, indexées avec
+ * la même notion de jour que la déduplication de l'historique unifié. Le filtrage
+ * `Medicament.categorie = VACCIN` reste effectué par l'appelant Prisma.
+ */
+export function medicamentsVaccinauxParAnimalEtJour(
+  traitements: readonly TraitementVaccinalIdentifie[],
+): Map<string, ReadonlySet<string>> {
+  return indexerMedicaments(
+    traitements,
+    (traitement) => `${traitement.animalId}|${cleJour(traitement.dateDebut)}`,
+    (traitement) => traitement.medicamentId,
+  );
+}
+
+export function cleVaccinaleAnimalJour(animalId: string, date: Date): string {
+  return `${animalId}|${cleJour(date)}`;
+}
+
 /**
  * Fusionne les `Vaccination` (statut FAIT) et les `Traitement` dont le médicament est
  * catégorisé VACCIN en une seule liste d'actes réellement faits.
@@ -53,9 +95,18 @@ export function unifierActesVaccinaux(
   vaccinations: readonly ActeVaccination[],
   traitements: readonly ActeTraitementVaccin[]
 ): ActeVaccination[] {
+  const medicamentsTraitementsParJour = indexerMedicaments(
+    traitements,
+    (traitement) => cleJour(traitement.dateDebut),
+    (traitement) => traitement.medicamentId,
+  );
   const faites = vaccinations
     .filter((vaccination) => vaccination.statut === "FAIT")
-    .map((vaccination) => ({ ...vaccination, sourceType: vaccination.sourceType ?? "VACCINATION" as const }));
+    .map((vaccination) => {
+      const candidats = medicamentsTraitementsParJour.get(cleJour(vaccination.date));
+      const medicamentId = vaccination.medicamentId ?? (candidats?.size === 1 ? [...candidats][0] : null);
+      return { ...vaccination, medicamentId, sourceType: vaccination.sourceType ?? "VACCINATION" as const };
+    });
   const couverts = new Set(
     faites
       .filter((vaccination) => vaccination.medicamentId)

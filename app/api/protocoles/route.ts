@@ -179,14 +179,20 @@ export async function POST(request: NextRequest) {
       }));
       if (protocoleLegacyContientLaCible && configuration && medicament) {
         const [vaccinations, traitements] = await Promise.all([
-          prisma.vaccination.findMany({ where: { protocoleId: existant.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleId: true } }),
-          prisma.traitement.findMany({ where: { protocoleVaccinId: existant.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleVaccinId: true } }),
+          prisma.vaccination.findMany({ where: { protocoleId: existant.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleId: true, date: true } }),
+          prisma.traitement.findMany({ where: { protocoleVaccinId: existant.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleVaccinId: true, dateDebut: true } }),
         ]);
+        const animalIdsLegacy = [...new Set([...vaccinations, ...traitements].map((acte) => acte.animalId))];
+        const traitementsVaccinauxReels = animalIdsLegacy.length === 0 ? [] : await prisma.traitement.findMany({
+          where: { animalId: { in: animalIdsLegacy }, medicamentId: { not: null }, medicament: { categorie: "VACCIN" } },
+          select: { animalId: true, dateDebut: true, medicamentId: true },
+        });
         const plan = planifierExtractionVaccin({
           medicamentId: configuration.medicamentId,
           etapes: existant.etapes.map((etape) => ({ id: etape.id, label: etape.label, cycle: etape.cycle, medicamentIds: etape.medicaments.map((liaison) => liaison.medicamentId) })),
           vaccinations: vaccinations.map((acte) => ({ ...acte, etapeId: acte.etapeProtocoleId })),
-          traitements: traitements.map((acte) => ({ ...acte, etapeId: acte.etapeProtocoleVaccinId })),
+          traitements: traitements.map((acte) => ({ ...acte, etapeId: acte.etapeProtocoleVaccinId, date: acte.dateDebut })),
+          traitementsVaccinauxReels,
           idsCibles: idsDemandes,
         });
         if (extraireDepuisProtocoleId !== existant.id) {
@@ -226,6 +232,11 @@ export async function POST(request: NextRequest) {
             tx.vaccination.findMany({ where: { protocoleId: legacy.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleId: true, statut: true, date: true } }),
             tx.traitement.findMany({ where: { protocoleVaccinId: legacy.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleVaccinId: true, dateDebut: true } }),
           ]);
+          const animalIdsLegacyActuels = [...new Set([...vaccinationsActuelles, ...traitementsActuels].map((acte) => acte.animalId))];
+          const traitementsVaccinauxReelsActuels = animalIdsLegacyActuels.length === 0 ? [] : await tx.traitement.findMany({
+            where: { animalId: { in: animalIdsLegacyActuels }, medicamentId: { not: null }, medicament: { categorie: "VACCIN" } },
+            select: { animalId: true, dateDebut: true, medicamentId: true },
+          });
           const medicamentsLegacy = new Set(legacy.etapes.flatMap((etape) => etape.medicaments.map((liaison) => liaison.medicamentId)));
           if (!medicamentsLegacy.has(configuration.medicamentId)) {
             throw new ExtractionVaccinRefusee("Le protocole historique ne contient plus le vaccin demandé.");
@@ -234,7 +245,8 @@ export async function POST(request: NextRequest) {
             medicamentId: configuration.medicamentId,
             etapes: legacy.etapes.map((etape) => ({ id: etape.id, label: etape.label, cycle: etape.cycle, medicamentIds: etape.medicaments.map((liaison) => liaison.medicamentId) })),
             vaccinations: vaccinationsActuelles.map((acte) => ({ ...acte, etapeId: acte.etapeProtocoleId })),
-            traitements: traitementsActuels.map((acte) => ({ ...acte, etapeId: acte.etapeProtocoleVaccinId })),
+            traitements: traitementsActuels.map((acte) => ({ ...acte, etapeId: acte.etapeProtocoleVaccinId, date: acte.dateDebut })),
+            traitementsVaccinauxReels: traitementsVaccinauxReelsActuels,
             idsCibles: idsDemandes,
           });
           if (!planActuel.possible) throw new ExtractionVaccinRefusee(planActuel.raison);
