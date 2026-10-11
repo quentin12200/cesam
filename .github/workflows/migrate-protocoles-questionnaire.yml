@@ -1,0 +1,87 @@
+name: Migration protocoles questionnaire
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    name: Ajouter et vérifier les colonnes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci --ignore-scripts --omit=dev
+
+      - name: Appliquer uniquement la migration du questionnaire
+        env:
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { createClient } = require("@libsql/client");
+
+          const authToken = process.env.TURSO_AUTH_TOKEN;
+          if (!authToken) {
+            throw new Error("Le secret TURSO_AUTH_TOKEN est absent.");
+          }
+
+          const client = createClient({
+            url: "libsql://cesam-quentin12200.aws-eu-west-1.turso.io",
+            authToken,
+          });
+
+          const colonnes = async (table) => {
+            const resultat = await client.execute(`PRAGMA table_info("${table}")`);
+            return new Set(resultat.rows.map((ligne) => String(ligne.name)));
+          };
+
+          const ajouts = [
+            {
+              table: "ProtocoleVaccin",
+              colonne: "configurationQuestionnaireJson",
+              sql: 'ALTER TABLE "ProtocoleVaccin" ADD COLUMN "configurationQuestionnaireJson" TEXT',
+            },
+            {
+              table: "StatutProtocoleVaccinal",
+              colonne: "brancheInitialeId",
+              sql: 'ALTER TABLE "StatutProtocoleVaccinal" ADD COLUMN "brancheInitialeId" TEXT',
+            },
+          ];
+
+          async function main() {
+            try {
+              for (const ajout of ajouts) {
+                const avant = await colonnes(ajout.table);
+                if (!avant.has(ajout.colonne)) {
+                  await client.execute(ajout.sql);
+                }
+
+                const apres = await colonnes(ajout.table);
+                if (!apres.has(ajout.colonne)) {
+                  throw new Error(`${ajout.table}.${ajout.colonne} n'a pas été créée.`);
+                }
+                console.log(`${ajout.table}.${ajout.colonne}: OK`);
+              }
+            } finally {
+              client.close();
+            }
+          }
+
+          main().catch((erreur) => {
+            console.error(erreur instanceof Error ? erreur.message : "Échec de la migration.");
+            process.exit(1);
+          });
+          NODE
