@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { bornerFenetreInitialeAuVelage, construireBlocsVaccinaux, construireGrilleVaccinale, extraireActionsPrevues, type AnimalGrille, type ProtocoleGrille, type VaccinPharmacieGrille } from "./vaccine-grid.ts";
+import { actesHistoriquesEtape } from "./vaccine-history-view.ts";
 
 const AUJOURDHUI = new Date("2026-09-29T12:00:00Z");
 const jours = (n: number) => new Date(new Date("2026-01-01T12:00:00Z").getTime() + n * 86_400_000);
@@ -35,6 +36,7 @@ test("les sous-colonnes viennent des étapes réelles du protocole, rien n'est i
   const blocs = construireBlocsVaccinaux([protocoleBovigrip], []);
   assert.equal(blocs.length, 1);
   assert.deepEqual(blocs[0].sousColonnes.map((s) => s.label), ["Primo", "Rappel"]);
+  assert.deepEqual(blocs[0].sousColonnes.map((s) => s.cycle), ["INITIAL", "INITIAL"]);
   assert.equal(blocs[0].sousColonnes[0].protocoleId, "proto-bovigrip");
   assert.equal(blocs[0].sousColonnes[0].medicamentId, "med-bovigrip");
 });
@@ -45,6 +47,7 @@ test("un vaccin de pharmacie sans protocole garde une seule sous-colonne (pas d'
   assert.equal(blocs.length, 1);
   assert.equal(blocs[0].sousColonnes.length, 1);
   assert.equal(blocs[0].sousColonnes[0].label, "");
+  assert.equal(blocs[0].sousColonnes[0].cycle, null);
 });
 
 test("un vaccin actif de pharmacie comme ROTAVEC reste représenté même sans protocole", () => {
@@ -333,6 +336,8 @@ test("PALUCHE : l'entretien CRYPTIUM historique reste visible et seul l'entretie
   assert.equal(ligne.cellules[primo.id].statut, "VIDE");
   assert.equal(ligne.cellules[rappel.id].statut, "VIDE");
   assert.equal(ligne.cellules[entretien.id].statut, "A_FAIRE");
+  assert.equal(grille.blocs[0].sousColonnes.find((colonne) => colonne.id === entretien.id)?.cycle, "ENTRETIEN");
+  assert.equal(actesHistoriquesEtape(ligne.actes.map((acte) => ({ ...acte, date: acte.date.toISOString() })), entretien.id).length, 1);
   assert.equal(ligne.actes.some((acte) => acte.date.getTime() === entretienHistorique.getTime() && acte.etapeProtocoleId === entretien.id), true);
   assert.deepEqual(extraireActionsPrevues(grille).map((action) => ({ etapeId: action.etapeId, statut: action.statut })), [{ etapeId: entretien.id, statut: "A_FAIRE" }]);
 });

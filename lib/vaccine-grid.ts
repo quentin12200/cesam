@@ -98,6 +98,7 @@ export function bornerFenetreInitialeAuVelage(
 export interface SousColonneGrille {
   id: string;
   label: string;
+  cycle: string | null;
   protocoleId: string | null;
   medicamentId: string | null;
   medicamentNom: string | null;
@@ -236,6 +237,7 @@ export function construireBlocsVaccinaux(
           .map((etape) => ({
             id: etape.id,
             label: etape.label,
+            cycle: etape.cycle,
             protocoleId: protocole.id,
             medicamentId: etape.medicamentId ?? medicament?.id ?? null,
             medicamentNom: etape.medicamentNom ?? medicament?.nom ?? null,
@@ -277,6 +279,7 @@ export function construireBlocsVaccinaux(
       sousColonnes: [{
         id: vaccin.medicamentId,
         label: "",
+        cycle: null,
         protocoleId: null,
         medicamentId: vaccin.medicamentId,
         medicamentNom: vaccin.nom,

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { unifierActesVaccinaux, type ActeTraitementVaccin, type ActeVaccination } from "./vaccine-acts.ts";
 import { construireGrilleVaccinale, type AnimalGrille, type EtapeGrille, type ProtocoleGrille } from "./vaccine-grid.ts";
-import { actesDuVaccin, anneesDisponibles, datesCompactes, filtrerParAnnees, type ActeHistorique } from "./vaccine-history-view.ts";
+import { actesDuVaccin, actesHistoriquesEtape, anneesDisponibles, datesCompactes, filtrerParAnnees, type ActeHistorique } from "./vaccine-history-view.ts";
 import { comparerDateVelage } from "./vaccine-table-presentation.ts";
 
 const NAISSANCE = new Date("2025-03-01T12:00:00Z");
@@ -127,6 +127,26 @@ test("12. dates compactes : jour/mois si l'année est évidente, avec l'année s
   assert.deepEqual(datesCompactes(actes, null).libelles, ["01/03/26", "02/10/26"]);
   assert.deepEqual(datesCompactes(actes, new Set([2025])).libelles, ["10/12"]);
   assert.equal(datesCompactes(actes, new Set([2024])).total, 0);
+});
+
+test("13. historique d'étape : toutes les dates réelles restent disponibles, sans couvrir une nouvelle échéance", () => {
+  const actes = [
+    vaccination("e-2023", "2023-10-01", "annuel"),
+    vaccination("e-2024", "2024-10-01", "annuel"),
+    vaccination("e-2025", "2025-10-01", "annuel"),
+    vaccination("p-2025", "2025-08-01", "primo"),
+  ].map(enActeHistorique);
+  const entretiens = actesHistoriquesEtape(actes, "annuel");
+  assert.deepEqual(entretiens.map((acte) => acte.date.slice(0, 10)), ["2023-10-01", "2024-10-01", "2025-10-01"]);
+  assert.equal(actesHistoriquesEtape(actes, "primo").length, 1, "la vraie Primo reste distincte");
+
+  const tableau = readFileSync(new URL("../app/sanitaire/vaccins/TableauVaccinal.tsx", import.meta.url), "utf8");
+  assert.match(tableau, /etape\.cycle === "ENTRETIEN"/);
+  assert.match(tableau, /<span className="text-\[10px\]">historique<\/span>/);
+  assert.match(tableau, /title=\{`Historique : \$\{tousLesActes\}/, "le tooltip conserve toutes les dates");
+  assert.match(tableau, /onClick=\{\(\) => ouvrirHistorique\(ligne, bloc, etape\)\}/, "clic et tap ouvrent le panneau existant");
+  assert.match(tableau, /\{historique\}[\s\S]{0,80}\{action\}/, "l'historique compact précède l'échéance courante");
+  assert.doesNotMatch(tableau, /datesCompactes\(cellule\.actes/, "les années d'entretien ne sont plus empilées dans la cellule");
 });
 
 test("F/14. déduplication : même médicament + même jour = un seul acte, la Vaccination gagne ; deux jours = deux actes", () => {

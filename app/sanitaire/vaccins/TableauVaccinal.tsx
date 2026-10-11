@@ -11,7 +11,7 @@ import MedicamentPicker, { type MedicamentOption } from "@/app/sanitaire/nouvel-
 import { medicamentCompatibleAvecEtape } from "@/lib/vaccine-attachment";
 import { actionsSelectionAnimaux, basculerSelectionVisibles, etatSelectionMaitre, libelleAnimauxSelectionnes } from "@/lib/vaccine-selection";
 import { construireChargeSoin } from "@/lib/vaccine-soin-seance";
-import { actesDuVaccin, anneesDisponibles, datesCompactes, type ActeHistorique } from "@/lib/vaccine-history-view";
+import { actesDuVaccin, actesHistoriquesEtape, anneesDisponibles, datesCompactes, type ActeHistorique } from "@/lib/vaccine-history-view";
 import { comparerDateVelage, comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
 import { libelleFenetreVaccinale, selectionDepuisGroupeAgenda, type ActionAgenda, type GroupeAgenda } from "@/lib/vaccine-agenda";
 import CalendrierVaccinal from "./CalendrierVaccinal";
@@ -62,6 +62,7 @@ interface Ligne {
 interface SousColonne {
   id: string;
   label: string;
+  cycle: string | null;
   protocoleId: string | null;
   medicamentId: string | null;
   medicamentNom: string | null;
@@ -495,27 +496,34 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     const bloc = blocs.find((item) => item.sousColonnes.some((sousColonne) => sousColonne.id === etape.id));
     const selectionne = actesSelectionnes.has(cleActe(ligne.animalId, etape.id));
     const disponible = estSelectionnable(cellule, etape);
-    if (cellule.statut === "FAIT") {
-      // Historique FAIT (badge vert, toutes les dates réelles des années affichées) ET prochaine
-      // échéance (ligne à sa couleur de planning) coexistent dans la même case.
-      const { libelles, reste, total } = datesCompactes(cellule.actes, anneesFiltre);
-      const anneeDerniere = cellule.date ? new Date(cellule.date).getFullYear() : null;
-      const contenu = total > 0
-        ? <><span className="text-base leading-none">☑</span>{libelles.map((libelle, index) => <span key={`${libelle}-${index}`} className="text-[11px]">{libelle}</span>)}{reste > 0 && <span className="text-[10px] font-black">+{reste}</span>}</>
-        : <><span className="text-base leading-none">☑</span><span className="text-[10px] opacity-70">{anneeDerniere}</span></>;
-      const tousLesActes = cellule.actes.map((acte) => afficherDate(acte.date)).join(", ");
-      const badgeClasse = total > 0 ? "border-green-600 bg-green-100 text-green-950 hover:bg-green-200" : "border-green-300 bg-green-50 text-green-800 hover:bg-green-100";
-      return <div className="space-y-0.5">
-        {bloc
-          ? <button type="button" title={`Historique : ${tousLesActes} — voir ou corriger l’étape`} onClick={() => ouvrirHistorique(ligne, bloc, etape)} className={`flex w-full flex-wrap items-center justify-center gap-x-1 rounded border px-1 py-0.5 font-bold ${badgeClasse}`}>{contenu}</button>
-          : <span className={`flex w-full flex-wrap items-center justify-center gap-x-1 rounded border px-1 py-0.5 font-bold ${badgeClasse}`}>{contenu}</span>}
-        {selectionne && !cellule.prochaine && <span className="block rounded border border-green-700 px-1 text-center text-[10px] font-bold text-green-900 ring-2 ring-green-700">+ nouvelle</span>}
-        {cellule.prochaine && (() => { const libelle = libelleFenetreVaccinale(cellule.prochaine.statut, cellule.prochaine.fenetre.debut, cellule.prochaine.fenetre.fin); return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title="Prochaine échéance : ajouter ou retirer des vaccinations à enregistrer" className={`flex w-full items-center justify-center gap-1 rounded border px-1 py-0.5 ${classeStatut(cellule.prochaine.statut)} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-[11px] font-black">{selectionne ? "☑" : "→"}</span><span className="text-[10px] font-semibold leading-tight">{libelle.statut && <span className="block">{libelle.statut}</span>}<span className="block">{libelle.date}</span></span></button>; })()}
-      </div>;
-    }
-    const classe = classeStatut(cellule.statut);
-    const libelle = cellule.fenetre && cellule.statut !== "VIDE" ? libelleFenetreVaccinale(cellule.statut, cellule.fenetre.debut, cellule.fenetre.fin) : null;
-    return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title={disponible ? "Ajouter ou retirer des vaccinations à enregistrer" : cellule.aValider ? "Résoudre d’abord l’historique à rattacher" : "Médicament à renseigner"} className={`flex w-full items-center justify-center gap-1 rounded border px-1.5 py-1 ${classe} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-xl font-black leading-none">{selectionne ? "☑" : "☐"}</span>{libelle && <span className="text-[10px] font-semibold leading-tight opacity-80">{libelle.statut && <span className="block">{libelle.statut}</span>}<span className="block">{libelle.date}</span></span>}</button>;
+    const historiqueEtape = actesHistoriquesEtape(ligne.actes, etape.id);
+    const tousLesActes = historiqueEtape.map((acte) => afficherDate(acte.date)).join(", ");
+    const estEntretien = etape.cycle === "ENTRETIEN";
+    const datesInitiales = datesCompactes(historiqueEtape, anneesFiltre, 1);
+    const afficherHistorique = estEntretien ? historiqueEtape.length > 0 : datesInitiales.total > 0;
+    const historique = afficherHistorique && bloc
+      ? <button type="button" title={`Historique : ${tousLesActes} — voir ou corriger l’étape`} aria-label={`Ouvrir l’historique ${etape.label || "vaccinal"} : ${tousLesActes}`} onClick={() => ouvrirHistorique(ligne, bloc, etape)} className="flex w-full items-center justify-center gap-x-1 rounded border border-green-600 bg-green-100 px-1 py-0.5 font-bold text-green-950 hover:bg-green-200">
+          <span className="text-base leading-none">✓</span>
+          {estEntretien
+            ? <span className="text-[10px]">historique</span>
+            : <>{datesInitiales.libelles.map((libelle) => <span key={libelle} className="text-[11px]">{libelle}</span>)}{datesInitiales.reste > 0 && <span className="text-[10px] font-black">+{datesInitiales.reste}</span>}</>}
+        </button>
+      : null;
+
+    const prochaine = cellule.statut === "FAIT" ? cellule.prochaine : cellule.statut !== "VIDE" && cellule.fenetre
+      ? { statut: cellule.statut, fenetre: cellule.fenetre }
+      : null;
+    const action = prochaine ? (() => {
+      const libelle = libelleFenetreVaccinale(prochaine.statut, prochaine.fenetre.debut, prochaine.fenetre.fin);
+      return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title={cellule.statut === "FAIT" ? "Prochaine échéance : ajouter ou retirer des vaccinations à enregistrer" : disponible ? "Ajouter ou retirer des vaccinations à enregistrer" : cellule.aValider ? "Résoudre d’abord l’historique à rattacher" : "Médicament à renseigner"} className={`flex w-full items-center justify-center gap-1 rounded border px-1 py-0.5 ${classeStatut(prochaine.statut)} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className={`${cellule.statut === "FAIT" ? "text-[11px]" : "text-xl"} font-black leading-none`}>{selectionne ? "☑" : cellule.statut === "FAIT" ? "→" : "☐"}</span><span className="text-[10px] font-semibold leading-tight">{libelle.statut && <span className="block">{libelle.statut}</span>}<span className="block">{libelle.date}</span></span></button>;
+    })() : null;
+
+    if (!historique && !action) return <span className="text-gray-300">—</span>;
+    return <div className="space-y-0.5">
+      {historique}
+      {action}
+      {selectionne && cellule.statut === "FAIT" && !cellule.prochaine && <span className="block rounded border border-green-700 px-1 text-center text-[10px] font-bold text-green-900 ring-2 ring-green-700">+ nouvelle</span>}
+    </div>;
   }
 
   function renduPanneauHistorique() {

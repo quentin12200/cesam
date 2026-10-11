@@ -72,3 +72,17 @@ export function actesDuVaccin<T extends ActeHistorique>(
       : normaliser(acte.vaccin) === nom)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
+
+/**
+ * Actes réels explicitement rattachés à une étape. Cette sélection sert uniquement au rendu :
+ * elle permet notamment de montrer un entretien ancien sans le confondre avec l'entretien dû
+ * pour la gestation courante.
+ */
+export function actesHistoriquesEtape<T extends { date: string; etapeProtocoleId: string | null }>(
+  actes: readonly T[],
+  etapeId: string,
+): T[] {
+  return actes
+    .filter((acte) => acte.etapeProtocoleId === etapeId)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
