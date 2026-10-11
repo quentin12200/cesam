@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_PROTOCOLES } from "@/lib/utils";
 import { logAction } from "@/lib/action-log";
 import { etapeIdsConfigurationQuestionnaire, lireConfigurationQuestionnaire } from "@/lib/vaccine-protocol-questionnaire";
 import { referencesPharmacieValides } from "@/lib/vaccine-protocol-validation";
+import { preparerConversionProtocole } from "@/lib/vaccine-protocol-name";
+
+function cibleErreurUniqueContientNom(meta: unknown): boolean {
+  if (!meta || typeof meta !== "object") return false;
+  const target = (meta as { target?: unknown }).target;
+  return Array.isArray(target)
+    ? target.some((champ) => champ === "nom")
+    : typeof target === "string" && target.includes("nom");
+}
+
+function normaliserNomInterne(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+}
 
 export async function GET() {
   let protocoles = await prisma.protocoleVaccin.findMany({
@@ -58,9 +72,62 @@ export async function POST(request: NextRequest) {
     }
   }
   try {
+    const nomInterne = nom.trim().toUpperCase();
+    const existant = await prisma.protocoleVaccin.findUnique({
+      where: { nom: nomInterne },
+      select: {
+        id: true, nom: true, label: true, configurationQuestionnaireJson: true,
+        etapes: {
+          orderBy: { ordre: "asc" },
+          select: {
+            id: true, label: true, cycle: true,
+            medicaments: { select: { medicamentId: true } },
+            _count: { select: { vaccinations: true, traitements: true } },
+          },
+        },
+      },
+    });
+    if (existant) {
+      const medicament = configuration
+        ? await prisma.medicament.findUnique({ where: { id: configuration.medicamentId }, select: { nom: true } })
+        : null;
+      const medicamentIds = new Set(existant.etapes.flatMap((etape) => etape.medicaments.map((liaison) => liaison.medicamentId)));
+      const memeVaccin = Boolean(configuration && medicament) && (medicamentIds.size > 0
+        ? medicamentIds.size === 1 && medicamentIds.has(configuration!.medicamentId)
+        : normaliserNomInterne(existant.nom) === normaliserNomInterne(medicament!.nom));
+      const etapesExistantes = existant.etapes.map((etape) => ({
+        id: etape.id, label: etape.label, cycle: etape.cycle,
+        vaccinationsCount: etape._count.vaccinations,
+        traitementsCount: etape._count.traitements,
+      }));
+      const idsDemandes = configuration ? {
+        dose: configuration.demarrage.type === "DOSE_UNIQUE" ? configuration.demarrage.etapeDoseId : null,
+        primo: configuration.demarrage.type === "PRIMO_RAPPEL" ? configuration.demarrage.etapePrimoId : null,
+        rappel: configuration.demarrage.type === "PRIMO_RAPPEL" ? configuration.demarrage.etapeRappelId : null,
+        entretien: configuration.entretien.actif ? configuration.entretien.etapeId : null,
+      } : { dose: null, primo: null, rappel: null, entretien: null };
+      const conversion = existant.configurationQuestionnaireJson
+        ? { possible: false as const, raison: "Ce protocole utilise déjà le questionnaire : modifiez directement le protocole existant." }
+        : !memeVaccin
+          ? { possible: false as const, raison: "Ce nom appartient à un autre vaccin : la conversion automatique est impossible." }
+          : preparerConversionProtocole(etapesExistantes, idsDemandes);
+      const nomVaccin = medicament?.nom ?? label.trim();
+      const error = conversion.possible
+        ? `Un protocole existe déjà pour ${nomVaccin}. Mettre à jour ce protocole ?`
+        : `Un protocole existe déjà pour ${nomVaccin}. ${conversion.raison}`;
+      return NextResponse.json({
+        error,
+        code: "PROTOCOLE_EXISTANT",
+        protocole: {
+          id: existant.id, nom: existant.nom, label: existant.label,
+          configurationQuestionnairePresente: Boolean(existant.configurationQuestionnaireJson),
+          memeVaccin, etapes: etapesExistantes, conversion,
+        },
+      }, { status: 409 });
+    }
     const protocole = await prisma.protocoleVaccin.create({
       data: {
-        nom: nom.trim().toUpperCase(),
+        nom: nomInterne,
         label: label.trim(),
         ordre: ordre ?? 99,
         ageMinJours: ageMinJours ?? 0,
@@ -87,7 +154,14 @@ export async function POST(request: NextRequest) {
     } catch {}
 
     return NextResponse.json({ ...protocole, _undoId: undoId, _undoDesc: desc }, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Ce nom existe déjà" }, { status: 409 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const message = cibleErreurUniqueContientNom(error.meta)
+        ? "Un protocole utilise déjà ce nom"
+        : "Une donnée de ce protocole existe déjà";
+      return NextResponse.json({ error: message }, { status: 409 });
+    }
+    console.error("Échec de création du protocole vaccinal", error);
+    return NextResponse.json({ error: "Le protocole n’a pas pu être enregistré" }, { status: 500 });
   }
 }
