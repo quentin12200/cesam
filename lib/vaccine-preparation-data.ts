@@ -16,6 +16,7 @@ import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
 import { resoudreAdministrationEtape } from "@/lib/vaccine-administration";
 import { estAnimalConcerneParProtocole } from "@/lib/vaccine-eligibility";
 import { configurationQuestionnaireLieeAuVelage, lireConfigurationQuestionnaire } from "@/lib/vaccine-protocol-questionnaire";
+import { protocoleInitialAcquisDepuisHistorique } from "@/lib/vaccine-statut";
 
 export interface LignePreparationVaccin {
   animalId: string;
@@ -177,10 +178,12 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       const protocoleLieAuVelage = configurationQuestionnaire
         ? configurationQuestionnaireLieeAuVelage(configurationQuestionnaire)
         : protocole.etapes.some((etape) => etape.reference === "VELAGE");
-      const dejaRattachees = actes.filter((vaccination) =>
+      const historiqueRattache = actes.filter((vaccination) =>
         vaccination.statut === "FAIT" &&
         vaccination.protocoleId === protocole.id
-        && vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, vaccination.gestationId, gestation?.id)
+      );
+      const dejaRattachees = historiqueRattache.filter((vaccination) =>
+        vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, vaccination.gestationId, gestation?.id)
       );
       // Centralisé dans lib/vaccine-history.ts : utilisé identiquement par la préparation de
       // séance et par la grille (lib/vaccine-grid.ts), pour qu'elles répondent pareil.
@@ -194,9 +197,12 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         : dejaRattachees;
       const statutEnregistre = animal.statutsProtocolesVaccinaux.find((statut) => statut.protocoleId === protocole.id) ?? null;
       const aUneEtapeFaite = vaccinations.some((vaccination) => vaccination.etapeProtocoleId);
-      const statutProtocole = aUneEtapeFaite && !protocoleLieAuVelage && etapesInitiales.length === 2
+      const statutCalcule = aUneEtapeFaite && !protocoleLieAuVelage && etapesInitiales.length === 2
         ? null
         : statutEnregistre?.statut ?? null;
+      const statutProtocole = protocoleInitialAcquisDepuisHistorique(protocole.etapes, historiqueRattache)
+        ? "PROTOCOLE_ACQUIS"
+        : statutCalcule;
       const action = calculerActionVaccinale({
         date,
         dateNaissance: animal.danais,
@@ -206,6 +212,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         bientotJours: 7,
         etapes: protocole.etapes,
         vaccinations,
+        historiqueVaccinations: historiqueRattache,
         statutProtocole: (acteInfere ? null : statutProtocole) as StatutProtocoleVaccinal | null,
         configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
         brancheInitialeId: statutEnregistre?.brancheInitialeId ?? null,

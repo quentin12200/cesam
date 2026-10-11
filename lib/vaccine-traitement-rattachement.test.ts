@@ -4,6 +4,7 @@ import test from "node:test";
 import { unifierActesVaccinaux, type ActeVaccination } from "./vaccine-acts.ts";
 import { medicamentCompatibleAvecEtape, protocoleLieAuVelage } from "./vaccine-attachment.ts";
 import { construireGrilleVaccinale, type AnimalGrille, type EtapeGrille, type ProtocoleGrille } from "./vaccine-grid.ts";
+import { protocoleInitialAcquisDepuisHistorique } from "./vaccine-statut.ts";
 
 const AUJOURDHUI = new Date("2026-10-15T12:00:00Z");
 const NAISSANCE = new Date("2026-06-01T12:00:00Z");
@@ -56,6 +57,14 @@ test("unifierActesVaccinaux restitue protocole, étape et gestation du Traitemen
   assert.equal(acte.etapeProtocoleId, "somni-primo");
   assert.equal(acte.gestationId, "g1");
   assert.equal(acte.statut, "FAIT");
+});
+
+test("un Traitement VACCIN rattaché à l'entretien prouve que l'initial est acquis", () => {
+  const entretien = { ...rappel, id: "somni-entretien", label: "Entretien", cycle: "ENTRETIEN" };
+  const actes = unifierActesVaccinaux([], [
+    traitement({ protocoleVaccinId: "proto-somni", etapeProtocoleVaccinId: entretien.id, gestationId: "g1" }),
+  ]);
+  assert.equal(protocoleInitialAcquisDepuisHistorique([primo, rappel, entretien], actes), true);
 });
 
 test("la Vaccination structurée du même jour reste prioritaire : aucun double acte", () => {

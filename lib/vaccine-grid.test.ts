@@ -271,7 +271,7 @@ test("grille et Agenda utilisent la branche questionnaire et sa préconisation P
   assert.equal(extraireActionsPrevues(grille)[0].etapeId, "bovigrip-primo");
 });
 
-test("PROTOCOLE_ACQUIS ne repropose jamais les étapes initiales et planifie l'entretien du cycle courant", () => {
+test("un entretien historique acquiert l'initial et planifie l'entretien du nouveau cycle", () => {
   const velage = new Date("2027-02-15T12:00:00Z");
   const entretien = {
     ...etapePrimo,
@@ -289,10 +289,9 @@ test("PROTOCOLE_ACQUIS ne repropose jamais les étapes initiales et planifie l'e
   const gestante = animal({
     gestationId: "gestation-courante",
     dateVelagePrevueIso: velage.toISOString(),
-    statutsProtocoles: [{ protocoleId: protocole.id, statut: "PROTOCOLE_ACQUIS" }],
+    statutsProtocoles: [{ protocoleId: protocole.id, statut: "PRIMO_A_FAIRE" }],
     actes: [
-      { date: new Date("2025-01-10T12:00:00Z"), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: protocole.id, etapeProtocoleId: etapePrimo.id, gestationId: "ancienne-gestation", statut: "FAIT" },
-      { date: new Date("2025-02-10T12:00:00Z"), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: protocole.id, etapeProtocoleId: etapeRappel.id, gestationId: "ancienne-gestation", statut: "FAIT" },
+      { date: new Date("2025-02-10T12:00:00Z"), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: protocole.id, etapeProtocoleId: entretien.id, gestationId: "ancienne-gestation", statut: "FAIT" },
     ],
   });
   const grille = construireGrilleVaccinale([gestante], [protocole], [], AUJOURDHUI);
@@ -302,20 +301,22 @@ test("PROTOCOLE_ACQUIS ne repropose jamais les étapes initiales et planifie l'e
   assert.deepEqual(extraireActionsPrevues(grille).map((action) => action.etapeId), [entretien.id]);
 });
 
-test("PROTOCOLE_ACQUIS avec entretien fait dans la gestation courante reste FAIT sans nouvelle primo", () => {
+test("un entretien du cycle courant acquiert l'initial et ne crée aucune nouvelle échéance", () => {
   const entretien = { ...etapePrimo, id: "entretien", label: "Entretien", ordre: 2, cycle: "ENTRETIEN", reference: "VELAGE", debutValeur: 90, debutPosition: "AVANT", finValeur: 21, finPosition: "AVANT" };
   const protocole = { ...protocoleBovigrip, etapes: [etapePrimo, etapeRappel, entretien] };
   const dateActe = new Date("2026-09-20T12:00:00Z");
   const gestante = animal({
     gestationId: "g1",
     dateVelagePrevueIso: "2026-12-01T12:00:00Z",
-    statutsProtocoles: [{ protocoleId: protocole.id, statut: "PROTOCOLE_ACQUIS" }],
+    statutsProtocoles: [{ protocoleId: protocole.id, statut: "PRIMO_A_FAIRE" }],
     actes: [{ date: dateActe, vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: protocole.id, etapeProtocoleId: entretien.id, gestationId: "g1", statut: "FAIT" }],
   });
-  const { lignes } = construireGrilleVaccinale([gestante], [protocole], [], AUJOURDHUI);
+  const grille = construireGrilleVaccinale([gestante], [protocole], [], AUJOURDHUI);
+  const { lignes } = grille;
   assert.equal(lignes[0].cellules[entretien.id].statut, "FAIT");
   assert.equal(lignes[0].cellules[etapePrimo.id].statut, "VIDE");
   assert.equal(lignes[0].cellules[etapeRappel.id].statut, "VIDE");
+  assert.deepEqual(extraireActionsPrevues(grille), []);
 });
 
 test("PRIMO_EN_COURS continue le rappel initial configuré", () => {

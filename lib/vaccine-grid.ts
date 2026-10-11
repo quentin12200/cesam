@@ -17,6 +17,7 @@ import { estAnimalConcerneParProtocole } from "./vaccine-eligibility.ts";
 import { addDays, addMonths } from "date-fns";
 import type { ActeVaccination } from "./vaccine-acts.ts";
 import { medicamentCompatibleAvecEtape } from "./vaccine-attachment.ts";
+import { protocoleInitialAcquisDepuisHistorique } from "./vaccine-statut.ts";
 
 export interface EtapeGrille extends EtapeVaccinaleConfig {
   medicamentId: string | null;
@@ -335,10 +336,13 @@ function celluleProtocole(
     ? configurationQuestionnaireLieeAuVelage(configurationQuestionnaire)
     : etapes.some((etape) => etape.reference === "VELAGE");
   const statutEnregistre = animal.statutsProtocoles?.find((statut) => statut.protocoleId === protocole.id) ?? null;
-  const statutProtocole = statutEnregistre?.statut ?? null;
-  const actesDuProtocole = animal.actes.filter(
-    (acte) => acte.protocoleId === protocole.id && vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, acte.gestationId, animal.gestationId)
+  const actesHistoriquesDuProtocole = animal.actes.filter((acte) => acte.statut === "FAIT" && acte.protocoleId === protocole.id);
+  const actesDuProtocole = actesHistoriquesDuProtocole.filter(
+    (acte) => vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, acte.gestationId, animal.gestationId)
   );
+  const statutProtocole = protocoleInitialAcquisDepuisHistorique(etapes, actesHistoriquesDuProtocole)
+    ? "PROTOCOLE_ACQUIS"
+    : statutEnregistre?.statut ?? null;
   const etapesInitiales = etapes.filter((etape) => etape.cycle !== "ENTRETIEN");
   const medicament = medicamentPrincipal(protocole);
   const medicamentPartage = medicament
@@ -378,6 +382,7 @@ function celluleProtocole(
         dateVelagePrevue: animal.dateVelagePrevueIso ? new Date(animal.dateVelagePrevueIso) : null,
         etapes,
         vaccinations: actesUtiles,
+        historiqueVaccinations: actesHistoriquesDuProtocole,
         statutProtocole,
         configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
         brancheInitialeId: statutEnregistre?.brancheInitialeId ?? null,

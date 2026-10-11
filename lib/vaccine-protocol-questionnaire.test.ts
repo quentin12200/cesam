@@ -111,3 +111,46 @@ test("premier entretien à 6 mois puis récurrence distincte à 12 mois", () => 
   assert.equal(iso(premier.dateMin), "2026-07-01");
   assert.equal(iso(suivant.dateMin), "2027-07-01");
 });
+
+function protocoleGestationAvecEntretien(): ConfigurationQuestionnaireV1 {
+  const fenetre = { type: "AVANT_VELAGE" as const, debutAvant: { valeur: 3, unite: "MOIS" as const }, finAvant: { valeur: 3, unite: "SEMAINE" as const } };
+  return {
+    version: 1,
+    medicamentId: "med-cryptium",
+    cible: { tousBovins: false, categories: ["GENISSE", "VACHE"] },
+    demarrage: {
+      type: "PRIMO_RAPPEL", etapePrimoId: "primo", etapeRappelId: "rappel", calendrierPrimo: fenetre,
+      rappel: { type: "DELAI_FIXE", delai: { valeur: 28, unite: "JOUR" }, preconisationPrimoId: "p", preconisationRappelId: "p", resterDansFenetrePrimo: true },
+    },
+    entretien: { actif: true, etapeId: "entretien", preconisationId: "p", calendrier: fenetre },
+  };
+}
+
+test("un entretien historique acquiert l'initial mais ne couvre pas la nouvelle gestation", () => {
+  const ancienEntretien = { date: jour("2025-09-01"), etapeProtocoleId: "entretien" };
+  const resultat = action(protocoleGestationAvecEntretien(), {
+    date: jour("2026-09-01"), dateVelagePrevue: jour("2026-12-01"),
+    vaccinations: [], historiqueVaccinations: [ancienEntretien], statutProtocole: "PRIMO_A_FAIRE",
+  });
+  assert.equal(resultat.etape?.id, "entretien");
+  assert.equal(iso(resultat.dateMin), "2026-09-02");
+});
+
+test("un entretien du cycle courant acquiert l'initial et couvre seulement ce cycle", () => {
+  const entretienCourant = { date: jour("2026-09-01"), etapeProtocoleId: "entretien" };
+  const resultat = action(protocoleGestationAvecEntretien(), {
+    date: jour("2026-09-01"), dateVelagePrevue: jour("2026-12-01"),
+    vaccinations: [entretienCourant], historiqueVaccinations: [entretienCourant], statutProtocole: "PRIMO_A_FAIRE",
+  });
+  assert.equal(resultat.statut, "TERMINE");
+  assert.equal(resultat.etape, null);
+});
+
+test("sans acte l'initial commence par la Primo, puis une Primo seule attend le Rappel", () => {
+  const configuration = protocoleGestationAvecEntretien();
+  const sansActe = action(configuration, { date: jour("2026-09-01"), dateVelagePrevue: jour("2026-12-01"), vaccinations: [], historiqueVaccinations: [], statutProtocole: "PRIMO_A_FAIRE" });
+  assert.equal(sansActe.etape?.id, "primo");
+  const primo = { date: jour("2026-09-01"), etapeProtocoleId: "primo" };
+  const enCours = action(configuration, { date: jour("2026-09-29"), dateVelagePrevue: jour("2026-12-01"), vaccinations: [primo], historiqueVaccinations: [primo], statutProtocole: "PRIMO_EN_COURS" });
+  assert.equal(enCours.etape?.id, "rappel");
+});

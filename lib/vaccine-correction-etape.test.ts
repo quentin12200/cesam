@@ -113,13 +113,23 @@ test("une échéance dépassée ou ouverte garde son statut ; PREVU n'apparaît 
 
 test("statut du protocole recalculé depuis les étapes réellement faites", () => {
   const etapes = [primo, rappel, annuel].map((item) => ({ id: item.id, cycle: item.cycle, ordre: item.ordre, obligatoire: true }));
-  assert.equal(statutDepuisEtapesFaites(etapes, new Set(["annuel"])), "PRIMO_EN_COURS", "un rappel annuel seul ne vaut pas protocole acquis");
+  assert.equal(statutDepuisEtapesFaites(etapes, new Set(["annuel"])), "PROTOCOLE_ACQUIS", "un entretien réel prouve que l'initial était acquis");
   assert.equal(statutDepuisEtapesFaites(etapes, new Set(["primo"])), "PRIMO_EN_COURS");
   assert.equal(statutDepuisEtapesFaites(etapes, new Set(["primo", "rappel"])), "PROTOCOLE_ACQUIS");
   assert.equal(statutDepuisEtapesFaites(etapes, new Set()), null);
   assert.equal(typeInjectionPourEtape(etapes, "primo"), "PRIMO_1");
   assert.equal(typeInjectionPourEtape(etapes, "rappel"), "RAPPEL");
   assert.equal(typeInjectionPourEtape(etapes, "annuel"), "ENTRETIEN");
+});
+
+test("grille et préparation utilisent la même preuve historique et le même planner", () => {
+  const grille = readFileSync(new URL("./vaccine-grid.ts", import.meta.url), "utf8");
+  const preparation = readFileSync(new URL("./vaccine-preparation-data.ts", import.meta.url), "utf8");
+  for (const source of [grille, preparation]) {
+    assert.match(source, /protocoleInitialAcquisDepuisHistorique/);
+    assert.match(source, /calculerActionVaccinale\(/);
+    assert.match(source, /historiqueVaccinations:/);
+  }
 });
 
 test("en-tête d'étape : voie courte, dose et unité, et absence visible", () => {

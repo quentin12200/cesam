@@ -8,6 +8,7 @@ import {
   type ConfigurationQuestionnaireV1,
   type DureeQuestionnaire,
 } from "./vaccine-protocol-questionnaire.ts";
+import { protocoleInitialAcquisDepuisHistorique } from "./vaccine-statut.ts";
 
 export const STATUTS_CONSERVATION = ["IMMEDIATE", "CONSERVABLE", "INCONNUE"] as const;
 export type StatutConservation = (typeof STATUTS_CONSERVATION)[number];
@@ -531,6 +532,7 @@ export function calculerActionVaccinale({
   bientotJours = 30,
   etapes,
   vaccinations,
+  historiqueVaccinations,
   statutProtocole,
   configurationQuestionnaireJson,
   brancheInitialeId,
@@ -543,22 +545,27 @@ export function calculerActionVaccinale({
   bientotJours?: number;
   etapes: ReadonlyArray<EtapeVaccinaleConfig>;
   vaccinations: ReadonlyArray<VaccinationEtape>;
+  /** Actes FAIT de tous les cycles, utilisés seulement comme preuve de l'acquisition initiale. */
+  historiqueVaccinations?: ReadonlyArray<VaccinationEtape>;
   /** undefined conserve l'ancien calcul générique ; null signifie qu'aucun statut n'est renseigné. */
   statutProtocole?: StatutProtocoleVaccinal | null;
   /** Non-null bascule exclusivement vers le moteur questionnaire. */
   configurationQuestionnaireJson?: string | null;
   brancheInitialeId?: string | null;
 }): ActionVaccinaleCalculee {
+  const statutDeduit = protocoleInitialAcquisDepuisHistorique(etapes, historiqueVaccinations ?? vaccinations)
+    ? "PROTOCOLE_ACQUIS"
+    : statutProtocole;
   if (configurationQuestionnaireJson != null) {
     const configuration = lireConfigurationQuestionnaire(configurationQuestionnaireJson);
     if (!configuration) return { statut: "A_CONFIRMER", etape: null, dateMin: null, dateMax: null, raison: null };
-    return calculerActionVaccinaleQuestionnaire({ date, dateNaissance, dateVelagePrevue, bientotJours, etapes, vaccinations, statutProtocole, brancheInitialeId, configuration });
+    return calculerActionVaccinaleQuestionnaire({ date, dateNaissance, dateVelagePrevue, bientotJours, etapes, vaccinations, statutProtocole: statutDeduit, brancheInitialeId, configuration });
   }
   const toutesEtapes = [...etapes].sort((a, b) => a.ordre - b.ordre);
   const initiales = toutesEtapes.filter((etape) => etape.cycle !== "ENTRETIEN");
   const entretiens = toutesEtapes.filter((etape) => etape.cycle === "ENTRETIEN");
-  let statutEffectif = statutProtocole;
-  if (statutProtocole === null) {
+  let statutEffectif = statutDeduit;
+  if (statutEffectif === null) {
     const initialesFaites = new Set(vaccinations.map((vaccination) => vaccination.etapeProtocoleId).filter(Boolean));
     if (initiales.some((etape) => initialesFaites.has(etape.id))) {
       statutEffectif = initiales.filter((etape) => etape.obligatoire !== false).every((etape) => initialesFaites.has(etape.id))
