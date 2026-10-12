@@ -9,7 +9,7 @@ import { formatAgeTerrain } from "@/lib/animal-age";
 import { regrouperActesVaccinaux } from "@/lib/vaccination-session";
 import MedicamentPicker, { type MedicamentOption } from "@/app/sanitaire/nouvel-evenement/MedicamentPicker";
 import { medicamentCompatibleAvecEtape } from "@/lib/vaccine-attachment";
-import { actionsSelectionAnimaux, basculerSelectionVisibles, etatSelectionMaitre, libelleAnimauxSelectionnes } from "@/lib/vaccine-selection";
+import { actionsSelectionAnimaux, basculerSelectionVisibles, celluleVaccinaleSelectionnable, etatSelectionMaitre, libelleAnimauxSelectionnes } from "@/lib/vaccine-selection";
 import { construireChargeSoin } from "@/lib/vaccine-soin-seance";
 import { actesDuVaccin, actesHistoriquesEtape, anneesDisponibles, datesCompactes, type ActeHistorique } from "@/lib/vaccine-history-view";
 import { comparerDateVelage, comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
@@ -130,8 +130,6 @@ const dateLocaleIso = () => {
 const cleActe = (animalId: string, etapeId: string) => `${animalId}|${etapeId}`;
 const estAFaire = (statut: CelluleGrille["statut"]) => statut === "A_FAIRE" || statut === "BIENTOT";
 // Une case FAIT n'est jamais verrouillée : une nouvelle administration reste possible (via l'historique).
-const estSelectionnable = (cellule: CelluleGrille | undefined, etape: SousColonne) =>
-  Boolean(cellule && !cellule.aValider && etape.medicamentId);
 const statutEffectif = (cellule: CelluleGrille): CelluleGrille["statut"] => cellule.statut === "FAIT" && cellule.prochaine ? cellule.prochaine.statut : cellule.statut;
 const echeanceDeTri = (cellule: CelluleGrille | undefined) =>
   cellule?.prochaine ? { statut: cellule.prochaine.statut, date: cellule.prochaine.date } : cellule;
@@ -181,6 +179,8 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [soinModifierAnimaux, setSoinModifierAnimaux] = useState(false);
   const [soinEnCours, setSoinEnCours] = useState(false);
   const [soinMessage, setSoinMessage] = useState("");
+  const [vaccinsMenuOuvert, setVaccinsMenuOuvert] = useState(false);
+  const [saisieOuverte, setSaisieOuverte] = useState(false);
 
   useEffect(() => {
     fetch("/api/intervenants").then((reponse) => reponse.json()).then(setIntervenants).catch(() => {});
@@ -191,7 +191,10 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       if (!menuColonneRef.current?.contains(event.target as Node)) setMenuColonne(null);
     }
     function fermerSurEchap(event: KeyboardEvent) {
-      if (event.key === "Escape") setMenuColonne(null);
+      if (event.key === "Escape") {
+        setMenuColonne(null);
+        setVaccinsMenuOuvert(false);
+      }
     }
     document.addEventListener("pointerdown", fermerMenu);
     window.addEventListener("keydown", fermerSurEchap);
@@ -339,7 +342,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
 
   function basculerActe(ligne: Ligne, etape: SousColonne) {
     const cellule = ligne.cellules[etape.id];
-    if (!estSelectionnable(cellule, etape)) return;
+    if (!celluleVaccinaleSelectionnable(cellule, etape.medicamentId)) return;
     basculerDansSet(setActesSelectionnes, cleActe(ligne.animalId, etape.id));
   }
 
@@ -495,7 +498,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     if (!cellule) return <span className="text-gray-300">—</span>;
     const bloc = blocs.find((item) => item.sousColonnes.some((sousColonne) => sousColonne.id === etape.id));
     const selectionne = actesSelectionnes.has(cleActe(ligne.animalId, etape.id));
-    const disponible = estSelectionnable(cellule, etape);
+    const disponible = celluleVaccinaleSelectionnable(cellule, etape.medicamentId);
     const historiqueEtape = actesHistoriquesEtape(ligne.actes, etape.id);
     const tousLesActes = historiqueEtape.map((acte) => afficherDate(acte.date)).join(", ");
     const estEntretien = etape.cycle === "ENTRETIEN";
@@ -513,10 +516,13 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     const prochaine = cellule.statut === "FAIT" ? cellule.prochaine : cellule.statut !== "VIDE" && cellule.fenetre
       ? { statut: cellule.statut, fenetre: cellule.fenetre }
       : null;
+    const saisieLibre = etape.protocoleId === null && cellule.statut === "VIDE";
     const action = prochaine ? (() => {
       const libelle = libelleFenetreVaccinale(prochaine.statut, prochaine.fenetre.debut, prochaine.fenetre.fin);
       return <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title={cellule.statut === "FAIT" ? "Prochaine échéance : ajouter ou retirer des vaccinations à enregistrer" : disponible ? "Ajouter ou retirer des vaccinations à enregistrer" : cellule.aValider ? "Résoudre d’abord l’historique à rattacher" : "Médicament à renseigner"} className={`flex w-full items-center justify-center gap-1 rounded border px-1 py-0.5 ${classeStatut(prochaine.statut)} ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className={`${cellule.statut === "FAIT" ? "text-[11px]" : "text-xl"} font-black leading-none`}>{selectionne ? "☑" : cellule.statut === "FAIT" ? "→" : "☐"}</span><span className="text-[10px] font-semibold leading-tight">{libelle.statut && <span className="block">{libelle.statut}</span>}<span className="block">{libelle.date}</span></span></button>;
-    })() : null;
+    })() : saisieLibre
+      ? <button type="button" disabled={!disponible} aria-pressed={selectionne} onClick={() => basculerActe(ligne, etape)} title="Enregistrer une injection réelle, sans échéance médicale calculée" className={`flex w-full items-center justify-center gap-1 rounded border border-slate-400 bg-slate-50 px-1 py-1 text-slate-800 ${selectionne ? "ring-2 ring-green-700" : ""} disabled:cursor-not-allowed disabled:opacity-50`}><span className="text-lg font-black leading-none">{selectionne ? "☑" : "☐"}</span><span className="text-[10px] font-semibold">Injection</span></button>
+      : null;
 
     if (!historique && !action) return <span className="text-gray-300">—</span>;
     return <div className="space-y-0.5">
@@ -701,13 +707,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         {vue === "TABLEAU" && <>
         <input value={recherche} onChange={(event) => setRecherche(event.target.value)} placeholder="Recherche animal" aria-label="Rechercher un animal" className="min-h-10 min-w-48 flex-1 rounded-lg border px-3 text-sm" />
 
-        <details className="relative">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border px-3 text-sm font-semibold text-gray-700">Vaccins affichés ▾</summary>
-          <div className="absolute right-0 z-40 mt-1 max-h-72 min-w-64 overflow-y-auto rounded-xl border bg-white p-2 shadow-xl">
-            <div className="mb-2 flex gap-2 border-b pb-2 text-xs font-semibold"><button type="button" onClick={() => setVaccinsAffiches(new Set(blocs.map((bloc) => bloc.cle)))} className="underline">Tout sélectionner</button><button type="button" onClick={() => setVaccinsAffiches(new Set())} className="underline">Tout désélectionner</button></div>
-            {blocs.map((bloc) => <label key={bloc.cle} className="flex min-h-9 cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={vaccinsAffiches.has(bloc.cle)} onChange={() => basculerDansSet(setVaccinsAffiches, bloc.cle)} className="h-4 w-4 accent-green-700" />{bloc.nom}</label>)}
-          </div>
-        </details>
+        <button type="button" onClick={() => setVaccinsMenuOuvert(true)} aria-haspopup="dialog" aria-expanded={vaccinsMenuOuvert} className="flex min-h-10 items-center rounded-lg border px-3 text-sm font-semibold text-gray-700">Vaccins affichés ▾</button>
 
         <details className="relative">
           <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border px-3 text-sm font-semibold text-gray-700">Statuts ▾</summary>
@@ -742,8 +742,10 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       <p className="vaccin-print-hidden mx-3 mb-2 flex flex-wrap items-center gap-x-2 text-xs text-gray-600"><span className="font-semibold">{libelleAnimauxSelectionnes(animauxSelectionnes.size)}</span><span aria-hidden="true">·</span><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => setUniquementSelection((actuel) => !actuel)} className="min-h-9 px-1 font-semibold text-green-800 underline disabled:opacity-40">{actionsSelectionAnimaux(uniquementSelection).basculerVue}</button><span aria-hidden="true">·</span><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => { setAnimauxSelectionnes(new Set()); setUniquementSelection(false); }} className="min-h-9 px-1 font-semibold text-green-800 underline disabled:opacity-40">{actionsSelectionAnimaux(uniquementSelection).vider}</button></p>
 
 
-      <div className="vaccin-print-hidden mx-3 mb-3 rounded-xl border border-green-200 bg-green-50 p-3">
-        <p className="mb-2 text-sm font-black text-green-950">Saisie des vaccinations</p>
+      <div className="vaccin-print-hidden mx-3 mb-3 rounded-xl border border-green-200 bg-green-50 p-2 sm:p-3">
+        <button type="button" onClick={() => setSaisieOuverte((actuel) => !actuel)} aria-expanded={saisieOuverte} className="flex min-h-9 w-full items-center justify-between text-left text-sm font-black text-green-950 sm:hidden"><span>💉 Saisie · {actes.length} vaccination(s) sélectionnée(s)</span><span aria-hidden="true">{saisieOuverte ? "▴" : "▾"}</span></button>
+        <div className={`${saisieOuverte ? "block" : "hidden"} sm:block`}>
+        <p className="mb-2 hidden text-sm font-black text-green-950 sm:block">Saisie des vaccinations</p>
         <div className="grid gap-2 sm:grid-cols-[10rem_minmax(12rem,1fr)_auto] sm:items-end">
           <label className="text-xs font-semibold text-green-950">Date<input type="date" value={dateSession} onChange={(event) => setDateSession(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border bg-white px-2 text-sm font-normal text-gray-900" /></label>
           <label className="text-xs font-semibold text-green-950">Exécutant<div className="mt-1 font-normal text-gray-900"><ExecutantSelect intervenants={intervenants} value={executant} onChange={setExecutant} onAdded={(intervenant) => setIntervenants((actuels) => [...actuels, intervenant])} /></div></label>
@@ -751,6 +753,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2"><p className="mr-auto text-xs font-semibold text-green-950">{nombreAnimaux} animal(aux) · {actes.length} vaccination(s) sélectionnée(s)</p><button type="button" onClick={() => void ouvrirSoin()} className="min-h-8 rounded-lg border border-green-700 bg-white px-2 text-xs font-semibold text-green-900">+ Ajouter un soin / traitement</button>{soinMessage && <span className="text-xs font-semibold text-green-900">{soinMessage}</span>}{actes.length > 0 && <button type="button" onClick={() => setActesSelectionnes(new Set())} className="min-h-8 rounded-lg border bg-white px-2 text-xs font-semibold">Vider la sélection</button>}</div>
         {erreur && !donneesManquantes && <p className="mt-2 text-sm font-semibold text-red-700">{erreur}</p>}
+        </div>
       </div>
 
       {blocsAffiches.length === 0 ? <p className="border-t p-3 text-sm text-gray-600">{blocs.length === 0 ? "Aucune vaccination ni protocole à afficher." : "Aucun vaccin sélectionné."}</p> : <div className="vaccin-table-scroll overflow-auto border-t">
@@ -787,6 +790,14 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         {colonnesMasquees.size > 0 && <div className="mt-1 border-t pt-1"><p className="px-2 py-1 text-xs font-semibold text-gray-500">Réafficher une colonne</p>{colonnesAnimal.filter((colonne) => colonnesMasquees.has(colonne.id)).map((colonne) => <button key={colonne.id} type="button" role="menuitem" onClick={() => reafficherColonne(colonne.id)} className="block min-h-9 w-full rounded px-2 text-left text-gray-700 hover:bg-gray-50">{colonne.label}</button>)}<button type="button" role="menuitem" onClick={() => { setColonnesMasquees(new Set()); setMenuColonne(null); }} className="mt-1 block min-h-9 w-full rounded border-t px-2 text-left font-semibold text-gray-700 hover:bg-gray-50">Réafficher toutes les colonnes</button></div>}
       </div>}
 
+      {vaccinsMenuOuvert && <div className="vaccin-print-hidden fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Vaccins affichés" onMouseDown={(event) => { if (event.target === event.currentTarget) setVaccinsMenuOuvert(false); }}>
+        <div className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="border-b p-3"><h2 className="font-black text-gray-900">Vaccins affichés</h2><div className="mt-2 flex flex-wrap gap-3 text-xs font-semibold"><button type="button" onClick={() => setVaccinsAffiches(new Set(blocs.map((bloc) => bloc.cle)))} className="min-h-8 underline">Tout sélectionner</button><button type="button" onClick={() => setVaccinsAffiches(new Set())} className="min-h-8 underline">Tout désélectionner</button></div></div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">{blocs.map((bloc) => <label key={bloc.cle} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm hover:bg-gray-50"><input type="checkbox" checked={vaccinsAffiches.has(bloc.cle)} onChange={() => basculerDansSet(setVaccinsAffiches, bloc.cle)} className="h-5 w-5 shrink-0 accent-green-700" /><span className="min-w-0 break-words">{bloc.nom}</span></label>)}</div>
+          <div className="border-t p-3"><button type="button" onClick={() => setVaccinsMenuOuvert(false)} className="min-h-11 w-full rounded-lg bg-green-800 font-bold text-white">Fermer</button></div>
+        </div>
+      </div>}
+
       <p className="vaccin-print-hidden border-t px-3 py-2 text-xs text-gray-500">{resultat.length} animal(aux) · Jaune = à faire · Orange = bientôt, inclus dans « À faire » · Rouge = en retard.</p>
       </div>
 
@@ -810,7 +821,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         }
         @media (max-width: 640px) {
           #tableau-vaccinal-impression .animal-fixed:nth-child(n+4) { position: static; }
-          #tableau-vaccinal-impression .vaccin-table-scroll { max-height: calc(100vh - 18rem); }
+          #tableau-vaccinal-impression .vaccin-table-scroll { max-height: calc(100dvh - 12rem); }
         }
         @media print {
           @page { size: A4 landscape; margin: 8mm; }

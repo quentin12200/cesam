@@ -59,6 +59,31 @@ test("un vaccin actif de pharmacie comme ROTAVEC reste représenté même sans p
   assert.equal(lignes[0].cellules["med-rotavec"].rattachementProtocoleAutorise, false);
 });
 
+test("PROTOCOLE_ACQUIS sans acte réel ne fabrique aucune case FAIT ni date", () => {
+  const acquisSansInjection = animal({
+    statutsProtocoles: [{ protocoleId: protocoleBovigrip.id, statut: "PROTOCOLE_ACQUIS" }],
+    actes: [],
+  });
+  const { lignes } = construireGrilleVaccinale([acquisSansInjection], [protocoleBovigrip], [], AUJOURDHUI);
+  for (const cellule of Object.values(lignes[0].cellules)) {
+    assert.notEqual(cellule.statut, "FAIT");
+    assert.equal(cellule.actes.length, 0);
+    assert.equal(cellule.date, null);
+  }
+});
+
+test("une vraie Vaccination datée reste la seule preuve d'une case FAIT", () => {
+  const date = jours(20);
+  const avecInjection = animal({
+    statutsProtocoles: [{ protocoleId: protocoleBovigrip.id, statut: "PROTOCOLE_ACQUIS" }],
+    actes: [{ date, vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip", protocoleId: protocoleBovigrip.id, etapeProtocoleId: etapePrimo.id, gestationId: null, statut: "FAIT" }],
+  });
+  const { lignes } = construireGrilleVaccinale([avecInjection], [protocoleBovigrip], [], AUJOURDHUI);
+  assert.equal(lignes[0].cellules[etapePrimo.id].statut, "FAIT");
+  assert.equal(lignes[0].cellules[etapePrimo.id].date?.getTime(), date.getTime());
+  assert.equal(lignes[0].cellules[etapePrimo.id].actes.length, 1);
+});
+
 test("primo non fait et hors fenêtre => en retard (rouge) ; rappel non atteignable => vide", () => {
   const a = animal({ danaisIso: jours(-100).toISOString() }); // 100j : primo (14-45j) en retard
   const { lignes } = construireGrilleVaccinale([a], [protocoleBovigrip], [], AUJOURDHUI);

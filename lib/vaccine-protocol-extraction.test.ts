@@ -31,6 +31,7 @@ test("Vaccination et Traitement du vaccin extrait sont conservés 1:1, les autre
   if (!plan.possible) return;
   assert.deepEqual(plan.vaccinations, [{ id: "v-cible", animalId: "a1", etapeCibleId: "nouvelle-primo" }]);
   assert.deepEqual(plan.traitements, [{ id: "t-cible", animalId: "a1", etapeCibleId: "nouveau-rappel" }]);
+  assert.deepEqual(plan.traitementsDoublonsADetacher, []);
   assert.equal(plan.vaccinations.some((acte) => acte.id === "v-autre"), false);
   assert.equal(plan.traitements.some((acte) => acte.id === "t-autre"), false);
 });
@@ -69,6 +70,7 @@ test("un Traitement VACCIN identifié le même jour résout une Vaccination lega
   if (!plan.possible) return;
   assert.deepEqual(plan.vaccinations, [{ id: "v-legacy", animalId: "a1", etapeCibleId: "nouvelle-primo" }]);
   assert.deepEqual(plan.traitements, [], "le Traitement de référence n'est pas ajouté une deuxième fois au plan");
+  assert.deepEqual(plan.traitementsDoublonsADetacher, []);
   assert.equal(plan.resolusAutomatiquement, 1);
 });
 
@@ -114,6 +116,22 @@ test("un Traitement VACCIN non rattaché au legacy sert de vérité sans créer 
   if (!plan.possible) return;
   assert.deepEqual(plan.vaccinations.map((acte) => acte.id), ["v-technique"]);
   assert.deepEqual(plan.traitements, [], "la réconciliation n'ajoute pas le Traitement source au plan d'extraction");
+  assert.deepEqual(plan.traitementsDoublonsADetacher, []);
+});
+
+test("un Traitement déjà rattaché et sa Vaccination legacy correspondante donnent un seul fait logique extrait", () => {
+  const plan = planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes, idsCibles,
+    vaccinations: [{ id: "v-structuree", animalId: "a7", medicamentId: null, etapeId: "ancienne-primo", date: JOUR }],
+    traitements: [{ id: "t-double", animalId: "a7", medicamentId: CIBLE, etapeId: "ancienne-primo", date: JOUR }],
+    traitementsVaccinauxReels: [{ animalId: "a7", dateDebut: JOUR, medicamentId: CIBLE }],
+  });
+  assert.equal(plan.possible, true);
+  if (!plan.possible) return;
+  assert.deepEqual(plan.vaccinations.map((acte) => acte.id), ["v-structuree"]);
+  assert.deepEqual(plan.traitements, []);
+  assert.deepEqual(plan.traitementsDoublonsADetacher, ["t-double"]);
+  assert.equal(plan.vaccinations.length + plan.traitements.length, 1);
 });
 
 test("scénario réconcilié : deux actes certains, aucun acte ambigu", () => {
@@ -185,6 +203,7 @@ test("l'API propose une extraction confirmée, atomique, sans suffixe de protoco
     "la confirmation recalcule le même plan avec les données actuelles");
   assert.match(route, /tx\.vaccination\.update/);
   assert.match(route, /tx\.traitement\.update/);
+  assert.match(route, /tx\.traitement\.updateMany\([\s\S]*traitementsDoublons/);
   assert.match(route, /tx\.statutProtocoleVaccinal\.deleteMany/);
   assert.match(route, /statutDepuisEtapesFaites/);
   assert.match(route, /configurationQuestionnaireJson: null,[\s\S]*medicaments: \{ some: \{ medicamentId: configuration\.medicamentId \}/);

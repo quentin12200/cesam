@@ -165,8 +165,8 @@ test("les routes de rattachement resynchronisent le statut du protocole sans cr�
 
 test("dose : la dose affichée dans l'en-tête est celle envoyée au Traitement et à la Vaccination", () => {
   const tableau = readFileSync(new URL("../app/sanitaire/vaccins/TableauVaccinal.tsx", import.meta.url), "utf8");
-  assert.match(tableau, /dose: groupe\.etape\.dose == null \? "" : String\(groupe\.etape\.dose\)/);
-  assert.match(tableau, /uniteDosage: groupe\.etape\.uniteDosage \?\? "ml"/);
+  assert.match(tableau, /dose: \(cellule\?\.dose \?\? groupe\.etape\.dose\) == null \? "" : String\(cellule\?\.dose \?\? groupe\.etape\.dose\)/);
+  assert.match(tableau, /uniteDosage: cellule\?\.uniteDosage \?\? groupe\.etape\.uniteDosage \?\? "ml"/);
   const dose = tableau.match(/const dose = administration\.dose === "" \? null : Number\(administration\.dose\);/);
   assert.ok(dose, "une seule dose calculée");
   const traitement = tableau.match(/traitements: \[\{[\s\S]*?doseUnique: true,\s*\}\]/)?.[0] ?? "";

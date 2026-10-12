@@ -6,7 +6,7 @@ import { resoudreAdministrationEtape, voiesPossibles, type PreconisationAdminist
 import { construireGrilleVaccinale, extraireActionsPrevues, type AnimalGrille, type EtapeGrille, type ProtocoleGrille } from "./vaccine-grid.ts";
 import { actesDuVaccin, type ActeHistorique } from "./vaccine-history-view.ts";
 import { calculerActionVaccinale } from "./vaccine-planner.ts";
-import { actionsSelectionAnimaux, basculerSelectionVisibles, etatSelectionMaitre, libelleAnimauxSelectionnes } from "./vaccine-selection.ts";
+import { actionsSelectionAnimaux, basculerSelectionVisibles, celluleVaccinaleSelectionnable, etatSelectionMaitre, libelleAnimauxSelectionnes } from "./vaccine-selection.ts";
 import { construireChargeSoin } from "./vaccine-soin-seance.ts";
 import { libelleVoieDose } from "./vaccine-table-presentation.ts";
 
@@ -192,6 +192,39 @@ test("G. soin ajouté à la séance : mêmes animaux/date/exécutant, Traitement
   assert.match(lire("../app/sanitaire/vaccins/page.tsx"), /traitements: \{ where: \{ medicament: \{ categorie: "VACCIN" \} \}/);
   const parasite = unifierActesVaccinaux([], []);
   assert.equal(parasite.length, 0);
+});
+
+test("H. vaccin Pharmacie sans protocole : sélection et acte réel possibles, sans échéance inventée", () => {
+  const vaccin = { medicamentId: "med-rotavec", nom: "ROTAVEC CORONA", voie: "IM" };
+  const vide = construireGrilleVaccinale([animal([])], [], [vaccin], jour("2026-10-12"));
+  const etapeLibre = vide.blocs[0].sousColonnes[0];
+  const celluleVide = vide.lignes[0].cellules[etapeLibre.id];
+  assert.equal(etapeLibre.protocoleId, null);
+  assert.equal(celluleVide.statut, "VIDE");
+  assert.equal(celluleVide.date, null, "aucune échéance médicale n'est inventée");
+  assert.equal(celluleVaccinaleSelectionnable(celluleVide, etapeLibre.medicamentId), true);
+
+  const actes = unifierActesVaccinaux([], [{
+    id: "traitement-rotavec", dateDebut: jour("2026-10-12"), medicamentNom: vaccin.nom,
+    medicamentId: vaccin.medicamentId, voie: "IM", dose: 2, uniteDosage: "ml",
+  }]);
+  const fait = construireGrilleVaccinale([animal(actes)], [], [vaccin], jour("2026-10-13"));
+  assert.equal(fait.lignes[0].cellules[etapeLibre.id].statut, "FAIT");
+  assert.equal(fait.lignes[0].cellules[etapeLibre.id].actes.length, 1);
+
+  const tableau = lire("../app/sanitaire/vaccins/TableauVaccinal.tsx");
+  assert.match(tableau, /saisieLibre[\s\S]*Injection réelle|saisieLibre[\s\S]*Enregistrer une injection réelle/);
+  assert.match(tableau, /groupe\.etape\.protocoleId[\s\S]*vaccinationSession/, "sans protocole, la séance reste un Traitement VACCIN réel via la route batch");
+});
+
+test("I. mobile : choix des vaccins contenu dans le viewport et saisie repliable par défaut", () => {
+  const tableau = lire("../app/sanitaire/vaccins/TableauVaccinal.tsx");
+  assert.match(tableau, /role="dialog" aria-modal="true" aria-label="Vaccins affichés"/);
+  assert.match(tableau, /max-h-\[90dvh\][\s\S]*overflow-y-auto/);
+  assert.match(tableau, /useState\(false\);[\s\S]*setSaisieOuverte/);
+  assert.match(tableau, /💉 Saisie · \{actes\.length\} vaccination\(s\) sélectionnée\(s\)/);
+  assert.match(tableau, /\$\{saisieOuverte \? "block" : "hidden"\} sm:block/);
+  assert.match(tableau, /vaccin-table-scroll[\s\S]*100dvh - 12rem/);
 });
 
 test("10. actions prévues : base de données du futur bandeau, dérivée de la grille", () => {

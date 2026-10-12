@@ -25,7 +25,7 @@ export type ActeAExtraire = {
 
 export type PlanExtractionVaccin =
   | { possible: false; raison: string; actesAmbigus: Array<{ source: "VACCINATION" | "TRAITEMENT"; id: string }>; resolusAutomatiquement: number }
-  | { possible: true; vaccinations: ActeAExtraire[]; traitements: ActeAExtraire[]; resolusAutomatiquement: number };
+  | { possible: true; vaccinations: ActeAExtraire[]; traitements: ActeAExtraire[]; traitementsDoublonsADetacher: string[]; resolusAutomatiquement: number };
 
 export function resoudreLegacyParMedicament<T extends { id: string }>(candidats: readonly T[]):
   | { type: "AUCUN" }
@@ -115,7 +115,7 @@ export function planifierExtractionVaccin({
     return [{ id: acte.id, animalId: acte.animalId, etapeCibleId: etapeCible(acte, parId, idsCibles) }];
   });
   const vaccinationsAExtraire = selectionner("VACCINATION", vaccinations);
-  const traitementsAExtraire = selectionner("TRAITEMENT", traitements);
+  const traitementsAExtraireBruts = selectionner("TRAITEMENT", traitements);
   if (actesAmbigus.length > 0) {
     return {
       possible: false,
@@ -124,5 +124,16 @@ export function planifierExtractionVaccin({
       resolusAutomatiquement,
     };
   }
-  return { possible: true, vaccinations: vaccinationsAExtraire, traitements: traitementsAExtraire, resolusAutomatiquement };
+  const vaccinationsCiblesParJour = new Set(vaccinationsAExtraire.flatMap((selection) => {
+    const acte = vaccinations.find((candidate) => candidate.id === selection.id);
+    return acte?.date ? [cleVaccinaleAnimalJour(acte.animalId, acte.date)] : [];
+  }));
+  const traitementsDoublonsADetacher: string[] = [];
+  const traitementsAExtraire = traitementsAExtraireBruts.filter((selection) => {
+    const acte = traitements.find((candidate) => candidate.id === selection.id);
+    const doublon = Boolean(acte?.date && vaccinationsCiblesParJour.has(cleVaccinaleAnimalJour(acte.animalId, acte.date)));
+    if (doublon) traitementsDoublonsADetacher.push(selection.id);
+    return !doublon;
+  });
+  return { possible: true, vaccinations: vaccinationsAExtraire, traitements: traitementsAExtraire, traitementsDoublonsADetacher, resolusAutomatiquement };
 }

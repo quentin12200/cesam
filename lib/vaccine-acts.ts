@@ -21,6 +21,7 @@ export interface ActeVaccination {
   voie?: string | null;
   dose?: number | null;
   uniteDosage?: string | null;
+  etapeLabel?: string | null;
 }
 
 export interface ActeTraitementVaccin {
@@ -35,6 +36,7 @@ export interface ActeTraitementVaccin {
   voie?: string | null;
   dose?: number | null;
   uniteDosage?: string | null;
+  etapeLabel?: string | null;
 }
 
 function cleJour(date: Date): string {
@@ -127,6 +129,7 @@ export function unifierActesVaccinaux(
       voie: traitement.voie ?? null,
       dose: traitement.dose ?? null,
       uniteDosage: traitement.uniteDosage ?? null,
+      etapeLabel: traitement.etapeLabel ?? null,
       statut: "FAIT",
     }));
   return [...faites, ...issus];

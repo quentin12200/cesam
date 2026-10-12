@@ -25,3 +25,14 @@ export function libelleAnimauxSelectionnes(nombre: number): string {
 export function actionsSelectionAnimaux(uniquementSelection: boolean): { basculerVue: string; vider: string } {
   return { basculerVue: uniquementSelection ? "Afficher tous" : "Voir seulement", vider: "Vider" };
 }
+
+/**
+ * Une cellule peut enregistrer une injection réelle dès qu'un médicament Pharmacie est connu.
+ * Un protocole sert à calculer une échéance, jamais à interdire la saisie d'un acte fait.
+ */
+export function celluleVaccinaleSelectionnable(
+  cellule: { aValider: boolean } | undefined,
+  medicamentId: string | null,
+): boolean {
+  return Boolean(cellule && !cellule.aValider && medicamentId);
+}

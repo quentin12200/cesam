@@ -65,6 +65,7 @@ import VelageActions from "./VelageActions";
 import { resolveBiologicalMother, resolveParentWorkNumber } from "@/lib/animal-genealogy";
 import { findAnimalsByExactNational, normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
 import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
+import { construireHistoriqueVaccinalSante } from "@/lib/vaccine-health-history";
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
@@ -142,7 +143,13 @@ async function getAnimal(nutrav: string) {
         select: { id: true, nutrav: true, nobovi: true, danais: true, sexbov: true, statut: true },
         orderBy: { danais: "desc" },
       },
-      vaccinations: { orderBy: { date: "asc" } },
+      vaccinations: {
+        orderBy: { date: "asc" },
+        include: {
+          medicament: { select: { nom: true } },
+          etapeProtocole: { select: { label: true } },
+        },
+      },
       evenements: { orderBy: { date: "desc" }, include: { symptomes: true, reponses: { include: { question: true } } } },
       traitements: {
         orderBy: { dateDebut: "desc" },
@@ -199,9 +206,21 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   // (médicament catégorie VACCIN) compte comme fait ici aussi. Voir lib/vaccine-acts.ts.
   const traitementsVaccinAnimal = await prisma.traitement.findMany({
     where: { animalId: animal.id, medicament: { categorie: "VACCIN" } },
-    select: { dateDebut: true, medicamentNom: true, medicamentId: true, protocoleVaccinId: true, etapeProtocoleVaccinId: true, gestationId: true },
+    select: { id: true, dateDebut: true, medicamentNom: true, medicamentId: true, protocoleVaccinId: true, etapeProtocoleVaccinId: true, gestationId: true, voie: true, dose: true, uniteDosage: true, etapeProtocoleVaccin: { select: { label: true } } },
   });
-  const actesVaccinaux = unifierActesVaccinaux(animal.vaccinations, traitementsVaccinAnimal);
+  const actesVaccinaux = unifierActesVaccinaux(
+    animal.vaccinations.map((vaccination) => ({
+      ...vaccination,
+      sourceId: vaccination.id,
+      vaccin: vaccination.medicament?.nom ?? vaccination.vaccin,
+      etapeLabel: vaccination.etapeProtocole?.label ?? null,
+    })),
+    traitementsVaccinAnimal.map((traitement) => ({
+      ...traitement,
+      etapeLabel: traitement.etapeProtocoleVaccin?.label ?? null,
+    })),
+  );
+  const historiqueVaccinalSante = construireHistoriqueVaccinalSante(actesVaccinaux);
   const birthVelage = animal.velageVeau ?? animal.veauxVelage[0]?.velage ?? null;
   const fatherNational = animal.taureau?.nupere
     ?? birthVelage?.gestation?.saillie?.taureau?.nupere
@@ -799,6 +818,21 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   );
                 })}
               </div>
+            </div>
+
+            <div className="rounded-xl bg-white p-4 shadow">
+              <h3 className="mb-2 font-semibold text-gray-800">Vaccinations réelles</h3>
+              {historiqueVaccinalSante.length === 0
+                ? <p className="text-sm text-gray-500">Aucune injection réelle datée n’est enregistrée.</p>
+                : <ul className="divide-y rounded-lg border">
+                    {historiqueVaccinalSante.map((acte, index) => {
+                      const administration = [acte.voie, acte.dose == null ? null : `${String(acte.dose).replace(".", ",")}${acte.unite ? ` ${acte.unite}` : ""}`].filter(Boolean).join(" · ");
+                      return <li key={`${acte.sourceType}:${acte.sourceId ?? index}:${acte.date.toISOString()}`} className="px-3 py-2 text-sm">
+                        <p className="font-semibold text-gray-900">{formatDate(acte.date)} — {acte.medicament}</p>
+                        <p className="text-xs text-gray-600">{acte.etape}{administration ? ` — ${administration}` : ""}</p>
+                      </li>;
+                    })}
+                  </ul>}
             </div>
 
             {/* Événements (avec ou sans traitement) */}
