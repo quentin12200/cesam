@@ -87,21 +87,109 @@ test("le médicament réel de l'autre vaccin classe l'acte AUTRE sans le déplac
   assert.equal(plan.resolusAutomatiquement, 1);
 });
 
-test("deux médicaments vaccinaux possibles le même jour restent AMBIGUS", () => {
+test("une Vaccination générique couverte par CRYPTIUM et ROTAVEC certains ne bloque pas l'extraction CRYPTIUM", () => {
   const plan = planifierExtractionVaccin({
     medicamentId: CIBLE, etapes, idsCibles,
-    vaccinations: [{ id: "v-ambigu-reel", animalId: "a3", medicamentId: null, etapeId: "ancienne-primo", date: JOUR }],
-    traitements: [],
+    vaccinations: [{ id: "v-generique", animalId: "a3", medicamentId: null, etapeId: "ancienne-primo", date: JOUR }],
+    traitements: [
+      { id: "t-cryptium", animalId: "a3", medicamentId: CIBLE, etapeId: "ancienne-primo", date: JOUR },
+      { id: "t-rotavec", animalId: "a3", medicamentId: AUTRE, etapeId: "ancienne-primo", date: JOUR },
+    ],
     traitementsVaccinauxReels: [
       { animalId: "a3", dateDebut: JOUR, medicamentId: CIBLE },
       { animalId: "a3", dateDebut: JOUR, medicamentId: AUTRE },
     ],
   });
+  assert.equal(plan.possible, true);
+  if (!plan.possible) return;
+  assert.deepEqual(plan.vaccinations, []);
+  assert.deepEqual(plan.vaccinationsGeneriquesANeutraliser, ["v-generique"]);
+  assert.deepEqual(plan.traitements.map((acte) => acte.id), ["t-cryptium"]);
+  assert.equal(plan.resolusAutomatiquement, 1);
+});
+
+test("la même Vaccination générique couverte ne bloque pas l'extraction ROTAVEC", () => {
+  const plan = planifierExtractionVaccin({
+    medicamentId: AUTRE, etapes, idsCibles,
+    vaccinations: [{ id: "v-generique", animalId: "a3", medicamentId: null, etapeId: "ancienne-primo", date: JOUR }],
+    traitements: [
+      { id: "t-cryptium", animalId: "a3", medicamentId: CIBLE, etapeId: "ancienne-primo", date: JOUR },
+      { id: "t-rotavec", animalId: "a3", medicamentId: AUTRE, etapeId: "ancienne-primo", date: JOUR },
+    ],
+    traitementsVaccinauxReels: [
+      { animalId: "a3", dateDebut: JOUR, medicamentId: CIBLE },
+      { animalId: "a3", dateDebut: JOUR, medicamentId: AUTRE },
+    ],
+  });
+  assert.equal(plan.possible, true);
+  if (!plan.possible) return;
+  assert.deepEqual(plan.vaccinations, []);
+  assert.deepEqual(plan.vaccinationsGeneriquesANeutraliser, ["v-generique"]);
+  assert.deepEqual(plan.traitements.map((acte) => acte.id), ["t-rotavec"]);
+});
+
+test("séparation successive CRYPTIUM puis ROTAVEC conserve exactement deux vrais actes", () => {
+  const traitements = [
+    { id: "t-cryptium", animalId: "a3", medicamentId: CIBLE, etapeId: "ancienne-primo", date: JOUR },
+    { id: "t-rotavec", animalId: "a3", medicamentId: AUTRE, etapeId: "ancienne-primo", date: JOUR },
+  ];
+  const reels = traitements.map((acte) => ({ animalId: acte.animalId, dateDebut: acte.date, medicamentId: acte.medicamentId }));
+  const cryptium = planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes, idsCibles,
+    vaccinations: [{ id: "v-generique", animalId: "a3", medicamentId: null, etapeId: "ancienne-primo", date: JOUR }],
+    traitements, traitementsVaccinauxReels: reels,
+  });
+  assert.equal(cryptium.possible, true);
+  if (!cryptium.possible) return;
+  const rotavec = planifierExtractionVaccin({
+    medicamentId: AUTRE, etapes, idsCibles,
+    vaccinations: [],
+    traitements: traitements.filter((acte) => acte.id === "t-rotavec"),
+    traitementsVaccinauxReels: reels,
+  });
+  assert.equal(rotavec.possible, true);
+  if (!rotavec.possible) return;
+  assert.deepEqual([
+    ...cryptium.vaccinations, ...cryptium.traitements,
+    ...rotavec.vaccinations, ...rotavec.traitements,
+  ].map((acte) => acte.id).sort(), ["t-cryptium", "t-rotavec"]);
+});
+
+test("une couverture incomplète reste ambiguë", () => {
+  const etapesTroisVaccins = etapes.map((etape) => etape.id === "ancienne-primo"
+    ? { ...etape, medicamentIds: [CIBLE, AUTRE, "med-troisieme"] }
+    : etape);
+  const plan = planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes: etapesTroisVaccins, idsCibles,
+    vaccinations: [{ id: "v-incomplete", animalId: "a8", medicamentId: null, etapeId: "ancienne-primo", date: JOUR }],
+    traitements: [],
+    traitementsVaccinauxReels: [
+      { animalId: "a8", dateDebut: JOUR, medicamentId: CIBLE },
+      { animalId: "a8", dateDebut: JOUR, medicamentId: AUTRE },
+    ],
+  });
   assert.equal(plan.possible, false);
-  if (plan.possible) return;
-  assert.deepEqual(plan.actesAmbigus, [{ source: "VACCINATION", id: "v-ambigu-reel" }]);
-  assert.equal(plan.resolusAutomatiquement, 0);
-  assert.equal(plan.raison, "1 acte(s) restent réellement ambigus après vérification de l’historique médicamenteux.");
+  if (!plan.possible) assert.deepEqual(plan.actesAmbigus, [{ source: "VACCINATION", id: "v-incomplete" }]);
+});
+
+test("plusieurs Vaccination génériques le même jour restent ambiguës", () => {
+  const plan = planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes, idsCibles,
+    vaccinations: [
+      { id: "v-generique-1", animalId: "a9", medicamentId: null, etapeId: "ancienne-primo", date: JOUR },
+      { id: "v-generique-2", animalId: "a9", medicamentId: null, etapeId: "ancienne-primo", date: JOUR },
+    ],
+    traitements: [],
+    traitementsVaccinauxReels: [
+      { animalId: "a9", dateDebut: JOUR, medicamentId: CIBLE },
+      { animalId: "a9", dateDebut: JOUR, medicamentId: AUTRE },
+    ],
+  });
+  assert.equal(plan.possible, false);
+  if (!plan.possible) assert.deepEqual(plan.actesAmbigus, [
+    { source: "VACCINATION", id: "v-generique-1" },
+    { source: "VACCINATION", id: "v-generique-2" },
+  ]);
 });
 
 test("un Traitement VACCIN non rattaché au legacy sert de vérité sans créer de doublon", () => {
@@ -202,6 +290,8 @@ test("l'API propose une extraction confirmée, atomique, sans suffixe de protoco
   assert.match(route, /traitementsVaccinauxReels: traitementsVaccinauxReelsActuels/,
     "la confirmation recalcule le même plan avec les données actuelles");
   assert.match(route, /tx\.vaccination\.update/);
+  assert.match(route, /NEUTRALISE_DOUBLON_LEGACY/);
+  assert.match(route, /vaccinationsGeneriquesANeutraliser/);
   assert.match(route, /tx\.traitement\.update/);
   assert.match(route, /tx\.traitement\.updateMany\([\s\S]*traitementsDoublons/);
   assert.match(route, /tx\.statutProtocoleVaccinal\.deleteMany/);

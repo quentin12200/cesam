@@ -253,9 +253,10 @@ export async function POST(request: NextRequest) {
 
           const vaccinationsDeplacees = new Map(planActuel.vaccinations.map((acte) => [acte.id, acte]));
           const traitementsDeplaces = new Map(planActuel.traitements.map((acte) => [acte.id, acte]));
+          const vaccinationsGeneriques = new Set(planActuel.vaccinationsGeneriquesANeutraliser);
           const traitementsDoublons = new Set(planActuel.traitementsDoublonsADetacher);
           const liensRestants = legacy.etapes.flatMap((etape) => etape.medicaments).filter((liaison) => liaison.medicamentId !== configuration.medicamentId).length;
-          const actesRestants = vaccinationsActuelles.length + traitementsActuels.length - vaccinationsDeplacees.size - traitementsDeplaces.size - traitementsDoublons.size;
+          const actesRestants = vaccinationsActuelles.length + traitementsActuels.length - vaccinationsDeplacees.size - vaccinationsGeneriques.size - traitementsDeplaces.size - traitementsDoublons.size;
           await tx.protocoleVaccin.update({
             where: { id: legacy.id },
             data: { nom: nomInterneLegacy(legacy.nom, legacy.id), actif: liensRestants > 0 || actesRestants > 0 ? legacy.actif : false },
@@ -263,6 +264,15 @@ export async function POST(request: NextRequest) {
           const nouveau = await tx.protocoleVaccin.create({ data: donneesCreation });
           for (const acte of planActuel.vaccinations) {
             await tx.vaccination.update({ where: { id: acte.id }, data: { protocoleId: nouveau.id, etapeProtocoleId: acte.etapeCibleId } });
+          }
+          if (vaccinationsGeneriques.size > 0) {
+            const neutralisees = await tx.vaccination.updateMany({
+              where: { id: { in: [...vaccinationsGeneriques] }, protocoleId: legacy.id, medicamentId: null },
+              data: { protocoleId: null, etapeProtocoleId: null, statut: "NEUTRALISE_DOUBLON_LEGACY" },
+            });
+            if (neutralisees.count !== vaccinationsGeneriques.size) {
+              throw new ExtractionVaccinRefusee("Les vaccinations génériques historiques ont changé : recharge la page.");
+            }
           }
           for (const acte of planActuel.traitements) {
             await tx.traitement.update({ where: { id: acte.id }, data: { protocoleVaccinId: nouveau.id, etapeProtocoleVaccinId: acte.etapeCibleId } });
@@ -304,7 +314,7 @@ export async function POST(request: NextRequest) {
               });
             }
             const faitsLegacy = new Set([
-              ...vaccinationsActuelles.filter((acte) => acte.animalId === animalId && acte.statut === "FAIT" && !vaccinationsDeplacees.has(acte.id) && acte.etapeProtocoleId).map((acte) => acte.etapeProtocoleId!),
+              ...vaccinationsActuelles.filter((acte) => acte.animalId === animalId && acte.statut === "FAIT" && !vaccinationsDeplacees.has(acte.id) && !vaccinationsGeneriques.has(acte.id) && acte.etapeProtocoleId).map((acte) => acte.etapeProtocoleId!),
               ...traitementsActuels.filter((acte) => acte.animalId === animalId && !traitementsDeplaces.has(acte.id) && !traitementsDoublons.has(acte.id) && acte.etapeProtocoleVaccinId).map((acte) => acte.etapeProtocoleVaccinId!),
             ]);
             const statutLegacy = statutDepuisEtapesFaites(legacy.etapes, faitsLegacy);

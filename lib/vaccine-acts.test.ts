@@ -62,6 +62,48 @@ test("deux médicaments différents le même jour restent deux actes distincts",
   assert.equal(actes.length, 2);
 });
 
+test("une Vaccination legacy neutralisée après vérification ne crée pas un troisième fait", () => {
+  const date = new Date("2025-10-15T12:00:00Z");
+  const actes = unifierActesVaccinaux(
+    [vaccination({ sourceId: "v-generique", date, medicamentId: null, vaccin: "Protocole legacy", protocoleId: null, statut: "NEUTRALISE_DOUBLON_LEGACY" })],
+    [
+      traitement({ id: "t-cryptium", dateDebut: date, medicamentId: "med-cryptium", medicamentNom: "CRYPTIUM" }),
+      traitement({ id: "t-rotavec", dateDebut: date, medicamentId: "med-rotavec", medicamentNom: "ROTAVEC" }),
+    ],
+  );
+  assert.equal(actes.length, 2);
+  assert.deepEqual(actes.map((acte) => acte.sourceId).sort(), ["t-cryptium", "t-rotavec"]);
+  assert.deepEqual(actes.map((acte) => acte.medicamentId).sort(), ["med-cryptium", "med-rotavec"]);
+});
+
+test("sans vérification de couverture, une Vaccination générique n'est pas masquée abusivement", () => {
+  const date = new Date("2025-10-15T12:00:00Z");
+  const actes = unifierActesVaccinaux(
+    [vaccination({ sourceId: "v-generique", date, medicamentId: null, vaccin: "Protocole legacy" })],
+    [
+      traitement({ id: "t-a", dateDebut: date, medicamentId: "med-a", medicamentNom: "A" }),
+      traitement({ id: "t-b", dateDebut: date, medicamentId: "med-b", medicamentNom: "B" }),
+    ],
+  );
+  assert.equal(actes.length, 3, "l'extraction doit d'abord vérifier que tous les médicaments possibles sont couverts");
+});
+
+test("plusieurs Vaccination génériques le même jour restent visibles comme incohérence non couverte", () => {
+  const date = new Date("2025-10-15T12:00:00Z");
+  const actes = unifierActesVaccinaux(
+    [
+      vaccination({ sourceId: "v-generique-1", date, medicamentId: null, vaccin: "Legacy 1" }),
+      vaccination({ sourceId: "v-generique-2", date, medicamentId: null, vaccin: "Legacy 2" }),
+    ],
+    [
+      traitement({ id: "t-a", dateDebut: date, medicamentId: "med-a", medicamentNom: "A" }),
+      traitement({ id: "t-b", dateDebut: date, medicamentId: "med-b", medicamentNom: "B" }),
+    ],
+  );
+  assert.equal(actes.length, 4);
+  assert.equal(actes.filter((acte) => acte.medicamentId === null).length, 2);
+});
+
 test("un Traitement sans médicament identifié n'est jamais fusionné ni ajouté à l'aveugle", () => {
   const actes = unifierActesVaccinaux([], [traitement({ medicamentId: null, medicamentNom: "Vaccin libre" })]);
   assert.equal(actes.length, 0);

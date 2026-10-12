@@ -86,6 +86,21 @@ export function cleVaccinaleAnimalJour(animalId: string, date: Date): string {
 }
 
 /**
+ * Une unique ligne Vaccination générique est un artefact technique lorsqu'au moins deux
+ * médicaments possibles sont tous prouvés par des Traitement VACCIN certains le même jour.
+ * Plusieurs lignes génériques, ou une couverture partielle, restent volontairement ambiguës.
+ */
+export function vaccinationGeneriqueCouverteParTraitementsCertains(
+  nombreVaccinationsGeneriquesDuJour: number,
+  medicamentsPossibles: ReadonlySet<string>,
+  medicamentsReels: ReadonlySet<string>,
+): boolean {
+  return nombreVaccinationsGeneriquesDuJour === 1
+    && medicamentsPossibles.size > 1
+    && [...medicamentsPossibles].every((medicamentId) => medicamentsReels.has(medicamentId));
+}
+
+/**
  * Fusionne les `Vaccination` (statut FAIT) et les `Traitement` dont le médicament est
  * catégorisé VACCIN en une seule liste d'actes réellement faits.
  * Dédoublonnage : même médicament (medicamentId) + même animal (implicite : les deux listes
