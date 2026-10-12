@@ -201,6 +201,7 @@ export async function POST(request: NextRequest) {
               ? `L’ancien protocole « ${existant.label} » contient ${medicament.nom}. Il doit être séparé avant de créer ce protocole.`
               : plan.raison,
             code: "PROTOCOLE_EXTRACTION_PROPOSEE",
+            diagnostic: plan.possible ? undefined : plan.diagnostic,
             protocole: {
               id: existant.id, nom: existant.nom, label: existant.label,
               configurationQuestionnairePresente: false, memeVaccin: false, etapes: etapesExistantes,

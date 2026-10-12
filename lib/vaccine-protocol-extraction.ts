@@ -23,8 +23,56 @@ export type ActeAExtraire = {
   etapeCibleId: string | null;
 };
 
+export type CauseDiagnosticExtraction =
+  | "AUCUN_TRAITEMENT_VACCIN_CERTAIN_MEME_JOUR"
+  | "UN_TRAITEMENT_VACCIN_CERTAIN_MEME_JOUR"
+  | "PLUSIEURS_TRAITEMENTS_VACCIN_CERTAINS_MEME_JOUR"
+  | "COUVERTURE_PARTIELLE_MEDICAMENTS_ETAPE"
+  | "PLUSIEURS_VACCINATIONS_GENERIQUES_MEME_JOUR"
+  | "ETAPE_LEGACY_ABSENTE"
+  | "ETAPE_LEGACY_UN_MEDICAMENT"
+  | "ETAPE_LEGACY_PLUSIEURS_MEDICAMENTS"
+  | "AUTRE_INCOHERENCE";
+
+export interface ExempleDiagnosticExtraction {
+  source: "VACCINATION" | "TRAITEMENT";
+  acteId: string;
+  animalId: string;
+  date: string | null;
+  vaccinationId: string | null;
+  ancienneEtape: { id: string; label: string | null } | null;
+  medicamentIdVaccination: string | null;
+  medicamentsPossiblesEtape: string[];
+  medicamentsReelsJour: string[];
+  nombreVaccinationsGeneriquesJour: number;
+}
+
+export interface DiagnosticExtractionLegacy {
+  totalAmbigus: number;
+  vaccinationsAmbigues: number;
+  autresActesAmbigus: number;
+  repartition: Array<{
+    cause: CauseDiagnosticExtraction;
+    libelle: string;
+    nombre: number;
+    exemples: ExempleDiagnosticExtraction[];
+  }>;
+}
+
+const libellesDiagnostic: Record<CauseDiagnosticExtraction, string> = {
+  AUCUN_TRAITEMENT_VACCIN_CERTAIN_MEME_JOUR: "aucun Traitement VACCIN certain le même animal/jour",
+  UN_TRAITEMENT_VACCIN_CERTAIN_MEME_JOUR: "un seul Traitement VACCIN certain le même animal/jour",
+  PLUSIEURS_TRAITEMENTS_VACCIN_CERTAINS_MEME_JOUR: "plusieurs Traitement VACCIN certains le même animal/jour",
+  COUVERTURE_PARTIELLE_MEDICAMENTS_ETAPE: "médicaments réels présents mais couverture partielle des médicaments possibles de l’étape legacy",
+  PLUSIEURS_VACCINATIONS_GENERIQUES_MEME_JOUR: "plusieurs Vaccination génériques le même animal/jour",
+  ETAPE_LEGACY_ABSENTE: "étape legacy absente",
+  ETAPE_LEGACY_UN_MEDICAMENT: "étape legacy avec un seul médicament",
+  ETAPE_LEGACY_PLUSIEURS_MEDICAMENTS: "étape legacy avec plusieurs médicaments",
+  AUTRE_INCOHERENCE: "autre incohérence",
+};
+
 export type PlanExtractionVaccin =
-  | { possible: false; raison: string; actesAmbigus: Array<{ source: "VACCINATION" | "TRAITEMENT"; id: string }>; resolusAutomatiquement: number }
+  | { possible: false; raison: string; actesAmbigus: Array<{ source: "VACCINATION" | "TRAITEMENT"; id: string }>; diagnostic: DiagnosticExtractionLegacy; resolusAutomatiquement: number }
   | { possible: true; vaccinations: ActeAExtraire[]; traitements: ActeAExtraire[]; vaccinationsGeneriquesANeutraliser: string[]; traitementsDoublonsADetacher: string[]; resolusAutomatiquement: number };
 
 export function resoudreLegacyParMedicament<T extends { id: string }>(candidats: readonly T[]):
@@ -76,6 +124,83 @@ function etapeCible(
   if (!etape) return null;
   const role = roleEtapeProtocole(etape);
   return role ? idsCibles[role] : null;
+}
+
+function construireDiagnosticExtraction({
+  actesAmbigus,
+  vaccinations,
+  traitements,
+  parId,
+  medicamentsReelsParJour,
+  vaccinationsGeneriquesParJour,
+}: {
+  actesAmbigus: readonly { source: "VACCINATION" | "TRAITEMENT"; id: string }[];
+  vaccinations: readonly ActeExtractionVaccin[];
+  traitements: readonly ActeExtractionVaccin[];
+  parId: ReadonlyMap<string, EtapeExtractionVaccin>;
+  medicamentsReelsParJour: ReadonlyMap<string, ReadonlySet<string>>;
+  vaccinationsGeneriquesParJour: ReadonlyMap<string, number>;
+}): DiagnosticExtractionLegacy {
+  const groupes = new Map<CauseDiagnosticExtraction, ExempleDiagnosticExtraction[]>();
+  const nombres = new Map<CauseDiagnosticExtraction, number>();
+  let vaccinationsAmbigues = 0;
+
+  for (const ambigu of actesAmbigus) {
+    const acte = (ambigu.source === "VACCINATION" ? vaccinations : traitements).find((candidate) => candidate.id === ambigu.id);
+    if (!acte) continue;
+    if (ambigu.source === "VACCINATION") vaccinationsAmbigues += 1;
+    const etape = acte.etapeId ? parId.get(acte.etapeId) ?? null : null;
+    const medicamentsPossibles = [...new Set(etape?.medicamentIds ?? [])].sort();
+    const cle = acte.date ? cleVaccinaleAnimalJour(acte.animalId, acte.date) : null;
+    const medicamentsReels = [...(cle ? medicamentsReelsParJour.get(cle) ?? [] : [])].sort();
+    const nombreGeneriques = cle ? vaccinationsGeneriquesParJour.get(cle) ?? 0 : 0;
+    const medicamentsCouverts = medicamentsPossibles.filter((id) => medicamentsReels.includes(id));
+
+    let cause: CauseDiagnosticExtraction;
+    if (ambigu.source !== "VACCINATION") cause = "AUTRE_INCOHERENCE";
+    else if (nombreGeneriques > 1) cause = "PLUSIEURS_VACCINATIONS_GENERIQUES_MEME_JOUR";
+    else if (!etape) cause = "ETAPE_LEGACY_ABSENTE";
+    else if (!acte.date) cause = medicamentsPossibles.length === 1
+      ? "ETAPE_LEGACY_UN_MEDICAMENT"
+      : medicamentsPossibles.length > 1
+        ? "ETAPE_LEGACY_PLUSIEURS_MEDICAMENTS"
+        : "AUTRE_INCOHERENCE";
+    else if (medicamentsReels.length === 0) cause = "AUCUN_TRAITEMENT_VACCIN_CERTAIN_MEME_JOUR";
+    else if (medicamentsReels.length === 1) cause = "UN_TRAITEMENT_VACCIN_CERTAIN_MEME_JOUR";
+    else if (medicamentsCouverts.length > 0 && medicamentsCouverts.length < medicamentsPossibles.length) cause = "COUVERTURE_PARTIELLE_MEDICAMENTS_ETAPE";
+    else if (medicamentsReels.length > 1) cause = "PLUSIEURS_TRAITEMENTS_VACCIN_CERTAINS_MEME_JOUR";
+    else cause = "AUTRE_INCOHERENCE";
+
+    nombres.set(cause, (nombres.get(cause) ?? 0) + 1);
+    const exemples = groupes.get(cause) ?? [];
+    if (exemples.length < 5) {
+      exemples.push({
+        source: ambigu.source,
+        acteId: acte.id,
+        animalId: acte.animalId,
+        date: acte.date?.toISOString() ?? null,
+        vaccinationId: ambigu.source === "VACCINATION" ? acte.id : null,
+        ancienneEtape: acte.etapeId ? { id: acte.etapeId, label: etape?.label ?? null } : null,
+        medicamentIdVaccination: ambigu.source === "VACCINATION" ? acte.medicamentId : null,
+        medicamentsPossiblesEtape: medicamentsPossibles,
+        medicamentsReelsJour: medicamentsReels,
+        nombreVaccinationsGeneriquesJour: nombreGeneriques,
+      });
+      groupes.set(cause, exemples);
+    }
+  }
+
+  return {
+    totalAmbigus: actesAmbigus.length,
+    vaccinationsAmbigues,
+    autresActesAmbigus: actesAmbigus.length - vaccinationsAmbigues,
+    repartition: [...nombres.entries()].map(([cause, nombre]) => ({
+      cause,
+      libelle: libellesDiagnostic[cause],
+      nombre,
+      exemples: groupes.get(cause) ?? [],
+    })),
+  };
 }
 
 /**
@@ -144,6 +269,14 @@ export function planifierExtractionVaccin({
       possible: false,
       raison: `${actesAmbigus.length} acte(s) restent réellement ambigus après vérification de l’historique médicamenteux.`,
       actesAmbigus,
+      diagnostic: construireDiagnosticExtraction({
+        actesAmbigus,
+        vaccinations,
+        traitements,
+        parId,
+        medicamentsReelsParJour,
+        vaccinationsGeneriquesParJour,
+      }),
       resolusAutomatiquement,
     };
   }

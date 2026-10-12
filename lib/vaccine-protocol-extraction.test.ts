@@ -49,13 +49,35 @@ test("un acte sans medicamentId est attribuable quand son étape ne possède qu'
 test("un médicament ambigu bloque toute extraction au lieu d'être deviné", () => {
   const plan = planifierExtractionVaccin({
     medicamentId: CIBLE, etapes, idsCibles,
-    vaccinations: [{ id: "v-ambigu", animalId: "a1", medicamentId: null, etapeId: "ancienne-primo" }],
+    vaccinations: [{ id: "v-ambigu", animalId: "a1", medicamentId: null, etapeId: "ancienne-primo", date: JOUR }],
     traitements: [],
   });
   assert.equal(plan.possible, false);
   if (!plan.possible) {
     assert.deepEqual(plan.actesAmbigus, [{ source: "VACCINATION", id: "v-ambigu" }]);
     assert.match(plan.raison, /restent réellement ambigus après vérification/);
+    assert.deepEqual(plan.diagnostic, {
+      totalAmbigus: 1,
+      vaccinationsAmbigues: 1,
+      autresActesAmbigus: 0,
+      repartition: [{
+        cause: "AUCUN_TRAITEMENT_VACCIN_CERTAIN_MEME_JOUR",
+        libelle: "aucun Traitement VACCIN certain le même animal/jour",
+        nombre: 1,
+        exemples: [{
+          source: "VACCINATION",
+          acteId: "v-ambigu",
+          animalId: "a1",
+          date: JOUR.toISOString(),
+          vaccinationId: "v-ambigu",
+          ancienneEtape: { id: "ancienne-primo", label: "Primo" },
+          medicamentIdVaccination: null,
+          medicamentsPossiblesEtape: [AUTRE, CIBLE].sort(),
+          medicamentsReelsJour: [],
+          nombreVaccinationsGeneriquesJour: 1,
+        }],
+      }],
+    });
   }
 });
 
@@ -169,7 +191,11 @@ test("une couverture incomplète reste ambiguë", () => {
     ],
   });
   assert.equal(plan.possible, false);
-  if (!plan.possible) assert.deepEqual(plan.actesAmbigus, [{ source: "VACCINATION", id: "v-incomplete" }]);
+  if (!plan.possible) {
+    assert.deepEqual(plan.actesAmbigus, [{ source: "VACCINATION", id: "v-incomplete" }]);
+    assert.equal(plan.diagnostic.repartition[0]?.cause, "COUVERTURE_PARTIELLE_MEDICAMENTS_ETAPE");
+    assert.deepEqual(plan.diagnostic.repartition[0]?.exemples[0]?.medicamentsReelsJour, [AUTRE, CIBLE].sort());
+  }
 });
 
 test("plusieurs Vaccination génériques le même jour restent ambiguës", () => {
@@ -186,10 +212,65 @@ test("plusieurs Vaccination génériques le même jour restent ambiguës", () =>
     ],
   });
   assert.equal(plan.possible, false);
-  if (!plan.possible) assert.deepEqual(plan.actesAmbigus, [
-    { source: "VACCINATION", id: "v-generique-1" },
-    { source: "VACCINATION", id: "v-generique-2" },
-  ]);
+  if (!plan.possible) {
+    assert.deepEqual(plan.actesAmbigus, [
+      { source: "VACCINATION", id: "v-generique-1" },
+      { source: "VACCINATION", id: "v-generique-2" },
+    ]);
+    assert.equal(plan.diagnostic.repartition[0]?.cause, "PLUSIEURS_VACCINATIONS_GENERIQUES_MEME_JOUR");
+    assert.equal(plan.diagnostic.repartition[0]?.nombre, 2);
+    assert.equal(plan.diagnostic.repartition[0]?.exemples[0]?.nombreVaccinationsGeneriquesJour, 2);
+  }
+});
+
+test("le diagnostic distingue un ou plusieurs Traitement VACCIN certains mais incompatibles avec le legacy", () => {
+  const creerPlan = (medicamentIds: string[]) => planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes, idsCibles,
+    vaccinations: [{ id: `v-${medicamentIds.length}`, animalId: "a-diagnostic", medicamentId: null, etapeId: "ancienne-primo", date: JOUR }],
+    traitements: [],
+    traitementsVaccinauxReels: medicamentIds.map((medicamentId) => ({ animalId: "a-diagnostic", dateDebut: JOUR, medicamentId })),
+  });
+
+  const un = creerPlan(["med-hors-legacy"]);
+  assert.equal(un.possible, false);
+  if (!un.possible) assert.equal(un.diagnostic.repartition[0]?.cause, "UN_TRAITEMENT_VACCIN_CERTAIN_MEME_JOUR");
+
+  const plusieurs = creerPlan(["med-hors-legacy-1", "med-hors-legacy-2"]);
+  assert.equal(plusieurs.possible, false);
+  if (!plusieurs.possible) assert.equal(plusieurs.diagnostic.repartition[0]?.cause, "PLUSIEURS_TRAITEMENTS_VACCIN_CERTAINS_MEME_JOUR");
+});
+
+test("le diagnostic signale une étape legacy absente", () => {
+  const plan = planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes, idsCibles,
+    vaccinations: [{ id: "v-sans-etape", animalId: "a-sans-etape", medicamentId: null, etapeId: "etape-supprimee", date: JOUR }],
+    traitements: [],
+  });
+  assert.equal(plan.possible, false);
+  if (!plan.possible) {
+    assert.equal(plan.diagnostic.repartition[0]?.cause, "ETAPE_LEGACY_ABSENTE");
+    assert.deepEqual(plan.diagnostic.repartition[0]?.exemples[0]?.ancienneEtape, { id: "etape-supprimee", label: null });
+  }
+});
+
+test("le diagnostic limite chaque catégorie à cinq exemples sans fausser son total", () => {
+  const plan = planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes, idsCibles,
+    vaccinations: Array.from({ length: 6 }, (_, index) => ({
+      id: `v-exemple-${index}`,
+      animalId: `a-exemple-${index}`,
+      medicamentId: null,
+      etapeId: "ancienne-primo",
+      date: JOUR,
+    })),
+    traitements: [],
+  });
+  assert.equal(plan.possible, false);
+  if (!plan.possible) {
+    assert.equal(plan.diagnostic.totalAmbigus, 6);
+    assert.equal(plan.diagnostic.repartition[0]?.nombre, 6);
+    assert.equal(plan.diagnostic.repartition[0]?.exemples.length, 5);
+  }
 });
 
 test("un Traitement VACCIN non rattaché au legacy sert de vérité sans créer de doublon", () => {
@@ -283,6 +364,8 @@ test("l'API propose une extraction confirmée, atomique, sans suffixe de protoco
   const route = readFileSync(new URL("../app/api/protocoles/route.ts", import.meta.url), "utf8");
   const ui = readFileSync(new URL("../app/config/protocoles/ProtocoleQuestionnaire.tsx", import.meta.url), "utf8");
   assert.match(route, /code: "PROTOCOLE_EXTRACTION_PROPOSEE"/);
+  assert.match(route, /diagnostic: plan\.possible \? undefined : plan\.diagnostic/,
+    "le diagnostic n'est joint qu'à la réponse 409 lorsque l'extraction est impossible");
   assert.match(route, /await prisma\.\$transaction\(async \(tx\) =>/);
   assert.match(route, /medicament: \{ categorie: "VACCIN" \}/);
   assert.match(route, /traitementsVaccinauxReelsActuels = [\s\S]*await tx\.traitement\.findMany/,
