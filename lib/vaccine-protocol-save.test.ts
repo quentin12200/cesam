@@ -85,7 +85,7 @@ test("une ambiguïté historique bloque la conversion", () => {
 test("l’interface affiche l’erreur du POST et libère toujours l’enregistrement", () => {
   const source = readFileSync(new URL("../app/config/protocoles/ProtocoleQuestionnaire.tsx", import.meta.url), "utf8");
   assert.match(source, /const \[erreurEnregistrement, setErreurEnregistrement\] = useState\(""\)/);
-  assert.match(source, /const erreur = await response\.json\(\) as \{ error\?: unknown; code\?: unknown; protocole\?: ConflitProtocole \}/);
+  assert.match(source, /const erreur = await response\.json\(\) as \{ error\?: unknown; code\?: unknown; protocole\?: ConflitProtocole; diagnostic\?: DiagnosticExtraction \}/);
   assert.match(source, /setErreurEnregistrement\(typeof erreur\.error === "string"/);
   assert.match(source, /finally \{ setSaving\(false\); \}/);
   assert.match(source, /role="alert"/);

@@ -389,4 +389,10 @@ test("l'API propose une extraction confirmée, atomique, sans suffixe de protoco
   assert.match(ui, /window\.confirm/);
   assert.match(ui, /conflitProtocole\.extraction\.raison !== erreurEnregistrement/,
     "un même message d'ambiguïté n'est affiché qu'une fois");
+  assert.match(ui, /diagnosticExtraction\.totalAmbigus/,
+    "le questionnaire affiche le total d'actes ambigus renvoyé par l'API");
+  assert.match(ui, /diagnosticExtraction\.repartition\.map\(\(categorie\) =>/,
+    "le questionnaire affiche le nombre et le libellé de chaque catégorie");
+  assert.doesNotMatch(ui, /diagnosticExtraction[\s\S]{0,500}\.exemples/,
+    "les exemples techniques du diagnostic ne sont pas affichés dans l'interface");
 });
