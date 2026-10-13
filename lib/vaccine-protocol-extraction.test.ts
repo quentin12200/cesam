@@ -364,8 +364,12 @@ test("l'API propose une extraction confirmée, atomique, sans suffixe de protoco
   const route = readFileSync(new URL("../app/api/protocoles/route.ts", import.meta.url), "utf8");
   const ui = readFileSync(new URL("../app/config/protocoles/ProtocoleQuestionnaire.tsx", import.meta.url), "utf8");
   assert.match(route, /code: "PROTOCOLE_EXTRACTION_PROPOSEE"/);
-  assert.match(route, /diagnostic: plan\.possible \? undefined : plan\.diagnostic/,
-    "le diagnostic n'est joint qu'à la réponse 409 lorsque l'extraction est impossible");
+  assert.match(route, /const diagnostic = plan\.possible \? undefined :/,
+    "le diagnostic n'est construit que lorsque l'extraction est impossible");
+  assert.match(route, /animal: \{ select: \{ nutrav: true \} \}/,
+    "l'API lit le numéro de travail sans modifier l'animal");
+  assert.match(route, /nutrav: nutravParAnimalId\.get\(exemple\.animalId\) \?\? null/,
+    "chaque exemple reçoit son numéro de travail lorsque celui-ci existe");
   assert.match(route, /await prisma\.\$transaction\(async \(tx\) =>/);
   assert.match(route, /medicament: \{ categorie: "VACCIN" \}/);
   assert.match(route, /traitementsVaccinauxReelsActuels = [\s\S]*await tx\.traitement\.findMany/,
@@ -393,6 +397,10 @@ test("l'API propose une extraction confirmée, atomique, sans suffixe de protoco
     "le questionnaire affiche le total d'actes ambigus renvoyé par l'API");
   assert.match(ui, /diagnosticExtraction\.repartition\.map\(\(categorie\) =>/,
     "le questionnaire affiche le nombre et le libellé de chaque catégorie");
-  assert.doesNotMatch(ui, /diagnosticExtraction[\s\S]{0,500}\.exemples/,
-    "les exemples techniques du diagnostic ne sont pas affichés dans l'interface");
+  assert.match(ui, /categorie\.exemples\.slice\(0, 5\)\.map/,
+    "l'interface limite chaque catégorie à cinq exemples");
+  assert.match(ui, /exemple\.nutrav \|\| exemple\.animalId/,
+    "le numéro de travail est prioritaire avec repli sur l'identifiant animal");
+  assert.match(ui, /dateDiagnostic\(exemple\.date\)/);
+  assert.match(ui, /exemple\.ancienneEtape\?\.label \|\| "Étape inconnue"/);
 });

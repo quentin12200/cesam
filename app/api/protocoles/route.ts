@@ -179,8 +179,8 @@ export async function POST(request: NextRequest) {
       }));
       if (protocoleLegacyContientLaCible && configuration && medicament) {
         const [vaccinations, traitements] = await Promise.all([
-          prisma.vaccination.findMany({ where: { protocoleId: existant.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleId: true, date: true } }),
-          prisma.traitement.findMany({ where: { protocoleVaccinId: existant.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleVaccinId: true, dateDebut: true } }),
+          prisma.vaccination.findMany({ where: { protocoleId: existant.id }, select: { id: true, animalId: true, animal: { select: { nutrav: true } }, medicamentId: true, etapeProtocoleId: true, date: true } }),
+          prisma.traitement.findMany({ where: { protocoleVaccinId: existant.id }, select: { id: true, animalId: true, animal: { select: { nutrav: true } }, medicamentId: true, etapeProtocoleVaccinId: true, dateDebut: true } }),
         ]);
         const animalIdsLegacy = [...new Set([...vaccinations, ...traitements].map((acte) => acte.animalId))];
         const traitementsVaccinauxReels = animalIdsLegacy.length === 0 ? [] : await prisma.traitement.findMany({
@@ -195,13 +195,24 @@ export async function POST(request: NextRequest) {
           traitementsVaccinauxReels,
           idsCibles: idsDemandes,
         });
+        const nutravParAnimalId = new Map([...vaccinations, ...traitements].map((acte) => [acte.animalId, acte.animal.nutrav]));
+        const diagnostic = plan.possible ? undefined : {
+          ...plan.diagnostic,
+          repartition: plan.diagnostic.repartition.map((categorie) => ({
+            ...categorie,
+            exemples: categorie.exemples.map((exemple) => ({
+              ...exemple,
+              nutrav: nutravParAnimalId.get(exemple.animalId) ?? null,
+            })),
+          })),
+        };
         if (extraireDepuisProtocoleId !== existant.id) {
           return NextResponse.json({
             error: plan.possible
               ? `L’ancien protocole « ${existant.label} » contient ${medicament.nom}. Il doit être séparé avant de créer ce protocole.`
               : plan.raison,
             code: "PROTOCOLE_EXTRACTION_PROPOSEE",
-            diagnostic: plan.possible ? undefined : plan.diagnostic,
+            diagnostic,
             protocole: {
               id: existant.id, nom: existant.nom, label: existant.label,
               configurationQuestionnairePresente: false, memeVaccin: false, etapes: etapesExistantes,
