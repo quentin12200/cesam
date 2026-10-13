@@ -7,6 +7,7 @@ export type EtapeExtractionVaccin = {
   label: string;
   cycle: string;
   medicamentIds: readonly string[];
+  medicamentsConnus?: readonly { id: string; nom: string }[];
 };
 
 export type ActeExtractionVaccin = {
@@ -15,12 +16,14 @@ export type ActeExtractionVaccin = {
   medicamentId: string | null;
   etapeId: string | null;
   date?: Date | null;
+  vaccin?: string | null;
 };
 
 export type ActeAExtraire = {
   id: string;
   animalId: string;
   etapeCibleId: string | null;
+  medicamentIdAEnregistrer?: string;
 };
 
 export type CauseDiagnosticExtraction =
@@ -89,9 +92,12 @@ function classerActe(
   medicamentId: string,
   etapes: ReadonlyMap<string, EtapeExtractionVaccin>,
   medicamentsLegacy: ReadonlySet<string>,
+  medicamentsParNom: ReadonlyMap<string, ReadonlySet<string>>,
   medicamentsReelsParJour: ReadonlyMap<string, ReadonlySet<string>>,
 ): "CIBLE" | "AUTRE" | "AMBIGU" {
   if (acte.medicamentId) return acte.medicamentId === medicamentId ? "CIBLE" : "AUTRE";
+  const medicamentHistorique = medicamentDepuisNomHistorique(acte.vaccin, medicamentsParNom);
+  if (medicamentHistorique) return medicamentHistorique === medicamentId ? "CIBLE" : "AUTRE";
   if (acte.date) {
     const identitesReelles = identitesReellesCompatibles(acte, medicamentsLegacy, medicamentsReelsParJour);
     if (identitesReelles.length === 1) return identitesReelles[0] === medicamentId ? "CIBLE" : "AUTRE";
@@ -102,6 +108,37 @@ function classerActe(
   if (medicaments.size === 1) return medicaments.has(medicamentId) ? "CIBLE" : "AUTRE";
   if (medicaments.size > 1 && !medicaments.has(medicamentId)) return "AUTRE";
   return "AMBIGU";
+}
+
+function normaliserNomMedicament(nom: string): string {
+  return nom
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function indexerMedicamentsParNom(etapes: readonly EtapeExtractionVaccin[]): Map<string, Set<string>> {
+  const resultat = new Map<string, Set<string>>();
+  for (const medicament of etapes.flatMap((etape) => etape.medicamentsConnus ?? [])) {
+    const nom = normaliserNomMedicament(medicament.nom);
+    if (!nom) continue;
+    const ids = resultat.get(nom) ?? new Set<string>();
+    ids.add(medicament.id);
+    resultat.set(nom, ids);
+  }
+  return resultat;
+}
+
+function medicamentDepuisNomHistorique(
+  vaccin: string | null | undefined,
+  medicamentsParNom: ReadonlyMap<string, ReadonlySet<string>>,
+): string | null {
+  if (!vaccin) return null;
+  const ids = medicamentsParNom.get(normaliserNomMedicament(vaccin));
+  return ids?.size === 1 ? [...ids][0] : null;
 }
 
 function identitesReellesCompatibles(
@@ -224,6 +261,7 @@ export function planifierExtractionVaccin({
 }): PlanExtractionVaccin {
   const parId = new Map(etapes.map((etape) => [etape.id, etape]));
   const medicamentsLegacy = new Set(etapes.flatMap((etape) => etape.medicamentIds));
+  const medicamentsParNom = indexerMedicamentsParNom(etapes);
   const medicamentsReelsParJour = medicamentsVaccinauxParAnimalEtJour(traitementsVaccinauxReels);
   const vaccinationsGeneriquesParJour = new Map<string, number>();
   for (const vaccination of vaccinations) {
@@ -235,7 +273,10 @@ export function planifierExtractionVaccin({
   const actesAmbigus: Array<{ source: "VACCINATION" | "TRAITEMENT"; id: string }> = [];
   let resolusAutomatiquement = 0;
   const selectionner = (source: "VACCINATION" | "TRAITEMENT", actes: readonly ActeExtractionVaccin[]) => actes.flatMap((acte) => {
-    if (source === "VACCINATION" && !acte.medicamentId && acte.date) {
+    const medicamentHistorique = source === "VACCINATION" && !acte.medicamentId
+      ? medicamentDepuisNomHistorique(acte.vaccin, medicamentsParNom)
+      : null;
+    if (source === "VACCINATION" && !acte.medicamentId && !medicamentHistorique && acte.date) {
       const cle = cleVaccinaleAnimalJour(acte.animalId, acte.date);
       const medicamentsPossibles = acte.etapeId
         ? new Set(parId.get(acte.etapeId)?.medicamentIds ?? [])
@@ -251,16 +292,17 @@ export function planifierExtractionVaccin({
         return [];
       }
     }
-    const resolvableParHistorique = !acte.medicamentId
-      && identitesReellesCompatibles(acte, medicamentsLegacy, medicamentsReelsParJour).length === 1;
-    const classement = classerActe(acte, medicamentId, parId, medicamentsLegacy, medicamentsReelsParJour);
+    const resolvableParHistorique = !acte.medicamentId && Boolean(medicamentHistorique
+      || identitesReellesCompatibles(acte, medicamentsLegacy, medicamentsReelsParJour).length === 1);
+    const classement = classerActe(acte, medicamentId, parId, medicamentsLegacy, medicamentsParNom, medicamentsReelsParJour);
     if (resolvableParHistorique && classement !== "AMBIGU") resolusAutomatiquement += 1;
     if (classement === "AMBIGU") {
       actesAmbigus.push({ source, id: acte.id });
       return [];
     }
     if (classement === "AUTRE") return [];
-    return [{ id: acte.id, animalId: acte.animalId, etapeCibleId: etapeCible(acte, parId, idsCibles) }];
+    const selection = { id: acte.id, animalId: acte.animalId, etapeCibleId: etapeCible(acte, parId, idsCibles) };
+    return [medicamentHistorique ? { ...selection, medicamentIdAEnregistrer: medicamentHistorique } : selection];
   });
   const vaccinationsAExtraire = selectionner("VACCINATION", vaccinations);
   const traitementsAExtraireBruts = selectionner("TRAITEMENT", traitements);

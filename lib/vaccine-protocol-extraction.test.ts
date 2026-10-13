@@ -14,6 +14,13 @@ const etapes: EtapeExtractionVaccin[] = [
   { id: "ancien-entretien", label: "Rappel annuel", cycle: "ENTRETIEN", medicamentIds: [CIBLE, AUTRE] },
   { id: "cible-seule", label: "Injection historique", cycle: "INITIAL", medicamentIds: [CIBLE] },
 ];
+const etapesNommees = etapes.map((etape) => ({
+  ...etape,
+  medicamentsConnus: etape.medicamentIds.map((medicamentId) => ({
+    id: medicamentId,
+    nom: medicamentId === CIBLE ? "BOVILIS CRYPTIUM" : "ROTAVEC CORONA",
+  })),
+}));
 
 test("Vaccination et Traitement du vaccin extrait sont conservés 1:1, les autres restent dans le legacy", () => {
   const plan = planifierExtractionVaccin({
@@ -44,6 +51,87 @@ test("un acte sans medicamentId est attribuable quand son étape ne possède qu'
   });
   assert.equal(plan.possible, true);
   if (plan.possible) assert.deepEqual(plan.vaccinations, [{ id: "v1", animalId: "a1", etapeCibleId: null }]);
+});
+
+test("le nom historique CRYPTIUM classe l'acte comme AUTRE pendant l'extraction ROTAVEC", () => {
+  const plan = planifierExtractionVaccin({
+    medicamentId: AUTRE, etapes: etapesNommees, idsCibles,
+    vaccinations: [{ id: "v-cryptium", animalId: "a1", medicamentId: null, vaccin: "  bovilis, cryptiùm  ", etapeId: "ancienne-primo", date: JOUR }],
+    traitements: [],
+  });
+  assert.equal(plan.possible, true);
+  if (plan.possible) assert.deepEqual(plan.vaccinations, []);
+});
+
+test("le nom historique ROTAVEC classe l'acte comme CIBLE et prépare son medicamentId", () => {
+  const plan = planifierExtractionVaccin({
+    medicamentId: AUTRE, etapes: etapesNommees, idsCibles,
+    vaccinations: [{ id: "v-rotavec", animalId: "a1", medicamentId: null, vaccin: "ROTAVEC-CORONA", etapeId: "ancienne-primo", date: JOUR }],
+    traitements: [],
+  });
+  assert.equal(plan.possible, true);
+  if (!plan.possible) return;
+  assert.deepEqual(plan.vaccinations, [{
+    id: "v-rotavec",
+    animalId: "a1",
+    etapeCibleId: "nouvelle-primo",
+    medicamentIdAEnregistrer: AUTRE,
+  }]);
+});
+
+test("deux noms historiques certains permettent les extractions successives sans troisième acte", () => {
+  const vaccinations = [
+    { id: "v-cryptium", animalId: "a1", medicamentId: null, vaccin: "BOVILIS CRYPTIUM", etapeId: "ancienne-primo", date: new Date("2025-10-10T12:00:00Z") },
+    { id: "v-rotavec", animalId: "a1", medicamentId: null, vaccin: "ROTAVEC CORONA", etapeId: "ancienne-primo", date: new Date("2025-11-18T12:00:00Z") },
+  ];
+  const rotavec = planifierExtractionVaccin({ medicamentId: AUTRE, etapes: etapesNommees, idsCibles, vaccinations, traitements: [] });
+  assert.equal(rotavec.possible, true);
+  if (!rotavec.possible) return;
+  const cryptium = planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes: etapesNommees, idsCibles,
+    vaccinations: vaccinations.filter((acte) => acte.id === "v-cryptium"),
+    traitements: [],
+  });
+  assert.equal(cryptium.possible, true);
+  if (!cryptium.possible) return;
+  assert.deepEqual([...rotavec.vaccinations, ...cryptium.vaccinations].map((acte) => [acte.id, acte.medicamentIdAEnregistrer]), [
+    ["v-rotavec", AUTRE],
+    ["v-cryptium", CIBLE],
+  ]);
+});
+
+test("un nom historique inconnu reste ambigu", () => {
+  const plan = planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes: etapesNommees, idsCibles,
+    vaccinations: [{ id: "v-inconnue", animalId: "a1", medicamentId: null, vaccin: "VACCIN INCONNU", etapeId: "ancienne-primo" }],
+    traitements: [],
+  });
+  assert.equal(plan.possible, false);
+  if (!plan.possible) assert.deepEqual(plan.actesAmbigus, [{ source: "VACCINATION", id: "v-inconnue" }]);
+});
+
+test("deux médicaments au même nom normalisé restent ambigus", () => {
+  const etapeDoublon: EtapeExtractionVaccin = {
+    id: "etape-doublon", label: "Injection", cycle: "INITIAL", medicamentIds: [CIBLE, AUTRE],
+    medicamentsConnus: [{ id: CIBLE, nom: "Vaccin Démo" }, { id: AUTRE, nom: "VACCIN-DEMO" }],
+  };
+  const plan = planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes: [etapeDoublon], idsCibles,
+    vaccinations: [{ id: "v-doublon", animalId: "a1", medicamentId: null, vaccin: "vaccin demo", etapeId: etapeDoublon.id }],
+    traitements: [],
+  });
+  assert.equal(plan.possible, false);
+});
+
+test("un medicamentId existant reste prioritaire sur le texte vaccin", () => {
+  const plan = planifierExtractionVaccin({
+    medicamentId: CIBLE, etapes: etapesNommees, idsCibles,
+    vaccinations: [{ id: "v-prioritaire", animalId: "a1", medicamentId: CIBLE, vaccin: "ROTAVEC CORONA", etapeId: "ancienne-primo" }],
+    traitements: [],
+  });
+  assert.equal(plan.possible, true);
+  if (!plan.possible) return;
+  assert.deepEqual(plan.vaccinations, [{ id: "v-prioritaire", animalId: "a1", etapeCibleId: "nouvelle-primo" }]);
 });
 
 test("un médicament ambigu bloque toute extraction au lieu d'être deviné", () => {
@@ -377,6 +465,10 @@ test("l'API propose une extraction confirmée, atomique, sans suffixe de protoco
   assert.match(route, /traitementsVaccinauxReels: traitementsVaccinauxReelsActuels/,
     "la confirmation recalcule le même plan avec les données actuelles");
   assert.match(route, /tx\.vaccination\.update/);
+  assert.match(route, /vaccin: true/,
+    "l'API lit le nom historique réellement enregistré sur la Vaccination");
+  assert.match(route, /medicamentId: acte\.medicamentIdAEnregistrer/,
+    "le médicament identifié par nom est persisté uniquement lors du déplacement de l'acte");
   assert.match(route, /NEUTRALISE_DOUBLON_LEGACY/);
   assert.match(route, /vaccinationsGeneriquesANeutraliser/);
   assert.match(route, /tx\.traitement\.update/);
@@ -389,6 +481,8 @@ test("l'API propose une extraction confirmée, atomique, sans suffixe de protoco
   assert.match(route, /PROTOCOLES_LEGACY_AMBIGUS/);
   assert.doesNotMatch(route, /BOVILIS_CRYPTIUM_2|nomInterne.*_[23]/);
   assert.doesNotMatch(route, /CRYPTIUM|ROTAVEC/);
+  const extraction = readFileSync(new URL("./vaccine-protocol-extraction.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(extraction, /CRYPTIUM|ROTAVEC/);
   assert.match(ui, /Séparer \{conflitProtocole\.extraction\.medicamentNom\} de l’ancien protocole et créer ce protocole/);
   assert.match(ui, /window\.confirm/);
   assert.match(ui, /conflitProtocole\.extraction\.raison !== erreurEnregistrement/,

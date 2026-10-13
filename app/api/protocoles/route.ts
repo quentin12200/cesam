@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         orderBy: { ordre: "asc" as const },
         select: {
           id: true, label: true, cycle: true,
-          medicaments: { select: { medicamentId: true } },
+          medicaments: { select: { medicamentId: true, medicament: { select: { nom: true } } } },
           _count: { select: { vaccinations: true, traitements: true } },
         },
       },
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
       }));
       if (protocoleLegacyContientLaCible && configuration && medicament) {
         const [vaccinations, traitements] = await Promise.all([
-          prisma.vaccination.findMany({ where: { protocoleId: existant.id }, select: { id: true, animalId: true, animal: { select: { nutrav: true } }, medicamentId: true, etapeProtocoleId: true, date: true } }),
+          prisma.vaccination.findMany({ where: { protocoleId: existant.id }, select: { id: true, animalId: true, animal: { select: { nutrav: true } }, medicamentId: true, vaccin: true, etapeProtocoleId: true, date: true } }),
           prisma.traitement.findMany({ where: { protocoleVaccinId: existant.id }, select: { id: true, animalId: true, animal: { select: { nutrav: true } }, medicamentId: true, etapeProtocoleVaccinId: true, dateDebut: true } }),
         ]);
         const animalIdsLegacy = [...new Set([...vaccinations, ...traitements].map((acte) => acte.animalId))];
@@ -189,7 +189,13 @@ export async function POST(request: NextRequest) {
         });
         const plan = planifierExtractionVaccin({
           medicamentId: configuration.medicamentId,
-          etapes: existant.etapes.map((etape) => ({ id: etape.id, label: etape.label, cycle: etape.cycle, medicamentIds: etape.medicaments.map((liaison) => liaison.medicamentId) })),
+          etapes: existant.etapes.map((etape) => ({
+            id: etape.id,
+            label: etape.label,
+            cycle: etape.cycle,
+            medicamentIds: etape.medicaments.map((liaison) => liaison.medicamentId),
+            medicamentsConnus: etape.medicaments.map((liaison) => ({ id: liaison.medicamentId, nom: liaison.medicament.nom })),
+          })),
           vaccinations: vaccinations.map((acte) => ({ ...acte, etapeId: acte.etapeProtocoleId })),
           traitements: traitements.map((acte) => ({ ...acte, etapeId: acte.etapeProtocoleVaccinId, date: acte.dateDebut })),
           traitementsVaccinauxReels,
@@ -235,13 +241,13 @@ export async function POST(request: NextRequest) {
             where: { id: existant.id },
             select: {
               id: true, nom: true, actif: true, configurationQuestionnaireJson: true,
-              etapes: { select: { id: true, label: true, cycle: true, ordre: true, obligatoire: true, medicaments: { select: { medicamentId: true } } } },
+              etapes: { select: { id: true, label: true, cycle: true, ordre: true, obligatoire: true, medicaments: { select: { medicamentId: true, medicament: { select: { nom: true } } } } } },
               statutsAnimaux: { select: { animalId: true } },
             },
           });
           if (!legacy || legacy.configurationQuestionnaireJson != null) throw new ExtractionVaccinRefusee("Le protocole historique a changé : recharge la page.");
           const [vaccinationsActuelles, traitementsActuels] = await Promise.all([
-            tx.vaccination.findMany({ where: { protocoleId: legacy.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleId: true, statut: true, date: true } }),
+            tx.vaccination.findMany({ where: { protocoleId: legacy.id }, select: { id: true, animalId: true, medicamentId: true, vaccin: true, etapeProtocoleId: true, statut: true, date: true } }),
             tx.traitement.findMany({ where: { protocoleVaccinId: legacy.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleVaccinId: true, dateDebut: true } }),
           ]);
           const animalIdsLegacyActuels = [...new Set([...vaccinationsActuelles, ...traitementsActuels].map((acte) => acte.animalId))];
@@ -255,7 +261,13 @@ export async function POST(request: NextRequest) {
           }
           const planActuel = planifierExtractionVaccin({
             medicamentId: configuration.medicamentId,
-            etapes: legacy.etapes.map((etape) => ({ id: etape.id, label: etape.label, cycle: etape.cycle, medicamentIds: etape.medicaments.map((liaison) => liaison.medicamentId) })),
+            etapes: legacy.etapes.map((etape) => ({
+              id: etape.id,
+              label: etape.label,
+              cycle: etape.cycle,
+              medicamentIds: etape.medicaments.map((liaison) => liaison.medicamentId),
+              medicamentsConnus: etape.medicaments.map((liaison) => ({ id: liaison.medicamentId, nom: liaison.medicament.nom })),
+            })),
             vaccinations: vaccinationsActuelles.map((acte) => ({ ...acte, etapeId: acte.etapeProtocoleId })),
             traitements: traitementsActuels.map((acte) => ({ ...acte, etapeId: acte.etapeProtocoleVaccinId, date: acte.dateDebut })),
             traitementsVaccinauxReels: traitementsVaccinauxReelsActuels,
@@ -275,7 +287,7 @@ export async function POST(request: NextRequest) {
           });
           const nouveau = await tx.protocoleVaccin.create({ data: donneesCreation });
           for (const acte of planActuel.vaccinations) {
-            await tx.vaccination.update({ where: { id: acte.id }, data: { protocoleId: nouveau.id, etapeProtocoleId: acte.etapeCibleId } });
+            await tx.vaccination.update({ where: { id: acte.id }, data: { protocoleId: nouveau.id, etapeProtocoleId: acte.etapeCibleId, medicamentId: acte.medicamentIdAEnregistrer } });
           }
           if (vaccinationsGeneriques.size > 0) {
             const neutralisees = await tx.vaccination.updateMany({
