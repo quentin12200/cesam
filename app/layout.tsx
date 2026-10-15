@@ -18,6 +18,7 @@ import LayoutPersonalizer from "@/components/LayoutPersonalizer";
 import ReturnNavigationConfirmation from "@/app/components/ReturnNavigationConfirmation";
 import { ReproductionModalProvider } from "@/app/components/ReproductionModalProvider";
 import GlobalDropdownDismissal from "@/components/GlobalDropdownDismissal";
+import QuickSearch from "@/app/components/QuickSearch";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -51,8 +52,8 @@ export default function RootLayout({
         <GlobalDropdownDismissal />
         <UserPreferencesProvider>
         <ReproductionModalProvider>
-        <header className="print:hidden bg-green-700 text-white shadow-md sticky top-0 z-30">
-          <div className="flex items-center justify-between px-3 py-1.5 sm:px-4">
+        <header className="print:hidden bg-green-700 text-white shadow-md sticky top-0 z-30 has-[[data-global-search-open]]:z-[60]">
+          <div className="relative flex items-center justify-between gap-3 px-3 py-1.5 sm:px-4">
             <div className="flex items-center gap-2.5">
               <Image
                 src="/logo-cesam.jpg"
@@ -61,8 +62,9 @@ export default function RootLayout({
                 height={28}
                 className="rounded-lg"
               />
-              <h1 className="hidden text-base font-bold tracking-wide sm:block">GAEC CESAM — Samuel &amp; Céline</h1>
+              <h1 className="hidden text-base font-bold tracking-wide xl:block">GAEC CESAM — Samuel &amp; Céline</h1>
             </div>
+            <QuickSearch />
             <div className="flex items-center gap-1.5">
               <GlobalScanner />
               <NoteVoiceButton />
