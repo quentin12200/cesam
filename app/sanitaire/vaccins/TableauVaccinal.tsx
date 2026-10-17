@@ -506,6 +506,10 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     const selectionne = actesSelectionnes.has(cleActe(ligne.animalId, etape.id));
     const disponible = celluleVaccinaleSelectionnable(cellule, etape.medicamentId);
     const historiqueEtape = actesHistoriquesEtape(ligne.actes, etape.id);
+    // La grille peut reconnaître une ancienne étape en lecture, sans modifier l'acte stocké.
+    for (const acte of cellule.actes) {
+      if (!historiqueEtape.some((v) => v.sourceType === acte.sourceType && v.sourceId === acte.sourceId && v.date === acte.date && v.medicamentId === acte.medicamentId)) historiqueEtape.push(acte);
+    }
     const tousLesActes = historiqueEtape.map((acte) => afficherDate(acte.date)).join(", ");
     const estEntretien = etape.cycle === "ENTRETIEN";
     const datesInitiales = datesCompactes(historiqueEtape, anneesFiltre, 1);
@@ -548,11 +552,17 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     const medicamentId = etapeCliquee.medicamentId ?? bloc.medicamentId;
     const nomVaccin = etapeCliquee.medicamentNom ?? bloc.nom;
     // Source unique : les actes réels unifiés (Vaccination + Traitement VACCIN) de lib/vaccine-acts.ts.
-    const actesVaccin = actesDuVaccin(ligne.actes, { id: medicamentId, nom: nomVaccin });
+    const actesDuProduit = actesDuVaccin(ligne.actes, { id: medicamentId, nom: nomVaccin });
+    const aRattacher = ligne.cellules[etapeCliquee.id]?.historiquesAValider ?? [];
+    const actesVaccin = ligne.actes.filter((acte) => actesDuProduit.includes(acte) || aRattacher.some((v) =>
+      v.sourceType === acte.sourceType && v.sourceId === acte.sourceId && v.date === acte.date && v.medicamentId === acte.medicamentId));
     const configEtapes = { etapes: bloc.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicamentIds.map((idMedicament) => ({ medicamentId: idMedicament })) })) };
-    const etapeDe = (acte: ActeHistorique) => bloc.protocoleId && acte.protocoleId === bloc.protocoleId && acte.etapeProtocoleId
-      ? bloc.sousColonnes.find((sousColonne) => sousColonne.id === acte.etapeProtocoleId) ?? null
-      : null;
+    const etapeDe = (acte: ActeHistorique) => {
+      const structuree = bloc.protocoleId && acte.protocoleId === bloc.protocoleId && acte.etapeProtocoleId
+        ? bloc.sousColonnes.find((sousColonne) => sousColonne.id === acte.etapeProtocoleId) : null;
+      return structuree ?? bloc.sousColonnes.find((colonne) => ligne.cellules[colonne.id]?.actes.some((v) =>
+        v.sourceType === acte.sourceType && v.sourceId === acte.sourceId && v.date === acte.date && v.medicamentId === acte.medicamentId)) ?? null;
+    };
     const nonRattaches = actesVaccin.filter((acte) => !etapeDe(acte)).length;
     const cleEdition = (acte: ActeHistorique) => `${acte.sourceType}:${acte.sourceId}`;
     const fermer = () => { setPanneauHistorique(null); setActeEnEdition(null); setEtapeChoisie(""); setErreur(""); };
@@ -583,6 +593,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
               {sousColonne
                 ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-900">{sousColonne.label || "Injection"}</span>
                 : <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">À rattacher</span>}
+              {!sousColonne && <span className="text-xs text-gray-600">{acte.vaccin}</span>}
               {details && <span className="text-xs text-gray-600">{details}</span>}
               <span className="text-[10px] text-gray-400">{acte.sourceType === "TRAITEMENT" ? "Traitement" : "Vaccination"}</span>
               {bloc.protocoleId && acte.sourceId && !enEdition && <button type="button" disabled={rattachementEnCours} onClick={() => { setActeEnEdition(cle); setEtapeChoisie(""); setErreur(""); }} className="ml-auto min-h-8 rounded-lg border px-2 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">{sousColonne ? "Modifier l’étape" : "Choisir l’étape"}</button>}

@@ -3,16 +3,13 @@
  * étape réelle du protocole (rien n'est inventé : sans protocole configuré, un vaccin garde
  * une seule sous-colonne, comme avant).
  *
- * Présentation seule : cette fonction n'ajoute aucune règle métier. Elle appelle les mêmes
- * primitives déjà fiables (calculerFenetreEtape, statutPlanningVaccin, rattacherPrimoNonLiee,
- * vaccinationsSansEtapeFiable, vaccinationAppartientAuCycleCourant, estAnimalConcerneParProtocole)
- * une fois par étape au lieu d'une fois pour « la prochaine action » seulement.
+ * Les faits sont interprétés en lecture seule par vaccine-history.ts et la même résolution
+ * alimente la grille et la préparation de séance.
  */
 import { calculerActionVaccinale, calculerFenetreEtape, type EtapeVaccinaleConfig, type StatutProtocoleVaccinal } from "./vaccine-planner.ts";
 import { configurationQuestionnaireLieeAuVelage, lireConfigurationQuestionnaire } from "./vaccine-protocol-questionnaire.ts";
 import { statutPlanningVaccin } from "./vaccine-planning-status.ts";
-import { rattacherInjectionOrpheline, vaccinationsSansEtapeFiable } from "./vaccine-history.ts";
-import { vaccinationAppartientAuCycleCourant } from "./vaccination-session.ts";
+import { interpreterHistoriqueVaccinal, medicamentPartageEntreProtocoles, nomVaccinComparable } from "./vaccine-history.ts";
 import { estAnimalConcerneParProtocole } from "./vaccine-eligibility.ts";
 import { addDays, addMonths } from "date-fns";
 import type { ActeVaccination } from "./vaccine-acts.ts";
@@ -339,37 +336,58 @@ function celluleProtocole(
     ? configurationQuestionnaireLieeAuVelage(configurationQuestionnaire)
     : etapes.some((etape) => etape.reference === "VELAGE");
   const statutEnregistre = animal.statutsProtocoles?.find((statut) => statut.protocoleId === protocole.id) ?? null;
-  const actesHistoriquesDuProtocole = animal.actes.filter((acte) => acte.statut === "FAIT" && acte.protocoleId === protocole.id);
-  const actesDuProtocole = actesHistoriquesDuProtocole.filter(
-    (acte) => vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, acte.gestationId, animal.gestationId)
-  );
-  const statutProtocole = protocoleInitialAcquisDepuisHistorique(etapes, actesHistoriquesDuProtocole)
-    ? "PROTOCOLE_ACQUIS"
-    : statutEnregistre?.statut ?? null;
-  const etapesInitiales = etapes.filter((etape) => etape.cycle !== "ENTRETIEN");
-  const medicament = medicamentPrincipal(protocole);
-  const medicamentPartage = medicament
-    ? protocoles.some((autre) => autre.id !== protocole.id && autre.etapes.some((etape) => etape.medicamentId === medicament.id))
-    : false;
-  // Ambiguïté historique (acte sans étape fiable, ex: saisi en Traitement libre) : calculée avant
-  // la boucle pour pouvoir rattacher automatiquement ce qui n'est pas ambigu (voir ci-dessous) et
-  // avertir discrètement sur le reste.
+  const medicaments = etapes.flatMap((e) => e.medicaments.map((m) => m.medicament));
   const correspondanceHistorique = {
     id: protocole.id,
-    noms: [protocole.nom, protocole.label, medicament?.nom].filter((n): n is string => Boolean(n)),
-    medicamentIds: medicament ? [medicament.id] : [],
+    noms: [protocole.nom, protocole.label, ...medicaments.map((m) => m.nom)],
+    medicamentIds: medicaments.map((m) => m.id),
     etapeIds: etapes.map((e) => e.id),
   };
-  // Centralisé dans lib/vaccine-history.ts : utilisé identiquement par la grille et par la
-  // préparation de séance (lib/vaccine-preparation-data.ts), pour qu'elles répondent pareil.
-  const acteInfere = rattacherInjectionOrpheline(
-    animal.actes,
-    { ...correspondanceHistorique, etapes: protocole.etapes },
-    { protocoleLieAuVelage, medicamentPartage }
-  );
-  const actesUtiles = acteInfere
-    ? [...actesDuProtocole, { ...acteInfere, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0]?.id ?? null }]
-    : actesDuProtocole;
+  const interpretation = interpreterHistoriqueVaccinal(animal.actes, {
+    ...correspondanceHistorique, etapes, configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
+  }, { protocoleLieAuVelage, medicamentPartage: medicamentPartageEntreProtocoles(protocole, protocoles), gestationId: animal.gestationId });
+  const actesHistoriquesDuProtocole = interpretation.historique;
+  const actesUtiles = interpretation.vaccinations;
+  const statutProtocole = protocoleInitialAcquisDepuisHistorique(etapes, actesHistoriquesDuProtocole)
+    ? "PROTOCOLE_ACQUIS" : statutEnregistre?.statut ?? null;
+
+  // Même garantie après les deux chemins (questionnaire et legacy) : aucun fait ne disparaît.
+  const finaliserHistorique = () => {
+    const versHistorique = (acte: ActeVaccination, raison?: string): HistoriqueVaccinalAValider => ({
+      sourceType: acte.sourceType ?? "VACCINATION", sourceId: acte.sourceId ?? null,
+      date: acte.date, vaccin: acte.vaccin, medicamentId: acte.medicamentId,
+      protocoleId: protocole.id, protocoleNom: protocole.label || protocole.nom,
+      gestationId: acte.gestationId, protocoleLieAuVelage,
+      etapesCompatibles: etapes.filter((etape) => acte.medicamentId
+        ? medicamentCompatibleAvecEtape(
+          { etapes: etapes.map((e) => ({ id: e.id, reference: e.reference, medicaments: e.medicaments.map((m) => ({ medicamentId: m.medicament.id })) })) }, etape.id, acte.medicamentId,
+        )
+        : etape.medicaments.some((m) => nomVaccinComparable(m.medicament.nom) === nomVaccinComparable(acte.vaccin)))
+        .map((e) => ({ id: e.id, label: e.label })),
+      raison: raison ?? (acte.sourceType === "TRAITEMENT"
+        ? "Cet acte provient d’un traitement vaccinal ancien sans rattachement structuré."
+        : "L’étape du protocole n’a pas pu être déterminée avec certitude."),
+    });
+    // Les faits déjà structurés d'une autre gestation restent visibles sans couvrir ce cycle.
+    for (const acte of interpretation.historique.filter((v) => !actesUtiles.includes(v))) {
+      const cellule = cellules.get(acte.etapeProtocoleId!);
+      if (cellule) cellule.historiquesAValider.push(versHistorique(acte, "Acte réel rattaché à une autre gestation : il ne couvre pas le cycle courant."));
+    }
+    if (interpretation.aConfirmer.length && etapes[0]) {
+      for (const [id, cellule] of cellules) {
+        cellules.set(id, cellule.statut === "FAIT" ? { ...cellule, prochaine: null }
+          : { ...celluleVide(), rattachementProtocoleAutorise: false, historiquesAValider: cellule.historiquesAValider });
+      }
+      for (const acte of interpretation.aConfirmer) {
+        const historique = versHistorique(acte);
+        const cible = etapes.find((e) => historique.etapesCompatibles.some((c) => c.id === e.id)) ?? etapes[0];
+        const cellule = cellules.get(cible.id)!;
+        cellules.set(cible.id, { ...cellule, aValider: true,
+          historiquesAValider: [...cellule.historiquesAValider, historique] });
+      }
+    }
+    return cellules;
+  };
 
   if (protocole.configurationQuestionnaireJson != null) {
     for (const etape of etapes) {
@@ -400,7 +418,7 @@ function celluleProtocole(
         } else cellules.set(action.etape.id, { ...planning, rattachementProtocoleAutorise: true });
       }
     }
-    return cellules;
+    return finaliserHistorique();
   }
 
   let dateEtapePrecedente: Date | null = null;
@@ -443,41 +461,7 @@ function celluleProtocole(
     cellules.set(etape.id, { ...cellule, rattachementProtocoleAutorise: eligible });
   }
 
-  // Avertissement discret sur la première sous-colonne pour ce qui reste ambigu après le
-  // rattachement automatique ci-dessus, seulement si elle n'est pas déjà cochée faite.
-  const actesAVerifier = vaccinationsSansEtapeFiable(animal.actes, correspondanceHistorique)
-    .filter((acte) => acte !== acteInfere);
-  const premiereEtape = etapes[0];
-  if (actesAVerifier.length > 0 && premiereEtape) {
-    const cellule = cellules.get(premiereEtape.id);
-    if (cellule && cellule.statut !== "FAIT") cellules.set(premiereEtape.id, {
-      ...cellule,
-      aValider: true,
-      historiquesAValider: actesAVerifier.map((acte) => ({
-        sourceType: acte.sourceType ?? "VACCINATION",
-        sourceId: acte.sourceId ?? null,
-        date: acte.date,
-        vaccin: acte.vaccin,
-        medicamentId: acte.medicamentId,
-        protocoleId: protocole.id,
-        protocoleNom: protocole.label || protocole.nom,
-        gestationId: acte.gestationId,
-        protocoleLieAuVelage,
-        etapesCompatibles: etapes
-          .filter((etape) => !acte.medicamentId || medicamentCompatibleAvecEtape(
-            { etapes: protocole.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicaments.map((liaison) => ({ medicamentId: liaison.medicament.id })) })) },
-            etape.id,
-            acte.medicamentId,
-          ))
-          .map((etape) => ({ id: etape.id, label: etape.label })),
-        raison: acte.sourceType === "TRAITEMENT"
-          ? "Cet acte provient d’un traitement vaccinal ancien sans rattachement structuré."
-          : "L’étape du protocole n’a pas pu être déterminée avec certitude.",
-      })),
-    });
-  }
-
-  return cellules;
+  return finaliserHistorique();
 }
 
 export function construireGrilleVaccinale(
@@ -501,7 +485,13 @@ export function construireGrilleVaccinale(
     for (const bloc of blocs) {
       if (bloc.sousColonnes.length !== 1 || cellules[bloc.sousColonnes[0].id]) continue;
       const sousColonne = bloc.sousColonnes[0];
-      const actes = animal.actes.filter((acte) => acte.medicamentId === bloc.cle).sort((a, b) => b.date.getTime() - a.date.getTime());
+      const idsDuNom = new Set([
+        ...vaccinsPharmacie.filter((m) => nomVaccinComparable(m.nom) === nomVaccinComparable(bloc.nom)).map((m) => m.medicamentId),
+        ...protocoles.flatMap((p) => p.etapes.flatMap((e) => e.medicaments.map((m) => m.medicament))).filter((m) => nomVaccinComparable(m.nom) === nomVaccinComparable(bloc.nom)).map((m) => m.id),
+      ]);
+      const actes = animal.actes.filter((acte) => acte.statut === "FAIT" && (acte.medicamentId != null
+        ? acte.medicamentId === bloc.cle
+        : idsDuNom.size === 1 && nomVaccinComparable(acte.vaccin) === nomVaccinComparable(bloc.nom))).sort((a, b) => b.date.getTime() - a.date.getTime());
       cellules[sousColonne.id] = actes[0]
         ? { statut: "FAIT", date: actes[0].date, aValider: false, rattachementProtocoleAutorise: false, historiquesAValider: [], actes: [...actes].reverse().map(versActeCellule), prochaine: null }
         : celluleVide();

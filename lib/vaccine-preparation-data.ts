@@ -10,8 +10,7 @@ import {
   type StatutProtocoleVaccinal,
 } from "@/lib/vaccine-planner";
 import { statutPlanningVaccin, type StatutPlanningVaccin } from "@/lib/vaccine-planning-status";
-import { rattacherInjectionOrpheline, vaccinationsSansEtapeFiable } from "@/lib/vaccine-history";
-import { vaccinationAppartientAuCycleCourant } from "@/lib/vaccination-session";
+import { interpreterHistoriqueVaccinal, medicamentPartageEntreProtocoles } from "@/lib/vaccine-history";
 import { unifierActesVaccinaux } from "@/lib/vaccine-acts";
 import { resoudreAdministrationEtape } from "@/lib/vaccine-administration";
 import { estAnimalConcerneParProtocole } from "@/lib/vaccine-eligibility";
@@ -153,9 +152,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
     const aConfirmer: GroupePreparationVaccin["aConfirmer"] = [];
     let medicamentReference = protocole.etapes.flatMap((etape) => etape.medicaments)[0]?.medicament ?? null;
     const medicamentsProtocole = protocole.etapes.flatMap((etape) => etape.medicaments.map((liaison) => liaison.medicament));
-    const medicamentPartage = protocoles.some((autre) => autre.id !== protocole.id &&
-      autre.etapes.some((etape) => etape.medicaments.some((liaison) =>
-        medicamentsProtocole.some((medicament) => medicament.id === liaison.medicament.id))));
+    const medicamentPartage = medicamentPartageEntreProtocoles(protocole, protocoles);
     const correspondanceHistorique = {
       id: protocole.id,
       noms: [protocole.nom, protocole.label, ...medicamentsProtocole.map((medicament) => medicament.nom)],
@@ -178,23 +175,12 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       const protocoleLieAuVelage = configurationQuestionnaire
         ? configurationQuestionnaireLieeAuVelage(configurationQuestionnaire)
         : protocole.etapes.some((etape) => etape.reference === "VELAGE");
-      const historiqueRattache = actes.filter((vaccination) =>
-        vaccination.statut === "FAIT" &&
-        vaccination.protocoleId === protocole.id
-      );
-      const dejaRattachees = historiqueRattache.filter((vaccination) =>
-        vaccinationAppartientAuCycleCourant(protocoleLieAuVelage, vaccination.gestationId, gestation?.id)
-      );
-      // Centralisé dans lib/vaccine-history.ts : utilisé identiquement par la préparation de
-      // séance et par la grille (lib/vaccine-grid.ts), pour qu'elles répondent pareil.
-      const acteInfere = rattacherInjectionOrpheline(
-        actes,
-        { ...correspondanceHistorique, etapes: protocole.etapes },
-        { protocoleLieAuVelage, medicamentPartage }
-      );
-      const vaccinations = acteInfere
-        ? [...dejaRattachees, { ...acteInfere, protocoleId: protocole.id, etapeProtocoleId: etapesInitiales[0].id }]
-        : dejaRattachees;
+      const interpretation = interpreterHistoriqueVaccinal(actes,
+        { ...correspondanceHistorique, etapes: protocole.etapes, configurationQuestionnaireJson: protocole.configurationQuestionnaireJson },
+        { protocoleLieAuVelage, medicamentPartage, gestationId: gestation?.id ?? null });
+      const historiqueRattache = interpretation.historique;
+      const vaccinations = interpretation.vaccinations;
+      const acteInfere = interpretation.acteInfere;
       const statutEnregistre = animal.statutsProtocolesVaccinaux.find((statut) => statut.protocoleId === protocole.id) ?? null;
       const aUneEtapeFaite = vaccinations.some((vaccination) => vaccination.etapeProtocoleId);
       const statutCalcule = aUneEtapeFaite && !protocoleLieAuVelage && etapesInitiales.length === 2
@@ -217,9 +203,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
         brancheInitialeId: statutEnregistre?.brancheInitialeId ?? null,
       });
-      const historique = action.statut === "TERMINE" ? [] : vaccinationsSansEtapeFiable(actes, correspondanceHistorique)
-        .filter((vaccination) => vaccination.statut === "FAIT")
-        .filter((vaccination) => vaccination !== acteInfere)
+      const historique = interpretation.aConfirmer
         .map((vaccination) => ({ vaccin: vaccination.vaccin, date: vaccination.date.toISOString() }));
       if (action.statut === "A_CONFIRMER" || historique.length > 0) {
         aConfirmer.push({

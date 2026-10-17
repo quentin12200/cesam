@@ -17,8 +17,8 @@ const before = (file) => execFileSync("git", ["show", `${head}:${file}`], { enco
 const tablePath = "app/sanitaire/vaccins/TableauVaccinal.tsx";
 
 
-test('moteur vaccinal inchangé',()=>{
- for(const file of ['lib/vaccine-grid.ts','lib/vaccine-planner.ts','lib/vaccine-selection.ts','lib/vaccination-session.ts','app/api/evenements/batch/route.ts'])assert.equal(read(file),before(file));
+test('le brouillon ne modifie pas la planification ni l’enregistrement vaccinal',()=>{
+ for(const file of ['lib/vaccine-planner.ts','lib/vaccine-selection.ts','lib/vaccination-session.ts','app/api/evenements/batch/route.ts'])assert.equal(read(file),before(file));
 });
 test('brouillon vaccinal : navigateur réel sans base', {timeout:180000},async(t)=>{
   const scratch = mkdtempSync(path.join(tmpdir(), "cesam-vaccin-draft-ui-"));

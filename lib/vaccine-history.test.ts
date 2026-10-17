@@ -100,15 +100,15 @@ test("rattacherInjectionOrpheline : utilise rattacherPrimoNonLiee quand les deux
   assert.equal(resultat, bovigrip);
 });
 
-test("rattacherInjectionOrpheline : cas réel Bovigrip — l'étape rappel n'a pas de médicament lié en base, le repli à 1 candidate prend le relais", () => {
+test("Bovigrip : une Primo identifiable ne dépend pas du médicament lié sur l'étape Rappel", () => {
   const primo = { id: "bovigrip-primo", ordre: 0, cycle: "INITIAL", reference: "NAISSANCE", medicaments: [{ medicament: { id: "med-bovigrip", nom: "BOVILIS BOVIGRIP" } }] };
   const rappelSansMedicament = { id: "bovigrip-rappel", ordre: 1, cycle: "INITIAL", reference: "ETAPE_PRECEDENTE", medicaments: [] };
   const protocoleReel = { id: "proto-bovigrip", noms: ["BOVILIS BOVIGRIP"], medicamentIds: ["med-bovigrip"], etapes: [primo, rappelSansMedicament] };
   const acte = vaccination({ vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip" });
 
-  // rattacherPrimoNonLiee seul échoue (noms[1] vide) : c'est exactement ce que
-  // /sanitaire/nouvel-evenement utilisait avant ce correctif, d'où l'incohérence constatée.
-  assert.equal(rattacherPrimoNonLiee([acte], protocoleReel).rattachee, null);
+  // Le produit de Primo suffit : aucun acte Rappel n'est présent, donc le second
+  // produit (ou son absence dans le protocole legacy) n'empêche pas l'inférence sûre.
+  assert.equal(rattacherPrimoNonLiee([acte], protocoleReel).rattachee, acte);
 
   const resultat = rattacherInjectionOrpheline([acte], protocoleReel, { protocoleLieAuVelage: false, medicamentPartage: false });
   assert.equal(resultat, acte);
