@@ -14,6 +14,7 @@ import { construireChargeSoin } from "@/lib/vaccine-soin-seance";
 import { actesDuVaccin, actesHistoriquesEtape, anneesDisponibles, datesCompactes, type ActeHistorique } from "@/lib/vaccine-history-view";
 import { comparerDateVelage, comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
 import { libelleFenetreVaccinale, selectionDepuisGroupeAgenda, type ActionAgenda, type GroupeAgenda } from "@/lib/vaccine-agenda";
+import { useVaccinWorkspace } from "./useVaccinWorkspace";
 import CalendrierVaccinal from "./CalendrierVaccinal";
 
 interface CelluleGrille {
@@ -181,6 +182,11 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [soinMessage, setSoinMessage] = useState("");
   const [vaccinsMenuOuvert, setVaccinsMenuOuvert] = useState(false);
   const [saisieOuverte, setSaisieOuverte] = useState(false);
+
+  const { message: messageBrouillon, vider: viderBrouillon } = useVaccinWorkspace({
+    vue, recherche, vaccinsAffiches, statuts, tri, directionTri, colonnesMasquees, anneesAffichees, toutHistorique, uniquementSelection,
+    animauxSelectionnes, actesSelectionnes, dateSession, executant, ajustements,
+  }, { setVue, setRecherche, setVaccinsAffiches, setStatuts, setTri, setDirectionTri, setColonnesMasquees, setAnneesAffichees, setToutHistorique, setUniquementSelection, setAnimauxSelectionnes, setActesSelectionnes, setDateSession, setExecutant, setAjustements }, lignes, blocs);
 
   useEffect(() => {
     fetch("/api/intervenants").then((reponse) => reponse.json()).then(setIntervenants).catch(() => {});
@@ -363,7 +369,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       setErreur("Indique la date, l’exécutant et sélectionne au moins un acte.");
       return;
     }
-    const administrations = administrationsParDefaut();
+    const administrations = { ...administrationsParDefaut(), ...ajustements };
     setAjustements(administrations);
     setErreur("");
     if (groupesSession.some((groupe) => !administrations[groupe.cle]?.voie.trim())) {
@@ -432,7 +438,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         }
         groupe.actes.forEach((acte) => enregistres.add(acte.cle));
       }
-      setActesSelectionnes(new Set());
+      viderBrouillon();
       setDonneesManquantes(false);
       router.refresh();
     } catch (cause) {
@@ -698,6 +704,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
 
   return (
     <section id="tableau-vaccinal-impression" className="rounded-2xl bg-white shadow-sm">
+      {messageBrouillon && <p role="status" className="vaccin-print-hidden m-3 rounded-lg bg-amber-50 p-2 text-sm text-amber-950">{messageBrouillon}</p>}
       <h1 className="hidden text-lg font-black print:block">Tableau vaccinal</h1>
       <div className="vaccin-print-hidden flex flex-wrap items-start gap-2 p-3">
         <div className="inline-flex min-h-10 rounded-lg border bg-white p-1 text-sm font-semibold">
