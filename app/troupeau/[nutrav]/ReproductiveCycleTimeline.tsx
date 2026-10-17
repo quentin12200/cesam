@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useId, useMemo, useState, type CSSProperties } from "react";
 import { addDays, addMonths, differenceInCalendarDays, subDays } from "date-fns";
 import { AlertTriangle, CheckCircle2, Clock3, Syringe } from "lucide-react";
 import {
@@ -304,6 +304,8 @@ export default function ReproductiveCycleTimeline({
   dryOffDate,
 }: ReproductiveCycleTimelineProps) {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [cycleOpen, setCycleOpen] = useState(false);
+  const cycleId = useId();
 
   const model = useMemo(() => {
     const today = new Date();
@@ -888,20 +890,16 @@ export default function ReproductiveCycleTimeline({
       className="mt-3 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       aria-label={`Cycle reproductif : ${model.title}, ${model.main}`}
     >
-      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2.5 sm:px-4 sm:py-3">
-        <div>
-          <p className="hidden text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400 sm:block">Reproduction</p>
-          <h3 className="whitespace-nowrap text-sm font-bold text-slate-900 sm:text-base">Cycle reproductif</h3>
-        </div>
-        <span className={`min-w-0 truncate rounded-full bg-slate-50 px-2.5 py-1 text-xs font-bold ${model.tone}`}>
-          {model.title}
-        </span>
+      <div className="px-3 py-2.5 sm:px-4 sm:py-3" aria-label="Résumé reproduction">
+        <h3 className={`text-sm font-bold leading-snug ${model.tone}`}>
+          {model.title} <span className="font-semibold">· {model.main}</span>
+        </h3>
+        <p className="mt-1 text-xs leading-snug text-slate-600">{model.secondary}</p>
       </div>
 
-      <div className="px-1.5 py-2.5 sm:px-5 sm:py-4">
-        <div className={`mx-auto grid max-w-5xl items-center gap-2.5 sm:gap-4 ${model.alerts.length > 0 ? "lg:grid-cols-[190px_minmax(0,1fr)]" : "lg:grid-cols-1"}`}>
+      <div className="px-1.5 pb-2 sm:px-5">
           {model.alerts.length > 0 && (
-            <aside className="order-2 space-y-2 lg:order-1">
+            <aside className="mb-2 space-y-2" aria-label="Alertes reproduction">
               {model.alerts.map((alert) => {
                 const alertSoftColor = softenColor(alert.color, 0.9);
                 const alertBorderColor = softenColor(alert.color, 0.68);
@@ -929,7 +927,17 @@ export default function ReproductiveCycleTimeline({
             </aside>
           )}
 
-          <div className="order-1 min-w-0 lg:order-2">
+          <button
+            type="button"
+            aria-expanded={cycleOpen}
+            aria-controls={cycleId}
+            onClick={() => setCycleOpen((open) => !open)}
+            className="flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
+          >
+            {cycleOpen ? "Masquer le cycle repro" : "Voir le cycle repro"}
+          </button>
+
+          {cycleOpen && <div id={cycleId} className="min-w-0 pt-2">
             <div className="relative mx-auto my-3 aspect-square w-[min(88vw,390px)] sm:w-[430px]">
               <svg
                 viewBox="-14 -14 228 228"
@@ -1233,8 +1241,7 @@ export default function ReproductiveCycleTimeline({
                 );
               })}
             </div>
-          </div>
-        </div>
+          </div>}
       </div>
     </section>
   );
