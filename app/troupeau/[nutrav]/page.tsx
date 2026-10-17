@@ -249,6 +249,13 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     historicalNationalNumber: fatherNational,
     manualWorkNumber: animal.pereTravailManuel,
   });
+  const fatherRecord = animal.taureau ?? birthVelage?.gestation?.saillie?.taureau ?? null;
+  const fatherName = fatherRecord
+    ? fatherRecord.nopere
+    : birthVelage?.pereNom ?? animal.pereNomManuel;
+  const motherName = biologicalMother.linked
+    ? biologicalMother.linked.nobovi
+    : animal.nomeip ?? animal.mereNomManuel;
   const lastCalving = animal.velagesVache[0]?.date ?? null;
   const currentBreeding = getCurrentCycleBreeding(animal.saillies, lastCalving);
   const activeEchoRequest = animal.demandesEchographie[0] ?? null;
@@ -482,23 +489,14 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
           <>
             {/* Identité */}
             <div className="bg-white rounded-xl shadow overflow-hidden">
-              <dl className="grid grid-cols-2 sm:grid-cols-3">
+              <dl className="grid grid-cols-2">
                 <div className="p-2.5 border-b border-r border-gray-100">
                   <dt className="text-[11px] font-medium text-gray-500 uppercase">Naissance</dt>
                   <dd className="mt-0.5 text-sm font-semibold text-gray-800">{formatDate(animal.danais)}</dd>
                 </div>
-                <div className="p-2.5 border-b sm:border-r border-gray-100">
-                  <dt className="text-[11px] font-medium text-gray-500 uppercase">Catégorie</dt>
-                  <dd className="mt-0.5 flex items-center flex-wrap">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getCategorieColor(getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie))}`}>
-                      {animal.sexbov === "F" ? "♀" : "♂"} {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
-                    </span>
-                  </dd>
-                </div>
-
-                <div className="col-span-2 sm:col-span-1 p-2.5 border-b border-gray-100">
+                <div className="min-w-0 p-2.5 border-b border-gray-100">
                   <dt className="text-[11px] font-medium text-gray-500 uppercase">Groupe</dt>
-                  <dd className={`mt-0.5 text-sm ${animal.groupe ? "font-semibold text-gray-800" : "font-normal text-gray-400"}`}>
+                  <dd className={`mt-0.5 break-words text-sm ${animal.groupe ? "font-semibold text-gray-800" : "font-normal text-gray-400"}`}>
                     {animal.groupe?.nom ?? "Aucun groupe"}
                   </dd>
                 </div>
@@ -536,12 +534,12 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               {animal.notes && (
                 <div className="border-t border-gray-100 px-3 py-2.5">
                   <div className="text-[11px] font-medium text-gray-500 uppercase mb-1">Notes</div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{animal.notes}</p>
+                  <p className="break-words text-sm text-gray-700 whitespace-pre-wrap">{animal.notes}</p>
                 </div>
               )}
 
               {animal.statut === "ACTIF" && (
-                <div className="border-t border-gray-100 bg-gray-50 px-3 py-2.5 flex flex-wrap gap-2">
+                <div className="border-t border-gray-100 bg-gray-50 px-3 py-2 flex flex-wrap gap-2 [&_button]:min-h-11">
                   <CategorieButton
                     nutrav={animal.nutrav}
                     sexbov={animal.sexbov}
@@ -559,145 +557,116 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               )}
             </div>
 
-            {/* Naissance (si c'est un veau) */}
-            {birthVelage && (
-              <div className="bg-white rounded-xl shadow p-3">
-                <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                  <Baby size={16} className="text-pink-500" />
-                  Naissance
-                </h3>
-                <div className="space-y-1.5 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Date</span>
-                    <span>{formatDate(birthVelage.date)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500">Mère</span>
-                    <Link
-                      href={`/troupeau/${birthVelage.vache.nutrav}`}
-                      className="text-green-700 font-medium hover:underline flex items-center gap-1"
-                    >
-                      <span className="font-mono text-xs bg-green-100 px-1.5 py-0.5 rounded">
-                        {birthVelage.vache.nutrav}
-                      </span>
-                      {birthVelage.vache.nobovi && (
-                        <span>{birthVelage.vache.nobovi}</span>
-                      )}
-                    </Link>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Qualificatif</span>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        birthVelage.qualificatif === "NORMAL"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-yellow-100 text-yellow-700"
-                      }`}
-                    >
-                      {birthVelage.qualificatif}
-                    </span>
-                  </div>
-                  {birthVelage.pereNom && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Père (déclaré)</span>
-                      <span className="font-medium">{birthVelage.pereNom}</span>
-                    </div>
-                  )}
-                  <Link href={`/velage?modifier=${birthVelage.id}&returnTo=${encodeURIComponent(`/troupeau/${animal.nutrav}`)}`} className="mt-2 flex min-h-11 items-center justify-center rounded-lg border border-pink-200 bg-pink-50 px-3 text-sm font-semibold text-pink-800">Voir le vêlage</Link>
-                </div>
-              </div>
-            )}
-
             {/* Pesées — tous animaux, tous âges */}
             <div className="bg-white rounded-xl shadow p-3">
               <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                 <Scale size={16} className="text-blue-600" />
                 Pesées {pesees.length > 0 && `(${pesees.length})`}
               </h3>
-              {gmqGlobal !== null && (
-                <div className="mb-2 bg-blue-50 rounded-lg p-2 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">GMQ global</span>
-                  <span className="text-lg font-bold text-blue-700">{gmqGlobal} g/j</span>
-                </div>
-              )}
               {pesees.length > 0 ? (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50">
-                    <span className="text-gray-500">{formatDate(pesees[0].date)}</span>
-                    <span className="font-bold text-gray-800">{pesees[0].poids} kg</span>
-                  </div>
-                  {gmqParPeriode.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50">
-                      <span className="text-gray-500">{formatDate(p.date)}</span>
-                      <div className="flex items-center gap-3">
-                        {p.gmq !== null && (
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                            p.gmq >= 1500 ? "bg-green-100 text-green-700"
-                            : p.gmq >= 1200 ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
-                          }`}>
-                            +{p.gmq} g/j
-                          </span>
-                        )}
-                        <span className="font-bold text-gray-800">{p.poids} kg</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-sm text-gray-600">
+                  Dernière : <strong className="text-base text-gray-900">{pesees[pesees.length - 1].poids} kg</strong>
+                  {" · "}{formatDate(pesees[pesees.length - 1].date)}
+                </p>
               ) : (
-                <p className="text-sm text-gray-400 italic mb-2">Aucune pesée enregistrée</p>
+                <p className="text-sm text-gray-400 italic">Aucune pesée enregistrée</p>
               )}
-              <div className="mt-2">
+              <div className="mt-2 [&_button]:min-h-11">
                 <PeseeInlineForm nutrav={animal.nutrav} initialOpen={pesee === "1"} initialPoids={poids && /^\d+(?:[.,]\d+)?$/.test(poids) ? poids.replace(",", ".") : ""} />
               </div>
+              {pesees.length > 0 && (
+                <details className="mt-2 border-t border-gray-100">
+                  <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-gray-600">Voir l’historique des pesées ({pesees.length})</summary>
+                  {gmqGlobal !== null && (
+                    <p className="mb-2 text-xs text-gray-500">GMQ global : <strong className="text-blue-700">{gmqGlobal} g/j</strong></p>
+                  )}
+                  <div className="divide-y divide-gray-100">
+                    {[...gmqParPeriode].reverse().map((p) => (
+                      <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                        <span className="text-gray-500">{formatDate(p.date)}</span>
+                        <div className="flex items-center gap-3">
+                          {p.gmq !== null && (
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              p.gmq >= 1500 ? "bg-green-100 text-green-700"
+                              : p.gmq >= 1200 ? "bg-yellow-100 text-yellow-700"
+                              : "bg-red-100 text-red-700"
+                            }`}>
+                              +{p.gmq} g/j
+                            </span>
+                          )}
+                          <span className="font-bold text-gray-800">{p.poids} kg</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between gap-2 py-2 text-sm">
+                      <span className="text-gray-500">{formatDate(pesees[0].date)}</span>
+                      <span className="font-bold text-gray-800">{pesees[0].poids} kg</span>
+                    </div>
+                  </div>
+                </details>
+              )}
             </div>
 
-            {/* Généalogie */}
+            {/* Parenté : une seule présentation des parents et de la naissance. */}
             <div className="bg-white rounded-xl shadow p-3">
-              <h3 className="font-semibold text-gray-800 mb-2">Généalogie</h3>
+              <h3 className="font-semibold text-gray-800 mb-1">Parenté</h3>
               <div className="space-y-1.5 text-sm">
                 {/* Mère */}
-                <div className="flex items-center justify-between">
+                <div className="flex min-h-11 items-center justify-between gap-3">
                   <span className="text-gray-500">Mère</span>
                   {biologicalMother.linked ? (
                     <Link
                       href={`/troupeau/${biologicalMother.linked.nutrav}`}
-                      className="flex items-center gap-1.5 text-green-700 font-medium hover:underline"
+                      className="flex min-h-11 min-w-0 items-center justify-end gap-1.5 text-green-700 font-medium hover:underline"
                     >
                       <span className="font-mono text-xs bg-green-100 px-1.5 py-0.5 rounded">
                         {biologicalMother.linked.nutrav}
                       </span>
+                      {motherName && <span className="min-w-0 break-words">{motherName}</span>}
                     </Link>
                   ) : (
-                    <span className="font-mono text-gray-700">{motherWorkNumber ?? "—"}</span>
+                    <span className="min-w-0 break-words text-right text-gray-700"><span className="font-mono">{motherWorkNumber ?? "—"}</span>{motherName && ` · ${motherName}`}</span>
                   )}
                 </div>
 
                 {/* Père */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-gray-500">Père</span>
-                  <span className="font-mono font-medium text-gray-800">{fatherWorkNumber ?? "—"}</span>
+                  <span className="min-w-0 break-words text-right font-medium text-gray-800"><span className="font-mono">{fatherWorkNumber ?? "—"}</span>{fatherName && ` · ${fatherName}`}</span>
                 </div>
               </div>
 
+              {birthVelage && (
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-1">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${birthVelage.qualificatif === "NORMAL" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                    Naissance · {birthVelage.qualificatif}
+                  </span>
+                  {formatDate(birthVelage.date) !== formatDate(animal.danais) && (
+                    <span className="text-xs text-gray-500">Vêlage enregistré le {formatDate(birthVelage.date)}</span>
+                  )}
+                  <Link href={`/velage?modifier=${birthVelage.id}&returnTo=${encodeURIComponent(`/troupeau/${animal.nutrav}`)}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-green-700 hover:underline">Voir le vêlage</Link>
+                </div>
+              )}
+            </div>
+
               {/* Veaux */}
               {animal.veaux.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  <div className="text-xs font-semibold text-gray-500 mb-2">
-                    Descendance ({animal.veaux.length})
-                  </div>
+                <details className="rounded-xl bg-white px-3 shadow">
+                  <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-gray-700">
+                    Descendance · {animal.veaux.length} {animal.veaux.length > 1 ? "veaux" : "veau"}
+                  </summary>
                   <div className="space-y-1">
                     {animal.veaux.map((veau) => (
                       <Link
                         key={veau.id}
                         href={`/troupeau/${veau.nutrav}`}
-                        className="flex items-center justify-between py-1.5 hover:bg-gray-50 rounded px-1"
+                        className="flex min-h-11 flex-wrap items-center justify-between gap-2 py-1.5 hover:bg-gray-50 rounded px-1"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
                           <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded font-bold">
                             {veau.nutrav}
                           </span>
-                          <span className="text-sm text-gray-700">{veau.nobovi ?? "Sans nom"}</span>
+                          <span className="min-w-0 break-words text-sm text-gray-700">{veau.nobovi ?? "Sans nom"}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-500">{formatAge(veau.danais)}</span>
@@ -715,9 +684,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                       </Link>
                     ))}
                   </div>
-                </div>
+                </details>
               )}
-            </div>
           </>
         )}
 
