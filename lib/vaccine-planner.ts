@@ -357,7 +357,6 @@ export function calculerActionVaccinaleQuestionnaire({
 }): ActionVaccinaleCalculee {
   const etapeParId = (id: string) => etapes.find((etape) => etape.id === id) ?? null;
   if (statutProtocole === "A_CONFIRMER") return actionQuestionnaire("A_CONFIRMER", null, null, null);
-  if (statutProtocole === null && vaccinations.length === 0) return actionQuestionnaire("A_CONFIRMER", null, null, null);
   const demarrage = configuration.demarrage;
   const idPrimo = demarrage.type === "DOSE_UNIQUE" ? demarrage.etapeDoseId : demarrage.etapePrimoId;
   const idRappel = demarrage.type === "PRIMO_RAPPEL" ? demarrage.etapeRappelId : null;

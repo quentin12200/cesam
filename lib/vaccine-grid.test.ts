@@ -430,3 +430,67 @@ test("une fenêtre initiale qui chevauche le vêlage est bornée au jour du vêl
   assert.equal(fenetre?.debut.toISOString(), "2026-11-20T12:00:00.000Z");
   assert.equal(fenetre?.fin.toISOString(), velage.toISOString());
 });
+
+const mhePrimo = { ...etapePrimo, id: "mhe-primo", medicamentId: "med-hepizovac", medicamentNom: "HEPIZOVAC - MHE", medicaments: [{ medicament: { id: "med-hepizovac", nom: "HEPIZOVAC - MHE" } }] };
+const mheRappel = { ...etapeRappel, id: "mhe-rappel", medicamentId: "med-hepizovac", medicamentNom: "HEPIZOVAC - MHE", medicaments: [{ medicament: { id: "med-hepizovac", nom: "HEPIZOVAC - MHE" } }] };
+const mheConfig = {
+  version: 1, medicamentId: "med-hepizovac", cible: { tousBovins: false, categories: ["VACHE"] },
+  demarrage: { type: "PRIMO_RAPPEL", etapePrimoId: mhePrimo.id, etapeRappelId: mheRappel.id, calendrierPrimo: { type: "SANS_REGLE" }, rappel: { type: "DELAI_FIXE", delai: { valeur: 21, unite: "JOUR" }, preconisationPrimoId: "precon-mhe", preconisationRappelId: "precon-mhe", resterDansFenetrePrimo: false } },
+  entretien: { actif: false },
+};
+const protocoleMhe: ProtocoleGrille = {
+  ...protocoleBovigrip, id: "proto-mhe", nom: "MHE", label: "HEPIZOVAC - MHE",
+  categoriesJson: JSON.stringify(["VACHE"]), sexeCible: "F", configurationQuestionnaireJson: JSON.stringify(mheConfig), etapes: [mhePrimo, mheRappel],
+};
+const nouveauMhe = (partiel: Partial<AnimalGrille> = {}) => animal({
+  id: "mhe-nouveau", nutrav: "NOUVEAU", nom: "Nouvelle vache", sexe: "F", categorie: "VACHE",
+  danaisIso: "2025-01-01T12:00:00Z", statutsProtocoles: [], actes: [], ...partiel,
+});
+
+test("questionnaire MHE générique : animal éligible sans acte ni statut voit sa Primo sélectionnable", () => {
+  const grille = construireGrilleVaccinale([nouveauMhe()], [protocoleMhe], [], AUJOURDHUI);
+  const cellule = grille.lignes[0].cellules[mhePrimo.id];
+  assert.equal(cellule.statut, "A_FAIRE");
+  assert.equal(cellule.rattachementProtocoleAutorise, true);
+  assert.equal(grille.lignes[0].cellules[mheRappel.id].statut, "VIDE");
+  assert.deepEqual(extraireActionsPrevues(grille).map((item) => item.etapeId), [mhePrimo.id]);
+});
+
+test("questionnaire MHE : le calendrier peut afficher prévu ou bientôt sans statut enregistré", () => {
+  const dateNaissance = "2026-09-20T12:00:00Z";
+  const config = (age: number) => JSON.stringify({ ...mheConfig, demarrage: { ...mheConfig.demarrage, calendrierPrimo: { type: "AGE_MINIMUM", age: { valeur: age, unite: "JOUR" } } } });
+  const prevu = construireGrilleVaccinale([nouveauMhe({ danaisIso: dateNaissance })], [{ ...protocoleMhe, configurationQuestionnaireJson: config(60) }], [], AUJOURDHUI);
+  const bientot = construireGrilleVaccinale([nouveauMhe({ danaisIso: dateNaissance })], [{ ...protocoleMhe, configurationQuestionnaireJson: config(15) }], [], AUJOURDHUI);
+  assert.equal(prevu.lignes[0].cellules[mhePrimo.id].statut, "PREVU");
+  assert.equal(bientot.lignes[0].cellules[mhePrimo.id].statut, "BIENTOT");
+  assert.equal(extraireActionsPrevues(prevu)[0].etapeId, mhePrimo.id);
+});
+
+test("questionnaire MHE : animal hors cible sans historique ne reçoit aucune recommandation", () => {
+  const grille = construireGrilleVaccinale([nouveauMhe({ categorie: "VEAU_M", sexe: "M" })], [protocoleMhe], [], AUJOURDHUI);
+  assert.equal(grille.lignes[0].cellules[mhePrimo.id].statut, "VIDE");
+  assert.equal(extraireActionsPrevues(grille).length, 0);
+});
+
+test("questionnaire MHE : deux actes réels ambigus restent à rattacher sans nouvelle Primo", () => {
+  const actes = ["2026-08-01", "2026-08-22"].map((date, index) => ({
+    sourceType: "VACCINATION" as const, sourceId: `mhe-${index}`, date: new Date(`${date}T12:00:00Z`),
+    vaccin: "HEPIZOVAC - MHE", medicamentId: "med-hepizovac", protocoleId: null, etapeProtocoleId: null, gestationId: null, statut: "FAIT",
+  }));
+  const grille = construireGrilleVaccinale([nouveauMhe({ actes })], [protocoleMhe], [], AUJOURDHUI);
+  const primo = grille.lignes[0].cellules[mhePrimo.id];
+  assert.equal(primo.aValider, true);
+  assert.equal(primo.historiquesAValider.length, 2);
+  assert.equal(primo.statut, "VIDE");
+  assert.equal(extraireActionsPrevues(grille).length, 0);
+});
+
+test("questionnaire MHE : une Primo réelle mène au Rappel, un statut acquis ne relance rien", () => {
+  const acte = { date: new Date("2026-09-10T12:00:00Z"), vaccin: "HEPIZOVAC - MHE", medicamentId: "med-hepizovac", protocoleId: protocoleMhe.id, etapeProtocoleId: mhePrimo.id, gestationId: null, statut: "FAIT" };
+  const grille = construireGrilleVaccinale([nouveauMhe({ actes: [acte] })], [protocoleMhe], [], AUJOURDHUI);
+  assert.equal(grille.lignes[0].cellules[mhePrimo.id].statut, "FAIT");
+  assert.equal(grille.lignes[0].cellules[mheRappel.id].statut, "BIENTOT");
+  assert.deepEqual(extraireActionsPrevues(grille).map((item) => item.etapeId), [mheRappel.id]);
+  const acquis = construireGrilleVaccinale([nouveauMhe({ statutsProtocoles: [{ protocoleId: protocoleMhe.id, statut: "PROTOCOLE_ACQUIS" }] })], [protocoleMhe], [], AUJOURDHUI);
+  assert.equal(extraireActionsPrevues(acquis).length, 0);
+});

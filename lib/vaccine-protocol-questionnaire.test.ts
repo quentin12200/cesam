@@ -154,3 +154,70 @@ test("sans acte l'initial commence par la Primo, puis une Primo seule attend le 
   const enCours = action(configuration, { date: jour("2026-09-29"), dateVelagePrevue: jour("2026-12-01"), vaccinations: [primo], historiqueVaccinations: [primo], statutProtocole: "PRIMO_EN_COURS" });
   assert.equal(enCours.etape?.id, "rappel");
 });
+
+test("sans acte ni statut, un questionnaire Primo/Rappel démarre par la Primo", () => {
+  const configuration = base();
+  configuration.demarrage = { type: "PRIMO_RAPPEL", etapePrimoId: "primo", etapeRappelId: "rappel", calendrierPrimo: { type: "SANS_REGLE" }, rappel: { type: "DELAI_FIXE", delai: { valeur: 21, unite: "JOUR" }, preconisationPrimoId: "p-im", preconisationRappelId: "p-im", resterDansFenetrePrimo: false } };
+  const resultat = action(configuration, { statutProtocole: null });
+  assert.equal(resultat.statut, "A_FAIRE");
+  assert.equal(resultat.etape?.id, "primo");
+  assert.equal(iso(resultat.dateMin), "2026-03-01");
+});
+
+test("sans acte ni statut, une dose unique suit son calendrier", () => {
+  const resultat = action(base(), { statutProtocole: null });
+  assert.equal(resultat.statut, "A_FAIRE");
+  assert.equal(resultat.etape?.id, "dose");
+});
+
+test("sans historique, l'âge minimum diffère puis ouvre la première étape", () => {
+  const configuration = base();
+  configuration.demarrage = { type: "PRIMO_RAPPEL", etapePrimoId: "primo", etapeRappelId: "rappel", calendrierPrimo: { type: "AGE_MINIMUM", age: { valeur: 60, unite: "JOUR" } }, rappel: { type: "DELAI_FIXE", delai: { valeur: 21, unite: "JOUR" }, preconisationPrimoId: "p-im", preconisationRappelId: "p-im", resterDansFenetrePrimo: false } };
+  const tropJeune = action(configuration, { date: jour("2026-01-10"), statutProtocole: null });
+  assert.equal(tropJeune.statut, "TROP_TOT");
+  assert.equal(tropJeune.etape?.id, "primo");
+  assert.equal(iso(tropJeune.dateMin), "2026-03-02");
+  const ageAtteint = action(configuration, { date: jour("2026-03-03"), statutProtocole: null });
+  assert.equal(ageAtteint.statut, "A_FAIRE");
+  assert.equal(ageAtteint.etape?.id, "primo");
+});
+
+test("sans date de vêlage le parcours pré-vêlage reste à confirmer, avec date il respecte la fenêtre", () => {
+  const configuration = base();
+  configuration.demarrage = { type: "PRIMO_RAPPEL", etapePrimoId: "primo", etapeRappelId: "rappel", calendrierPrimo: { type: "AVANT_VELAGE", debutAvant: { valeur: 90, unite: "JOUR" }, finAvant: { valeur: 30, unite: "JOUR" } }, rappel: { type: "DELAI_FIXE", delai: { valeur: 21, unite: "JOUR" }, preconisationPrimoId: "p-im", preconisationRappelId: "p-im", resterDansFenetrePrimo: false } };
+  assert.equal(action(configuration, { statutProtocole: null, dateVelagePrevue: null }).statut, "A_CONFIRMER");
+  const prevu = action(configuration, { statutProtocole: null, date: jour("2026-08-01"), dateVelagePrevue: jour("2026-12-01") });
+  assert.equal(prevu.etape?.id, "primo");
+  assert.equal(iso(prevu.dateMin), "2026-09-02");
+  assert.equal(prevu.statut, "TROP_TOT");
+  const ouvert = action(configuration, { statutProtocole: null, date: jour("2026-09-15"), dateVelagePrevue: jour("2026-12-01") });
+  assert.equal(ouvert.statut, "A_FAIRE");
+  assert.equal(iso(ouvert.dateMax), "2026-11-01");
+});
+
+test("sans historique, les mois annuels restent la source de la première fenêtre", () => {
+  const configuration = base();
+  configuration.demarrage = { type: "DOSE_UNIQUE", etapeDoseId: "dose", preconisationId: "p-im", calendrier: { type: "MOIS_ANNUELS", mois: [10] } };
+  const resultat = action(configuration, { statutProtocole: null, date: jour("2026-03-01") });
+  assert.equal(resultat.etape?.id, "dose");
+  assert.equal(iso(resultat.dateMin), "2026-10-01");
+  assert.equal(resultat.statut, "TROP_TOT");
+});
+
+test("l'incertitude réelle demeure : configuration invalide et statut explicite à confirmer", () => {
+  assert.equal(action(base(), { statutProtocole: "A_CONFIRMER" }).statut, "A_CONFIRMER");
+  const invalide = action(base(), { statutProtocole: null, configurationQuestionnaireJson: "{invalide" });
+  assert.equal(invalide.statut, "A_CONFIRMER");
+  assert.equal(invalide.etape, null);
+});
+
+test("une Primo réelle sans statut conduit au Rappel ; un protocole acquis ne redémarre pas", () => {
+  const configuration = base();
+  configuration.demarrage = { type: "PRIMO_RAPPEL", etapePrimoId: "primo", etapeRappelId: "rappel", calendrierPrimo: { type: "SANS_REGLE" }, rappel: { type: "DELAI_FIXE", delai: { valeur: 21, unite: "JOUR" }, preconisationPrimoId: "p-im", preconisationRappelId: "p-im", resterDansFenetrePrimo: false } };
+  const rappel = action(configuration, { statutProtocole: null, vaccinations: [{ date: jour("2026-02-20"), etapeProtocoleId: "primo" }] });
+  assert.equal(rappel.etape?.id, "rappel");
+  assert.equal(iso(rappel.dateMin), "2026-03-13");
+  const acquis = action(configuration, { statutProtocole: "PROTOCOLE_ACQUIS" });
+  assert.equal(acquis.statut, "TERMINE");
+  assert.equal(acquis.etape, null);
+});
