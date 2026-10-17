@@ -47,11 +47,14 @@ export function libelleFenetreVaccinale(
   statut: StatutAgenda,
   dateMin: string,
   dateMax: string,
+  premiereEtape = false,
 ): { statut: string; date: string } {
-  if (statut === "PREVU") return { statut: "", date: `dès ${formatDateAgenda(dateMin)}` };
-  if (statut === "BIENTOT") return { statut: "bientôt", date: `dès ${formatDateAgenda(dateMin)}` };
-  if (statut === "A_FAIRE") return { statut: "à faire", date: `jusqu’au ${formatDateAgenda(dateMax)}` };
-  return { statut: "en retard", date: `depuis ${formatDateAgenda(dateMax)}` };
+  const libelleStatut = { PREVU: premiereEtape ? "" : "prévu", BIENTOT: "bientôt", A_FAIRE: "à faire", EN_RETARD: "en retard" }[statut];
+  if (premiereEtape) {
+    return { statut: libelleStatut, date: `${statut === "A_FAIRE" || statut === "EN_RETARD" ? "depuis" : "dès"} ${formatDateAgenda(statut === "EN_RETARD" ? dateMax : dateMin)}` };
+  }
+  const unique = new Date(dateMin).getTime() === new Date(dateMax).getTime();
+  return { statut: libelleStatut, date: unique ? `le ${formatDateAgenda(dateMin)}` : `${formatDateAgenda(dateMin)} → ${formatDateAgenda(dateMax)}` };
 }
 
 export function regrouperActionsAgenda(actions: readonly ActionAgenda[]): GroupeAgenda[] {

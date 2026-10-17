@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { comparerUrgenceVaccinale, formatTempsAvantVelage, type CelluleVaccinaleTri } from "./vaccine-table-presentation.ts";
+import { classeStatutVaccinal, comparerUrgenceVaccinale, formatTempsAvantVelage, type CelluleVaccinaleTri } from "./vaccine-table-presentation.ts";
+
+test("les cinq statuts ont des couleurs distinctes et le vert est réservé au fait", () => {
+  const classes = ["PREVU", "BIENTOT", "A_FAIRE", "EN_RETARD", "FAIT"].map((statut) => classeStatutVaccinal[statut as keyof typeof classeStatutVaccinal]);
+  assert.equal(new Set(classes).size, 5);
+  assert.ok(classes[4].includes("green"));
+  assert.ok(classes.slice(0, 4).every((classe) => !classe.includes("green")));
+});
 
 test("le tri vaccinal place retard, à faire, bientôt, prévu plus tard puis sans échéance", () => {
   const cellules: CelluleVaccinaleTri[] = [

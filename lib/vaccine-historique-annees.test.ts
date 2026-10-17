@@ -141,12 +141,12 @@ test("13. historique d'étape : toutes les dates réelles restent disponibles, s
   assert.equal(actesHistoriquesEtape(actes, "primo").length, 1, "la vraie Primo reste distincte");
 
   const tableau = readFileSync(new URL("../app/sanitaire/vaccins/TableauVaccinal.tsx", import.meta.url), "utf8");
-  assert.match(tableau, /etape\.cycle === "ENTRETIEN"/);
-  assert.match(tableau, /<span className="text-\[10px\]">historique<\/span>/);
+  assert.match(tableau, /historiqueEtape\.length > 0/, "un acte réel reste visible quelle que soit l'année affichée");
+  assert.match(tableau, /datesInitiales\.total === 0[\s\S]{0,80}ancien/, "une date hors filtre est annoncée comme ancienne");
   assert.match(tableau, /title=\{`Historique : \$\{tousLesActes\}/, "le tooltip conserve toutes les dates");
   assert.match(tableau, /onClick=\{\(\) => ouvrirHistorique\(ligne, bloc, etape\)\}/, "clic et tap ouvrent le panneau existant");
   assert.match(tableau, /\{historique\}[\s\S]{0,80}\{action\}/, "l'historique compact précède l'échéance courante");
-  assert.doesNotMatch(tableau, /datesCompactes\(cellule\.actes/, "les années d'entretien ne sont plus empilées dans la cellule");
+  assert.doesNotMatch(tableau, /datesCompactes\(cellule\.actes/, "les dates viennent des actes réels de l'étape");
 });
 
 test("F/14. déduplication : même médicament + même jour = un seul acte, la Vaccination gagne ; deux jours = deux actes", () => {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { formatTempsAvantVelage } from "@/lib/vaccine-table-presentation";
+import { classeStatutVaccinal, formatTempsAvantVelage } from "@/lib/vaccine-table-presentation";
 import {
   cleJourCalendrier,
   construireJoursCalendrier,
@@ -70,14 +70,6 @@ const joursSemaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const titreMois = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
 const dateLongue = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-const classeEvenement: Record<StatutAgenda | "FAIT", string> = {
-  EN_RETARD: "border-red-800 bg-red-700 text-white",
-  A_FAIRE: "border-yellow-600 bg-yellow-300 text-yellow-950",
-  BIENTOT: "border-orange-700 bg-orange-400 text-orange-950",
-  PREVU: "border-slate-400 bg-slate-100 text-slate-800",
-  FAIT: "border-green-700 bg-green-100 text-green-950",
-};
-
 const libelleStatut: Record<StatutAgenda | "FAIT", string> = {
   EN_RETARD: "En retard", A_FAIRE: "À faire", BIENTOT: "Bientôt", PREVU: "Prévu", FAIT: "Fait",
 };
@@ -86,20 +78,22 @@ function nombreAnimaux(evenement: EvenementCalendrier): number {
   return evenement.type === "PREVU" ? evenement.groupe.actions.length : evenement.animaux.length;
 }
 
-function DetailsEvenement({ evenement, lignes, onPreparer, onFermer }: {
+function DetailsEvenement({ evenement, lignes, blocs, onPreparer, onFermer }: {
   evenement: EvenementCalendrier;
   lignes: Map<string, LigneAgenda>;
+  blocs: BlocAgenda[];
   onPreparer: (groupe: GroupeAgenda) => void;
   onFermer: () => void;
 }) {
-  const libelle = evenement.type === "PREVU" ? libelleFenetreVaccinale(evenement.statut, evenement.groupe.dateMin, evenement.groupe.dateMax) : null;
+  const premiereEtape = evenement.type === "PREVU" && evenement.groupe.actions[0]?.typeEtape !== "ENTRETIEN" && blocs.some((bloc) => bloc.sousColonnes[0]?.id === evenement.groupe.actions[0]?.etapeId);
+  const libelle = evenement.type === "PREVU" ? libelleFenetreVaccinale(evenement.statut, evenement.groupe.dateMin, evenement.groupe.dateMax, premiereEtape) : null;
   const animaux = evenement.type === "PREVU"
     ? evenement.groupe.actions.map((action) => ({ action, ligne: lignes.get(action.animalId) }))
     : evenement.animaux.map((ligne) => ({ action: null, ligne }));
 
   return <div>
     <button type="button" onClick={onFermer} className="mb-2 min-h-9 text-sm font-semibold text-green-800 underline">← Retour au jour</button>
-    <p className={`inline-flex rounded-full border px-2 py-1 text-xs font-black ${classeEvenement[evenement.statut]}`}>{libelleStatut[evenement.statut]}</p>
+    <p className={`inline-flex rounded-full border px-2 py-1 text-xs font-black ${classeStatutVaccinal[evenement.statut]}`}>{libelleStatut[evenement.statut]}</p>
     <h2 className="mt-2 text-lg font-black text-gray-950">{evenement.vaccin} — {evenement.etape}</h2>
     <p className="text-sm text-gray-600">{nombreAnimaux(evenement)} animal(aux){evenement.type === "PREVU" && libelle ? ` · ${[libelle.statut, libelle.date].filter(Boolean).join(" · ")}` : evenement.type === "FAIT" ? ` · fait le ${formatDateAgenda(evenement.date)}` : ""}</p>
     <ul className="mt-3 max-h-[50vh] divide-y overflow-y-auto border-y">
@@ -204,13 +198,13 @@ export default function CalendrierVaccinal({ actions, lignes, blocs, anneesFiltr
         const visible = duJour.slice(0, 3);
         return <div key={jour.cle} onClick={() => { setJourOuvert(jour.cle); setEvenementOuvert(null); }} className={`min-h-28 cursor-pointer border-b border-r p-1.5 text-left align-top hover:bg-green-50 ${jour.dansMois ? "bg-white" : "bg-gray-50 text-gray-400"} ${jour.cle === cleAujourdhui ? "ring-2 ring-inset ring-green-700" : ""}`}>
           <button type="button" onClick={() => { setJourOuvert(jour.cle); setEvenementOuvert(null); }} aria-label={`Voir le ${dateLongue.format(jour.date)}`} className={`mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full text-xs font-black ${jour.cle === cleAujourdhui ? "bg-green-800 text-white" : ""}`}>{jour.date.getDate()}</button>
-          <div className="space-y-1">{visible.map((evenement) => <button key={evenement.cle} type="button" aria-label={`${evenement.vaccin}, ${evenement.etape}, ${nombreAnimaux(evenement)} animaux, ${libelleStatut[evenement.statut]}`} onClick={(event) => { event.stopPropagation(); setJourOuvert(jour.cle); setEvenementOuvert(evenement.cle); }} className={`block w-full rounded border px-1 py-0.5 text-left text-[10px] font-bold leading-tight ${classeEvenement[evenement.statut]}`}><span className="block truncate">{evenement.vaccin}</span><span className="block truncate font-medium">{evenement.etape} · {nombreAnimaux(evenement)}</span></button>)}{duJour.length > visible.length && <button type="button" onClick={(event) => { event.stopPropagation(); setJourOuvert(jour.cle); setEvenementOuvert(null); }} className="block px-1 text-[10px] font-black text-gray-600">+{duJour.length - visible.length}</button>}</div>
+          <div className="space-y-1">{visible.map((evenement) => <button key={evenement.cle} type="button" aria-label={`${evenement.vaccin}, ${evenement.etape}, ${nombreAnimaux(evenement)} animaux, ${libelleStatut[evenement.statut]}`} onClick={(event) => { event.stopPropagation(); setJourOuvert(jour.cle); setEvenementOuvert(evenement.cle); }} className={`block w-full rounded border px-1 py-0.5 text-left text-[10px] font-bold leading-tight ${classeStatutVaccinal[evenement.statut]}`}><span className="block truncate">{evenement.vaccin}</span><span className="block truncate font-medium">{evenement.etape} · {nombreAnimaux(evenement)}</span></button>)}{duJour.length > visible.length && <button type="button" onClick={(event) => { event.stopPropagation(); setJourOuvert(jour.cle); setEvenementOuvert(null); }} className="block px-1 text-[10px] font-black text-gray-600">+{duJour.length - visible.length}</button>}</div>
         </div>;
       })}</div>
     </div></div>
 
     {jourOuvert && <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Détail du calendrier vaccinal" onMouseDown={(event) => { if (event.currentTarget === event.target) { setJourOuvert(null); setEvenementOuvert(null); } }}><div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
-      {evenementDetail ? <DetailsEvenement evenement={evenementDetail} lignes={indexLignes} onPreparer={onPreparer} onFermer={() => setEvenementOuvert(null)} /> : <><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><h2 className="text-lg font-black capitalize text-gray-950">{dateLongue.format(new Date(`${jourOuvert}T12:00:00`))}</h2><p className="text-sm text-gray-600">{evenementsJour.length} action(s) vaccinale(s)</p></div><button type="button" onClick={() => setJourOuvert(null)} aria-label="Fermer" className="min-h-10 min-w-10 rounded-lg border text-xl">×</button></div><div className="mt-4 space-y-2">{evenementsJour.map((evenement) => <button key={evenement.cle} type="button" onClick={() => setEvenementOuvert(evenement.cle)} className={`w-full rounded-xl border p-3 text-left ${classeEvenement[evenement.statut]}`}><span className="block font-black">{evenement.vaccin} — {evenement.etape}</span><span className="block text-sm">{nombreAnimaux(evenement)} animal(aux) · {libelleStatut[evenement.statut]}</span></button>)}{evenementsJour.length === 0 && <p className="rounded-xl border border-dashed p-6 text-center text-sm text-gray-500">Aucune action vaccinale ce jour.</p>}</div></>}
+      {evenementDetail ? <DetailsEvenement evenement={evenementDetail} lignes={indexLignes} blocs={blocs} onPreparer={onPreparer} onFermer={() => setEvenementOuvert(null)} /> : <><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><h2 className="text-lg font-black capitalize text-gray-950">{dateLongue.format(new Date(`${jourOuvert}T12:00:00`))}</h2><p className="text-sm text-gray-600">{evenementsJour.length} action(s) vaccinale(s)</p></div><button type="button" onClick={() => setJourOuvert(null)} aria-label="Fermer" className="min-h-10 min-w-10 rounded-lg border text-xl">×</button></div><div className="mt-4 space-y-2">{evenementsJour.map((evenement) => <button key={evenement.cle} type="button" onClick={() => setEvenementOuvert(evenement.cle)} className={`w-full rounded-xl border p-3 text-left ${classeStatutVaccinal[evenement.statut]}`}><span className="block font-black">{evenement.vaccin} — {evenement.etape}</span><span className="block text-sm">{nombreAnimaux(evenement)} animal(aux) · {libelleStatut[evenement.statut]}</span></button>)}{evenementsJour.length === 0 && <p className="rounded-xl border border-dashed p-6 text-center text-sm text-gray-500">Aucune action vaccinale ce jour.</p>}</div></>}
     </div></div>}
   </div>;
 }

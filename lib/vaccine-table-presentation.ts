@@ -2,6 +2,16 @@ import { addMonths, differenceInCalendarDays, differenceInCalendarMonths } from 
 
 export type StatutCelluleVaccinale = "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
 
+/** Codes visuels communs au tableau et à l'Agenda ; le texte reste toujours explicite. */
+export const classeStatutVaccinal: Record<StatutCelluleVaccinale, string> = {
+  FAIT: "border-green-700 bg-green-100 text-green-950",
+  PREVU: "border-slate-300 bg-slate-50 text-slate-700",
+  BIENTOT: "border-yellow-600 bg-yellow-100 text-yellow-950",
+  A_FAIRE: "border-orange-700 bg-orange-100 text-orange-950",
+  EN_RETARD: "border-red-800 bg-red-100 text-red-950",
+  VIDE: "border-gray-300 bg-gray-50 text-gray-700",
+};
+
 export interface CelluleVaccinaleTri {
   statut: StatutCelluleVaccinale;
   date: string | null;

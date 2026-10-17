@@ -22,9 +22,12 @@ function action(partiel: Partial<ActionAgenda> = {}): ActionAgenda {
 }
 
 test("les libellés expliquent le sens de la fenêtre sans date nue", () => {
-  assert.deepEqual(libelleFenetreVaccinale("PREVU", "2026-11-04T12:00:00Z", "2026-11-22T12:00:00Z"), { statut: "", date: "dès 04/11" });
-  assert.deepEqual(libelleFenetreVaccinale("A_FAIRE", "2026-11-04T12:00:00Z", "2026-11-22T12:00:00Z"), { statut: "à faire", date: "jusqu’au 22/11" });
-  assert.deepEqual(libelleFenetreVaccinale("EN_RETARD", "2026-10-01T12:00:00Z", "2026-10-05T12:00:00Z"), { statut: "en retard", date: "depuis 05/10" });
+  assert.deepEqual(libelleFenetreVaccinale("PREVU", "2026-11-04T12:00:00Z", "2026-11-22T12:00:00Z", true), { statut: "", date: "dès 04/11" });
+  assert.deepEqual(libelleFenetreVaccinale("BIENTOT", "2026-11-04T12:00:00Z", "2026-11-22T12:00:00Z", true), { statut: "bientôt", date: "dès 04/11" });
+  assert.deepEqual(libelleFenetreVaccinale("A_FAIRE", "2026-11-04T12:00:00Z", "2026-11-22T12:00:00Z", true), { statut: "à faire", date: "depuis 04/11" });
+  assert.deepEqual(libelleFenetreVaccinale("A_FAIRE", "2026-11-14T12:00:00Z", "2026-11-14T12:00:00Z"), { statut: "à faire", date: "le 14/11" });
+  assert.deepEqual(libelleFenetreVaccinale("A_FAIRE", "2026-11-14T12:00:00Z", "2026-11-21T12:00:00Z"), { statut: "à faire", date: "14/11 → 21/11" });
+  assert.deepEqual(libelleFenetreVaccinale("EN_RETARD", "2026-10-01T12:00:00Z", "2026-10-05T12:00:00Z"), { statut: "en retard", date: "01/10 → 05/10" });
 });
 
 test("l'Agenda mélange tous les vaccins et ordonne retard, à faire, bientôt puis prévu", () => {
