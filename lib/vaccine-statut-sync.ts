@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { statutDepuisEtapesFaites } from "@/lib/vaccine-statut";
 import { brancheInitialeDepuisActes, lireConfigurationQuestionnaire } from "@/lib/vaccine-protocol-questionnaire";
 
@@ -7,16 +8,16 @@ import { brancheInitialeDepuisActes, lireConfigurationQuestionnaire } from "@/li
  * (Vaccination + Traitement rattaché). Pour un protocole questionnaire, la branche initiale
  * suit toujours les actes réels, même si le statut métier a été posé à la main.
  */
-export async function resynchroniserStatutProtocole(animalId: string, protocoleId: string): Promise<void> {
-  const statut = await prisma.statutProtocoleVaccinal.findUnique({
+export async function resynchroniserStatutProtocole(animalId: string, protocoleId: string, db: Prisma.TransactionClient = prisma): Promise<void> {
+  const statut = await db.statutProtocoleVaccinal.findUnique({
     where: { animalId_protocoleId: { animalId, protocoleId } },
     select: { id: true, statut: true, source: true, brancheInitialeId: true },
   });
   const [protocole, vaccinations, traitements, animal] = await Promise.all([
-    prisma.protocoleVaccin.findUnique({ where: { id: protocoleId }, select: { configurationQuestionnaireJson: true, etapes: { select: { id: true, cycle: true, obligatoire: true } } } }),
-    prisma.vaccination.findMany({ where: { animalId, protocoleId, statut: "FAIT", etapeProtocoleId: { not: null } }, select: { etapeProtocoleId: true, date: true } }),
-    prisma.traitement.findMany({ where: { animalId, protocoleVaccinId: protocoleId, etapeProtocoleVaccinId: { not: null } }, select: { etapeProtocoleVaccinId: true, dateDebut: true } }),
-    prisma.animal.findUnique({ where: { id: animalId }, select: { danais: true } }),
+    db.protocoleVaccin.findUnique({ where: { id: protocoleId }, select: { configurationQuestionnaireJson: true, etapes: { select: { id: true, cycle: true, obligatoire: true } } } }),
+    db.vaccination.findMany({ where: { animalId, protocoleId, statut: "FAIT", etapeProtocoleId: { not: null } }, select: { etapeProtocoleId: true, date: true } }),
+    db.traitement.findMany({ where: { animalId, protocoleVaccinId: protocoleId, etapeProtocoleVaccinId: { not: null } }, select: { etapeProtocoleVaccinId: true, dateDebut: true } }),
+    db.animal.findUnique({ where: { id: animalId }, select: { danais: true } }),
   ]);
   if (!protocole) return;
   const faites = new Set<string>([
@@ -30,7 +31,7 @@ export async function resynchroniserStatutProtocole(animalId: string, protocoleI
   if (!configuration) {
     if (!statut || statut.source !== "VACCINATION") return;
     if (attendu && attendu !== statut.statut) {
-      await prisma.statutProtocoleVaccinal.update({ where: { id: statut.id }, data: { statut: attendu } });
+      await db.statutProtocoleVaccinal.update({ where: { id: statut.id }, data: { statut: attendu } });
     }
     return;
   }
@@ -42,7 +43,7 @@ export async function resynchroniserStatutProtocole(animalId: string, protocoleI
     : null;
   if (!statut) {
     if (!attendu) return;
-    await prisma.statutProtocoleVaccinal.create({
+    await db.statutProtocoleVaccinal.create({
       data: {
         animalId,
         protocoleId,
@@ -58,12 +59,12 @@ export async function resynchroniserStatutProtocole(animalId: string, protocoleI
   // une décision : elle décrit la date de la Primo réellement effectuée et doit suivre ses corrections.
   if (statut.source !== "VACCINATION") {
     if (brancheInitialeId !== statut.brancheInitialeId) {
-      await prisma.statutProtocoleVaccinal.update({ where: { id: statut.id }, data: { brancheInitialeId } });
+      await db.statutProtocoleVaccinal.update({ where: { id: statut.id }, data: { brancheInitialeId } });
     }
     return;
   }
   const statutAttendu = attendu ?? "A_CONFIRMER";
   if (statutAttendu !== statut.statut || brancheInitialeId !== statut.brancheInitialeId) {
-    await prisma.statutProtocoleVaccinal.update({ where: { id: statut.id }, data: { statut: statutAttendu, brancheInitialeId } });
+    await db.statutProtocoleVaccinal.update({ where: { id: statut.id }, data: { statut: statutAttendu, brancheInitialeId } });
   }
 }
