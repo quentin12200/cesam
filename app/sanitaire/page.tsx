@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
+import { bouclageInfo } from "@/lib/bouclage";
 import { getVaccinsManquants, formatDate, formatAge, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { differenceInDays, subDays, addDays } from "date-fns";
@@ -33,7 +34,7 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
   const [animaux, vaccinationsRecentes, vachesAvecGestation, evenementsRaw, traitementsRaw] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
-      include: { vaccinations: { select: { id: true, vaccin: true, date: true } } },
+      include: { velageVeau: { select: { id: true } }, vaccinations: { select: { id: true, vaccin: true, date: true } } },
       orderBy: { danais: "asc" },
     }),
     prisma.vaccination.findMany({
@@ -50,13 +51,13 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
       },
     }),
     prisma.evenementSanitaire.findMany({
-      include: { animal: { select: { nutrav: true, nobovi: true } }, symptomes: { select: { libelle: true } } },
+      include: { animal: { select: { nutrav: true, nobovi: true, statut: true, boucleFaite: true, velageVeau: { select: { id: true } } } }, symptomes: { select: { libelle: true } } },
       orderBy: { date: "desc" },
       take: 100,
     }),
     prisma.traitement.findMany({
       include: {
-        animal: { select: { nutrav: true, nobovi: true } },
+        animal: { select: { nutrav: true, nobovi: true, statut: true, boucleFaite: true, velageVeau: { select: { id: true } } } },
         medicament: { select: { id: true, delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } },
       },
       orderBy: { dateDebut: "desc" },
@@ -69,6 +70,7 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     .filter((a) => differenceInDays(now, a.danais) <= 365 * 2)
     .map((animal) => ({
       id: animal.id,
+      ...bouclageInfo(animal),
       nutrav: animal.nutrav,
       nobovi: animal.nobovi,
       ageLabel: formatAge(animal.danais),
@@ -90,6 +92,7 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     .filter((a) => differenceInDays(now, a.danais) <= 365 * 2)
     .map((animal) => ({
       id: animal.id,
+      ...bouclageInfo(animal),
       nutrav: animal.nutrav,
       nobovi: animal.nobovi,
       danais: animal.danais.toISOString(),
@@ -190,6 +193,7 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
   const evenements: EvenementItem[] = evenementsRaw.map((e) => ({
     id: e.id,
     animalNutrav: e.animal.nutrav,
+    ...bouclageInfo(e.animal),
     animalNom: e.animal.nobovi,
     type: e.type,
     symptomes: e.symptomes.map((s) => s.libelle),
@@ -212,6 +216,7 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     return {
       id: t.id,
       animalNutrav: t.animal.nutrav,
+      ...bouclageInfo(t.animal),
       animalNom: t.animal.nobovi,
       medicamentNom: t.medicamentNom,
       medicamentId: t.medicamentId,

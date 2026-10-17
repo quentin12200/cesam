@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { logAction } from "@/lib/action-log";
+import { bouclageInfo } from "@/lib/bouclage";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -18,6 +19,9 @@ export async function GET(request: NextRequest) {
       select: {
         nutrav: true,
         danais: true,
+        statut: true,
+        boucleFaite: true,
+        velageVeau: { select: { id: true } },
         mere: { select: { nutrav: true } },
       },
     });
@@ -25,6 +29,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       animaux: animaux.map((animal) => ({
         nutrav: animal.nutrav,
+        ...bouclageInfo(animal),
         birthDate: animal.danais?.toISOString() ?? null,
         mereNutrav: animal.mere?.nutrav ?? null,
       })),

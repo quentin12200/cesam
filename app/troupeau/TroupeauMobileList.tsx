@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight, Settings2, X } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import NutravBadge from "@/app/components/NutravBadge";
+import BouclageIndicator from "@/app/components/BouclageIndicator";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 import {
   formatAgeCompact,
@@ -190,13 +191,16 @@ export default function TroupeauMobileList({
 
         return (
           <article key={animal.id} className="rounded-xl bg-white p-3 shadow-sm">
-            <Link href={`/troupeau/${animal.nutrav}`} className="flex min-h-10 items-center gap-2">
-              <NutravBadge nutrav={animal.nutrav} className="!bg-emerald-600" />
+            <div className="flex min-h-11 items-center gap-1">
+              <Link href={`/troupeau/${animal.nutrav}`}><NutravBadge nutrav={animal.nutrav} className="!bg-emerald-600" /></Link>
+              <BouclageIndicator nutrav={animal.nutrav} boucleFaite={animal.boucleFaite} estConcerneParBouclage={animal.estConcerneParBouclage} />
+              <Link href={`/troupeau/${animal.nutrav}`} className="flex min-h-11 min-w-0 flex-1 items-center gap-2">
               <span className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900">
                 {animal.nobovi ?? <span className="font-medium italic text-gray-400">Sans nom</span>}
               </span>
               <ChevronRight aria-hidden="true" size={18} className="shrink-0 text-gray-400" />
-            </Link>
+              </Link>
+            </div>
 
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
               {isVisible("reproduction") && reproduction && (

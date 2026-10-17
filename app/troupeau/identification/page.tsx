@@ -4,6 +4,7 @@ import { subDays, differenceInDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import TroupeauTabs from "@/components/TroupeauTabs";
 import IdentificationClient, { type VeauIdentification } from "./IdentificationClient";
+import { BOUCLAGE_POPULATION } from "@/lib/bouclage";
 
 export default async function IdentificationPage() {
   const now = new Date();
@@ -12,9 +13,8 @@ export default async function IdentificationPage() {
   const [aBoucler, recemmentBoucles] = await Promise.all([
     prisma.animal.findMany({
       where: {
-        statut: "ACTIF",
+        ...BOUCLAGE_POPULATION,
         boucleFaite: false,
-        velageVeau: { isNot: null },
       },
       select: {
         id: true,
@@ -32,10 +32,9 @@ export default async function IdentificationPage() {
     }),
     prisma.animal.findMany({
       where: {
-        statut: "ACTIF",
+        ...BOUCLAGE_POPULATION,
         boucleFaite: true,
         dateBouclage: { gte: depuis },
-        velageVeau: { isNot: null },
       },
       select: {
         id: true,

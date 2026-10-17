@@ -8,6 +8,7 @@ import NouvelAnimalForm from "./NouvelAnimalForm";
 import TroupeauScrollRestorer from "./TroupeauScrollRestorer";
 import TroupeauTableau, { type AnimalRow } from "./TroupeauTableau";
 import TroupeauMobileList from "./TroupeauMobileList";
+import { bouclageInfo } from "@/lib/bouclage";
 import MoreMenu from "./MoreMenu";
 import TroupeauTabs from "@/components/TroupeauTabs";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
@@ -62,6 +63,7 @@ async function getAnimaux(params: TroupeauFilterParams) {
         danais: true,
         sexbov: true,
         statut: true,
+        boucleFaite: true,
         estGenisse: true,
         race: true,
         categorie: true,
@@ -267,6 +269,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       pereNom: bull?.nopere ?? animal.velageVeau?.pereNom ?? null,
       pereNumero: bull?.nupere ?? animal.velageVeau?.pereNunati ?? null,
       sevreFait: animal.sevreFait,
+      ...bouclageInfo(animal),
       activeCalves: [...activeCalves.values()],
       dernierPoids: animal.pesees[0]?.poids ?? null,
       dernierePeseeDate: animal.pesees[0]?.date.toISOString() ?? null,

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import BouclageIndicator from "@/app/components/BouclageIndicator";
+import type { BouclageInfo } from "@/lib/bouclage";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Settings } from "lucide-react";
@@ -44,7 +46,7 @@ interface HistoriqueAValider {
   etapesCompatibles: { id: string; label: string }[];
 }
 
-interface Ligne {
+interface Ligne extends BouclageInfo {
   animalId: string;
   nutrav: string;
   nom: string | null;
@@ -120,7 +122,7 @@ const colonnesAnimal: { id: ColonneAnimal; label: string }[] = [
   { id: "sexe", label: "Sexe" },
   { id: "velage", label: "Avant vêlage" },
 ];
-const largeurColonne: Record<ColonneAnimal, number> = { numero: 64, nom: 92, mere: 72, age: 66, sexe: 42, velage: 76 };
+const largeurColonne: Record<ColonneAnimal, number> = { numero: 76, nom: 92, mere: 72, age: 66, sexe: 42, velage: 76 };
 const largeurSelection = 38;
 const dateLocaleIso = () => {
   const date = new Date();
@@ -773,7 +775,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
           </thead>
           <tbody className="divide-y">{resultat.map((ligne) => <tr key={ligne.animalId}>
             <td className="animal-selection-column sticky left-0 z-30 border-r bg-white p-1 text-center"><input type="checkbox" checked={animauxSelectionnes.has(ligne.animalId)} onChange={() => basculerDansSet(setAnimauxSelectionnes, ligne.animalId)} aria-label={`Sélectionner l’animal ${ligne.nutrav}`} className="h-5 w-5 accent-green-700" /></td>
-            {!colonnesMasquees.has("numero") && <th scope="row" className="animal-fixed z-20 border-r bg-white p-1" style={{ left: decalageColonne("numero"), width: largeurColonne.numero, minWidth: largeurColonne.numero }}><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono text-sm font-black text-green-800 underline">{ligne.nutrav}</Link></th>}
+            {!colonnesMasquees.has("numero") && <th scope="row" className="animal-fixed animal-fixed-numero z-20 border-r bg-white p-1" style={{ left: decalageColonne("numero"), width: largeurColonne.numero, minWidth: largeurColonne.numero }}><span className="inline-flex items-center gap-0.5"><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono text-sm font-black text-green-800 underline">{ligne.nutrav}</Link><BouclageIndicator nutrav={ligne.nutrav} boucleFaite={ligne.boucleFaite} estConcerneParBouclage={ligne.estConcerneParBouclage} /></span></th>}
             {!colonnesMasquees.has("nom") && <td className="animal-fixed z-20 max-w-24 border-r bg-white p-1 text-xs text-gray-600" style={{ left: decalageColonne("nom"), width: largeurColonne.nom, minWidth: largeurColonne.nom }}><span className="block truncate">{ligne.nom || "—"}</span></td>}
             {!colonnesMasquees.has("mere") && <td className="animal-fixed z-20 border-r bg-white p-1 text-xs text-gray-700" style={{ left: decalageColonne("mere"), width: largeurColonne.mere, minWidth: largeurColonne.mere }} title={ligne.mereNom ? `${ligne.mereNutrav ?? ""} — ${ligne.mereNom}` : ligne.mereNutrav ?? undefined}>{ligne.mereNutrav ? (ligne.mereLiee ? <Link href={`/troupeau/${ligne.mereNutrav}`} className="font-mono font-bold text-green-800 underline">{ligne.mereNutrav}</Link> : <span className="font-mono font-semibold">{ligne.mereNutrav}</span>) : "—"}</td>}
             {!colonnesMasquees.has("age") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("age"), width: largeurColonne.age, minWidth: largeurColonne.age }}>{formatAgeTerrain(ligne.danaisIso)}</td>}
@@ -836,6 +838,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
           #tableau-vaccinal-impression .vaccin-table-scroll { max-height: none !important; overflow: visible !important; box-shadow: none; }
           #tableau-vaccinal-impression table { min-width: 100% !important; }
           #tableau-vaccinal-impression .sticky { position: static !important; }
+          #tableau-vaccinal-impression .animal-fixed-numero { width: 64px !important; min-width: 64px !important; }
         }
       `}</style>
     </section>

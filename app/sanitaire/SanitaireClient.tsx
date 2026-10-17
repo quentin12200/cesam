@@ -15,10 +15,12 @@ import VaccinationFormWrapper from "./VaccinationFormWrapper";
 import VaccineQuickButton from "./VaccineQuickButton";
 import EvenementsTab, { type TraitementItem } from "./EvenementsTab";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
+import BouclageIndicator from "@/app/components/BouclageIndicator";
+import type { BouclageInfo } from "@/lib/bouclage";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface VeauItem {
+export interface VeauItem extends BouclageInfo {
   id: string;
   nutrav: string;
   nobovi: string | null;
@@ -52,7 +54,7 @@ export interface RecentItem {
   dateLabel: string;
 }
 
-export interface VeauProtocolItem {
+export interface VeauProtocolItem extends BouclageInfo {
   id: string;
   nutrav: string;
   nobovi: string | null;
@@ -365,6 +367,7 @@ function VaccinsVeauxTab({ tousVeaux, protocoles, onRefresh }: { tousVeaux: Veau
                     <Link href={`/troupeau/${veau.nutrav}`} className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded font-bold hover:bg-green-100 transition-colors">
                       {veau.nutrav}
                     </Link>
+                    <BouclageIndicator nutrav={veau.nutrav} boucleFaite={veau.boucleFaite} estConcerneParBouclage={veau.estConcerneParBouclage} />
                     <span className="text-sm font-semibold text-gray-800">{veau.nobovi ?? "Sans nom"}</span>
                     <span className="text-xs text-gray-400">{veau.ageLabel}</span>
                     <span className="text-xs text-gray-400">{veau.sexbov === "M" ? "♂" : "♀"}</span>
@@ -957,6 +960,7 @@ export default function SanitaireClient({ veauxAVacciner, tousVeaux, cryptoRotav
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <Link href={`/troupeau/${animal.nutrav}`} className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{animal.nutrav}</Link>
+                          <BouclageIndicator nutrav={animal.nutrav} boucleFaite={animal.boucleFaite} estConcerneParBouclage={animal.estConcerneParBouclage} />
                           <span className="text-sm font-medium text-gray-800">{animal.nobovi ?? "Sans nom"}</span>
                         </div>
                         <div className="text-xs text-gray-500 mt-1">{animal.ageLabel}</div>

@@ -12,11 +12,13 @@ import {
   type EtatGestation,
 } from "@/lib/utils";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
+import BouclageIndicator from "@/app/components/BouclageIndicator";
+import type { BouclageInfo } from "@/lib/bouclage";
 import { getMotherWeaningDisplay } from "@/lib/troupeau-mother-weaning";
 import { formatFather, shouldDisplayNonWeaned } from "@/lib/troupeau-display";
 import ReproductionCycleSummary, { type ReproductionSummaryRow } from "./ReproductionCycleSummary";
 
-export interface AnimalRow {
+export interface AnimalRow extends BouclageInfo {
   id: string;
   nutrav: string;
   nobovi: string | null;
@@ -348,6 +350,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   </td>
                   <td className="px-3 py-2.5 font-mono font-bold text-green-800 whitespace-nowrap">
                     {animal.nutrav}
+                    <BouclageIndicator nutrav={animal.nutrav} boucleFaite={animal.boucleFaite} estConcerneParBouclage={animal.estConcerneParBouclage} />
                   </td>
                   <td className="px-3 py-2.5 text-gray-800 max-w-[140px] truncate">
                     {animal.nobovi ?? (

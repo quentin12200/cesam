@@ -1,4 +1,5 @@
 "use client";
+import { BouclageLookupProvider, BouclageLookupIndicator } from "@/app/components/BouclageLookup";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -548,6 +549,7 @@ export default function FieldWeighingSession() {
   const ageAlerts = fieldAgeAlertSummary(session.entries);
 
   return (
+    <BouclageLookupProvider nutravs={session.entries.map((entry) => entry.nutrav)}>
     <div className="min-h-full bg-white text-black">
       <header className="sticky top-0 z-20 border-b-4 border-black bg-white px-3 py-3">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
@@ -848,6 +850,7 @@ export default function FieldWeighingSession() {
         </main>
       )}
     </div>
+    </BouclageLookupProvider>
   );
 }
 
@@ -1001,7 +1004,7 @@ function SummaryRow({
             />
           )}
           <div className="min-w-0 flex-1 py-2">
-            <p className="text-xl font-black">{entry.nutrav} — {formatWeightKg(entry.poids)}</p>
+            <div className="flex flex-wrap items-center gap-1"><p className="text-xl font-black">{entry.nutrav}</p><BouclageLookupIndicator nutrav={entry.nutrav} /><span className="text-xl font-black">— {formatWeightKg(entry.poids)}</span></div>
             <WeighingAnimalDetails entry={entry} />
             {showHint && (
               <p className="mt-1 text-sm font-bold">Glisser pour modifier ou annuler</p>

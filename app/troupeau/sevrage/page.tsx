@@ -9,12 +9,14 @@ import WeaningDryOffPanel from "@/app/components/WeaningDryOffPanel";
 import { getWeaningDryOffCandidates } from "@/lib/weaning-dry-off-data";
 import { resolveCalfMother } from "@/lib/weaning-dry-off";
 import { formatWeaningAgeDays } from "@/lib/weaning-age-display";
+import { bouclageInfo, type BouclageInfo } from "@/lib/bouclage";
+import BouclageIndicator from "@/app/components/BouclageIndicator";
 // Page sans segment dynamique ni searchParams : sans cette directive, Next.js
 // la fige en HTML statique au moment du build et ne reflète plus les
 // évolutions de la base tant qu'un nouveau déploiement n'a pas lieu.
 export const dynamic = "force-dynamic";
 
-interface VeauSevre {
+interface VeauSevre extends BouclageInfo {
   id: string;
   nutrav: string;
   nobovi: string | null;
@@ -47,6 +49,8 @@ async function getVeauxSevres(): Promise<VeauSevre[]> {
       nobovi: true,
       danais: true,
       dateSevrage: true,
+      statut: true,
+      boucleFaite: true,
       velageVeau: {
         select: {
           vache: { select: { nutrav: true, nobovi: true } },
@@ -78,6 +82,7 @@ async function getVeauxSevres(): Promise<VeauSevre[]> {
       danais: a.danais,
       dateSevrage,
       ageSevrageJours: differenceInDays(dateSevrage, a.danais),
+      ...bouclageInfo(a),
       mereNutrav: mere?.nutrav ?? null,
       mereNobovi: mere?.nobovi ?? null,
     };
@@ -177,12 +182,12 @@ export default async function SevragePage() {
             {recents.map((v) => (
               <div key={v.id} className="bg-white rounded-xl shadow p-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <Link href={`/troupeau/${v.nutrav}`} className="hover:underline">
+                  <span className="inline-flex max-w-full flex-wrap items-center gap-1"><Link href={`/troupeau/${v.nutrav}`} className="hover:underline">
                     <span className="font-mono font-bold text-green-700 text-xs bg-green-50 px-1.5 py-0.5 rounded">
                       {v.nutrav}
                     </span>
                     {v.nobovi && <span className="ml-2 text-gray-800 text-sm font-medium">{v.nobovi}</span>}
-                  </Link>
+                  </Link><BouclageIndicator nutrav={v.nutrav} boucleFaite={v.boucleFaite} estConcerneParBouclage={v.estConcerneParBouclage} /></span>
                   <div className="text-xs text-gray-500 mt-1">
                     Sevré le {formatDate(v.dateSevrage)} à {formatAge(v.danais, v.dateSevrage)}
                   </div>
@@ -242,12 +247,12 @@ export default async function SevragePage() {
                   {veaux.map((v, i) => (
                     <tr key={v.id} className={`border-b border-gray-50 ${i % 2 === 0 ? "" : "bg-gray-50/50"}`}>
                       <td className="px-4 py-3">
-                        <Link href={`/troupeau/${v.nutrav}`} className="hover:underline">
+                        <span className="inline-flex max-w-full flex-wrap items-center gap-1"><Link href={`/troupeau/${v.nutrav}`} className="hover:underline">
                           <span className="font-mono font-bold text-green-700 text-xs bg-green-50 px-1.5 py-0.5 rounded">
                             {v.nutrav}
                           </span>
                           {v.nobovi && <span className="ml-2 text-gray-600 text-xs">{v.nobovi}</span>}
-                        </Link>
+                        </Link><BouclageIndicator nutrav={v.nutrav} boucleFaite={v.boucleFaite} estConcerneParBouclage={v.estConcerneParBouclage} /></span>
                       </td>
                       <td className="px-3 py-3">
                         {v.mereNutrav ? (

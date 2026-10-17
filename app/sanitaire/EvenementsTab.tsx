@@ -6,8 +6,10 @@ import Link from "next/link";
 import { CheckCircle2, History, AlertTriangle, AlertCircle, Clock, Pill } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
+import BouclageIndicator from "@/app/components/BouclageIndicator";
+import type { BouclageInfo } from "@/lib/bouclage";
 
-export interface EvenementItem {
+export interface EvenementItem extends Partial<BouclageInfo> {
   id: string;
   animalNutrav: string;
   animalNom: string | null;
@@ -18,7 +20,7 @@ export interface EvenementItem {
   resolu: boolean;
 }
 
-export interface TraitementItem {
+export interface TraitementItem extends Partial<BouclageInfo> {
   id: string;
   animalNutrav: string;
   animalNom: string | null;
@@ -48,9 +50,9 @@ function EvenementRow({ e, muted }: { e: EvenementItem; muted?: boolean }) {
         muted ? "bg-gray-50 border-gray-100 opacity-75 hover:bg-gray-100" : "bg-red-50 border-red-100 hover:bg-red-100"
       }`}
     >
-      <Link href={`/troupeau/${e.animalNutrav}?onglet=sante`} className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{e.animalNutrav}</span>
+          <Link href={`/troupeau/${e.animalNutrav}?onglet=sante`} className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">{e.animalNutrav}</Link><BouclageIndicator nutrav={e.animalNutrav} boucleFaite={e.boucleFaite ?? false} estConcerneParBouclage={e.estConcerneParBouclage ?? false} />
           <span className="text-sm font-medium text-gray-800">{e.animalNom ?? ""}</span>
           <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${muted ? "text-gray-600 bg-gray-200" : "text-red-700 bg-red-100"}`}>
             {e.symptomes.length > 1 ? e.symptomes.join(" • ") : e.type}
@@ -59,7 +61,7 @@ function EvenementRow({ e, muted }: { e: EvenementItem; muted?: boolean }) {
         {e.description && (
           <p className="text-xs text-gray-600 mt-1 truncate">{e.description}</p>
         )}
-      </Link>
+      </div>
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-xs text-gray-400">
           {new Date(e.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
@@ -81,7 +83,7 @@ function TraitementRow({ t, onTerminer }: { t: TraitementItem; onTerminer: (id: 
             <Link href={`/troupeau/${t.animalNutrav}`}
               className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded font-bold hover:bg-blue-100 transition-colors">
               {t.animalNutrav}
-            </Link>
+            </Link><BouclageIndicator nutrav={t.animalNutrav} boucleFaite={t.boucleFaite ?? false} estConcerneParBouclage={t.estConcerneParBouclage ?? false} />
             {t.animalNom && <span className="text-sm font-semibold text-gray-800">{t.animalNom}</span>}
           </div>
 
@@ -132,7 +134,7 @@ function TraitementRowMuted({ t }: { t: TraitementItem }) {
         <Link href={`/troupeau/${t.animalNutrav}`}
           className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded font-bold hover:bg-blue-100">
           {t.animalNutrav}
-        </Link>
+        </Link><BouclageIndicator nutrav={t.animalNutrav} boucleFaite={t.boucleFaite ?? false} estConcerneParBouclage={t.estConcerneParBouclage ?? false} />
         {t.animalNom && <span className="text-sm font-medium text-gray-700">{t.animalNom}</span>}
         <span className="text-sm text-gray-600">{t.medicamentNom}</span>
         <span className="ml-auto text-xs text-gray-400">{formatDate(new Date(t.dateDebut))}</span>

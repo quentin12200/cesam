@@ -16,6 +16,7 @@ import {
   type EtatGestation,
 } from "@/lib/utils";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
+import { BouclageLookupProvider, BouclageLookupIndicator } from "@/app/components/BouclageLookup";
 import type {
   WeaningDryOffAction,
   WeaningDryOffCandidate,
@@ -174,28 +175,30 @@ function CandidateLine({
           {compact ? (
             <>
               <div className="grid grid-cols-2 gap-2">
-                <Link
-                  href={`/troupeau/${candidate.calf.nutrav}`}
+                <div
                   className="min-w-0 rounded-lg border border-green-200 bg-green-50 px-2.5 py-2 hover:border-green-300"
                 >
                   <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-green-700">
                     Veau
                   </span>
-                  <span
-                    className={`block truncate font-mono text-base font-black leading-tight ${
+                  <div className="flex items-center gap-1">
+                  <Link href={`/troupeau/${candidate.calf.nutrav}`}
+                    className={`min-w-0 truncate font-mono text-base font-black leading-tight ${
                       candidate.recentlyWeaned
                         ? "text-slate-700"
                         : "text-green-950"
                     }`}
                   >
                     {candidate.calf.nutrav}
-                  </span>
+                  </Link>
+                  <BouclageLookupIndicator nutrav={candidate.calf.nutrav} />
+                  </div>
                   {candidate.calf.nobovi && (
                     <span className="block truncate text-[11px] font-semibold text-slate-600">
                       {candidate.calf.nobovi}
                     </span>
                   )}
-                </Link>
+                </div>
                 <Link
                   href={`/troupeau/${candidate.mother.nutrav}`}
                   className="min-w-0 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 hover:border-amber-300"
@@ -230,6 +233,7 @@ function CandidateLine({
             </>
           ) : (
             <>
+              <div className="flex flex-wrap items-center gap-1">
               <Link
                 href={`/troupeau/${candidate.calf.nutrav}`}
                 className={`text-sm font-extrabold hover:underline ${
@@ -238,6 +242,8 @@ function CandidateLine({
               >
                 {animalLabel(candidate.calf)}
               </Link>
+              <BouclageLookupIndicator nutrav={candidate.calf.nutrav} />
+              </div>
               <p className="text-xs text-slate-600">
                 {formatAge(new Date(candidate.calf.birthDate))}
                 <span className="mx-1 text-slate-300">·</span>
@@ -516,6 +522,7 @@ export default function WeaningDryOffPanel({
   if (candidates.length === 0) return null;
 
   return (
+    <BouclageLookupProvider nutravs={candidates.map((candidate) => candidate.calf.nutrav)}>
     <div
       className={
         compact
@@ -679,5 +686,6 @@ export default function WeaningDryOffPanel({
         </div>
       )}
     </div>
+    </BouclageLookupProvider>
   );
 }

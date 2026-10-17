@@ -11,6 +11,7 @@ import type { StatutProtocoleVaccinal } from "@/lib/vaccine-planner";
 import { resoudreAdministrationEtape } from "@/lib/vaccine-administration";
 import PreparationVaccinCard from "./PreparationVaccinCard";
 import TableauVaccinal from "./TableauVaccinal";
+import { bouclageInfo } from "@/lib/bouclage";
 
 const dateCourte = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
@@ -56,6 +57,7 @@ export default async function VaccinsPage() {
       where: { statut: "ACTIF" },
       select: {
         id: true, nutrav: true, nobovi: true, sexbov: true, danais: true, estGenisse: true, categorie: true,
+        statut: true, boucleFaite: true, velageVeau: { select: { id: true } },
         mere: { select: { nutrav: true, nobovi: true } },
         mereTravailManuel: true,
         mereNomManuel: true,
@@ -144,6 +146,7 @@ export default async function VaccinsPage() {
     protocolesGrille,
     medicamentsVaccin.map((m) => ({ medicamentId: m.id, nom: m.nom, voie: m.voie }))
   );
+  const bouclages = new Map(animauxDb.map((animal) => [animal.id, bouclageInfo(animal)]));
   const actionsPrevues = extraireActionsPrevues(grille).map((action) => ({
     animalId: action.animalId,
     nutrav: action.nutrav,
@@ -165,6 +168,7 @@ export default async function VaccinsPage() {
       <header><h1 className="text-xl font-black text-gray-900">Tableau vaccinal</h1></header>
       <TableauVaccinal actionsPrevues={actionsPrevues} blocs={grille.blocs} lignes={grille.lignes.map((ligne) => ({
         ...ligne,
+        ...bouclages.get(ligne.animalId)!,
         actes: ligne.actes.map((acte) => ({ ...acte, date: acte.date.toISOString() })),
         cellules: Object.fromEntries(Object.entries(ligne.cellules).map(([cle, cellule]) => [cle, {
           ...cellule,
