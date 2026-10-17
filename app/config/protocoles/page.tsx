@@ -5,6 +5,7 @@ import { DEFAULT_PROTOCOLES } from "@/lib/utils";
 import Link from "next/link";
 import { Settings, Building2 } from "lucide-react";
 import ProtocoleQuestionnaire from "./ProtocoleQuestionnaire";
+import Mhe2026Sync from "./Mhe2026Sync";
 
 import BackButton from "@/app/components/BackButton";
 async function getProtocoles() {
@@ -52,6 +53,7 @@ export default async function ProtocolesConfigPage() {
         Répondez aux questions : CESAM construit la frise et reformule le protocole avant enregistrement.
       </p>
 
+      <Mhe2026Sync />
       <ProtocoleQuestionnaire protocoles={protocoles} medicaments={medicaments} />
     </div>
   );
