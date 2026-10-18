@@ -122,8 +122,12 @@ export interface BlocVaccinGrille {
 
 export type StatutCelluleGrille = "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
 
+export type MotifSansEcheance = "HORS_CIBLE" | "ACQUIS_SANS_PREUVE" | "CALCUL_A_CONFIRMER";
+
 export interface CelluleGrille {
   statut: StatutCelluleGrille;
+  /** Explication en lecture seule, jamais une preuve d'injection ni une décision vétérinaire. */
+  motifSansEcheance?: MotifSansEcheance;
   date: Date | null;
   aValider: boolean;
   rattachementProtocoleAutorise: boolean;
@@ -352,6 +356,17 @@ function celluleProtocole(
   const actesUtiles = interpretation.vaccinations;
   const statutProtocole = protocoleInitialAcquisDepuisHistorique(etapes, actesHistoriquesDuProtocole)
     ? "PROTOCOLE_ACQUIS" : statutEnregistre?.statut ?? null;
+  // Un statut acquis enregistré, mais dépourvu d'injection probante, ne doit pas faire croire
+  // que la vaccination est faite ou que l'absence d'échéance est normale.
+  const acquisSansPreuve = statutProtocole === "PROTOCOLE_ACQUIS" && actesHistoriquesDuProtocole.length === 0;
+  const premiereInitiale = etapes.find((etape) => etape.cycle !== "ENTRETIEN") ?? etapes[0] ?? null;
+  const marquerAbsence = (motif: MotifSansEcheance) => {
+    if (!premiereInitiale) return;
+    const cellule = cellules.get(premiereInitiale.id) ?? celluleVide();
+    if (cellule.statut === "VIDE" && cellule.actes.length === 0) {
+      cellules.set(premiereInitiale.id, { ...cellule, motifSansEcheance: motif });
+    }
+  };
 
   // Même garantie après les deux chemins (questionnaire et legacy) : aucun fait ne disparaît.
   const finaliserHistorique = () => {
@@ -398,6 +413,8 @@ function celluleProtocole(
         ? { statut: "FAIT", date: faites[0].date, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [...faites].reverse().map(versActeCellule), prochaine: null }
         : { ...celluleVide(), rattachementProtocoleAutorise: eligible });
     }
+    if (!eligible) marquerAbsence("HORS_CIBLE");
+    if (eligible && acquisSansPreuve) marquerAbsence("ACQUIS_SANS_PREUVE");
     if (eligible) {
       const action = calculerActionVaccinale({
         date,
@@ -410,6 +427,7 @@ function celluleProtocole(
         configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
         brancheInitialeId: statutEnregistre?.brancheInitialeId ?? null,
       });
+      if (action.statut === "A_CONFIRMER" && !acquisSansPreuve) marquerAbsence("CALCUL_A_CONFIRMER");
       if (action.statut === "HORS_PROGRAMME" && action.etape) {
         const existante = cellules.get(action.etape.id) ?? celluleVide();
         if (existante.statut !== "FAIT") cellules.set(action.etape.id, { ...existante, horsProgramme: true });
@@ -427,6 +445,8 @@ function celluleProtocole(
     return finaliserHistorique();
   }
 
+  if (!eligible) marquerAbsence("HORS_CIBLE");
+  if (eligible && acquisSansPreuve) marquerAbsence("ACQUIS_SANS_PREUVE");
   let dateEtapePrecedente: Date | null = null;
   for (const etape of etapes) {
     const faites = actesUtiles.filter((acte) => acte.etapeProtocoleId === etape.id).sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -445,9 +465,14 @@ function celluleProtocole(
       cellules.set(etape.id, { statut: "FAIT", date: faites[0].date, aValider: false, rattachementProtocoleAutorise: true, historiquesAValider: [], actes: [...faites].reverse().map(versActeCellule), prochaine });
       continue;
     }
-    if (!eligible) { cellules.set(etape.id, celluleVide()); continue; }
+    if (!eligible) {
+      const existante = cellules.get(etape.id) ?? celluleVide();
+      cellules.set(etape.id, { ...celluleVide(), motifSansEcheance: existante.motifSansEcheance });
+      continue;
+    }
     if (!etapePlanifiableSelonStatut(etape, statutProtocole)) {
-      cellules.set(etape.id, { ...celluleVide(), rattachementProtocoleAutorise: eligible });
+      const existante = cellules.get(etape.id) ?? celluleVide();
+      cellules.set(etape.id, { ...celluleVide(), rattachementProtocoleAutorise: eligible, motifSansEcheance: existante.motifSansEcheance });
       continue;
     }
     const fenetreCalculee = calculerFenetreEtape({
@@ -464,7 +489,11 @@ function celluleProtocole(
       protocoleLieAuVelage && etape.cycle !== "ENTRETIEN",
     );
     const cellule = fenetre ? celluleDepuisPlanning(date, fenetre) : celluleVide();
-    cellules.set(etape.id, { ...cellule, rattachementProtocoleAutorise: eligible });
+    const existante = cellules.get(etape.id) ?? celluleVide();
+    cellules.set(etape.id, { ...cellule, rattachementProtocoleAutorise: eligible,
+      motifSansEcheance: cellule.statut === "VIDE"
+        ? (existante.motifSansEcheance ?? (etape.id === premiereInitiale?.id ? "CALCUL_A_CONFIRMER" : undefined))
+        : undefined });
   }
 
   return finaliserHistorique();
