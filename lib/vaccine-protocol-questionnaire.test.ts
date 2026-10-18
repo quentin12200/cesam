@@ -221,3 +221,57 @@ test("une Primo réelle sans statut conduit au Rappel ; un protocole acquis ne r
   assert.equal(acquis.statut, "TERMINE");
   assert.equal(acquis.etape, null);
 });
+
+test("la limite facultative du programme ne touche pas les anciens protocoles v1", () => {
+  const config = base();
+  assert.deepEqual(lireConfigurationQuestionnaire(JSON.stringify(config)), config);
+  assert.equal(action(config).statut, "A_FAIRE", "sans seuil explicite, la recommandation reste inchangée");
+});
+
+test("age maximal : à la date limite la Primo reste possible, le lendemain elle sort du programme", () => {
+  const cfg: ConfigurationQuestionnaireV1 = {
+    ...base(), ageMaxDemarrage: { valeur: 30, unite: "JOUR" },
+  };
+  assert.equal(action(cfg, { date: jour("2026-01-31") }).statut, "A_FAIRE");
+  const horsProgramme = action(cfg, { date: jour("2026-02-01") });
+  assert.equal(horsProgramme.statut, "HORS_PROGRAMME");
+  assert.equal(horsProgramme.etape?.id, "dose");
+  assert.equal(horsProgramme.dateMin, null, "une échéance hors programme ne crée pas de date fictive");
+});
+
+test("la limite facultative du programme ne supprime jamais le rappel après une Primo faite", () => {
+  const cfg: ConfigurationQuestionnaireV1 = {
+    ...base(),
+    ageMaxDemarrage: { valeur: 30, unite: "JOUR" },
+    demarrage: { type: "PRIMO_RAPPEL", etapePrimoId: "primo", etapeRappelId: "rappel", calendrierPrimo: { type: "SANS_REGLE" },
+      rappel: { type: "DELAI_FIXE", delai: { valeur: 28, unite: "JOUR" }, preconisationPrimoId: "p-im", preconisationRappelId: "p-im", resterDansFenetrePrimo: false },
+    },
+  };
+  const actionRappel = action(cfg, {
+    date: jour("2026-03-01"),
+    vaccinations: [{ date: jour("2026-01-15"), etapeProtocoleId: "primo" }],
+    statutProtocole: "PRIMO_EN_COURS",
+  });
+  assert.equal(actionRappel.etape?.id, "rappel");
+  assert.equal(actionRappel.statut, "EN_RETARD");
+  assert.equal(action(cfg, { date: jour("2026-03-01") }).statut, "HORS_PROGRAMME");
+});
+
+test("l'age maximal de demarrage invalide ou applique au velage est refuse", () => {
+  const cfg: ConfigurationQuestionnaireV1 = { ...base(), ageMaxDemarrage: { valeur: 30, unite: "JOUR" } };
+  const invalidAge = { ...cfg, ageMaxDemarrage: { valeur: -1, unite: "JOUR" } };
+  assert.equal(lireConfigurationQuestionnaire(JSON.stringify(invalidAge)), null);
+  const avantVelage = { ...cfg, demarrage: { type: "DOSE_UNIQUE", etapeDoseId: "dose", preconisationId: "p-im",
+    calendrier: { type: "AVANT_VELAGE", debutAvant: { valeur: 3, unite: "MOIS" }, finAvant: { valeur: 3, unite: "SEMAINE" } },
+  } };
+  assert.equal(lireConfigurationQuestionnaire(JSON.stringify(avantVelage)), null);
+  const minPlusGrand = { ...cfg, demarrage: { type: "DOSE_UNIQUE", etapeDoseId: "dose", preconisationId: "p-im",
+    calendrier: { type: "AGE_MINIMUM", age: { valeur: 2, unite: "MOIS" } },
+  } };
+  assert.equal(lireConfigurationQuestionnaire(JSON.stringify(minPlusGrand)), null);
+});
+
+test("la limite d'age ne reclasse pas un historique ambigu en hors programme", () => {
+  const cfg: ConfigurationQuestionnaireV1 = { ...base(), ageMaxDemarrage: { valeur: 30, unite: "JOUR" } };
+  assert.equal(action(cfg, { statutProtocole: "A_CONFIRMER" }).statut, "A_CONFIRMER");
+});
