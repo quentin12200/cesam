@@ -17,7 +17,7 @@ type ConflitProtocole = {
   id: string; nom: string; label: string; configurationQuestionnairePresente: boolean; memeVaccin: boolean;
   etapes: Array<{ id: string; label: string; cycle: string; vaccinationsCount: number; traitementsCount: number }>;
   conversion: { possible: boolean; raison?: string; ids?: { dose: string | null; primo: string | null; rappel: string | null; entretien: string | null } };
-  extraction?: { possible: boolean; medicamentId: string; medicamentNom: string; vaccinationsCount: number; traitementsCount: number; raison?: string; empreinte?: string | null; bilan?: { vaccinationsDeplacees: number; traitementsDeplaces: number; vaccinationsGeneriquesNeutralisees: number; traitementsDoublonsDetaches: number; statutsAnimauxRecalcules: number; animauxAvecHistorique: number } | null };
+  extraction?: { possible: boolean; medicamentId: string; medicamentNom: string; vaccinationsCount: number; traitementsCount: number; raison?: string; empreinte?: string | null; bilan?: { vaccinationsDeplacees: number; traitementsDeplaces: number; vaccinationsGeneriquesNeutralisees: number; traitementsDoublonsDetaches: number; statutsAnimauxRecalcules: number; statutsAvecDecisionOuNoteAProteger: number; animauxAvecHistorique: number } | null };
 };
 type DiagnosticExtraction = {
   totalAmbigus: number;
@@ -281,17 +281,20 @@ export default function ProtocoleQuestionnaire({ protocoles, medicaments }: { pr
     <li>{conflitProtocole.extraction.bilan.vaccinationsGeneriquesNeutralisees} ancienne(s) vaccination(s) générique(s) à marquer comme doublons techniques</li>
     <li>{conflitProtocole.extraction.bilan.traitementsDoublonsDetaches} traitement(s) en doublon à détacher</li>
     <li>{conflitProtocole.extraction.bilan.statutsAnimauxRecalcules} statut(s) vaccinaux existants à recalculer</li>
+    <li>{conflitProtocole.extraction.bilan.statutsAvecDecisionOuNoteAProteger} décision(s) ou note(s) manuelles nécessitant une préservation</li>
   </ul>
+  {conflitProtocole.extraction.bilan.statutsAvecDecisionOuNoteAProteger > 0 && <p role="alert" className="mt-2 rounded bg-red-50 p-2 text-xs font-bold text-red-900">Séparation bloquée : il faut préserver les statuts ou notes manuels avant toute migration. Aucune écriture ne sera faite.</p>}
   <p className="mt-2 text-xs font-semibold text-amber-900">Les injections réellement réalisées ne seront pas créées à nouveau. Attention : les statuts de protocole peuvent changer. Si le bilan change entre maintenant et la confirmation, CESAM refusera la séparation.</p>
   <button
     type="button"
+    disabled={conflitProtocole.extraction.bilan.statutsAvecDecisionOuNoteAProteger > 0}
     onClick={() => {
       const extraction = conflitProtocole.extraction!;
       const bilan = extraction.bilan!;
       const confirmation = `Séparer ${extraction.medicamentNom} du protocole historique ?\n\n${bilan.vaccinationsDeplacees} vaccinations rattachées, ${bilan.traitementsDeplaces} traitements rattachés, ${bilan.vaccinationsGeneriquesNeutralisees} génériques neutralisées, ${bilan.traitementsDoublonsDetaches} doublons détachés, ${bilan.statutsAnimauxRecalcules} statuts à recalculer.\n\nCette action modifie l’historique des rattachements. Confirmer ?`;
       if (window.confirm(confirmation)) void enregistrer({ type: "EXTRACTION", id: conflitProtocole.id, empreinte: extraction.empreinte! });
     }}
-    className="mt-3 min-h-11 w-full rounded-lg bg-red-800 px-3 font-semibold text-white"
+    className="mt-3 min-h-11 w-full rounded-lg bg-red-800 px-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
   >
     Confirmer la séparation de {conflitProtocole.extraction.medicamentNom}
   </button>
