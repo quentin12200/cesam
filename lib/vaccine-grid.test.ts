@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { bornerFenetreInitialeAuVelage, construireBlocsVaccinaux, construireGrilleVaccinale, extraireActionsPrevues, type AnimalGrille, type ProtocoleGrille, type VaccinPharmacieGrille } from "./vaccine-grid.ts";
 import { actesHistoriquesEtape } from "./vaccine-history-view.ts";
+import { compterVaccinationsVisibles } from "./vaccine-header-counts.ts";
 
 const AUJOURDHUI = new Date("2026-09-29T12:00:00Z");
 const jours = (n: number) => new Date(new Date("2026-01-01T12:00:00Z").getTime() + n * 86_400_000);
@@ -509,6 +510,8 @@ test("la limite facultative du programme ne touche pas l'historique ni le rappel
   assert.equal(cellule.horsProgramme, true);
   assert.equal(cellule.actes.length, 0);
   assert.deepEqual(extraireActionsPrevues(sansInjection), []);
+  assert.equal(compterVaccinationsVisibles(sansInjection.lignes, sansInjection.blocs)["med-bovigrip"].total.aFaire, 0,
+    "les animaux hors programme ne sont pas comptés comme injections dues");
   const avecInjection = construireGrilleVaccinale([animal({ actes: [{
     date: jours(20), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip",
     protocoleId: protocole.id, etapeProtocoleId: "bovigrip-primo", gestationId: null, statut: "FAIT",
