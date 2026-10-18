@@ -22,6 +22,7 @@ interface CelluleGrille {
   statut: "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
   date: string | null;
   horsProgramme?: boolean;
+  motifSansEcheance?: "HORS_CIBLE" | "ACQUIS_SANS_PREUVE" | "CALCUL_A_CONFIRMER";
   aValider: boolean;
   rattachementProtocoleAutorise: boolean;
   historiquesAValider: HistoriqueAValider[];
@@ -532,13 +533,25 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       ? <button type="button" title="Historique à rattacher" onClick={() => ouvrirHistorique(ligne, bloc, etape)} className="vaccin-print-hidden flex min-h-9 w-full items-center justify-center rounded border-2 border-amber-700 bg-amber-50 px-1 text-[11px] font-bold text-amber-950">À rattacher</button>
       : null;
 
+    const motifSansEcheance = !cellule.aValider && cellule.statut === "VIDE" && !historiqueEtape.length && cellule.motifSansEcheance
+      ? <span role="status" title={cellule.motifSansEcheance === "HORS_CIBLE"
+        ? "Cet animal ne correspond pas à la cible actuelle du protocole (catégorie, sexe, lot, gestation ou rang de vêlage). Aucune injection n'est déduite."
+        : cellule.motifSansEcheance === "ACQUIS_SANS_PREUVE"
+          ? "Le protocole porte un statut acquis, mais aucune injection correspondante n'a été retrouvée dans l'historique reconnu. À contrôler avant toute correction."
+          : "La planification ne peut pas être établie à partir des données actuelles. Vérifier les dates, le protocole et les anciens statuts."}
+        className="block rounded border border-amber-500 bg-amber-50 px-1 py-1 text-center text-[10px] font-semibold text-amber-950">
+        {cellule.motifSansEcheance === "HORS_CIBLE" ? "Hors cible · vérifier"
+          : cellule.motifSansEcheance === "ACQUIS_SANS_PREUVE" ? "Statut acquis sans acte · vérifier"
+            : "Calcul à confirmer"}
+      </span> : null;
     const horsProgramme = cellule.horsProgramme && !cellule.aValider
       ? <span title="Âge maximal de démarrage défini par l'élevage, sans vaccination enregistrée" className="block rounded border border-slate-300 bg-slate-50 px-1 py-1 text-center text-[10px] font-semibold text-slate-600">Hors programme</span>
       : null;
-    if (!historique && !action && !aRattacher && !horsProgramme) return <span className="text-gray-300">—</span>;
+    if (!historique && !action && !aRattacher && !horsProgramme && !motifSansEcheance) return <span className="text-gray-300">—</span>;
     return <div className="space-y-0.5">
       {historique}
       {aRattacher}
+      {motifSansEcheance}
       {horsProgramme}
       {action}
       {selectionne && cellule.statut === "FAIT" && !cellule.prochaine && <span className="block rounded border border-slate-700 px-1 text-center text-[10px] font-bold text-slate-900 ring-2 ring-slate-700">+ nouvelle</span>}
