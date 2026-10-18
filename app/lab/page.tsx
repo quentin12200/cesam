@@ -27,7 +27,7 @@ export default async function CesamLabPage() {
         animaux={animaux}
         echeances={echeances.map((row) => ({ id: row.id, nutrav: row.nutrav, nom: row.nobovi, date: row.dateVelagePrevue.toISOString() }))}
       />
-      <p className="text-xs text-gray-500">Cet espace n'enregistre aucun acte et n'altère aucun animal. Les actions de terrain sont présentées ici uniquement pour tester la navigation.</p>
+      <p className="text-xs text-gray-500">Cet espace n’enregistre aucun acte et n’altère aucun animal. Les actions de terrain sont présentées ici uniquement pour tester la navigation.</p>
     </main>
   );
 }
