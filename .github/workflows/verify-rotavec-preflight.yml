@@ -30,7 +30,7 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Direct ESLint
-        run: npx eslint app/api/protocoles/route.ts app/config/protocoles/ProtocoleQuestionnaire.tsx lib/vaccine-protocol-preflight.ts lib/vaccine-protocol-preflight.test.ts
+        run: ESLINT_USE_FLAT_CONFIG=false npx eslint app/api/protocoles/route.ts app/config/protocoles/ProtocoleQuestionnaire.tsx lib/vaccine-protocol-preflight.ts lib/vaccine-protocol-preflight.test.ts
       - name: Critical vaccination tests
         run: |
           node --test --experimental-strip-types \
