@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, CalendarDays, Users, ChevronDown, ChevronUp, Zap, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Search, CalendarDays, ChevronDown, ChevronUp, Plus, House, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import LabCreatePanel from "./LabCreatePanel";
 
 type Animal = {
   id: string;
@@ -14,7 +15,7 @@ type Animal = {
   reproduction: "VERT" | "ROSE" | "JAUNE" | "ROUGE" | "REPOS" | "GRIS" | null;
 };
 type Echeance = { id: string; nutrav: string; nom: string | null; date: string };
-type Vue = "animaux" | "prevoir" | "seances" | "rapide";
+type Vue = "accueil" | "animaux" | "creer";
 type Tri = "numero" | "sexe" | "age" | "repro";
 
 const reproLabels: Record<string, string> = { VERT: "Gestante", ROSE: "Vêlage imminent", JAUNE: "À écho", ROUGE: "Vide", REPOS: "Repos", GRIS: "En attente" };
@@ -38,11 +39,9 @@ export default function LabExplorer({
   animaux: Animal[];
   echeances: Echeance[];
 }) {
-  const [vue, setVue] = useState<Vue>("animaux");
+  const [vue, setVue] = useState<Vue>("accueil");
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState<string | null>(null);
-  const [seance, setSeance] = useState<string | null>(null);
-  const [quickAction, setQuickAction] = useState<string | null>(null);
   const [tri, setTri] = useState<{champ: Tri | null; sens: 0 | 1 | -1}>({champ:null,sens:0});
   function changerTri(champ: Tri) { setTri(p => p.champ !== champ ? {champ,sens:1} : p.sens===1 ? {champ,sens:-1} : {champ:null,sens:0}); }
   const visibles = animaux.filter((a) =>
@@ -52,18 +51,38 @@ export default function LabExplorer({
 
   return (
     <div className="space-y-4">
-      <nav className="grid grid-cols-4 gap-1.5" aria-label="Sections du CESAM LAB">
-        <button type="button" onClick={() => setVue("animaux")} className={vue === "animaux" ? "rounded-xl bg-green-700 p-3 text-sm font-bold text-white" : "rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}>
-          <Search className="mx-auto mb-1" size={20} />Animaux
-        </button>
-        <button type="button" onClick={() => setVue("prevoir")} className={vue === "prevoir" ? "rounded-xl bg-green-700 p-3 text-sm font-bold text-white" : "rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}>
-          <CalendarDays className="mx-auto mb-1" size={20} />À prévoir
-        </button>
-        <button type="button" onClick={() => setVue("seances")} className={vue === "seances" ? "rounded-xl bg-green-700 p-3 text-sm font-bold text-white" : "rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}>
-          <Users className="mx-auto mb-1" size={20} />Séances
-        </button>
-        <button type="button" onClick={() => setVue("rapide")} className={vue === "rapide" ? "rounded-xl bg-green-700 p-2 text-xs font-bold text-white" : "rounded-xl bg-white p-2 text-xs font-bold text-gray-700"}><Zap className="mx-auto mb-1" size={20}/>Action</button>
+      <nav className="grid grid-cols-3 gap-2" aria-label="Sections du CESAM LAB">
+        <button type="button" onClick={() => setVue("accueil")} className={vue==="accueil"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><House className="mx-auto mb-1" size={20}/>Accueil</button>
+        <button type="button" onClick={() => setVue("animaux")} className={vue==="animaux"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><Search className="mx-auto mb-1" size={20}/>Troupeau</button>
+        <button type="button" onClick={() => setVue("creer")} className={vue==="creer"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-green-50 p-3 text-sm font-bold text-green-800"}><Plus className="mx-auto mb-1" size={20}/>Créer</button>
       </nav>
+      {vue === "accueil" && (
+        <section className="space-y-3">
+          <h2 className="text-xl font-black">À faire et à prévoir</h2>
+          <p className="text-sm text-gray-600">Les échéances déjà connues de CESAM, sans nouvelle saisie.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setVue("animaux")} className="rounded-xl border bg-white p-4 text-left"><b className="block">{animaux.length} animaux actifs</b><span className="text-xs text-gray-500">Voir le troupeau</span></button>
+            <button type="button" onClick={() => setVue("creer")} className="rounded-xl border bg-white p-4 text-left"><b className="block">Intervenir</b><span className="text-xs text-gray-500">Individuel ou collectif</span></button>
+          </div>
+          <div className="rounded-xl border bg-white p-3">
+            <h3 className="flex items-center gap-2 font-bold"><CalendarDays size={18}/> Vêlages prévus</h3>
+            <div className="mt-3 space-y-2">{prochaines.slice(0,6).map(item=><Link href={"/troupeau/"+item.nutrav} key={item.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 p-3"><span className="font-semibold">{item.nutrav} · {item.nom||"Sans nom"}</span><span className="text-sm font-semibold text-green-800">{new Date(item.date).toLocaleDateString("fr-FR")}</span></Link>)}</div>
+            {prochaines.length===0&&<p className="mt-2 text-sm text-gray-500">Aucun vêlage prévu dans le calendrier.</p>}
+            <Link href="/velage" className="mt-3 block text-sm font-bold text-green-800">Voir le calendrier complet dans CESAM →</Link>
+          </div>
+          <div className="rounded-xl border bg-white p-3">
+            <h3 className="font-bold">Autres travaux à consulter</h3>
+            <p className="mt-1 text-xs text-gray-500">Ces raccourcis ouvrent les suivis existants ; ils ne constituent pas encore un agenda collectif unique.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Link href="/reproduction" className="rounded-lg bg-amber-50 p-3 text-sm font-semibold">Échographies →</Link>
+              <Link href="/sanitaire/vaccins" className="rounded-lg bg-blue-50 p-3 text-sm font-semibold">Vaccins et rappels →</Link>
+              <Link href="/parage" className="rounded-lg bg-green-50 p-3 text-sm font-semibold">Parage →</Link>
+              <Link href="/troupeau/pesee" className="rounded-lg bg-gray-50 p-3 text-sm font-semibold">Pesées →</Link>
+            </div>
+          </div>
+        </section>
+      )}
+      {vue === "creer" && <LabCreatePanel animaux={animaux}/>}
 
       {vue === "animaux" && (
         <section className="space-y-3">
@@ -114,55 +133,6 @@ export default function LabExplorer({
         </section>
       )}
 
-      {vue === "prevoir" && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-bold">Vêlages à prévoir</h2>
-          <p className="text-sm text-gray-600">Échéances du calendrier actuel, en lecture seule.</p>
-          {prochaines.map((item) => (
-            <div key={item.id} className="flex justify-between gap-2 rounded-xl border bg-white p-3">
-              <span className="font-semibold">{item.nutrav} · {item.nom || "Sans nom"}</span>
-              <span className="shrink-0 text-sm font-bold text-green-800">{new Date(item.date).toLocaleDateString("fr-FR")}</span>
-            </div>
-          ))}
-          {prochaines.length === 0 && <p>Aucune échéance trouvée.</p>}
-        </section>
-      )}
-
-      {vue === "rapide" && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-bold">Commencer par une action</h2>
-          <p className="text-sm text-gray-600">Choisis ton intervention avant de rechercher le numéro de l’animal.</p>
-          <div className="grid grid-cols-2 gap-2">
-            {["Vêlage", "Pesée", "Événement sanitaire", "Saillie / IA", "Échographie", "Chaleur"].map(action => (
-              <button key={action} type="button" onClick={() => setQuickAction(action)} className="min-h-16 rounded-xl border bg-white p-3 text-sm font-semibold">{action}</button>
-            ))}
-          </div>
-          {quickAction && <div className="space-y-2 rounded-xl border border-green-200 bg-green-50 p-4">
-            <p className="font-bold">{quickAction}</p>
-            <p className="text-sm">En continuant, tu quittes le LAB en lecture seule. Le parcours CESAM existant permet de véritables enregistrements.</p>
-            <Link className="block rounded-lg bg-green-700 px-3 py-3 text-center text-sm font-bold text-white"
-              href={quickAction==="Vêlage"?"/velage?nouveau=1":quickAction==="Pesée"?"/troupeau/pesee":quickAction==="Événement sanitaire"?"/sanitaire/nouvel-evenement":"/reproduction"}>Ouvrir le parcours dans CESAM</Link>
-            <button type="button" onClick={() => setQuickAction(null)} className="text-sm font-semibold text-green-800">Annuler</button>
-          </div>}
-        </section>
-      )}
-      {vue === "seances" && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-bold">Démarrer une séance</h2>
-          <p className="text-sm text-gray-600">Parcours fictifs pour évaluer la navigation. Aucun enregistrement possible.</p>
-          <div className="grid grid-cols-2 gap-2">
-            {seances.map((type) => (
-              <button key={type} type="button" onClick={() => setSeance(type)}
-                className="min-h-20 rounded-xl border bg-white p-3 text-sm font-semibold">{type}</button>
-            ))}
-          </div>
-          {seance && <div className="rounded-xl border border-green-300 bg-green-50 p-4">
-            <p className="font-bold">{seance}</p>
-            <p className="mt-1 text-sm">Ici, on pourrait choisir les animaux et préparer le travail.</p>
-            <p className="mt-2 text-xs font-semibold text-green-900">Prototype · lecture seule</p>
-          </div>}
-        </section>
-      )}
     </div>
   );
 }
