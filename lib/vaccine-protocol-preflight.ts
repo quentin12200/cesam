@@ -17,6 +17,7 @@ export type BilanAvantExtraction = {
   vaccinationsGeneriquesNeutralisees: number;
   traitementsDoublonsDetaches: number;
   statutsAnimauxRecalcules: number;
+  statutsAvecDecisionOuNoteAProteger: number;
   animauxAvecHistorique: number;
 };
 
@@ -32,6 +33,7 @@ export function bilanExtraction(
     vaccinationsGeneriquesNeutralisees: plan.vaccinationsGeneriquesANeutraliser.length,
     traitementsDoublonsDetaches: plan.traitementsDoublonsADetacher.length,
     statutsAnimauxRecalcules: statuts.length,
+    statutsAvecDecisionOuNoteAProteger: statuts.filter((statut) => statut.source !== "VACCINATION" || Boolean(statut.notes?.trim())).length,
     animauxAvecHistorique: new Set(animalIdsLegacy).size,
   };
 }
