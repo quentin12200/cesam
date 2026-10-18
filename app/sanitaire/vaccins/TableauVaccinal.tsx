@@ -23,6 +23,7 @@ interface CelluleGrille {
   date: string | null;
   horsProgramme?: boolean;
   motifSansEcheance?: "HORS_CIBLE" | "ACQUIS_SANS_PREUVE" | "CALCUL_A_CONFIRMER";
+  raisonsHorsCible?: { critere: "CATEGORIE" | "SEXE" | "GESTATION" | "RANG_VELAGE" | "LOT"; detail: string }[];
   aValider: boolean;
   rattachementProtocoleAutorise: boolean;
   historiquesAValider: HistoriqueAValider[];
@@ -533,17 +534,30 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       ? <button type="button" title="Historique à rattacher" onClick={() => ouvrirHistorique(ligne, bloc, etape)} className="vaccin-print-hidden flex min-h-9 w-full items-center justify-center rounded border-2 border-amber-700 bg-amber-50 px-1 text-[11px] font-bold text-amber-950">À rattacher</button>
       : null;
 
+    const libellesCriteres = {
+      CATEGORIE: "catégorie", SEXE: "sexe", GESTATION: "gestation", RANG_VELAGE: "rang de vêlage", LOT: "lot",
+    } as const;
+    const raisonsHorsCible = cellule.raisonsHorsCible ?? [];
     const motifSansEcheance = !cellule.aValider && cellule.statut === "VIDE" && !historiqueEtape.length && cellule.motifSansEcheance
-      ? <span role="status" title={cellule.motifSansEcheance === "HORS_CIBLE"
-        ? "Cet animal ne correspond pas à la cible actuelle du protocole (catégorie, sexe, lot, gestation ou rang de vêlage). Aucune injection n'est déduite."
-        : cellule.motifSansEcheance === "ACQUIS_SANS_PREUVE"
+      ? cellule.motifSansEcheance === "HORS_CIBLE"
+        ? <details className="rounded border border-amber-500 bg-amber-50 px-1 py-1 text-center text-[10px] font-semibold text-amber-950">
+            <summary className="cursor-pointer" title="Ouvrir les critères du protocole qui excluent cet animal">
+              Hors cible : {raisonsHorsCible.length ? [...new Set(raisonsHorsCible.map((raison) => libellesCriteres[raison.critere]))].join(", ") : "vérifier"}
+            </summary>
+            <div className="mt-1 space-y-1 border-t border-amber-200 pt-1 text-left font-normal">
+              {raisonsHorsCible.length
+                ? raisonsHorsCible.map((raison, index) => <p key={index}>{raison.detail}</p>)
+                : <p>Vérifie la catégorie, le sexe, la gestation, le lot et le rang de vêlage définis dans le protocole.</p>}
+              <p className="font-semibold">Aucune vaccination n’est déduite de cette exclusion.</p>
+            </div>
+          </details>
+        : <span role="status" title={cellule.motifSansEcheance === "ACQUIS_SANS_PREUVE"
           ? "Le protocole porte un statut acquis, mais aucune injection correspondante n'a été retrouvée dans l'historique reconnu. À contrôler avant toute correction."
           : "La planification ne peut pas être établie à partir des données actuelles. Vérifier les dates, le protocole et les anciens statuts."}
-        className="block rounded border border-amber-500 bg-amber-50 px-1 py-1 text-center text-[10px] font-semibold text-amber-950">
-        {cellule.motifSansEcheance === "HORS_CIBLE" ? "Hors cible · vérifier"
-          : cellule.motifSansEcheance === "ACQUIS_SANS_PREUVE" ? "Statut acquis sans acte · vérifier"
-            : "Calcul à confirmer"}
-      </span> : null;
+          className="block rounded border border-amber-500 bg-amber-50 px-1 py-1 text-center text-[10px] font-semibold text-amber-950">
+          {cellule.motifSansEcheance === "ACQUIS_SANS_PREUVE" ? "Statut acquis sans acte · vérifier" : "Calcul à confirmer"}
+        </span>
+      : null;
     const horsProgramme = cellule.horsProgramme && !cellule.aValider
       ? <span title="Âge maximal de démarrage défini par l'élevage, sans vaccination enregistrée" className="block rounded border border-slate-300 bg-slate-50 px-1 py-1 text-center text-[10px] font-semibold text-slate-600">Hors programme</span>
       : null;
