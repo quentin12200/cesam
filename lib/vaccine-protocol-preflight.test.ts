@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { bilanExtraction, empreinteExtraction, type PlanPossible, type StatutAvantExtraction } from "./vaccine-protocol-preflight.ts";
 
@@ -38,4 +39,16 @@ test("un statut manuel ou une étape historique modifiée rend la prévalidation
   assert.notEqual(avant, empreinteExtraction({ ...entree, statuts: [{ ...statut, statut: "PROTOCOLE_ACQUIS" }] }));
   assert.notEqual(avant, empreinteExtraction({ ...entree, statuts: [{ ...statut, notes: "Nouveau message" }] }));
   assert.notEqual(avant, empreinteExtraction({ ...entree, etapes: [{ ...entree.etapes[0], medicamentIds: ["med-crypto"] }] }));
+});
+
+test("la confirmation serveur refuse une empreinte manquante ou périmée avant toute écriture", () => {
+  const route = readFileSync(new URL("../app/api/protocoles/route.ts", import.meta.url), "utf8");
+  const ui = readFileSync(new URL("../app/config/protocoles/ProtocoleQuestionnaire.tsx", import.meta.url), "utf8");
+  assert.match(route, /empreinteExtractionPrevue !== empreintePrevue/);
+  const indexControle = route.indexOf("if (empreinteActuelle !== empreinteExtractionPrevue)");
+  const indexPremiereEcriture = route.indexOf("await tx.protocoleVaccin.update({");
+  assert.ok(indexControle !== -1 && indexControle < indexPremiereEcriture, "contrôle effectué dans la transaction avant toute mutation");
+  assert.match(route, /empreinte: empreintePrevue/);
+  assert.match(ui, /bilan\.statutsAnimauxRecalcules/);
+  assert.match(ui, /empreinteExtractionPrevue: action\?\.type === "EXTRACTION"/);
 });
