@@ -77,3 +77,18 @@ export function sexeImpliciteCategorieVaccinale(categories: readonly string[]): 
   if (categories.every((categorie) => males.has(categorie))) return "M";
   return null;
 }
+
+/** Lecture prudente des catégories d'un ancien protocole. Une valeur illisible doit
+ * bloquer l'éditeur plutôt que risquer de convertir le ciblage en « Tous les bovins ». */
+export function lireCategoriesHistoriques(raw: string | null): string[] | null {
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.every((valeur) =>
+      typeof valeur === "string" && Object.prototype.hasOwnProperty.call(LIBELLES_CATEGORIES_VACCINS, valeur))) return null;
+    if (new Set(parsed).size !== parsed.length) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}

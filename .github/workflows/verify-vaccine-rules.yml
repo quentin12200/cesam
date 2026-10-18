@@ -37,6 +37,7 @@ jobs:
             lib/vaccine-grid.test.ts \
             lib/vaccine-category-selection.test.ts \
             lib/vaccine-category-impact.test.ts \
+            lib/vaccine-category-legacy.test.ts \
             lib/vaccine-questionnaire-presentation.test.ts \
             lib/vaccine-eligibility.test.ts \
             lib/vaccine-age-preview.test.ts \
