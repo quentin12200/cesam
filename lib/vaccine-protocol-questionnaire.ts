@@ -20,6 +20,8 @@ export interface BrancheAgePrimoQuestionnaire {
 export interface ConfigurationQuestionnaireV1 {
   version: 1;
   medicamentId: string;
+  /** Limite facultative propre au programme d'élevage : uniquement pour démarrer, pas pour un rappel après Primo. */
+  ageMaxDemarrage?: DureeQuestionnaire | null;
   cible: {
     tousBovins: boolean;
     categories: string[];
@@ -103,6 +105,12 @@ export function lireConfigurationQuestionnaire(json: string | null | undefined):
   try { value = JSON.parse(json) as ConfigurationQuestionnaireV1; } catch { return null; }
   if (value.version !== 1 || !texteNonVide(value.medicamentId) || !value.cible || !value.demarrage || !value.entretien) return null;
   if (!Array.isArray(value.cible.categories)) return null;
+  // Les anciens questionnaires v1 sans limite sont conservés tels quels.
+  if (value.ageMaxDemarrage != null && !dureeQuestionnaireValide(value.ageMaxDemarrage)) return null;
+  if (value.ageMaxDemarrage != null) {
+    const calendrier = value.demarrage.type === "DOSE_UNIQUE" ? value.demarrage.calendrier : value.demarrage.type === "PRIMO_RAPPEL" ? value.demarrage.calendrierPrimo : null;
+    if (!calendrier || (calendrier.type !== "AGE_MINIMUM" && calendrier.type !== "SANS_REGLE")) return null;
+  }
   if (value.demarrage.type === "DOSE_UNIQUE") {
     if (!texteNonVide(value.demarrage.etapeDoseId) || !texteNonVide(value.demarrage.preconisationId) || !regleTemporelleValide(value.demarrage.calendrier)) return null;
   } else if (value.demarrage.type === "PRIMO_RAPPEL") {
