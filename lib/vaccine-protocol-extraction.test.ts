@@ -483,7 +483,8 @@ test("l'API propose une extraction confirmée, atomique, sans suffixe de protoco
   assert.doesNotMatch(route, /CRYPTIUM|ROTAVEC/);
   const extraction = readFileSync(new URL("./vaccine-protocol-extraction.ts", import.meta.url), "utf8");
   assert.doesNotMatch(extraction, /CRYPTIUM|ROTAVEC/);
-  assert.match(ui, /Séparer \{conflitProtocole\.extraction\.medicamentNom\} de l’ancien protocole et créer ce protocole/);
+  assert.match(ui, /Confirmer la séparation de \{conflitProtocole\.extraction\.medicamentNom\}/);
+  assert.match(ui, /Prévisualisation — aucun changement effectué/);
   assert.match(ui, /window\.confirm/);
   assert.match(ui, /conflitProtocole\.extraction\.raison !== erreurEnregistrement/,
     "un même message d'ambiguïté n'est affiché qu'une fois");
