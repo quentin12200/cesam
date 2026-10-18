@@ -47,12 +47,12 @@ export default function LabExplorer({
   function changerTri(champ: Tri) { setTri(p => p.champ !== champ ? {champ,sens:1} : p.sens===1 ? {champ,sens:-1} : {champ:null,sens:0}); }
   const visibles = animaux.filter((a) =>
     (a.nutrav + " " + (a.nobovi ?? "")).toLowerCase().includes(recherche.toLowerCase())
-  ).slice(0, 30);
+  ).sort((a,b) => { if (!tri.champ || !tri.sens) return a.nutrav.localeCompare(b.nutrav,"fr",{numeric:true}); let d=0; if(tri.champ==="numero")d=a.nutrav.localeCompare(b.nutrav,"fr",{numeric:true}); if(tri.champ==="sexe")d=a.sexbov.localeCompare(b.sexbov); if(tri.champ==="age")d=new Date(b.danais).getTime()-new Date(a.danais).getTime(); if(tri.champ==="repro")d=(a.aEchographier?"JAUNE":a.reproduction??"ZZZ").localeCompare(b.aEchographier?"JAUNE":b.reproduction??"ZZZ"); return d*tri.sens || a.nutrav.localeCompare(b.nutrav,"fr",{numeric:true}); }).slice(0, 30);
   const prochaines = [...echeances].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 15);
 
   return (
     <div className="space-y-4">
-      <nav className="grid grid-cols-3 gap-2" aria-label="Sections du CESAM LAB">
+      <nav className="grid grid-cols-4 gap-1.5" aria-label="Sections du CESAM LAB">
         <button type="button" onClick={() => setVue("animaux")} className={vue === "animaux" ? "rounded-xl bg-green-700 p-3 text-sm font-bold text-white" : "rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}>
           <Search className="mx-auto mb-1" size={20} />Animaux
         </button>
@@ -62,6 +62,7 @@ export default function LabExplorer({
         <button type="button" onClick={() => setVue("seances")} className={vue === "seances" ? "rounded-xl bg-green-700 p-3 text-sm font-bold text-white" : "rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}>
           <Users className="mx-auto mb-1" size={20} />Séances
         </button>
+        <button type="button" onClick={() => setVue("rapide")} className={vue === "rapide" ? "rounded-xl bg-green-700 p-2 text-xs font-bold text-white" : "rounded-xl bg-white p-2 text-xs font-bold text-gray-700"}><Zap className="mx-auto mb-1" size={20}/>Action</button>
       </nav>
 
       {vue === "animaux" && (
