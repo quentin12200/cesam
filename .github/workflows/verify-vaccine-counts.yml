@@ -1,0 +1,36 @@
+name: Verify vaccine counters
+on:
+  pull_request:
+    branches: [principal]
+    paths:
+      - "app/sanitaire/vaccins/**"
+      - "lib/vaccine-*.ts"
+      - "lib/vaccination-session*.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/verify-vaccine-counts.yml"
+  workflow_dispatch:
+
+jobs:
+  counters-and-grid:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Generate Prisma client without database writes
+        run: npx prisma generate
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Vaccine counters and grid unit tests
+        run: |
+          node --test --experimental-strip-types \
+            lib/vaccine-header-counts.test.ts \
+            lib/vaccine-grid.test.ts \
+            lib/vaccine-protocol-questionnaire.test.ts
