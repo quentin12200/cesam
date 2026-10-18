@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
         });
         const statutsPrecedents = await prisma.statutProtocoleVaccinal.findMany({
           where: { protocoleId: existant.id },
-          select: { animalId: true, statut: true, source: true, notes: true, brancheInitialeId: true, confirmeAt: true },
+          select: { id: true, animalId: true, statut: true, source: true, notes: true, brancheInitialeId: true, confirmeAt: true, createdAt: true, updatedAt: true },
         });
         const etapesPourEmpreinte = existant.etapes.map((etape) => ({
           id: etape.id, label: etape.label, cycle: etape.cycle,
@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
             select: {
               id: true, nom: true, actif: true, configurationQuestionnaireJson: true,
               etapes: { select: { id: true, label: true, cycle: true, ordre: true, obligatoire: true, medicaments: { select: { medicamentId: true, medicament: { select: { nom: true } } } } } },
-              statutsAnimaux: { select: { animalId: true, statut: true, source: true, notes: true, brancheInitialeId: true, confirmeAt: true } },
+              statutsAnimaux: { select: { id: true, animalId: true, statut: true, source: true, notes: true, brancheInitialeId: true, confirmeAt: true, createdAt: true, updatedAt: true } },
             },
           });
           if (!legacy || legacy.configurationQuestionnaireJson != null) throw new ExtractionVaccinRefusee("Le protocole historique a changé : recharge la page.");
