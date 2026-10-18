@@ -60,7 +60,7 @@ export default function LabCreatePanel({ animaux }: { animaux: Animal[] }) {
     </>}
     {mode==="combinee"&&<>
       <h2 className="text-lg font-bold">Séance combinée</h2>
-      <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900"><b>Démonstration uniquement.</b> Les cases cochées ne sont ni enregistrées ni envoyées aux fiches sanitaires. Ce n'est pas encore une vraie séance CESAM.</p>
+      <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900"><b>Démonstration uniquement.</b> Les cases cochées ne sont ni enregistrées ni envoyées aux fiches sanitaires. Ce n’est pas encore une vraie séance CESAM.</p>
       <h3 className="font-bold">1. Choisir les opérations</h3>
       <div className="grid grid-cols-2 gap-2">{actes.map(label=><button type="button" key={label} onClick={()=>toggleEtape(label)} aria-pressed={etapes.includes(label)} className={etapes.includes(label)?"flex min-h-12 items-center gap-2 rounded-xl border border-green-600 bg-green-50 p-3 text-sm font-semibold":"flex min-h-12 items-center gap-2 rounded-xl border bg-white p-3 text-sm font-semibold"}><span className="flex h-5 w-5 items-center justify-center rounded border border-green-600">{etapes.includes(label)&&<Check size={14}/>}</span>{label}</button>)}</div>
       <h3 className="font-bold">2. Choisir les animaux</h3>
