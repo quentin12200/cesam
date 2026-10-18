@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, X, UserRound, Mic, Loader2 } from "lucide-react";
+import { Settings, X, UserRound, Mic, Loader2, FlaskConical } from "lucide-react";
 import Link from "next/link";
 import { useUserPreferences, type CesamProfile } from "@/components/UserPreferencesProvider";
 import IdentificationSettings from "@/components/IdentificationSettings";
@@ -112,6 +112,12 @@ export default function GlobalSettingsButton() {
                 <span><span className="block font-bold">Notifications sur cet appareil</span><span className="block text-xs font-normal text-gray-500">Activation et choix des alertes reçues</span></span><span aria-hidden="true">›</span>
               </Link>
             </div>
+
+            <Link href="/lab" onClick={() => setOpen(false)} className="mt-5 flex min-h-16 items-center gap-3 rounded-xl border-2 border-green-200 bg-green-50 p-3 text-green-900">
+              <FlaskConical size={24} className="shrink-0" />
+              <span className="min-w-0 flex-1"><span className="block text-sm font-black">CESAM LAB · Tester la nouvelle interface</span><span className="block text-xs">Prototype en lecture seule, sans modifier les données</span></span>
+              <span aria-hidden="true">›</span>
+            </Link>
 
             <IdentificationSettings />
             <div className="mt-5 border-t border-gray-100 pt-4">
