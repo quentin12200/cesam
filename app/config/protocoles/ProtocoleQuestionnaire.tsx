@@ -213,7 +213,7 @@ export default function ProtocoleQuestionnaire({ protocoles, medicaments, apercu
   const afficherSexe = sexeDejaConnu == null;
   const afficherGestation = form.calendrier.type !== "AVANT_VELAGE"
     && form.sexeCible !== "M"
-    && (form.tous || form.categories.includes("GENISSE") || form.categories.includes("VACHE"));
+    && (form.tous || form.categories.some((code) => code === "GENISSE" || code === "VACHE" || code.endsWith("_GENISSE")));
   const valide = useMemo(() => {
     if (page === 0) return Boolean(med && med.preconisations.length > 0);
     if (page === 1) return form.tous || form.categories.length > 0;
