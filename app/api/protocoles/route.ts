@@ -319,6 +319,33 @@ export async function POST(request: NextRequest) {
           const traitementsDoublons = new Set(planActuel.traitementsDoublonsADetacher);
           const liensRestants = legacy.etapes.flatMap((etape) => etape.medicaments).filter((liaison) => liaison.medicamentId !== configuration.medicamentId).length;
           const actesRestants = vaccinationsActuelles.length + traitementsActuels.length - vaccinationsDeplacees.size - vaccinationsGeneriques.size - traitementsDeplaces.size - traitementsDoublons.size;
+          // Conserver atomiquement l'identité et toutes les dates d'origine des statuts avant
+          // recalcul, ainsi que les liens sanitaires modifiés. Ce journal est un instantané
+          // d'audit, PAS une annulation automatique de la séparation.
+          await tx.actionLog.create({
+            data: {
+              type: "ARCHIVE_AVANT_SEPARATION_PROTOCOLE",
+              description: `Archive sanitaire avant séparation du protocole ${legacy.id}`,
+              // L'API /api/undo ne doit jamais exécuter cet instantané comme RevertStep.
+              reverted: true,
+              revertData: JSON.stringify({
+                format: "CESAM_PROTOCOLE_EXTRACTION_AUDIT_V1",
+                irreversibleParUndoAutomatique: true,
+                ancienProtocole: { id: legacy.id, nom: legacy.nom, actif: legacy.actif, etapes: legacy.etapes },
+                medicamentExtraitId: configuration.medicamentId,
+                empreinte: empreinteActuelle,
+                statutsAvant: legacy.statutsAnimaux,
+                vaccinationsAvant: vaccinationsActuelles,
+                traitementsAvant: traitementsActuels,
+                deplacementsPrevus: {
+                  vaccinations: planActuel.vaccinations,
+                  traitements: planActuel.traitements,
+                  generiquesNeutralisees: [...vaccinationsGeneriques],
+                  traitementsDetaches: [...traitementsDoublons],
+                },
+              }),
+            },
+          });
           await tx.protocoleVaccin.update({
             where: { id: legacy.id },
             data: { nom: nomInterneLegacy(legacy.nom, legacy.id), actif: liensRestants > 0 || actesRestants > 0 ? legacy.actif : false },
