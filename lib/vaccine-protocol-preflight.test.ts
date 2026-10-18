@@ -1,0 +1,70 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+import { bilanExtraction, empreinteExtraction, type PlanPossible, type StatutAvantExtraction } from "./vaccine-protocol-preflight.ts";
+
+const plan: PlanPossible = {
+  possible: true,
+  vaccinations: [{ id: "vacc-1", animalId: "a1", etapeCibleId: "dose-rotavec" }],
+  traitements: [{ id: "trait-1", animalId: "a2", etapeCibleId: "dose-rotavec" }],
+  vaccinationsGeneriquesANeutraliser: ["generic-1"],
+  traitementsDoublonsADetacher: ["doublon-1"],
+  resolusAutomatiquement: 0,
+};
+const statut: StatutAvantExtraction = {
+  id: "stat-1", createdAt: new Date("2026-01-01T11:00:00Z"), updatedAt: new Date("2026-01-02T11:00:00Z"),
+  animalId: "a1", statut: "PRIMO_A_FAIRE", source: "MANUEL",
+  notes: "Observation gardée", brancheInitialeId: null, confirmeAt: new Date("2026-01-01T12:00:00Z"),
+};
+const entree = { ancienProtocoleId: "proto-legacy", medicamentId: "med-rotavec", plan, statuts: [statut],
+  etapes: [{ id: "etape-old", label: "Dose unique", cycle: "INITIAL", medicamentIds: ["med-crypto", "med-rotavec"] }] };
+
+test("le bilan annonce chaque type de modification avant de demander confirmation", () => {
+  assert.deepEqual(bilanExtraction(plan, [statut], ["a1", "a1", "a2"]), {
+    vaccinationsDeplacees: 1, traitementsDeplaces: 1, vaccinationsGeneriquesNeutralisees: 1,
+    traitementsDoublonsDetaches: 1, statutsAnimauxRecalcules: 1, statutsAvecDecisionOuNoteAProteger: 1, animauxAvecHistorique: 2,
+  });
+});
+test("une source vaccination sans note est reconstructible, une décision manuelle ne l'est pas", () => {
+  assert.equal(bilanExtraction(plan, [{ ...statut, source: "VACCINATION", notes: null }], ["a1"]).statutsAvecDecisionOuNoteAProteger, 0);
+  assert.equal(bilanExtraction(plan, [statut], ["a1"]).statutsAvecDecisionOuNoteAProteger, 1);
+});
+
+test("mêmes actes et statuts dans des ordres différents : même empreinte", () => {
+  assert.equal(empreinteExtraction(entree), empreinteExtraction({
+    ...entree, etapes: [{ ...entree.etapes[0], medicamentIds: ["med-rotavec", "med-crypto"] }],
+  }));
+});
+test("ajout d'un acte ou suppression d'un doublon : nouvelle empreinte", () => {
+  const avant = empreinteExtraction(entree);
+  assert.notEqual(avant, empreinteExtraction({ ...entree, plan: { ...plan, vaccinations: [...plan.vaccinations, { id: "vacc-2", animalId: "a1", etapeCibleId: "dose-rotavec" }] } }));
+  assert.notEqual(avant, empreinteExtraction({ ...entree, plan: { ...plan, vaccinationsGeneriquesANeutraliser: [] } }));
+});
+test("un statut manuel ou une étape historique modifiée rend la prévalidation caduque", () => {
+  const avant = empreinteExtraction(entree);
+  assert.notEqual(avant, empreinteExtraction({ ...entree, statuts: [{ ...statut, statut: "PROTOCOLE_ACQUIS" }] }));
+  assert.notEqual(avant, empreinteExtraction({ ...entree, statuts: [{ ...statut, notes: "Nouveau message" }] }));
+  assert.notEqual(avant, empreinteExtraction({ ...entree, statuts: [{ ...statut, confirmeAt: new Date("2026-01-03T12:00:00Z") }] }));
+  assert.notEqual(avant, empreinteExtraction({ ...entree, statuts: [{ ...statut, updatedAt: new Date("2026-01-03T11:00:00Z") }] }));
+  assert.notEqual(avant, empreinteExtraction({ ...entree, etapes: [{ ...entree.etapes[0], medicamentIds: ["med-crypto"] }] }));
+});
+
+test("la confirmation serveur refuse une empreinte manquante ou périmée avant toute écriture", () => {
+  const route = readFileSync(new URL("../app/api/protocoles/route.ts", import.meta.url), "utf8");
+  const ui = readFileSync(new URL("../app/config/protocoles/ProtocoleQuestionnaire.tsx", import.meta.url), "utf8");
+  assert.match(route, /empreinteExtractionPrevue !== empreintePrevue/);
+  const indexControle = route.indexOf("if (empreinteActuelle !== empreinteExtractionPrevue)");
+  const indexPremiereEcriture = route.indexOf("await tx.protocoleVaccin.update({");
+  assert.ok(indexControle !== -1 && indexControle < indexPremiereEcriture, "contrôle effectué dans la transaction avant toute mutation");
+  assert.match(route, /empreinte: empreintePrevue/);
+  const indexArchive = route.indexOf('type: "ARCHIVE_AVANT_SEPARATION_PROTOCOLE"');
+  assert.ok(indexArchive > indexControle && indexArchive < indexPremiereEcriture,
+    "archivage atomique des statuts d'origine avant remplacement");
+  assert.match(route, /statutsAvant: legacy\.statutsAnimaux/);
+  assert.match(route, /vaccinationsAvant: vaccinationsActuelles/);
+  assert.match(route, /traitementsAvant: traitementsActuels/);
+  assert.match(route, /reverted: true/);
+  assert.match(route, /if \(legacy\.statutsAnimaux\.some/, "refus de perdre les décisions ou notes manuelles");
+  assert.match(ui, /bilan\.statutsAnimauxRecalcules/);
+  assert.match(ui, /empreinteExtractionPrevue: action\?\.type === "EXTRACTION"/);
+});

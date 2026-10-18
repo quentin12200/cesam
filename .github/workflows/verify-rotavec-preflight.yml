@@ -1,0 +1,40 @@
+name: Verify Rotavec extraction safeguards
+on:
+  pull_request:
+    branches: [principal]
+    paths:
+      - "app/config/protocoles/**"
+      - "app/api/protocoles/**"
+      - "lib/vaccine-protocol-preflight*.ts"
+      - "lib/vaccine-protocol-extraction*.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/verify-rotavec-preflight.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Direct ESLint
+        run: ESLINT_USE_FLAT_CONFIG=false npx eslint app/api/protocoles/route.ts app/config/protocoles/ProtocoleQuestionnaire.tsx lib/vaccine-protocol-preflight.ts lib/vaccine-protocol-preflight.test.ts
+      - name: Critical vaccination tests
+        run: |
+          node --test --experimental-strip-types \
+            lib/vaccine-protocol-preflight.test.ts \
+            lib/vaccine-protocol-extraction.test.ts \
+            lib/vaccine-protocol-save.test.ts \
+            lib/vaccine-protocol-questionnaire.test.ts

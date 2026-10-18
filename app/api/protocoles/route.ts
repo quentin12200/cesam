@@ -7,6 +7,7 @@ import { brancheInitialeDepuisActes, etapeIdsConfigurationQuestionnaire, lireCon
 import { referencesPharmacieValides } from "@/lib/vaccine-protocol-validation";
 import { preparerConversionProtocole } from "@/lib/vaccine-protocol-name";
 import { planifierExtractionVaccin, resoudreLegacyParMedicament } from "@/lib/vaccine-protocol-extraction";
+import { bilanExtraction, empreinteExtraction } from "@/lib/vaccine-protocol-preflight";
 import { statutDepuisEtapesFaites } from "@/lib/vaccine-statut";
 
 function cibleErreurUniqueContientNom(meta: unknown): boolean {
@@ -60,7 +61,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { nom, label, ordre, ageMinJours, ageMaxJours, urgenceJours, estRappel, primoNom, delaiRappelJours, urgenceRappelJours, obligatoireVente, description, categories, sexeCible, stadeReproduction, gestante, rangVelageMin, rangVelageMax, lotCible, etapes, configurationQuestionnaire, extraireDepuisProtocoleId } = body;
+  const { nom, label, ordre, ageMinJours, ageMaxJours, urgenceJours, estRappel, primoNom, delaiRappelJours, urgenceRappelJours, obligatoireVente, description, categories, sexeCible, stadeReproduction, gestante, rangVelageMin, rangVelageMax, lotCible, etapes, configurationQuestionnaire, extraireDepuisProtocoleId, empreinteExtractionPrevue } = body;
   if (!nom?.trim() || !label?.trim()) {
     return NextResponse.json({ error: "nom et label requis" }, { status: 400 });
   }
@@ -201,6 +202,21 @@ export async function POST(request: NextRequest) {
           traitementsVaccinauxReels,
           idsCibles: idsDemandes,
         });
+        const statutsPrecedents = await prisma.statutProtocoleVaccinal.findMany({
+          where: { protocoleId: existant.id },
+          select: { id: true, animalId: true, statut: true, source: true, notes: true, brancheInitialeId: true, confirmeAt: true, createdAt: true, updatedAt: true },
+        });
+        const etapesPourEmpreinte = existant.etapes.map((etape) => ({
+          id: etape.id, label: etape.label, cycle: etape.cycle,
+          medicamentIds: etape.medicaments.map((liaison) => liaison.medicamentId),
+        }));
+        const empreintePrevue = plan.possible ? empreinteExtraction({
+          ancienProtocoleId: existant.id, medicamentId: configuration.medicamentId,
+          plan, statuts: statutsPrecedents, etapes: etapesPourEmpreinte,
+        }) : null;
+        const bilanPrevu = plan.possible
+          ? bilanExtraction(plan, statutsPrecedents, animalIdsLegacy)
+          : null;
         const nutravParAnimalId = new Map([...vaccinations, ...traitements].map((acte) => [acte.animalId, acte.animal.nutrav]));
         const diagnostic = plan.possible ? undefined : {
           ...plan.diagnostic,
@@ -229,12 +245,20 @@ export async function POST(request: NextRequest) {
                 medicamentNom: medicament.nom,
                 vaccinationsCount: plan.possible ? plan.vaccinations.length : 0,
                 traitementsCount: plan.possible ? plan.traitements.length : 0,
+                bilan: bilanPrevu,
+                empreinte: empreintePrevue,
                 raison: plan.possible ? undefined : plan.raison,
               },
             },
           }, { status: 409 });
         }
         if (!plan.possible) throw new ExtractionVaccinRefusee(plan.raison);
+        if (bilanPrevu && bilanPrevu.statutsAvecDecisionOuNoteAProteger > 0) {
+          throw new ExtractionVaccinRefusee("La séparation est bloquée : certains statuts du protocole contiennent une décision ou une note à préserver. Aucun historique modifié.");
+        }
+        if (!empreintePrevue || !empreinteExtractionPrevue || empreinteExtractionPrevue !== empreintePrevue) {
+          throw new ExtractionVaccinRefusee("Prévisualisation obsolète. Clique à nouveau sur Enregistrer pour actualiser le bilan avant de confirmer.");
+        }
 
         const protocole = await prisma.$transaction(async (tx) => {
           const legacy = await tx.protocoleVaccin.findUnique({
@@ -242,10 +266,13 @@ export async function POST(request: NextRequest) {
             select: {
               id: true, nom: true, actif: true, configurationQuestionnaireJson: true,
               etapes: { select: { id: true, label: true, cycle: true, ordre: true, obligatoire: true, medicaments: { select: { medicamentId: true, medicament: { select: { nom: true } } } } } },
-              statutsAnimaux: { select: { animalId: true } },
+              statutsAnimaux: { select: { id: true, animalId: true, statut: true, source: true, notes: true, brancheInitialeId: true, confirmeAt: true, createdAt: true, updatedAt: true } },
             },
           });
           if (!legacy || legacy.configurationQuestionnaireJson != null) throw new ExtractionVaccinRefusee("Le protocole historique a changé : recharge la page.");
+          if (legacy.statutsAnimaux.some((statut) => statut.source !== "VACCINATION" || Boolean(statut.notes?.trim()))) {
+            throw new ExtractionVaccinRefusee("Une décision ou une note manuelle empêche la reconstruction automatique des statuts. Aucune séparation effectuée.");
+          }
           const [vaccinationsActuelles, traitementsActuels] = await Promise.all([
             tx.vaccination.findMany({ where: { protocoleId: legacy.id }, select: { id: true, animalId: true, medicamentId: true, vaccin: true, etapeProtocoleId: true, statut: true, date: true } }),
             tx.traitement.findMany({ where: { protocoleVaccinId: legacy.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleVaccinId: true, dateDebut: true } }),
@@ -274,6 +301,17 @@ export async function POST(request: NextRequest) {
             idsCibles: idsDemandes,
           });
           if (!planActuel.possible) throw new ExtractionVaccinRefusee(planActuel.raison);
+          const empreinteActuelle = empreinteExtraction({
+            ancienProtocoleId: legacy.id, medicamentId: configuration.medicamentId,
+            plan: planActuel, statuts: legacy.statutsAnimaux,
+            etapes: legacy.etapes.map((etape) => ({
+              id: etape.id, label: etape.label, cycle: etape.cycle,
+              medicamentIds: etape.medicaments.map((liaison) => liaison.medicamentId),
+            })),
+          });
+          if (empreinteActuelle !== empreinteExtractionPrevue) {
+            throw new ExtractionVaccinRefusee("Les actes ou statuts historiques ont changé depuis le bilan. Aucune séparation effectuée. Clique sur Enregistrer pour actualiser.");
+          }
 
           const vaccinationsDeplacees = new Map(planActuel.vaccinations.map((acte) => [acte.id, acte]));
           const traitementsDeplaces = new Map(planActuel.traitements.map((acte) => [acte.id, acte]));
@@ -281,6 +319,33 @@ export async function POST(request: NextRequest) {
           const traitementsDoublons = new Set(planActuel.traitementsDoublonsADetacher);
           const liensRestants = legacy.etapes.flatMap((etape) => etape.medicaments).filter((liaison) => liaison.medicamentId !== configuration.medicamentId).length;
           const actesRestants = vaccinationsActuelles.length + traitementsActuels.length - vaccinationsDeplacees.size - vaccinationsGeneriques.size - traitementsDeplaces.size - traitementsDoublons.size;
+          // Conserver atomiquement l'identité et toutes les dates d'origine des statuts avant
+          // recalcul, ainsi que les liens sanitaires modifiés. Ce journal est un instantané
+          // d'audit, PAS une annulation automatique de la séparation.
+          await tx.actionLog.create({
+            data: {
+              type: "ARCHIVE_AVANT_SEPARATION_PROTOCOLE",
+              description: `Archive sanitaire avant séparation du protocole ${legacy.id}`,
+              // L'API /api/undo ne doit jamais exécuter cet instantané comme RevertStep.
+              reverted: true,
+              revertData: JSON.stringify({
+                format: "CESAM_PROTOCOLE_EXTRACTION_AUDIT_V1",
+                irreversibleParUndoAutomatique: true,
+                ancienProtocole: { id: legacy.id, nom: legacy.nom, actif: legacy.actif, etapes: legacy.etapes },
+                medicamentExtraitId: configuration.medicamentId,
+                empreinte: empreinteActuelle,
+                statutsAvant: legacy.statutsAnimaux,
+                vaccinationsAvant: vaccinationsActuelles,
+                traitementsAvant: traitementsActuels,
+                deplacementsPrevus: {
+                  vaccinations: planActuel.vaccinations,
+                  traitements: planActuel.traitements,
+                  generiquesNeutralisees: [...vaccinationsGeneriques],
+                  traitementsDetaches: [...traitementsDoublons],
+                },
+              }),
+            },
+          });
           await tx.protocoleVaccin.update({
             where: { id: legacy.id },
             data: { nom: nomInterneLegacy(legacy.nom, legacy.id), actif: liensRestants > 0 || actesRestants > 0 ? legacy.actif : false },
