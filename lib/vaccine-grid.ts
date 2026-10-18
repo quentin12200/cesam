@@ -134,6 +134,8 @@ export interface CelluleGrille {
   prochaine: { statut: Exclude<StatutCelluleGrille, "FAIT" | "VIDE">; date: Date; fenetre: { debut: Date; fin: Date } } | null;
   /** Fenêtre calculée par le planner pour une échéance (jamais pour une case FAIT). */
   fenetre?: { debut: Date; fin: Date } | null;
+  /** Hors fenêtre d'âge choisie par l'élevage, pas un acte réalisé ni une contre-indication. */
+  horsProgramme?: boolean;
   /** Administration spécifique à l'animal (branche questionnaire), issue de la Pharmacie. */
   voie?: string | null;
   dose?: number | null;
@@ -408,6 +410,10 @@ function celluleProtocole(
         configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
         brancheInitialeId: statutEnregistre?.brancheInitialeId ?? null,
       });
+      if (action.statut === "HORS_PROGRAMME" && action.etape) {
+        const existante = cellules.get(action.etape.id) ?? celluleVide();
+        if (existante.statut !== "FAIT") cellules.set(action.etape.id, { ...existante, horsProgramme: true });
+      }
       if (action.etape && action.dateMin && action.dateMax) {
         const existante = cellules.get(action.etape.id) ?? celluleVide();
         const etapeGrille = etapes.find((item) => item.id === action.etape!.id);

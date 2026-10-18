@@ -21,6 +21,7 @@ import CalendrierVaccinal from "./CalendrierVaccinal";
 interface CelluleGrille {
   statut: "FAIT" | "BIENTOT" | "A_FAIRE" | "EN_RETARD" | "PREVU" | "VIDE";
   date: string | null;
+  horsProgramme?: boolean;
   aValider: boolean;
   rattachementProtocoleAutorise: boolean;
   historiquesAValider: HistoriqueAValider[];
@@ -531,10 +532,14 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       ? <button type="button" title="Historique à rattacher" onClick={() => ouvrirHistorique(ligne, bloc, etape)} className="vaccin-print-hidden flex min-h-9 w-full items-center justify-center rounded border-2 border-amber-700 bg-amber-50 px-1 text-[11px] font-bold text-amber-950">À rattacher</button>
       : null;
 
-    if (!historique && !action && !aRattacher) return <span className="text-gray-300">—</span>;
+    const horsProgramme = cellule.horsProgramme && !cellule.aValider
+      ? <span title="Âge maximal de démarrage défini par l'élevage, sans vaccination enregistrée" className="block rounded border border-slate-300 bg-slate-50 px-1 py-1 text-center text-[10px] font-semibold text-slate-600">Hors programme</span>
+      : null;
+    if (!historique && !action && !aRattacher && !horsProgramme) return <span className="text-gray-300">—</span>;
     return <div className="space-y-0.5">
       {historique}
       {aRattacher}
+      {horsProgramme}
       {action}
       {selectionne && cellule.statut === "FAIT" && !cellule.prochaine && <span className="block rounded border border-slate-700 px-1 text-center text-[10px] font-bold text-slate-900 ring-2 ring-slate-700">+ nouvelle</span>}
     </div>;

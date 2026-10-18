@@ -1,0 +1,42 @@
+name: Verify vaccine rules
+on:
+  pull_request:
+    branches: [principal]
+    paths:
+      - "app/config/protocoles/**"
+      - "app/sanitaire/vaccins/**"
+      - "lib/vaccine-*.ts"
+      - "lib/vaccination-session*.ts"
+      - "prisma/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/verify-vaccine-rules.yml"
+  workflow_dispatch:
+
+jobs:
+  vaccine-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Generate Prisma client without database writes
+        run: npx prisma generate
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Vaccination and historical protocol regression tests
+        run: |
+          node --test --experimental-strip-types \
+            lib/vaccine-protocol-questionnaire.test.ts \
+            lib/vaccine-grid.test.ts \
+            lib/vaccine-age-preview.test.ts \
+            lib/vaccine-planner.test.ts \
+            lib/vaccine-protocol-extraction.test.ts \
+            lib/vaccine-acts.test.ts \
+            lib/vaccine-protocol-save.test.ts

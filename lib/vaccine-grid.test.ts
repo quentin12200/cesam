@@ -494,3 +494,25 @@ test("questionnaire MHE : une Primo réelle mène au Rappel, un statut acquis ne
   const acquis = construireGrilleVaccinale([nouveauMhe({ statutsProtocoles: [{ protocoleId: protocoleMhe.id, statut: "PROTOCOLE_ACQUIS" }] })], [protocoleMhe], [], AUJOURDHUI);
   assert.equal(extraireActionsPrevues(acquis).length, 0);
 });
+
+test("la limite facultative du programme ne touche pas l'historique ni le rappel, mais retire la Primo non commencee", () => {
+  const cfg = {
+    version: 1, medicamentId: "med-bovigrip", ageMaxDemarrage: { valeur: 30, unite: "JOUR" },
+    cible: { tousBovins: true, categories: [] },
+    demarrage: { type: "DOSE_UNIQUE", etapeDoseId: "bovigrip-primo", preconisationId: "preco", calendrier: { type: "SANS_REGLE" } },
+    entretien: { actif: false },
+  };
+  const protocole: ProtocoleGrille = { ...protocoleBovigrip, etapes: [etapePrimo], configurationQuestionnaireJson: JSON.stringify(cfg) };
+  const sansInjection = construireGrilleVaccinale([animal()], [protocole], [], AUJOURDHUI);
+  const cellule = sansInjection.lignes[0].cellules["bovigrip-primo"];
+  assert.equal(cellule.statut, "VIDE");
+  assert.equal(cellule.horsProgramme, true);
+  assert.equal(cellule.actes.length, 0);
+  assert.deepEqual(extraireActionsPrevues(sansInjection), []);
+  const avecInjection = construireGrilleVaccinale([animal({ actes: [{
+    date: jours(20), vaccin: "BOVILIS BOVIGRIP", medicamentId: "med-bovigrip",
+    protocoleId: protocole.id, etapeProtocoleId: "bovigrip-primo", gestationId: null, statut: "FAIT",
+  }] })], [protocole], [], AUJOURDHUI);
+  assert.equal(avecInjection.lignes[0].cellules["bovigrip-primo"].statut, "FAIT");
+  assert.equal(avecInjection.lignes[0].cellules["bovigrip-primo"].horsProgramme, undefined);
+});
