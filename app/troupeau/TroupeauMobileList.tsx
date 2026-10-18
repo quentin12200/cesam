@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Settings2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, Settings2, X } from "lucide-react";
+import QuickActionsBar from "./[nutrav]/QuickActionsBar";
 import { differenceInDays } from "date-fns";
 import NutravBadge from "@/app/components/NutravBadge";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
@@ -64,6 +65,7 @@ export default function TroupeauMobileList({
 }) {
   const [preferences, setPreferences] = useState<MobileDisplayPreferences>(copyDefaultPreferences);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     setPreferences(parseMobileDisplayPreferences(localStorage.getItem(TROUPEAU_MOBILE_DISPLAY_STORAGE_KEY)));
@@ -189,14 +191,22 @@ export default function TroupeauMobileList({
         const father = formatFather(animal.pereNom, animal.pereNumero);
 
         return (
-          <article key={animal.id} className="rounded-xl bg-white p-3 shadow-sm">
-            <Link href={`/troupeau/${animal.nutrav}`} className="flex min-h-10 items-center gap-2">
-              <NutravBadge nutrav={animal.nutrav} className="!bg-emerald-600" />
-              <span className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900">
-                {animal.nobovi ?? <span className="font-medium italic text-gray-400">Sans nom</span>}
-              </span>
-              <ChevronRight aria-hidden="true" size={18} className="shrink-0 text-gray-400" />
-            </Link>
+          <article key={animal.id} className={`rounded-xl border bg-white px-3 py-2 shadow-sm ${expandedId === animal.id ? "border-green-300" : "border-transparent"}`}>
+            <div className="flex items-center gap-2">
+              <Link href={`/troupeau/${animal.nutrav}`} className="flex min-h-10 min-w-0 flex-1 items-center gap-2">
+                <NutravBadge nutrav={animal.nutrav} className="!bg-emerald-600" />
+                <span className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900">
+                  {animal.nobovi ?? <span className="font-medium italic text-gray-400">Sans nom</span>}
+                </span>
+                <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-gray-400" />
+              </Link>
+              <button type="button" aria-label={`Actions pour ${animal.nutrav}`}
+                aria-expanded={expandedId === animal.id}
+                onClick={() => setExpandedId((current) => current === animal.id ? null : animal.id)}
+                className="flex min-h-10 items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 text-xs font-semibold text-green-800">
+                Actions {expandedId === animal.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              </button>
+            </div>
 
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
               {isVisible("reproduction") && reproduction && (
@@ -245,6 +255,18 @@ export default function TroupeauMobileList({
                 <span key={calf.nutrav} className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono font-bold text-blue-700">🍼{calf.nutrav}</span>
               ))}
             </div>
+            {expandedId === animal.id && (
+              <div className="mt-2 border-t border-gray-100 pt-2">
+                <QuickActionsBar
+                  animalId={animal.id}
+                  nutrav={animal.nutrav}
+                  isFemelle={animal.sexbov === "F"}
+                  isActif={true}
+                  saillieDate={animal.saillieDate}
+                  className="p-0"
+                />
+              </div>
+            )}
           </article>
         );
       })}
