@@ -529,6 +529,9 @@ test("MHE : une velle exclue des cibles reçoit un diagnostic, pas un faux statu
   const { lignes } = construireGrilleVaccinale([animal({ nutrav: "7483", categorie: "VELLE", actes: [] })], [mhe], [], AUJOURDHUI);
   assert.equal(lignes[0].cellules["mhe-primo"].statut, "VIDE");
   assert.equal(lignes[0].cellules["mhe-primo"].motifSansEcheance, "HORS_CIBLE");
+  assert.deepEqual(lignes[0].cellules["mhe-primo"].raisonsHorsCible, [{
+    critere: "CATEGORIE", detail: "Catégorie actuelle : Velle ; catégories ciblées : Génisses, Vaches.",
+  }]);
   assert.equal(lignes[0].cellules["mhe-primo"].actes.length, 0);
   assert.deepEqual(extraireActionsPrevues(construireGrilleVaccinale([animal({ categorie: "VELLE" })], [mhe], [], AUJOURDHUI)), []);
 });
