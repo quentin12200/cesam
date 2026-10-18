@@ -238,6 +238,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       id: animal.id,
       nutrav: animal.nutrav,
       nobovi: animal.nobovi,
+      statut: animal.statut,
       danais: animal.danais.toISOString(),
       sexbov: animal.sexbov,
       estGenisse: animal.estGenisse,
