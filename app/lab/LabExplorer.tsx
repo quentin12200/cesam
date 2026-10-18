@@ -22,7 +22,6 @@ export default function LabExplorer({ animaux, echeances }: { animaux: Animal[];
   const [selected, setSelected] = useState<string | null>(null);
   const [session, setSession] = useState<string | null>(null);
   const matches = useMemo(() => animaux.filter((a) => (a.nutrav + " " + (a.nobovi ?? "")).toLowerCase().includes(query.toLowerCase())).slice(0, 35), [animaux, query]);
-  const animal = animaux.find((a) => a.id === selected);
   const upcoming = [...echeances].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 15);
 
   function go(next: View) { setView(next); setSelected(null); setSession(null); }
