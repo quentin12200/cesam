@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, CalendarDays, Users, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, CalendarDays, Users, ChevronDown, ChevronUp, Zap, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 type Animal = {
   id: string;
@@ -14,7 +14,8 @@ type Animal = {
   reproduction: "VERT" | "ROSE" | "JAUNE" | "ROUGE" | "REPOS" | "GRIS" | null;
 };
 type Echeance = { id: string; nutrav: string; nom: string | null; date: string };
-type Vue = "animaux" | "prevoir" | "seances";
+type Vue = "animaux" | "prevoir" | "seances" | "rapide";
+type Tri = "numero" | "sexe" | "age" | "repro";
 
 const reproLabels: Record<string, string> = { VERT: "Gestante", ROSE: "Vêlage imminent", JAUNE: "À écho", ROUGE: "Vide", REPOS: "Repos", GRIS: "En attente" };
 const reproColors: Record<string, string> = { VERT: "bg-green-100 text-green-800", ROSE: "bg-pink-100 text-pink-800", JAUNE: "bg-amber-100 text-amber-800", ROUGE: "bg-red-100 text-red-800", REPOS: "bg-sky-100 text-sky-800", GRIS: "bg-gray-100 text-gray-700" };
@@ -41,6 +42,9 @@ export default function LabExplorer({
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState<string | null>(null);
   const [seance, setSeance] = useState<string | null>(null);
+  const [quickAction, setQuickAction] = useState<string | null>(null);
+  const [tri, setTri] = useState<{champ: Tri | null; sens: 0 | 1 | -1}>({champ:null,sens:0});
+  function changerTri(champ: Tri) { setTri(p => p.champ !== champ ? {champ,sens:1} : p.sens===1 ? {champ,sens:-1} : {champ:null,sens:0}); }
   const visibles = animaux.filter((a) =>
     (a.nutrav + " " + (a.nobovi ?? "")).toLowerCase().includes(recherche.toLowerCase())
   ).slice(0, 30);
