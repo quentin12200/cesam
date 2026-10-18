@@ -3,6 +3,9 @@ import type { PlanExtractionVaccin } from "./vaccine-protocol-extraction.ts";
 
 export type PlanPossible = Extract<PlanExtractionVaccin, { possible: true }>;
 export type StatutAvantExtraction = {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
   animalId: string;
   statut: string;
   source: string;
@@ -65,8 +68,8 @@ export function empreinteExtraction({
     traitementsDetaches: [...plan.traitementsDoublonsADetacher].sort(),
     etapes: ordonner(etapes, (etape) => JSON.stringify([etape.id, etape.label, etape.cycle, [...etape.medicamentIds].sort()])),
     statuts: ordonner(statuts, (statut) => JSON.stringify([
-      statut.animalId, statut.statut, statut.source, statut.notes, statut.brancheInitialeId,
-      statut.confirmeAt?.toISOString() ?? null,
+      statut.id, statut.animalId, statut.statut, statut.source, statut.notes, statut.brancheInitialeId,
+      statut.confirmeAt?.toISOString() ?? null, statut.createdAt.toISOString(), statut.updatedAt.toISOString(),
     ])),
   };
   return createHash("sha256").update(JSON.stringify(empreinte)).digest("hex");
