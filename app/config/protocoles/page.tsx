@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_PROTOCOLES } from "@/lib/utils";
 import Link from "next/link";
 import { Settings, Building2 } from "lucide-react";
+import { getCategorie } from "@/lib/utils";
 import ProtocoleQuestionnaire from "./ProtocoleQuestionnaire";
 import Mhe2026Sync from "./Mhe2026Sync";
 
@@ -35,6 +36,29 @@ async function getProtocoles() {
 export default async function ProtocolesConfigPage() {
   const protocoles = await getProtocoles();
   const medicaments = await prisma.medicament.findMany({ where: { actif: true, categorie: "VACCIN" }, select: { id: true, nom: true, voie: true, conditionnements: { where: { actif: true }, select: { doses: true } }, preconisations: { where: { statut: { in: ["VALIDE", "A_VERIFIER"] } }, select: { id: true, dose: true, unite: true, doseBase: true, voie: true, categorieAnimaux: true, agePoidsConcerne: true, statut: true } } }, orderBy: { nom: "asc" } });
+  // Aperçu strictement lecture seule : pas de doses ou de statuts modifiés lors de l'affichage.
+  const animauxPourApercu = await prisma.animal.findMany({
+    where: { statut: "ACTIF" },
+    select: {
+      danais: true, sexbov: true, estGenisse: true, categorie: true,
+      groupe: { select: { nom: true } },
+      _count: { select: { velagesVache: true } },
+      saillies: { where: { gestation: { is: { etat: { in: ["VERT", "ROSE"] } } } }, take: 1, select: { id: true } },
+      vaccinations: { where: { statut: "FAIT" }, select: { medicamentId: true } },
+      traitements: { where: { medicament: { categorie: "VACCIN" } }, select: { medicamentId: true } },
+      statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true } },
+    },
+  });
+  const apercuAgeAnimaux = animauxPourApercu.map((animal) => ({
+    danaisIso: animal.danais.toISOString(),
+    categorie: getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie),
+    sexe: animal.sexbov,
+    groupeNom: animal.groupe?.nom ?? null,
+    nombreVelages: animal._count.velagesVache,
+    gestation: animal.saillies.length > 0,
+    vaccinsFaitsIds: [...new Set([...animal.vaccinations, ...animal.traitements].map((acte) => acte.medicamentId).filter((id): id is string => id !== null))],
+    statutsProtocoles: animal.statutsProtocolesVaccinaux.map((s) => ({ protocoleId: s.protocoleId, statut: s.statut })),
+  }));
 
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
@@ -54,7 +78,7 @@ export default async function ProtocolesConfigPage() {
       </p>
 
       <Mhe2026Sync />
-      <ProtocoleQuestionnaire protocoles={protocoles} medicaments={medicaments} />
+      <ProtocoleQuestionnaire protocoles={protocoles} medicaments={medicaments} apercuAgeAnimaux={apercuAgeAnimaux} />
     </div>
   );
 }
