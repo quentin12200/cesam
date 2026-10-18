@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, CalendarDays, Users, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, CalendarDays, Users, ChevronDown, ChevronUp, Zap, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 type Animal = {
   id: string;
@@ -14,7 +14,8 @@ type Animal = {
   reproduction: "VERT" | "ROSE" | "JAUNE" | "ROUGE" | "REPOS" | "GRIS" | null;
 };
 type Echeance = { id: string; nutrav: string; nom: string | null; date: string };
-type Vue = "animaux" | "prevoir" | "seances";
+type Vue = "animaux" | "prevoir" | "seances" | "rapide";
+type Tri = "numero" | "sexe" | "age" | "repro";
 
 const reproLabels: Record<string, string> = { VERT: "Gestante", ROSE: "Vêlage imminent", JAUNE: "À écho", ROUGE: "Vide", REPOS: "Repos", GRIS: "En attente" };
 const reproColors: Record<string, string> = { VERT: "bg-green-100 text-green-800", ROSE: "bg-pink-100 text-pink-800", JAUNE: "bg-amber-100 text-amber-800", ROUGE: "bg-red-100 text-red-800", REPOS: "bg-sky-100 text-sky-800", GRIS: "bg-gray-100 text-gray-700" };
@@ -41,14 +42,17 @@ export default function LabExplorer({
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState<string | null>(null);
   const [seance, setSeance] = useState<string | null>(null);
+  const [quickAction, setQuickAction] = useState<string | null>(null);
+  const [tri, setTri] = useState<{champ: Tri | null; sens: 0 | 1 | -1}>({champ:null,sens:0});
+  function changerTri(champ: Tri) { setTri(p => p.champ !== champ ? {champ,sens:1} : p.sens===1 ? {champ,sens:-1} : {champ:null,sens:0}); }
   const visibles = animaux.filter((a) =>
     (a.nutrav + " " + (a.nobovi ?? "")).toLowerCase().includes(recherche.toLowerCase())
-  ).slice(0, 30);
+  ).sort((a,b) => { if (!tri.champ || !tri.sens) return a.nutrav.localeCompare(b.nutrav,"fr",{numeric:true}); let d=0; if(tri.champ==="numero")d=a.nutrav.localeCompare(b.nutrav,"fr",{numeric:true}); if(tri.champ==="sexe")d=a.sexbov.localeCompare(b.sexbov); if(tri.champ==="age")d=new Date(b.danais).getTime()-new Date(a.danais).getTime(); if(tri.champ==="repro")d=(a.aEchographier?"JAUNE":a.reproduction??"ZZZ").localeCompare(b.aEchographier?"JAUNE":b.reproduction??"ZZZ"); return d*tri.sens || a.nutrav.localeCompare(b.nutrav,"fr",{numeric:true}); }).slice(0, 30);
   const prochaines = [...echeances].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 15);
 
   return (
     <div className="space-y-4">
-      <nav className="grid grid-cols-3 gap-2" aria-label="Sections du CESAM LAB">
+      <nav className="grid grid-cols-4 gap-1.5" aria-label="Sections du CESAM LAB">
         <button type="button" onClick={() => setVue("animaux")} className={vue === "animaux" ? "rounded-xl bg-green-700 p-3 text-sm font-bold text-white" : "rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}>
           <Search className="mx-auto mb-1" size={20} />Animaux
         </button>
@@ -58,6 +62,7 @@ export default function LabExplorer({
         <button type="button" onClick={() => setVue("seances")} className={vue === "seances" ? "rounded-xl bg-green-700 p-3 text-sm font-bold text-white" : "rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}>
           <Users className="mx-auto mb-1" size={20} />Séances
         </button>
+        <button type="button" onClick={() => setVue("rapide")} className={vue === "rapide" ? "rounded-xl bg-green-700 p-2 text-xs font-bold text-white" : "rounded-xl bg-white p-2 text-xs font-bold text-gray-700"}><Zap className="mx-auto mb-1" size={20}/>Action</button>
       </nav>
 
       {vue === "animaux" && (
@@ -67,6 +72,15 @@ export default function LabExplorer({
             placeholder="Numéro ou nom…" aria-label="Rechercher un animal"
             className="min-h-12 w-full rounded-xl border bg-white px-3 text-base" />
           <p className="text-xs text-gray-500">{animaux.length} animaux actifs · 30 résultats au maximum</p>
+          <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1" aria-label="Tri des animaux">
+            {([["numero","N°"],["sexe","Sexe"],["age","Âge"],["repro","Repro"]] as [Tri,string][]).map(([champ,libelle]) => {
+              const Ic = tri.champ!==champ ? ArrowUpDown : tri.sens===1 ? ArrowUp : ArrowDown;
+              return <button key={champ} type="button" onClick={() => changerTri(champ)} aria-label={"Trier par "+libelle}
+                className={tri.champ===champ?"flex min-h-10 flex-1 items-center justify-center gap-1 rounded bg-white text-xs font-bold text-green-800 shadow-sm":"flex min-h-10 flex-1 items-center justify-center gap-1 text-xs font-semibold text-gray-600"}>
+                {libelle}<Ic size={12}/>
+              </button>;
+            })}
+          </div>
           <div className="space-y-2">
             {visibles.map((animal) => (
               <div key={animal.id} className="rounded-xl border bg-white">
@@ -114,6 +128,24 @@ export default function LabExplorer({
         </section>
       )}
 
+      {vue === "rapide" && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold">Commencer par une action</h2>
+          <p className="text-sm text-gray-600">Choisis ton intervention avant de rechercher le numéro de l’animal.</p>
+          <div className="grid grid-cols-2 gap-2">
+            {["Vêlage", "Pesée", "Événement sanitaire", "Saillie / IA", "Échographie", "Chaleur"].map(action => (
+              <button key={action} type="button" onClick={() => setQuickAction(action)} className="min-h-16 rounded-xl border bg-white p-3 text-sm font-semibold">{action}</button>
+            ))}
+          </div>
+          {quickAction && <div className="space-y-2 rounded-xl border border-green-200 bg-green-50 p-4">
+            <p className="font-bold">{quickAction}</p>
+            <p className="text-sm">En continuant, tu quittes le LAB en lecture seule. Le parcours CESAM existant permet de véritables enregistrements.</p>
+            <Link className="block rounded-lg bg-green-700 px-3 py-3 text-center text-sm font-bold text-white"
+              href={quickAction==="Vêlage"?"/velage?nouveau=1":quickAction==="Pesée"?"/troupeau/pesee":quickAction==="Événement sanitaire"?"/sanitaire/nouvel-evenement":"/reproduction"}>Ouvrir le parcours dans CESAM</Link>
+            <button type="button" onClick={() => setQuickAction(null)} className="text-sm font-semibold text-green-800">Annuler</button>
+          </div>}
+        </section>
+      )}
       {vue === "seances" && (
         <section className="space-y-3">
           <h2 className="text-lg font-bold">Démarrer une séance</h2>
