@@ -72,6 +72,7 @@ export default function QuickActionsBar({
                   <button type="button" onClick={() => openReproduction("saillie")} className="min-h-11 flex-1 rounded-lg bg-fuchsia-50 px-3 text-xs font-semibold text-fuchsia-800">Saillie / IA</button>
                   <button type="button" onClick={() => setEchoOpen(true)} className="min-h-11 flex-1 rounded-lg bg-yellow-50 px-3 text-xs font-semibold text-yellow-800">Écho</button>
                   <button type="button" onClick={() => openReproduction("chaleur")} className="min-h-11 flex-1 rounded-lg bg-pink-50 px-3 text-xs font-semibold text-pink-800">Chaleur</button>
+                  <button type="button" onClick={() => router.push(hrefWithOrigin(`/velage?nouveau=1&mere=${encodeURIComponent(nutrav)}`))} className="min-h-11 flex-1 rounded-lg bg-emerald-50 px-3 text-xs font-semibold text-emerald-800">Vêlage</button>
                 </>
               )}
               <button type="button" onClick={() => router.push(hrefWithOrigin(`/sanitaire/nouvel-evenement?animal=${encodeURIComponent(nutrav)}`))} className="min-h-11 flex-1 rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-800">Événement</button>
