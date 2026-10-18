@@ -12,6 +12,7 @@ const plan: PlanPossible = {
   resolusAutomatiquement: 0,
 };
 const statut: StatutAvantExtraction = {
+  id: "stat-1", createdAt: new Date("2026-01-01T11:00:00Z"), updatedAt: new Date("2026-01-02T11:00:00Z"),
   animalId: "a1", statut: "PRIMO_A_FAIRE", source: "MANUEL",
   notes: "Observation gardée", brancheInitialeId: null, confirmeAt: new Date("2026-01-01T12:00:00Z"),
 };
@@ -43,6 +44,8 @@ test("un statut manuel ou une étape historique modifiée rend la prévalidation
   const avant = empreinteExtraction(entree);
   assert.notEqual(avant, empreinteExtraction({ ...entree, statuts: [{ ...statut, statut: "PROTOCOLE_ACQUIS" }] }));
   assert.notEqual(avant, empreinteExtraction({ ...entree, statuts: [{ ...statut, notes: "Nouveau message" }] }));
+  assert.notEqual(avant, empreinteExtraction({ ...entree, statuts: [{ ...statut, confirmeAt: new Date("2026-01-03T12:00:00Z") }] }));
+  assert.notEqual(avant, empreinteExtraction({ ...entree, statuts: [{ ...statut, updatedAt: new Date("2026-01-03T11:00:00Z") }] }));
   assert.notEqual(avant, empreinteExtraction({ ...entree, etapes: [{ ...entree.etapes[0], medicamentIds: ["med-crypto"] }] }));
 });
 
@@ -54,6 +57,14 @@ test("la confirmation serveur refuse une empreinte manquante ou périmée avant 
   const indexPremiereEcriture = route.indexOf("await tx.protocoleVaccin.update({");
   assert.ok(indexControle !== -1 && indexControle < indexPremiereEcriture, "contrôle effectué dans la transaction avant toute mutation");
   assert.match(route, /empreinte: empreintePrevue/);
+  const indexArchive = route.indexOf('type: "ARCHIVE_AVANT_SEPARATION_PROTOCOLE"');
+  assert.ok(indexArchive > indexControle && indexArchive < indexPremiereEcriture,
+    "archivage atomique des statuts d'origine avant remplacement");
+  assert.match(route, /statutsAvant: legacy\.statutsAnimaux/);
+  assert.match(route, /vaccinationsAvant: vaccinationsActuelles/);
+  assert.match(route, /traitementsAvant: traitementsActuels/);
+  assert.match(route, /reverted: true/);
+  assert.match(route, /if \(legacy\.statutsAnimaux\.some/, "refus de perdre les décisions ou notes manuelles");
   assert.match(ui, /bilan\.statutsAnimauxRecalcules/);
   assert.match(ui, /empreinteExtractionPrevue: action\?\.type === "EXTRACTION"/);
 });
