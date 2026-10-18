@@ -368,7 +368,7 @@ export function calculerActionVaccinaleQuestionnaire({
     if (!primo) {
       // Règle optionnelle de l'élevage : une Primo non commencée ne doit pas rester en retard à vie.
       // Ne s'applique JAMAIS à un rappel après Primo réellement faite, ni aux cycles de vêlage.
-      if (configuration.ageMaxDemarrage && date > ajouterDureeQuestionnaire(dateNaissance, configuration.ageMaxDemarrage)) {
+      if (configuration.ageMaxDemarrage && differenceInCalendarDays(date, ajouterDureeQuestionnaire(dateNaissance, configuration.ageMaxDemarrage)) > 0) {
         return actionQuestionnaire("HORS_PROGRAMME", etapeParId(idPrimo), null, "AGE");
       }
       const regle = demarrage.type === "DOSE_UNIQUE" ? demarrage.calendrier : demarrage.calendrierPrimo;
