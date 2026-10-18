@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Search, CalendarDays, Users, ChevronDown, ChevronUp } from "lucide-react";
 
 type Animal = {
@@ -69,8 +70,8 @@ export default function LabExplorer({
           <div className="space-y-2">
             {visibles.map((animal) => (
               <div key={animal.id} className="rounded-xl border bg-white">
-                <button type="button" onClick={() => setOuvert(ouvert === animal.id ? null : animal.id)}
-                  className="flex min-h-14 w-full items-center gap-3 p-3 text-left">
+                <div className="flex min-h-14 items-center gap-2 p-3">
+                  <Link href={`/troupeau/${animal.nutrav}`} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                   <span className="rounded-lg bg-green-700 px-2 py-1 font-bold text-white">{animal.nutrav}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{animal.nobovi || "Sans nom"}</span>
@@ -80,8 +81,9 @@ export default function LabExplorer({
                       {animal.reproduction && <span className={`rounded-full px-2 py-0.5 font-semibold ${reproColors[animal.aEchographier ? "JAUNE" : animal.reproduction]}`}>{reproLabels[animal.aEchographier ? "JAUNE" : animal.reproduction]}</span>}
                     </span>
                   </span>
-                  {ouvert === animal.id ? <ChevronUp size={18} className="shrink-0 text-gray-500" /> : <ChevronDown size={18} className="shrink-0 text-gray-500" />}
-                </button>
+                  </Link>
+                  <button type="button" onClick={() => setOuvert(ouvert === animal.id ? null : animal.id)} aria-label={`Actions de ${animal.nutrav}`} aria-expanded={ouvert === animal.id} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-800">{ouvert === animal.id ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}</button>
+                </div>
                 {ouvert === animal.id && (
                   <div className="border-t bg-green-50 p-3">
                     <p className="mb-2 text-sm font-bold">Actions individuelles · démonstration</p>
