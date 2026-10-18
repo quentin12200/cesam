@@ -447,6 +447,7 @@ function celluleProtocole(
 
   if (!eligible) marquerAbsence("HORS_CIBLE");
   if (eligible && acquisSansPreuve) marquerAbsence("ACQUIS_SANS_PREUVE");
+  if (eligible && statutProtocole === "A_CONFIRMER") marquerAbsence("CALCUL_A_CONFIRMER");
   let dateEtapePrecedente: Date | null = null;
   for (const etape of etapes) {
     const faites = actesUtiles.filter((acte) => acte.etapeProtocoleId === etape.id).sort((a, b) => b.date.getTime() - a.date.getTime());
