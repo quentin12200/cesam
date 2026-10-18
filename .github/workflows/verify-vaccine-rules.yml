@@ -35,6 +35,7 @@ jobs:
           node --test --experimental-strip-types \
             lib/vaccine-protocol-questionnaire.test.ts \
             lib/vaccine-grid.test.ts \
+            lib/vaccine-eligibility.test.ts \
             lib/vaccine-age-preview.test.ts \
             lib/vaccine-planner.test.ts \
             lib/vaccine-protocol-extraction.test.ts \
