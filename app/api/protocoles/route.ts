@@ -253,6 +253,9 @@ export async function POST(request: NextRequest) {
           }, { status: 409 });
         }
         if (!plan.possible) throw new ExtractionVaccinRefusee(plan.raison);
+        if (bilanPrevu && bilanPrevu.statutsAvecDecisionOuNoteAProteger > 0) {
+          throw new ExtractionVaccinRefusee("La séparation est bloquée : certains statuts du protocole contiennent une décision ou une note à préserver. Aucun historique modifié.");
+        }
         if (!empreintePrevue || !empreinteExtractionPrevue || empreinteExtractionPrevue !== empreintePrevue) {
           throw new ExtractionVaccinRefusee("Prévisualisation obsolète. Clique à nouveau sur Enregistrer pour actualiser le bilan avant de confirmer.");
         }
@@ -267,6 +270,9 @@ export async function POST(request: NextRequest) {
             },
           });
           if (!legacy || legacy.configurationQuestionnaireJson != null) throw new ExtractionVaccinRefusee("Le protocole historique a changé : recharge la page.");
+          if (legacy.statutsAnimaux.some((statut) => statut.source !== "VACCINATION" || Boolean(statut.notes?.trim()))) {
+            throw new ExtractionVaccinRefusee("Une décision ou une note manuelle empêche la reconstruction automatique des statuts. Aucune séparation effectuée.");
+          }
           const [vaccinationsActuelles, traitementsActuels] = await Promise.all([
             tx.vaccination.findMany({ where: { protocoleId: legacy.id }, select: { id: true, animalId: true, medicamentId: true, vaccin: true, etapeProtocoleId: true, statut: true, date: true } }),
             tx.traitement.findMany({ where: { protocoleVaccinId: legacy.id }, select: { id: true, animalId: true, medicamentId: true, etapeProtocoleVaccinId: true, dateDebut: true } }),
