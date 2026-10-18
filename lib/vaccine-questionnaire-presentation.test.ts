@@ -9,6 +9,10 @@ test("le résumé des catégories utilise le français naturel sans codes intern
   assert.equal(resumeCibleQuestionnaire(false, ["VEAU", "GENISSE", "VACHE"]), "Ce protocole sera proposé aux veaux, aux génisses et aux vaches.");
   assert.equal(resumeCibleQuestionnaire(true, []), "Ce protocole pourra concerner tous les bovins.");
   assert.doesNotMatch(resumeCibleQuestionnaire(false, ["GENISSE", "VACHE"]), /GENISSE|VACHE/);
+  assert.equal(resumeCibleQuestionnaire(false, ["VELLE", "GENISSE", "VACHE"]),
+    "Ce protocole sera proposé aux velles, aux génisses et aux vaches.");
+  assert.equal(resumeCibleQuestionnaire(false, ["VEAU_M", "PETITE_GENISSE"]),
+    "Ce protocole sera proposé aux veaux mâles et aux petites génisses.");
 });
 
 test("le sexe est implicite seulement lorsque les catégories le déterminent", () => {
@@ -16,6 +20,8 @@ test("le sexe est implicite seulement lorsque les catégories le déterminent", 
   assert.equal(sexeImplicite(["TAUREAU"]), "M");
   assert.equal(sexeImplicite(["VEAU"]), null);
   assert.equal(sexeImplicite(["GENISSE", "TAUREAU"]), null);
+  assert.equal(sexeImplicite(["VELLE", "PRESELECTION_GENISSE", "VACHE"]), "F");
+  assert.equal(sexeImplicite(["VEAU_M"]), "M");
 });
 
 test("la fenêtre avant vêlage est formulée naturellement avec ses vraies bornes", () => {
