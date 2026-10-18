@@ -200,12 +200,12 @@ export default function TroupeauMobileList({
                 </span>
                 <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-gray-400" />
               </Link>
-              <button type="button" aria-label={`Actions pour ${animal.nutrav}`}
+              {animal.statut === "ACTIF" && <button type="button" aria-label={`Actions pour ${animal.nutrav}`}
                 aria-expanded={expandedId === animal.id}
                 onClick={() => setExpandedId((current) => current === animal.id ? null : animal.id)}
                 className="flex min-h-10 items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 text-xs font-semibold text-green-800">
                 Actions {expandedId === animal.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-              </button>
+              </button>}
             </div>
 
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
@@ -261,7 +261,8 @@ export default function TroupeauMobileList({
                   animalId={animal.id}
                   nutrav={animal.nutrav}
                   isFemelle={animal.sexbov === "F"}
-                  isActif={true}
+                  isActif={animal.statut === "ACTIF"}
+                  inlineActions
                   saillieDate={animal.saillieDate}
                   className="p-0"
                 />
