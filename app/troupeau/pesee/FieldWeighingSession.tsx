@@ -75,6 +75,11 @@ export default function FieldWeighingSession() {
   const router = useRouter();
   const [session, setSession] = useState<StoredFieldSession | null>(null);
   const [nutrav, setNutrav] = useState("");
+  // Préremplir uniquement le champ numéro : ne jamais enregistrer une pesée automatiquement.
+  useEffect(() => {
+    const selected = new URLSearchParams(window.location.search).get("animal");
+    if (selected) setNutrav(selected);
+  }, []);
   const [poids, setPoids] = useState("");
   const [editWeight, setEditWeight] = useState("");
   const [saving, setSaving] = useState(false);
