@@ -128,6 +128,24 @@ export default function LabExplorer({
         </section>
       )}
 
+      {vue === "rapide" && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold">Commencer par une action</h2>
+          <p className="text-sm text-gray-600">Choisis ton intervention avant de rechercher le numéro de l’animal.</p>
+          <div className="grid grid-cols-2 gap-2">
+            {["Vêlage", "Pesée", "Événement sanitaire", "Saillie / IA", "Échographie", "Chaleur"].map(action => (
+              <button key={action} type="button" onClick={() => setQuickAction(action)} className="min-h-16 rounded-xl border bg-white p-3 text-sm font-semibold">{action}</button>
+            ))}
+          </div>
+          {quickAction && <div className="space-y-2 rounded-xl border border-green-200 bg-green-50 p-4">
+            <p className="font-bold">{quickAction}</p>
+            <p className="text-sm">En continuant, tu quittes le LAB en lecture seule. Le parcours CESAM existant permet de véritables enregistrements.</p>
+            <Link className="block rounded-lg bg-green-700 px-3 py-3 text-center text-sm font-bold text-white"
+              href={quickAction==="Vêlage"?"/velage?nouveau=1":quickAction==="Pesée"?"/troupeau/pesee":quickAction==="Événement sanitaire"?"/sanitaire/nouvel-evenement":"/reproduction"}>Ouvrir le parcours dans CESAM</Link>
+            <button type="button" onClick={() => setQuickAction(null)} className="text-sm font-semibold text-green-800">Annuler</button>
+          </div>}
+        </section>
+      )}
       {vue === "seances" && (
         <section className="space-y-3">
           <h2 className="text-lg font-bold">Démarrer une séance</h2>
