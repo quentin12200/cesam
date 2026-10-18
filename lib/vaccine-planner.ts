@@ -242,7 +242,7 @@ export function resoudreVoieVaccinale({
   return voiePreconisation?.trim() || voieMedicament?.trim() || voieLiaison?.trim() || "À renseigner";
 }
 
-export type StatutPreparationVaccin = "A_FAIRE" | "A_PREVOIR" | "TROP_TOT" | "EN_RETARD" | "TERMINE" | "A_CONFIRMER";
+export type StatutPreparationVaccin = "A_FAIRE" | "A_PREVOIR" | "TROP_TOT" | "EN_RETARD" | "TERMINE" | "A_CONFIRMER" | "HORS_PROGRAMME";
 
 export interface EtapeVaccinaleConfig {
   id: string;
@@ -366,6 +366,11 @@ export function calculerActionVaccinaleQuestionnaire({
 
   if (!initialTermine && statutProtocole !== "PROTOCOLE_ACQUIS") {
     if (!primo) {
+      // Règle optionnelle de l'élevage : une Primo non commencée ne doit pas rester en retard à vie.
+      // Ne s'applique JAMAIS à un rappel après Primo réellement faite, ni aux cycles de vêlage.
+      if (configuration.ageMaxDemarrage && date > ajouterDureeQuestionnaire(dateNaissance, configuration.ageMaxDemarrage)) {
+        return actionQuestionnaire("HORS_PROGRAMME", etapeParId(idPrimo), null, "AGE");
+      }
       const regle = demarrage.type === "DOSE_UNIQUE" ? demarrage.calendrier : demarrage.calendrierPrimo;
       const brute = fenetreRegleQuestionnaire(regle, dateNaissance, dateVelagePrevue, date);
       const fenetre = brute && demarrage.type === "PRIMO_RAPPEL"
