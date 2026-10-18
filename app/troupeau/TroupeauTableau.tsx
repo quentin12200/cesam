@@ -20,6 +20,7 @@ export interface AnimalRow {
   id: string;
   nutrav: string;
   nobovi: string | null;
+  statut: string;
   danais: string;
   sexbov: string;
   estGenisse: boolean;
