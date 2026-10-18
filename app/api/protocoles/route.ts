@@ -7,6 +7,7 @@ import { brancheInitialeDepuisActes, etapeIdsConfigurationQuestionnaire, lireCon
 import { referencesPharmacieValides } from "@/lib/vaccine-protocol-validation";
 import { preparerConversionProtocole } from "@/lib/vaccine-protocol-name";
 import { planifierExtractionVaccin, resoudreLegacyParMedicament } from "@/lib/vaccine-protocol-extraction";
+import { bilanExtraction, empreinteExtraction } from "@/lib/vaccine-protocol-preflight";
 import { statutDepuisEtapesFaites } from "@/lib/vaccine-statut";
 
 function cibleErreurUniqueContientNom(meta: unknown): boolean {
@@ -60,7 +61,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { nom, label, ordre, ageMinJours, ageMaxJours, urgenceJours, estRappel, primoNom, delaiRappelJours, urgenceRappelJours, obligatoireVente, description, categories, sexeCible, stadeReproduction, gestante, rangVelageMin, rangVelageMax, lotCible, etapes, configurationQuestionnaire, extraireDepuisProtocoleId } = body;
+  const { nom, label, ordre, ageMinJours, ageMaxJours, urgenceJours, estRappel, primoNom, delaiRappelJours, urgenceRappelJours, obligatoireVente, description, categories, sexeCible, stadeReproduction, gestante, rangVelageMin, rangVelageMax, lotCible, etapes, configurationQuestionnaire, extraireDepuisProtocoleId, empreinteExtractionPrevue } = body;
   if (!nom?.trim() || !label?.trim()) {
     return NextResponse.json({ error: "nom et label requis" }, { status: 400 });
   }
@@ -201,6 +202,21 @@ export async function POST(request: NextRequest) {
           traitementsVaccinauxReels,
           idsCibles: idsDemandes,
         });
+        const statutsPrecedents = await prisma.statutProtocoleVaccinal.findMany({
+          where: { protocoleId: existant.id },
+          select: { animalId: true, statut: true, source: true, notes: true, brancheInitialeId: true, confirmeAt: true },
+        });
+        const etapesPourEmpreinte = existant.etapes.map((etape) => ({
+          id: etape.id, label: etape.label, cycle: etape.cycle,
+          medicamentIds: etape.medicaments.map((liaison) => liaison.medicamentId),
+        }));
+        const empreintePrevue = plan.possible ? empreinteExtraction({
+          ancienProtocoleId: existant.id, medicamentId: configuration.medicamentId,
+          plan, statuts: statutsPrecedents, etapes: etapesPourEmpreinte,
+        }) : null;
+        const bilanPrevu = plan.possible
+          ? bilanExtraction(plan, statutsPrecedents, animalIdsLegacy)
+          : null;
         const nutravParAnimalId = new Map([...vaccinations, ...traitements].map((acte) => [acte.animalId, acte.animal.nutrav]));
         const diagnostic = plan.possible ? undefined : {
           ...plan.diagnostic,
@@ -229,12 +245,17 @@ export async function POST(request: NextRequest) {
                 medicamentNom: medicament.nom,
                 vaccinationsCount: plan.possible ? plan.vaccinations.length : 0,
                 traitementsCount: plan.possible ? plan.traitements.length : 0,
+                bilan: bilanPrevu,
+                empreinte: empreintePrevue,
                 raison: plan.possible ? undefined : plan.raison,
               },
             },
           }, { status: 409 });
         }
         if (!plan.possible) throw new ExtractionVaccinRefusee(plan.raison);
+        if (!empreintePrevue || !empreinteExtractionPrevue || empreinteExtractionPrevue !== empreintePrevue) {
+          throw new ExtractionVaccinRefusee("Prévisualisation obsolète. Clique à nouveau sur Enregistrer pour actualiser le bilan avant de confirmer.");
+        }
 
         const protocole = await prisma.$transaction(async (tx) => {
           const legacy = await tx.protocoleVaccin.findUnique({
@@ -242,7 +263,7 @@ export async function POST(request: NextRequest) {
             select: {
               id: true, nom: true, actif: true, configurationQuestionnaireJson: true,
               etapes: { select: { id: true, label: true, cycle: true, ordre: true, obligatoire: true, medicaments: { select: { medicamentId: true, medicament: { select: { nom: true } } } } } },
-              statutsAnimaux: { select: { animalId: true } },
+              statutsAnimaux: { select: { animalId: true, statut: true, source: true, notes: true, brancheInitialeId: true, confirmeAt: true } },
             },
           });
           if (!legacy || legacy.configurationQuestionnaireJson != null) throw new ExtractionVaccinRefusee("Le protocole historique a changé : recharge la page.");
@@ -274,6 +295,17 @@ export async function POST(request: NextRequest) {
             idsCibles: idsDemandes,
           });
           if (!planActuel.possible) throw new ExtractionVaccinRefusee(planActuel.raison);
+          const empreinteActuelle = empreinteExtraction({
+            ancienProtocoleId: legacy.id, medicamentId: configuration.medicamentId,
+            plan: planActuel, statuts: legacy.statutsAnimaux,
+            etapes: legacy.etapes.map((etape) => ({
+              id: etape.id, label: etape.label, cycle: etape.cycle,
+              medicamentIds: etape.medicaments.map((liaison) => liaison.medicamentId),
+            })),
+          });
+          if (empreinteActuelle !== empreinteExtractionPrevue) {
+            throw new ExtractionVaccinRefusee("Les actes ou statuts historiques ont changé depuis le bilan. Aucune séparation effectuée. Clique sur Enregistrer pour actualiser.");
+          }
 
           const vaccinationsDeplacees = new Map(planActuel.vaccinations.map((acte) => [acte.id, acte]));
           const traitementsDeplaces = new Map(planActuel.traitements.map((acte) => [acte.id, acte]));
