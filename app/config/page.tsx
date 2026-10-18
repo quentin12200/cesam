@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Bell,
+  FlaskConical,
   Building2,
   ChevronRight,
   HeartPulse,
@@ -97,6 +98,12 @@ export default function ConfigPage() {
           );
         })}
       </div>
+
+      <Link href="/lab" className="mt-5 flex items-center gap-3 rounded-xl border-2 border-green-200 bg-green-50 p-4 text-green-900">
+        <FlaskConical size={26} />
+        <span className="flex-1"><span className="block font-black">CESAM LAB · Tester la nouvelle interface</span><span className="mt-1 block text-xs">Prototype en lecture seule, retour à CESAM à tout moment</span></span>
+        <ChevronRight size={20} />
+      </Link>
 
       <aside className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
         <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
