@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, CalendarDays, Users } from "lucide-react";
+import { Search, CalendarDays, Users, ChevronDown, ChevronUp } from "lucide-react";
 
 type Animal = {
   id: string;
@@ -9,9 +9,23 @@ type Animal = {
   nobovi: string | null;
   sexbov: string;
   aEchographier: boolean;
+  danais: string;
+  reproduction: "VERT" | "ROSE" | "JAUNE" | "ROUGE" | "REPOS" | "GRIS" | null;
 };
 type Echeance = { id: string; nutrav: string; nom: string | null; date: string };
 type Vue = "animaux" | "prevoir" | "seances";
+
+const reproLabels: Record<string, string> = { VERT: "Gestante", ROSE: "Vêlage imminent", JAUNE: "À écho", ROUGE: "Vide", REPOS: "Repos", GRIS: "En attente" };
+const reproColors: Record<string, string> = { VERT: "bg-green-100 text-green-800", ROSE: "bg-pink-100 text-pink-800", JAUNE: "bg-amber-100 text-amber-800", ROUGE: "bg-red-100 text-red-800", REPOS: "bg-sky-100 text-sky-800", GRIS: "bg-gray-100 text-gray-700" };
+function ageText(date: string): string {
+  const now = new Date();
+  const born = new Date(date);
+  let years = now.getFullYear() - born.getFullYear();
+  let months = now.getMonth() - born.getMonth();
+  if (now.getDate() < born.getDate()) months--;
+  if (months < 0) { years--; months += 12; }
+  return years > 0 ? `${years}a ${months}m` : `${months} mois`;
+}
 
 const seances = ["Échographies", "Vaccinations", "Antiparasitaires", "Soins / traitements", "Pesées", "Autre intervention"];
 
@@ -58,8 +72,15 @@ export default function LabExplorer({
                 <button type="button" onClick={() => setOuvert(ouvert === animal.id ? null : animal.id)}
                   className="flex min-h-14 w-full items-center gap-3 p-3 text-left">
                   <span className="rounded-lg bg-green-700 px-2 py-1 font-bold text-white">{animal.nutrav}</span>
-                  <span className="flex-1 font-semibold">{animal.nobovi || "Sans nom"}</span>
-                  <span className="text-xs text-gray-500">{animal.sexbov === "F" ? "Femelle" : "Mâle"}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{animal.nobovi || "Sans nom"}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+                      <span>{ageText(animal.danais)}</span>
+                      <span aria-label={animal.sexbov === "F" ? "Femelle" : "Mâle"} className={animal.sexbov === "F" ? "font-bold text-purple-700" : "font-bold text-blue-700"}>{animal.sexbov === "F" ? "♀" : "♂"}</span>
+                      {animal.reproduction && <span className={`rounded-full px-2 py-0.5 font-semibold ${reproColors[animal.aEchographier ? "JAUNE" : animal.reproduction]}`}>{reproLabels[animal.aEchographier ? "JAUNE" : animal.reproduction]}</span>}
+                    </span>
+                  </span>
+                  {ouvert === animal.id ? <ChevronUp size={18} className="shrink-0 text-gray-500" /> : <ChevronDown size={18} className="shrink-0 text-gray-500" />}
                 </button>
                 {ouvert === animal.id && (
                   <div className="border-t bg-green-50 p-3">
