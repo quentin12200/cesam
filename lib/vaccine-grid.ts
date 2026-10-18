@@ -10,7 +10,7 @@ import { calculerActionVaccinale, calculerFenetreEtape, type EtapeVaccinaleConfi
 import { configurationQuestionnaireLieeAuVelage, lireConfigurationQuestionnaire } from "./vaccine-protocol-questionnaire.ts";
 import { statutPlanningVaccin } from "./vaccine-planning-status.ts";
 import { interpreterHistoriqueVaccinal, medicamentPartageEntreProtocoles, nomVaccinComparable } from "./vaccine-history.ts";
-import { estAnimalConcerneParProtocole } from "./vaccine-eligibility.ts";
+import { expliquerExclusionsVaccinales, type ExclusionVaccinale } from "./vaccine-eligibility.ts";
 import { addDays, addMonths } from "date-fns";
 import type { ActeVaccination } from "./vaccine-acts.ts";
 import { medicamentCompatibleAvecEtape } from "./vaccine-attachment.ts";
@@ -128,6 +128,7 @@ export interface CelluleGrille {
   statut: StatutCelluleGrille;
   /** Explication en lecture seule, jamais une preuve d'injection ni une décision vétérinaire. */
   motifSansEcheance?: MotifSansEcheance;
+  raisonsHorsCible?: ExclusionVaccinale[];
   date: Date | null;
   aValider: boolean;
   rattachementProtocoleAutorise: boolean;
@@ -332,10 +333,11 @@ function celluleProtocole(
   // animal que le protocole ne cible plus (ex : catégorie recalculée depuis). Une vaccination
   // réellement faite reste toujours affichée comme faite, quelle que soit l'éligibilité
   // actuelle : « une vaccination réellement enregistrée doit toujours être visible comme faite ».
-  const eligible = estAnimalConcerneParProtocole(
+  const raisonsHorsCible = expliquerExclusionsVaccinales(
     { categorie: animal.categorie, sexbov: animal.sexe, groupeNom: animal.groupeNom, nombreVelages: animal.nombreVelages, gestation: Boolean(animal.gestationId) },
     protocole
   );
+  const eligible = raisonsHorsCible.length === 0;
 
   const configurationQuestionnaire = lireConfigurationQuestionnaire(protocole.configurationQuestionnaireJson);
   const protocoleLieAuVelage = configurationQuestionnaire
@@ -364,7 +366,8 @@ function celluleProtocole(
     if (!premiereInitiale) return;
     const cellule = cellules.get(premiereInitiale.id) ?? celluleVide();
     if (cellule.statut === "VIDE" && cellule.actes.length === 0) {
-      cellules.set(premiereInitiale.id, { ...cellule, motifSansEcheance: motif });
+      cellules.set(premiereInitiale.id, { ...cellule, motifSansEcheance: motif,
+        ...(motif === "HORS_CIBLE" ? { raisonsHorsCible } : {}) });
     }
   };
 
@@ -468,7 +471,8 @@ function celluleProtocole(
     }
     if (!eligible) {
       const existante = cellules.get(etape.id) ?? celluleVide();
-      cellules.set(etape.id, { ...celluleVide(), motifSansEcheance: existante.motifSansEcheance });
+      cellules.set(etape.id, { ...celluleVide(), motifSansEcheance: existante.motifSansEcheance,
+        raisonsHorsCible: existante.raisonsHorsCible });
       continue;
     }
     if (!etapePlanifiableSelonStatut(etape, statutProtocole)) {
