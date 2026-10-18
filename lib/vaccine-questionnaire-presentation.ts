@@ -1,11 +1,5 @@
 import type { DureeQuestionnaire, RegleTemporelleQuestionnaire } from "./vaccine-protocol-questionnaire";
-
-const LIBELLES_CATEGORIES: Record<string, string> = {
-  VEAU: "veaux",
-  GENISSE: "génisses",
-  VACHE: "vaches",
-  TAUREAU: "taureaux",
-};
+import { LIBELLES_CATEGORIES_VACCINS, sexeImpliciteCategorieVaccinale } from "./vaccine-category-selection.ts";
 
 export function listeFrancaise(elements: readonly string[]): string {
   if (elements.length <= 1) return elements[0] ?? "";
@@ -15,16 +9,14 @@ export function listeFrancaise(elements: readonly string[]): string {
 
 export function resumeCibleQuestionnaire(tous: boolean, categories: readonly string[]): string {
   if (tous) return "Ce protocole pourra concerner tous les bovins.";
-  const libelles = categories.map((categorie) => LIBELLES_CATEGORIES[categorie]).filter(Boolean);
+  const libelles = categories.map((categorie) => LIBELLES_CATEGORIES_VACCINS[categorie]).filter(Boolean);
   return libelles.length > 0
     ? `Ce protocole sera proposé ${listeFrancaise(libelles.map((libelle) => `aux ${libelle}`))}.`
     : "Choisis au moins une catégorie animale.";
 }
 
 export function sexeImplicite(categories: readonly string[]): "F" | "M" | null {
-  if (categories.length > 0 && categories.every((categorie) => categorie === "GENISSE" || categorie === "VACHE")) return "F";
-  if (categories.length > 0 && categories.every((categorie) => categorie === "TAUREAU")) return "M";
-  return null;
+  return sexeImpliciteCategorieVaccinale(categories);
 }
 
 export function texteDureeQuestionnaire(duree: DureeQuestionnaire): string {
