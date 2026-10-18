@@ -21,9 +21,14 @@ const entree = { ancienProtocoleId: "proto-legacy", medicamentId: "med-rotavec",
 test("le bilan annonce chaque type de modification avant de demander confirmation", () => {
   assert.deepEqual(bilanExtraction(plan, [statut], ["a1", "a1", "a2"]), {
     vaccinationsDeplacees: 1, traitementsDeplaces: 1, vaccinationsGeneriquesNeutralisees: 1,
-    traitementsDoublonsDetaches: 1, statutsAnimauxRecalcules: 1, animauxAvecHistorique: 2,
+    traitementsDoublonsDetaches: 1, statutsAnimauxRecalcules: 1, statutsAvecDecisionOuNoteAProteger: 1, animauxAvecHistorique: 2,
   });
 });
+test("une source vaccination sans note est reconstructible, une décision manuelle ne l'est pas", () => {
+  assert.equal(bilanExtraction(plan, [{ ...statut, source: "VACCINATION", notes: null }], ["a1"]).statutsAvecDecisionOuNoteAProteger, 0);
+  assert.equal(bilanExtraction(plan, [statut], ["a1"]).statutsAvecDecisionOuNoteAProteger, 1);
+});
+
 test("mêmes actes et statuts dans des ordres différents : même empreinte", () => {
   assert.equal(empreinteExtraction(entree), empreinteExtraction({
     ...entree, etapes: [{ ...entree.etapes[0], medicamentIds: ["med-rotavec", "med-crypto"] }],
