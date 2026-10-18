@@ -110,6 +110,7 @@ export function lireConfigurationQuestionnaire(json: string | null | undefined):
   if (value.ageMaxDemarrage != null) {
     const calendrier = value.demarrage.type === "DOSE_UNIQUE" ? value.demarrage.calendrier : value.demarrage.type === "PRIMO_RAPPEL" ? value.demarrage.calendrierPrimo : null;
     if (!calendrier || (calendrier.type !== "AGE_MINIMUM" && calendrier.type !== "SANS_REGLE")) return null;
+    if (calendrier.type === "AGE_MINIMUM" && dureeQuestionnaireEnJours(value.ageMaxDemarrage) < dureeQuestionnaireEnJours(calendrier.age)) return null;
   }
   if (value.demarrage.type === "DOSE_UNIQUE") {
     if (!texteNonVide(value.demarrage.etapeDoseId) || !texteNonVide(value.demarrage.preconisationId) || !regleTemporelleValide(value.demarrage.calendrier)) return null;
