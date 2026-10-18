@@ -77,6 +77,7 @@ export default function QuickActionsBar({
               <button type="button" onClick={() => router.push(hrefWithOrigin(`/sanitaire/nouvel-evenement?animal=${encodeURIComponent(nutrav)}`))} className="min-h-11 flex-1 rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-800">Événement</button>
             </div>
           ) : (
+          <>
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
@@ -137,6 +138,7 @@ export default function QuickActionsBar({
               </button>
             </div>
           )}
+          </>
           )}
         </div>
       )}
