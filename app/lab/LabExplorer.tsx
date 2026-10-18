@@ -72,6 +72,15 @@ export default function LabExplorer({
             placeholder="Numéro ou nom…" aria-label="Rechercher un animal"
             className="min-h-12 w-full rounded-xl border bg-white px-3 text-base" />
           <p className="text-xs text-gray-500">{animaux.length} animaux actifs · 30 résultats au maximum</p>
+          <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1" aria-label="Tri des animaux">
+            {([["numero","N°"],["sexe","Sexe"],["age","Âge"],["repro","Repro"]] as [Tri,string][]).map(([champ,libelle]) => {
+              const Ic = tri.champ!==champ ? ArrowUpDown : tri.sens===1 ? ArrowUp : ArrowDown;
+              return <button key={champ} type="button" onClick={() => changerTri(champ)} aria-label={"Trier par "+libelle}
+                className={tri.champ===champ?"flex min-h-10 flex-1 items-center justify-center gap-1 rounded bg-white text-xs font-bold text-green-800 shadow-sm":"flex min-h-10 flex-1 items-center justify-center gap-1 text-xs font-semibold text-gray-600"}>
+                {libelle}<Ic size={12}/>
+              </button>;
+            })}
+          </div>
           <div className="space-y-2">
             {visibles.map((animal) => (
               <div key={animal.id} className="rounded-xl border bg-white">
