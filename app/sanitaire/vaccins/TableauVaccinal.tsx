@@ -196,6 +196,12 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   }, { setVue, setRecherche, setVaccinModes, setStatuts, setTri, setDirectionTri, setColonnesMasquees, setAnneesAffichees, setToutHistorique, setUniquementSelection, setAnimauxSelectionnes, setActesSelectionnes, setDateSession, setExecutant, setAjustements }, lignes, blocs);
 
   useEffect(() => {
+    if (window.matchMedia("(max-width: 639px)").matches) {
+      setColonnesMasquees((actuelles) => actuelles.size > 0 ? actuelles : new Set(["nom", "mere", "age", "sexe", "velage"]));
+    }
+  }, []);
+
+  useEffect(() => {
     fetch("/api/intervenants").then((reponse) => reponse.json()).then(setIntervenants).catch(() => {});
   }, []);
 
@@ -807,7 +813,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       </div>
 
       <div className="vaccin-table-scroll overflow-auto border-t">
-        <table className="w-full min-w-max border-collapse text-left text-sm">
+        <table className="vaccin-table-mobile w-full min-w-max border-collapse text-left text-sm">
           <thead className="text-[13px]">
             <tr className="vaccin-head-1">
               <th rowSpan={2} scope="col" className="animal-selection-column sticky left-0 top-0 z-50 border-r bg-gray-50 p-1 text-center" style={{ width: largeurSelection, minWidth: largeurSelection }}><input type="checkbox" aria-label="Sélectionner ou désélectionner les animaux visibles" checked={etatMaitre === "TOUS"} ref={(element) => { if (element) element.indeterminate = etatMaitre === "PARTIEL"; }} onChange={basculerAnimauxVisibles} className="h-5 w-5 accent-green-700" /></th>
@@ -823,11 +829,11 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
             </tr>
             <tr className="vaccin-head-2">{blocsAffiches.flatMap((bloc) => modeVaccin(bloc.cle) === "COMPACT"
               ? [<th key={`${bloc.cle}-compact`} className="sticky top-11 z-30 w-11 min-w-11 border-r bg-gray-100 p-0"><button type="button" onClick={() => changerModeVaccin(bloc.cle, "OUVERT")} aria-label={`Ouvrir ${bloc.nom}`} title={bloc.nom} className="min-h-10 w-11 text-gray-600">‖</button></th>]
-              : bloc.sousColonnes.map((etape) => { const cleTri = `vaccin:${etape.id}` as const; return <th key={etape.id} scope="col" className="sticky top-11 z-30 min-w-24 border-r bg-gray-50 p-1 text-center font-medium text-gray-600"><button type="button" onClick={() => basculerTri(cleTri)} className="w-full font-semibold">{etape.protocoleId === null ? "Sans protocole" : etape.label || "Étape"}{indicateurTri(cleTri)}</button><span className="mt-0.5 block text-[9px] font-medium normal-case text-gray-500">{libelleVoieDose(etape.voie, etape.dose, etape.uniteDosage)}</span>{etape.protocoleId && <span className="mt-0.5 block text-[10px] font-bold text-gray-800">{compteursVaccin[bloc.cle]?.etapes[etape.id]?.aFaire ?? 0} à faire</span>}</th>; }))}</tr>
+              : bloc.sousColonnes.map((etape) => { const cleTri = `vaccin:${etape.id}` as const; return <th key={etape.id} scope="col" className="vaccin-etape-entete sticky top-11 z-30 min-w-24 border-r bg-gray-50 p-1 text-center font-medium text-gray-600"><button type="button" onClick={() => basculerTri(cleTri)} className="w-full font-semibold">{etape.protocoleId === null ? "Sans protocole" : etape.label || "Étape"}{indicateurTri(cleTri)}</button><span className="mt-0.5 block text-[9px] font-medium normal-case text-gray-500">{libelleVoieDose(etape.voie, etape.dose, etape.uniteDosage)}</span>{etape.protocoleId && <span className="mt-0.5 block text-[10px] font-bold text-gray-800">{compteursVaccin[bloc.cle]?.etapes[etape.id]?.aFaire ?? 0} à faire</span>}</th>; }))}</tr>
           </thead>
           <tbody className="divide-y">{resultat.map((ligne) => <tr key={ligne.animalId}>
             <td className="animal-selection-column sticky left-0 z-30 border-r bg-white p-1 text-center"><input type="checkbox" checked={animauxSelectionnes.has(ligne.animalId)} onChange={() => basculerDansSet(setAnimauxSelectionnes, ligne.animalId)} aria-label={`Sélectionner l’animal ${ligne.nutrav}`} className="h-5 w-5 accent-green-700" /></td>
-            <th scope="row" className="animal-fixed z-20 border-r bg-white p-1" style={{ left: decalageColonne("numero"), width: largeurColonne.numero, minWidth: largeurColonne.numero }}><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono text-sm font-black text-green-800 underline">{ligne.nutrav}</Link></th>
+            <th scope="row" className="animal-fixed z-20 border-r bg-white p-1" style={{ left: decalageColonne("numero"), width: largeurColonne.numero, minWidth: largeurColonne.numero }}><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono text-sm font-black text-green-800 underline">{ligne.nutrav}</Link><details className="relative mt-0.5 sm:hidden"><summary className="max-w-[64px] cursor-pointer list-none truncate text-[10px] font-normal text-gray-500" aria-label={`Informations de l’animal ${ligne.nutrav}`}>{ligne.nom || "Détails"} ▾</summary><div className="absolute left-0 z-[60] mt-1 w-48 rounded-lg border bg-white p-2 text-xs font-normal text-gray-700 shadow-xl"><p className="font-bold">{ligne.nom || "Sans nom"}</p><p>Mère : {ligne.mereNutrav || "—"}{ligne.mereNom ? ` · ${ligne.mereNom}` : ""}</p><p>Âge : {formatAgeTerrain(ligne.danaisIso)} · {ligne.sexe}</p></div></details></th>
             {!colonnesMasquees.has("nom") && <td className="animal-fixed z-20 max-w-24 border-r bg-white p-1 text-xs text-gray-600" style={{ left: decalageColonne("nom"), width: largeurColonne.nom, minWidth: largeurColonne.nom }}><span className="block truncate">{ligne.nom || "—"}</span></td>}
             {!colonnesMasquees.has("mere") && <td className="animal-fixed z-20 border-r bg-white p-1 text-xs text-gray-700" style={{ left: decalageColonne("mere"), width: largeurColonne.mere, minWidth: largeurColonne.mere }} title={ligne.mereNom ? `${ligne.mereNutrav ?? ""} — ${ligne.mereNom}` : ligne.mereNutrav ?? undefined}>{ligne.mereNutrav ? (ligne.mereLiee ? <Link href={`/troupeau/${ligne.mereNutrav}`} className="font-mono font-bold text-green-800 underline">{ligne.mereNutrav}</Link> : <span className="font-mono font-semibold">{ligne.mereNutrav}</span>) : "—"}</td>}
             {!colonnesMasquees.has("age") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("age"), width: largeurColonne.age, minWidth: largeurColonne.age }}>{formatAgeTerrain(ligne.danaisIso)}</td>}
@@ -835,7 +841,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
             {!colonnesMasquees.has("velage") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("velage"), width: largeurColonne.velage, minWidth: largeurColonne.velage }}>{ligne.dateVelagePrevueIso ? formatTempsAvantVelage(ligne.dateVelagePrevueIso) : "—"}</td>}
             {blocsAffiches.flatMap((bloc) => modeVaccin(bloc.cle) === "COMPACT"
               ? [<td key={`${bloc.cle}-compact`} className="w-11 min-w-11 border-r bg-gray-50 p-0 text-center"><button type="button" onClick={() => changerModeVaccin(bloc.cle, "OUVERT")} aria-label={`Ouvrir ${bloc.nom}`} title={bloc.nom} className="min-h-11 w-11 text-gray-600">‖</button></td>]
-              : bloc.sousColonnes.map((etape) => <td key={etape.id} className="border-r p-1 align-top">{renduCellule(ligne.cellules[etape.id], ligne, etape)}</td>))}
+              : bloc.sousColonnes.map((etape) => <td key={etape.id} className="vaccin-etape-cellule border-r p-1 align-top">{renduCellule(ligne.cellules[etape.id], ligne, etape)}</td>))}
           </tr>)}</tbody>
         </table>
         {resultat.length === 0 && <p className="p-3 text-sm text-gray-500">Aucun animal avec ces filtres.</p>}
@@ -888,6 +894,13 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         @media (max-width: 640px) {
           #tableau-vaccinal-impression .animal-fixed:nth-child(n+4) { position: static; }
           #tableau-vaccinal-impression .vaccin-table-scroll { max-height: calc(100dvh - 12rem); }
+        }
+
+        @media (max-width: 639px) {
+          #tableau-vaccinal-impression .vaccin-etape-entete { min-width: 72px; max-width: 100px; font-size: 10px; }
+          #tableau-vaccinal-impression .vaccin-etape-cellule { min-width: 72px; padding: 2px; }
+          #tableau-vaccinal-impression .vaccin-etape-cellule button { min-height: 40px; }
+          #tableau-vaccinal-impression .vaccin-table-scroll { overscroll-behavior-x: contain; }
         }
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
