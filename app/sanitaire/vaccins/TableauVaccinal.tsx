@@ -157,7 +157,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [statuts, setStatuts] = useState<Set<Statut>>(new Set());
   const [tri, setTri] = useState<Tri | null>(null);
   const [directionTri, setDirectionTri] = useState<DirectionTri | null>(null);
-  const [colonnesMasquees, setColonnesMasquees] = useState<Set<ColonneMasquable>>(() => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches ? new Set(["nom", "mere", "age", "sexe", "velage"]) : new Set());
+  const [colonnesMasquees, setColonnesMasquees] = useState<Set<ColonneMasquable>>(new Set());
   const [menuColonne, setMenuColonne] = useState<{ colonne: ColonneMasquable; x: number; y: number } | null>(null);
   const menuColonneRef = useRef<HTMLDivElement>(null);
   const [colonnesMenuOuvert, setColonnesMenuOuvert] = useState(false);
@@ -194,6 +194,12 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     vue, recherche, vaccinModes, statuts, tri, directionTri, colonnesMasquees, anneesAffichees, toutHistorique, uniquementSelection,
     animauxSelectionnes, actesSelectionnes, dateSession, executant, ajustements,
   }, { setVue, setRecherche, setVaccinModes, setStatuts, setTri, setDirectionTri, setColonnesMasquees, setAnneesAffichees, setToutHistorique, setUniquementSelection, setAnimauxSelectionnes, setActesSelectionnes, setDateSession, setExecutant, setAjustements }, lignes, blocs);
+
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 639px)").matches) {
+      setColonnesMasquees((actuelles) => actuelles.size > 0 ? actuelles : new Set(["nom", "mere", "age", "sexe", "velage"]));
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/intervenants").then((reponse) => reponse.json()).then(setIntervenants).catch(() => {});
