@@ -666,7 +666,7 @@ test("dose unique ROTAVEC : une injection reelle affiche FAIT meme rattachee a l
   assert.equal(cellule.actes.length, 1);
 });
 
-test("ROTAVEC : l'historique FAIT conserve la prochaine echeance de nouvelle gestation", () => {
+test("ROTAVEC : une dose precedente ne coche pas la nouvelle gestation", () => {
   const etape = { ...etapePrimo, id: "rotavec-gestation", reference: "VELAGE",
     debutValeur: 84, debutPosition: "AVANT", finValeur: 21, finPosition: "AVANT",
     medicamentId: "med-rotavec", medicamentNom: "ROTAVEC CORONA",
@@ -683,7 +683,6 @@ test("ROTAVEC : l'historique FAIT conserve la prochaine echeance de nouvelle ges
       medicamentId: "med-rotavec", protocoleId: "ancien-mixte",
       etapeProtocoleId: "ancienne-dose", gestationId: "ancienne-gestation", statut: "FAIT" }] });
   const cellule = construireGrilleVaccinale([a], [protocole], [], AUJOURDHUI).lignes[0].cellules[etape.id];
-  assert.equal(cellule.statut, "FAIT");
-  assert.equal(cellule.date?.toISOString(), "2025-11-20T12:00:00.000Z");
-  assert.ok(cellule.prochaine, "la nouvelle gestation doit conserver une echeance a faire");
+  assert.notEqual(cellule.statut, "FAIT");
+  assert.equal(cellule.actes.length, 0, "ancienne gestation absente de la cellule courante");
 });
