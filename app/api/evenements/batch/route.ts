@@ -170,6 +170,7 @@ export async function POST(request: NextRequest) {
       const vaccinationsCrees = vaccinationConfig ? await Promise.all(vaccinationConfig.session.animaux.map((animal) => tx.vaccination.create({
         data: {
           animalId: animal.animalId,
+          evenementId: parAnimal.get(animal.animalId) ?? null,
           vaccin: vaccinationConfig.medicamentNom,
           date: resolvedDate,
           voie: vaccinationConfig.session.voie?.trim() || null,
