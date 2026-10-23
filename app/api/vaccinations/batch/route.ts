@@ -54,7 +54,8 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const vaccinations = await Promise.all(
+    // Une séance est indivisible : soit chaque acte individuel est créé, soit aucun.
+    const vaccinations = await prisma.$transaction(
       data.map((d) => prisma.vaccination.create({ data: d }))
     );
 
