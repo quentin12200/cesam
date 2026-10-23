@@ -528,9 +528,23 @@ export function construireGrilleVaccinale(
     // Les actes des gestations précédentes restent consultables via ligne.actes / carnet sanitaire.
     for (const protocole of protocolesAvecEtapes) {
       const config = lireConfigurationQuestionnaire(protocole.configurationQuestionnaireJson);
-      if (!config || config.demarrage.type !== "DOSE_UNIQUE" || protocole.etapes.length !== 1 ||
-        !configurationQuestionnaireLieeAuVelage(config)) continue;
+      if (!config || config.demarrage.type !== "DOSE_UNIQUE" || protocole.etapes.length !== 1) continue;
       const etape = protocole.etapes[0];
+      if (!configurationQuestionnaireLieeAuVelage(config)) {
+        const actes = animal.actes.filter((acte) => acte.statut === "FAIT" &&
+          (acte.medicamentId ? acte.medicamentId === config.medicamentId :
+            etape.medicaments.some((m) => nomVaccinComparable(m.medicament.nom) === nomVaccinComparable(acte.vaccin))))
+          .sort((a, b) => b.date.getTime() - a.date.getTime());
+        if (actes.length) {
+          const cellule = cellules[etape.id] ?? celluleVide();
+          const prochaine = cellule.statut !== "FAIT" && cellule.fenetre && cellule.date
+            ? { statut: cellule.statut as Exclude<StatutCelluleGrille, "FAIT" | "VIDE">,
+                date: cellule.date, fenetre: cellule.fenetre } : cellule.prochaine;
+          cellules[etape.id] = { ...cellule, statut: "FAIT", date: actes[0].date,
+            aValider: false, historiquesAValider: [], actes: [...actes].reverse().map(versActeCellule), prochaine };
+        }
+        continue;
+      }
       const existante = cellules[etape.id] ?? celluleVide();
       if (!animal.gestationId) {
         cellules[etape.id] = celluleVide();
