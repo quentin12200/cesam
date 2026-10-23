@@ -228,8 +228,6 @@ export function construireBlocsVaccinaux(
     if (protocole.etapes.length === 0) continue;
     const medicament = medicamentPrincipal(protocole);
     const cle = medicament?.id ?? protocole.id;
-    for (const etape of protocole.etapes) {
-    }
     const voie = vaccinsPharmacie.find((v) => v.medicamentId === medicament?.id)?.voie ?? null;
     if (!blocs.has(cle)) {
       blocs.set(cle, {
@@ -237,6 +235,7 @@ export function construireBlocsVaccinaux(
         nom: medicament?.nom || protocole.label,
         voie,
         sousColonnes: [...protocole.etapes]
+          .filter((etape) => !medicament || etape.medicamentId === medicament.id || (!etape.medicamentId && etape.medicaments.some((m) => m.medicament.id === medicament.id)))
           .sort((a, b) => a.ordre - b.ordre)
           .map((etape) => ({
             id: etape.id,
@@ -264,7 +263,7 @@ export function construireBlocsVaccinaux(
             ...etape.medicaments.map((liaison) => liaison.medicament.id),
           ]),
         ])],
-        etapes: protocole.etapes.map((etape) => ({
+        etapes: protocole.etapes.filter((etape) => !medicament || etape.medicamentId === medicament.id || (!etape.medicamentId && etape.medicaments.some((m) => m.medicament.id === medicament.id))).map((etape) => ({
           id: etape.id,
           reference: etape.reference,
           cycle: etape.cycle,
