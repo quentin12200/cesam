@@ -22,7 +22,7 @@ export default async function RegistrePage({ searchParams }: { searchParams: Pro
     const evenement = observations.find(o => o.id === id);
     const seulTraitement = soins.find(s => s.sourceType === "TRAITEMENT" && s.evenementId === id);
     // Conserver aussi une ligne evenement si elle porte des observations propres non affichees dans le traitement.
-    return (liens.get(id)?.length ?? 0) !== 1 || !seulTraitement || seulTraitement.animalId !== evenement?.animalId || seulTraitement.date.getTime() !== evenement.date.getTime() || Boolean(evenement.description || evenement.temperature != null || evenement.symptomes.some(s => s !== "Vaccination"));
+    return (liens.get(id)?.length ?? 0) !== 1 || !seulTraitement || !evenement || seulTraitement.animalId !== evenement.animalId || seulTraitement.date.getTime() !== evenement.date.getTime() || Boolean(evenement.description || evenement.temperature != null || evenement.symptomes.some(s => s !== "Vaccination"));
   });
   const query = (p.recherche ?? "").toLowerCase();
   const type = p.type ?? "tous";
