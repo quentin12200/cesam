@@ -400,7 +400,10 @@ function celluleProtocole(
       }
       for (const acte of interpretation.aConfirmer) {
         const historique = versHistorique(acte);
-        const cible = etapes.find((e) => historique.etapesCompatibles.some((c) => c.id === e.id)) ?? etapes[0];
+        // Un acte sans étape compatible reste dans son historique source :
+        // ne jamais l'attribuer artificiellement au premier vaccin du protocole.
+        const cible = etapes.find((e) => historique.etapesCompatibles.some((c) => c.id === e.id));
+        if (!cible) continue;
         const cellule = cellules.get(cible.id)!;
         cellules.set(cible.id, { ...cellule, aValider: true,
           historiquesAValider: [...cellule.historiquesAValider, historique] });
