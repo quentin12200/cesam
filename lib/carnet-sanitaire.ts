@@ -1,5 +1,41 @@
 import { prisma } from "@/lib/prisma";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { unifierActesDuCarnet, type ActeSanitaireReel } from "@/lib/carnet-actes";
+
+/** Recherche du carnet : lecture seule des administrations, même sans protocole. */
+export async function getActesSanitairesReels(): Promise<ActeSanitaireReel[]> {
+  const [vaccinations, traitements] = await Promise.all([
+    prisma.vaccination.findMany({
+      where: { statut: "FAIT" },
+      select: {
+        id: true, date: true, statut: true, vaccin: true, medicamentId: true,
+        animal: { select: { id: true, nutrav: true, nobovi: true } },
+        medicament: { select: { nom: true } },
+        protocole: { select: { label: true } },
+        etapeProtocole: { select: { label: true } },
+      },
+    }),
+    prisma.traitement.findMany({
+      select: {
+        id: true, dateDebut: true, medicamentNom: true, medicamentId: true, executant: true,
+        animal: { select: { id: true, nutrav: true, nobovi: true } },
+        evenement: { select: { constatePar: true } },
+        protocoleVaccin: { select: { label: true } },
+        etapeProtocoleVaccin: { select: { label: true } },
+      },
+    }),
+  ]);
+  return unifierActesDuCarnet(
+    vaccinations.map((v) => ({ id: v.id, animal: { id: v.animal.id, nutrav: v.animal.nutrav, nom: v.animal.nobovi },
+      date: v.date, statut: v.statut, vaccin: v.vaccin, medicamentId: v.medicamentId,
+      medicamentNom: v.medicament?.nom ?? null, protocoleNom: v.protocole?.label ?? null,
+      etapeNom: v.etapeProtocole?.label ?? null })),
+    traitements.map((t) => ({ id: t.id, animal: { id: t.animal.id, nutrav: t.animal.nutrav, nom: t.animal.nobovi },
+      date: t.dateDebut, medicamentNom: t.medicamentNom, medicamentId: t.medicamentId,
+      executant: t.executant ?? t.evenement?.constatePar ?? null,
+      protocoleNom: t.protocoleVaccin?.label ?? null, etapeNom: t.etapeProtocoleVaccin?.label ?? null })),
+  );
+}
 
 export interface CarnetSanitaireRow {
   id: string;
@@ -99,6 +135,7 @@ export interface EvenementCarnetRow {
   animalNom: string | null;
   categorie: string | null;
   type: string;
+  produits: string[];
   symptomes: string[];
   temperature: number | null;
   moment: string | null;
@@ -112,6 +149,7 @@ export async function getEvenementsCarnetRows(): Promise<EvenementCarnetRow[]> {
     include: {
       animal: { select: { id: true, nutrav: true, nobovi: true } },
       symptomes: { select: { libelle: true } },
+      traitements: { select: { medicamentNom: true } },
     },
     orderBy: { date: "asc" },
   });
@@ -124,6 +162,7 @@ export async function getEvenementsCarnetRows(): Promise<EvenementCarnetRow[]> {
     animalNom: e.animal.nobovi,
     categorie: e.categorie,
     type: e.type,
+    produits: [...new Set(e.traitements.map((t) => t.medicamentNom).filter(Boolean))],
     symptomes: e.symptomes.map((s) => s.libelle),
     temperature: e.temperature,
     moment: e.moment,

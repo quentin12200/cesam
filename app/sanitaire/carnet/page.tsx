@@ -6,16 +6,19 @@ import { Download } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 import {
-  getCarnetSanitaireRows, groupRowsByAnimal, type CarnetSanitaireRow,
+  getActesSanitairesReels, getCarnetSanitaireRows, groupRowsByAnimal, type CarnetSanitaireRow,
   getEvenementsCarnetRows, groupEvenementsByAnimal, type EvenementCarnetRow,
 } from "@/lib/carnet-sanitaire";
+import type { RechercheActes } from "@/lib/carnet-actes";
 import { getCategorieLabel } from "@/lib/evenements-sanitaires";
 import PrintButton from "@/app/components/PrintButton";
 import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 import ImportHistoriqueButton from "./ImportHistoriqueButton";
+import RechercheActesCarnet from "./RechercheActes";
 
 interface PageProps {
-  searchParams: Promise<{ order?: string }>;
+  searchParams: Promise<{ order?: string; sort?: string; du?: string; au?: string; animal?: string; produit?: string;
+    acteTri?: string; acteDirection?: string; compare?: string }>;
 }
 
 async function getExploitationConfig() {
@@ -27,18 +30,33 @@ async function getExploitationConfig() {
 }
 
 export default async function CarnetSanitairePage({ searchParams }: PageProps) {
-  const { order: orderParam } = await searchParams;
+  const params = await searchParams;
+  const { order: orderParam, sort: sortParam } = params;
+  const sort = sortParam === "animal" || sortParam === "produit" ? sortParam : "date";
   const order = orderParam === "animal" ? "animal" : "chrono";
+  const comparer = params.compare === "rotavec-cryptium";
+  const recherche: RechercheActes = {
+    du: params.du, au: params.au, animal: params.animal, produit: params.produit,
+    tri: params.acteTri === "animal" || params.acteTri === "produit" || params.acteTri === "executant" ? params.acteTri : "date",
+    direction: params.acteDirection === "asc" ? "asc" : "desc",
+  };
 
-  const [rows, evenements, config] = await Promise.all([
+  const [rows, evenements, config, actes, tequila] = await Promise.all([
     getCarnetSanitaireRows(),
     getEvenementsCarnetRows(),
     getExploitationConfig(),
+    getActesSanitairesReels(),
+    comparer ? prisma.animal.findUnique({ where: { nutrav: "7926" }, select: { id: true, nutrav: true, nobovi: true } }) : Promise.resolve(null),
   ]);
   const now = new Date();
   const printDate = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const groupes = order === "animal" ? groupRowsByAnimal(rows) : [];
-  const groupesEvenements = order === "animal" ? groupEvenementsByAnimal(evenements) : [];
+  const evenementsTries = [...evenements].sort((a, b) => sort === "animal"
+    ? a.animalNutrav.localeCompare(b.animalNutrav, "fr", { numeric: true }) || b.date.getTime() - a.date.getTime()
+    : sort === "produit"
+      ? a.produits.join(", ").localeCompare(b.produits.join(", "), "fr") || b.date.getTime() - a.date.getTime()
+      : b.date.getTime() - a.date.getTime());
+  const groupesEvenements = order === "animal" ? groupEvenementsByAnimal(evenementsTries) : [];
 
   return (
     <>
@@ -76,12 +94,20 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
         >
           Par animal
         </Link>
+        <span className="text-sm text-gray-600">Trier les événements :</span>
+        {(["date", "animal", "produit"] as const).map((key) => (
+          <Link key={key} href={`/sanitaire/carnet?order=${order}&sort=${key}`}
+            className={`text-sm px-3 py-1.5 rounded-lg border ${sort === key ? "bg-green-700 text-white" : "bg-white text-gray-600 border-gray-200"}`}>
+            {key === "date" ? "Date ↓" : key === "animal" ? "Animal" : "Produit"}
+          </Link>
+        ))}
         <div className="ml-auto">
           <ImportHistoriqueButton />
         </div>
       </div>
 
       <div className="px-4 py-4 max-w-6xl mx-auto">
+        <RechercheActesCarnet actes={actes} recherche={recherche} comparer={comparer} tequila={tequila} />
         <div className="mb-6 rounded-xl overflow-hidden shadow-sm border border-green-800 print:border-2">
           <div className="bg-green-700 text-white px-6 py-5 text-center">
             <p className="text-xs uppercase tracking-widest text-green-100">{config?.raisonSociale ?? "GAEC Samuel & Céline"}</p>
@@ -105,7 +131,7 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
             {evenements.length > 0 && (
               <>
                 <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide mt-6 mb-2">Événements sanitaires</h2>
-                <EvenementsTable rows={evenements} showAnimal />
+                <EvenementsTable rows={evenementsTries} showAnimal />
               </>
             )}
           </>
@@ -176,6 +202,7 @@ function EvenementsTable({ rows, showAnimal }: { rows: EvenementCarnetRow[]; sho
           {showAnimal && <Th>Nom</Th>}
           <Th>Catégorie</Th>
           <Th>Événement</Th>
+          <Th>Produit administré</Th>
           <Th>Commentaire</Th>
           <Th>Constaté par</Th>
           <Th>Statut</Th>
@@ -193,6 +220,7 @@ function EvenementsTable({ rows, showAnimal }: { rows: EvenementCarnetRow[]; sho
               {r.symptomes.length > 1 ? r.symptomes.join(" • ") : r.type}
               {r.temperature != null ? ` (${r.temperature}°C)` : ""}
             </Td>
+            <Td className="font-medium">{r.produits.length ? r.produits.join(" • ") : "—"}</Td>
             <Td>{r.description ?? "—"}</Td>
             <Td>{r.constatePar ?? "—"}</Td>
             <Td className={!r.resolu ? "font-semibold text-red-700" : ""}>{r.resolu ? "Résolu" : "En cours"}</Td>
