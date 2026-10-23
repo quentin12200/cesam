@@ -512,9 +512,16 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     // Seules les preuves acceptées par la grille peuvent apparaître en vert sous cette étape.
     const historiqueEtape = cellule.actes;
     const tousLesActes = historiqueEtape.map((acte) => afficherDate(acte.date)).join(", ");
+    const historiqueDoseUniqueGestation = bloc?.protocoleLieAuVelage && bloc.sousColonnes.length === 1 && etape.cycle !== "ENTRETIEN"
+      ? ligne.actes.filter((acte) => acte.medicamentId === etape.medicamentId)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      : [];
+    const historiqueSurvol = historiqueDoseUniqueGestation.length
+      ? `Historique : ${historiqueDoseUniqueGestation.slice(0, 2).map((acte) => afficherDate(acte.date)).join(" · ")}${historiqueDoseUniqueGestation.length > 2 ? ` (+${historiqueDoseUniqueGestation.length - 2} ancienne(s))` : ""}`
+      : `Historique : ${tousLesActes}`;
     const datesInitiales = datesCompactes(historiqueEtape, anneesFiltre, 1);
     const historique = historiqueEtape.length > 0 && bloc
-      ? <button type="button" title={`Historique : ${tousLesActes} — voir ou corriger l’étape`} aria-label={`Ouvrir l’historique ${etape.label || "vaccinal"} : ${tousLesActes}`} onClick={() => ouvrirHistorique(ligne, bloc, etape)} className="flex w-full items-center justify-center gap-x-1 rounded border border-green-600 bg-green-100 px-1 py-0.5 font-bold text-green-950 hover:bg-green-200">
+      ? <button type="button" title={`${historiqueSurvol} — voir ou corriger l’étape`} aria-label={`Ouvrir l’historique ${etape.label || "vaccinal"} : ${tousLesActes}`} onClick={() => ouvrirHistorique(ligne, bloc, etape)} className="flex w-full items-center justify-center gap-x-1 rounded border border-green-600 bg-green-100 px-1 py-0.5 font-bold text-green-950 hover:bg-green-200">
           <span className="text-base leading-none">✓</span>
           {datesInitiales.total === 0 ? <span className="text-[10px]">ancien</span> : <>{datesInitiales.libelles.map((libelle) => <span key={libelle} className="text-[11px]">{libelle}</span>)}{datesInitiales.reste > 0 && <span className="text-[10px] font-black">+{datesInitiales.reste}</span>}</>}
         </button>
