@@ -524,25 +524,52 @@ export function construireGrilleVaccinale(
         cellules[etapeId] = cellule;
       }
     }
-    // Dose unique : la preuve d'administration est le médicament réellement enregistré,
-    // indépendamment du protocole historique auquel l'acte était rattaché.
-    // On garde l'échéance calculée éventuelle pour une gestation ultérieure.
+    // Dose unique liée au vêlage : une seule injection de la gestation courante dans la grille.
+    // Les actes des gestations précédentes restent consultables via ligne.actes / carnet sanitaire.
     for (const protocole of protocolesAvecEtapes) {
       const config = lireConfigurationQuestionnaire(protocole.configurationQuestionnaireJson);
       if (!config || config.demarrage.type !== "DOSE_UNIQUE" || protocole.etapes.length !== 1) continue;
       const etape = protocole.etapes[0];
+      if (!configurationQuestionnaireLieeAuVelage(config)) {
+        const actes = animal.actes.filter((acte) => acte.statut === "FAIT" &&
+          (acte.medicamentId ? acte.medicamentId === config.medicamentId :
+            etape.medicaments.some((m) => nomVaccinComparable(m.medicament.nom) === nomVaccinComparable(acte.vaccin))))
+          .sort((a, b) => b.date.getTime() - a.date.getTime());
+        if (actes.length) {
+          const cellule = cellules[etape.id] ?? celluleVide();
+          const prochaine = cellule.statut !== "FAIT" && cellule.fenetre && cellule.date
+            ? { statut: cellule.statut as Exclude<StatutCelluleGrille, "FAIT" | "VIDE">,
+                date: cellule.date, fenetre: cellule.fenetre } : cellule.prochaine;
+          cellules[etape.id] = { ...cellule, statut: "FAIT", date: actes[0].date,
+            aValider: false, historiquesAValider: [], actes: [...actes].reverse().map(versActeCellule), prochaine };
+        }
+        continue;
+      }
+      const existante = cellules[etape.id] ?? celluleVide();
+      if (!animal.gestationId) {
+        cellules[etape.id] = celluleVide();
+        continue;
+      }
       const medicamentId = config.medicamentId;
+      const dateVelagePrevue = animal.dateVelagePrevueIso ? new Date(animal.dateVelagePrevueIso) : null;
+      const debutGestationEstime = dateVelagePrevue && !Number.isNaN(dateVelagePrevue.getTime())
+        ? addDays(dateVelagePrevue, -300) : null;
       const actes = animal.actes.filter((acte) => acte.statut === "FAIT" &&
         (acte.medicamentId ? acte.medicamentId === medicamentId :
-          etape.medicaments.some((m) => nomVaccinComparable(m.medicament.nom) === nomVaccinComparable(acte.vaccin))))
+          etape.medicaments.some((m) => nomVaccinComparable(m.medicament.nom) === nomVaccinComparable(acte.vaccin))) &&
+        (acte.gestationId
+          ? acte.gestationId === animal.gestationId
+          : Boolean(debutGestationEstime && dateVelagePrevue &&
+              acte.date >= debutGestationEstime && acte.date <= dateVelagePrevue)))
         .sort((a, b) => b.date.getTime() - a.date.getTime());
-      if (!actes.length) continue;
-      const existante = cellules[etape.id] ?? celluleVide();
-      const prochaine = existante.statut !== "FAIT" && existante.fenetre && existante.date
-        ? { statut: existante.statut as Exclude<StatutCelluleGrille, "FAIT" | "VIDE">, date: existante.date, fenetre: existante.fenetre }
-        : existante.prochaine;
+      if (!actes.length) {
+        // Un ancien FAIT n'atteste pas la gestation actuelle.
+        if (existante.statut === "FAIT") cellules[etape.id] = celluleVide();
+        continue;
+      }
       cellules[etape.id] = { ...existante, statut: "FAIT", date: actes[0].date,
-        aValider: false, historiquesAValider: [], actes: [...actes].reverse().map(versActeCellule), prochaine };
+        aValider: false, historiquesAValider: [], actes: [...actes].reverse().map(versActeCellule),
+        prochaine: null };
     }
     // Vaccins de pharmacie sans protocole configuré : une seule sous-colonne, "fait" si un acte
     // existe, sinon vide (aucune fenêtre calculable sans étape).
