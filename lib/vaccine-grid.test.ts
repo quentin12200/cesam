@@ -587,7 +587,8 @@ test("CRYPTO | ROTAVEC : ROTAVEC sans étape renseignée reste sous son produit,
     { medicamentId: "med-cryptium", nom: "BOVILIS CRYPTIUM", voie: "SC" },
     { medicamentId: "med-rotavec", nom: "ROTAVEC CORONA", voie: "IM" },
   ], AUJOURDHUI);
-  assert.equal(resultat.blocs.length, 1, "ROTAVEC ne crée pas un second bloc pharmacie hors protocole");
+  assert.equal(resultat.blocs.length, 2, "ROTAVEC secondaire garde son bloc pharmacie visible à côté du protocole historique");
+  assert.equal(resultat.blocs.filter((bloc) => bloc.medicamentId === "med-rotavec").length, 1);
   const cryptoCellule = resultat.lignes[0].cellules[cryptium.id];
   const rotaCellule = resultat.lignes[0].cellules[rotavec.id];
   assert.equal(cryptoCellule.historiquesAValider.length, 0);
@@ -640,4 +641,45 @@ test("CRYPTO / ROTAVEC : ROTAVEC secondaire reste visible dans sa propre colonne
   const separe = { ...mixte, id: "rotavec-separe", label: "ROTAVEC", etapes: [rotavec] };
   const blocsSepares = construireBlocsVaccinaux([mixte, separe], vaccins);
   assert.equal(blocsSepares.filter((b) => b.medicamentId === "med-rotavec").length, 1);
+});
+
+test("dose unique ROTAVEC : une injection reelle affiche FAIT meme rattachee a l'ancien protocole", () => {
+  const rotavec = { ...etapePrimo, id: "rotavec-dose", medicamentId: "med-rotavec",
+    medicamentNom: "ROTAVEC CORONA", medicaments: [{ medicament: { id: "med-rotavec", nom: "ROTAVEC CORONA" } }] };
+  const configuration = { version: 1, medicamentId: "med-rotavec", cible: { tousBovins: true, categories: [] },
+    demarrage: { type: "DOSE_UNIQUE", etapeDoseId: rotavec.id, preconisationId: "preco", calendrier: { type: "SANS_REGLE" } },
+    entretien: { actif: false } };
+  const protocole = { ...protocoleBovigrip, id: "rotavec-propre", nom: "ROTAVEC", label: "ROTAVEC CORONA",
+    configurationQuestionnaireJson: JSON.stringify(configuration), etapes: [rotavec] };
+  const date = new Date("2026-10-12T12:00:00Z");
+  const a = animal({ actes: [{ date, vaccin: "ROTAVEC CORONA", medicamentId: "med-rotavec",
+    protocoleId: "ancien-crypto-rotavec", etapeProtocoleId: "ancienne-etape",
+    gestationId: null, statut: "FAIT" }] });
+  const grille = construireGrilleVaccinale([a], [protocole], [], AUJOURDHUI);
+  const cellule = grille.lignes[0].cellules[rotavec.id];
+  assert.equal(cellule.statut, "FAIT");
+  assert.equal(cellule.date?.getTime(), date.getTime());
+  assert.equal(cellule.actes.length, 1);
+});
+
+test("ROTAVEC : l'historique FAIT conserve la prochaine echeance de nouvelle gestation", () => {
+  const etape = { ...etapePrimo, id: "rotavec-gestation", reference: "VELAGE",
+    debutValeur: 84, debutPosition: "AVANT", finValeur: 21, finPosition: "AVANT",
+    medicamentId: "med-rotavec", medicamentNom: "ROTAVEC CORONA",
+    medicaments: [{ medicament: { id: "med-rotavec", nom: "ROTAVEC CORONA" } }] };
+  const configuration = { version: 1, medicamentId: "med-rotavec", cible: { tousBovins: true, categories: [] },
+    demarrage: { type: "DOSE_UNIQUE", etapeDoseId: etape.id, preconisationId: "preco",
+      calendrier: { type: "AVANT_VELAGE", debutAvant: { valeur: 84, unite: "JOUR" },
+        finAvant: { valeur: 21, unite: "JOUR" } } }, entretien: { actif: false } };
+  const protocole = { ...protocoleBovigrip, id: "rotavec-seul", etapes: [etape],
+    configurationQuestionnaireJson: JSON.stringify(configuration) };
+  const a = animal({ gestationId: "nouvelle-gestation",
+    dateVelagePrevueIso: "2026-12-01T12:00:00Z",
+    actes: [{ date: new Date("2025-11-20T12:00:00Z"), vaccin: "ROTAVEC CORONA",
+      medicamentId: "med-rotavec", protocoleId: "ancien-mixte",
+      etapeProtocoleId: "ancienne-dose", gestationId: "ancienne-gestation", statut: "FAIT" }] });
+  const cellule = construireGrilleVaccinale([a], [protocole], [], AUJOURDHUI).lignes[0].cellules[etape.id];
+  assert.equal(cellule.statut, "FAIT");
+  assert.equal(cellule.date?.toISOString(), "2025-11-20T12:00:00.000Z");
+  assert.ok(cellule.prochaine, "la nouvelle gestation doit conserver une echeance a faire");
 });
