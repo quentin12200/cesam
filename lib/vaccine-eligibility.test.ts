@@ -40,3 +40,12 @@ test("la classification GENISSE représente les catégories précises de géniss
     assert.equal(estAnimalConcerneParProtocole({...velle,categorie},p),true);
   assert.equal(estAnimalConcerneParProtocole(velle,p),false);
 });
+
+test("ROTAVEC : tous les gestants quelle que soit leur categorie, sans male ni femelle non gestante", () => {
+  const rotavec = { ...cible, categoriesJson: JSON.stringify([]), sexeCible: "F", gestante: true };
+  for (const categorie of ["VACHE", "GRANDE_GENISSE", "A_ENGRAISSER", "ENGRAISSEMENT"]) {
+    assert.equal(estAnimalConcerneParProtocole({ ...velle, categorie, gestation: true }, rotavec), true, categorie);
+  }
+  assert.equal(estAnimalConcerneParProtocole({ ...velle, categorie: "VACHE", gestation: false }, rotavec), false);
+  assert.equal(estAnimalConcerneParProtocole({ ...velle, categorie: "TAUREAU", sexbov: "M", gestation: false }, rotavec), false);
+});
