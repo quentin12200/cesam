@@ -112,18 +112,3 @@ export function rechercherActes(actes: readonly ActeSanitaireReel[], recherche: 
       return direction * principal || b.date.getTime() - a.date.getTime() || a.id.localeCompare(b.id);
     });
 }
-
-export function comparerRotavecCryptium(actes: readonly ActeSanitaireReel[], date = "2026-10-12") {
-  const duJour = actes.filter((a) => jour(a.date) === date);
-  const rotavec = new Map(duJour.filter((a) => ["ROTAVEC CORONA", "ROTAVEC"].includes(nomComparable(a.produit)))
-    .map((a) => [a.animalId, a]));
-  const cryptium = new Map(duJour.filter((a) => nomComparable(a.produit) === "BOVILIS CRYPTIUM")
-    .map((a) => [a.animalId, a]));
-  const ordre = (a: ActeSanitaireReel, b: ActeSanitaireReel) => a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
-  return {
-    rotavecSeul: [...rotavec.values()].filter((a) => !cryptium.has(a.animalId)).sort(ordre),
-    cryptiumSeul: [...cryptium.values()].filter((a) => !rotavec.has(a.animalId)).sort(ordre),
-    deuxProduits: [...rotavec.values()].filter((a) => cryptium.has(a.animalId)).sort(ordre),
-    rotavec, cryptium,
-  };
-}
