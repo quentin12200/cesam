@@ -583,9 +583,9 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     const nomVaccin = etapeCliquee.medicamentNom ?? bloc.nom;
     // Source unique : les actes réels unifiés (Vaccination + Traitement VACCIN) de lib/vaccine-acts.ts.
     const actesDuProduit = actesDuVaccin(ligne.actes, { id: medicamentId, nom: nomVaccin });
-    const aRattacher = ligne.cellules[etapeCliquee.id]?.historiquesAValider ?? [];
-    const actesVaccin = ligne.actes.filter((acte) => actesDuProduit.includes(acte) || aRattacher.some((v) =>
-      v.sourceType === acte.sourceType && v.sourceId === acte.sourceId && v.date === acte.date && v.medicamentId === acte.medicamentId));
+    // Ne jamais afficher un acte d’un autre produit au seul motif que le protocole le propose à rattacher.
+    // Exemple : un ROTAVEC en attente ne doit pas apparaître dans l’historique BOVILIS CRYPTIUM.
+    const actesVaccin = actesDuProduit;
     const configEtapes = { etapes: bloc.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicamentIds.map((idMedicament) => ({ medicamentId: idMedicament })) })) };
     const etapeDe = (acte: ActeHistorique) => {
       const structuree = bloc.protocoleId && acte.protocoleId === bloc.protocoleId && acte.etapeProtocoleId
