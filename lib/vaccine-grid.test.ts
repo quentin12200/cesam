@@ -587,7 +587,8 @@ test("CRYPTO | ROTAVEC : ROTAVEC sans étape renseignée reste sous son produit,
     { medicamentId: "med-cryptium", nom: "BOVILIS CRYPTIUM", voie: "SC" },
     { medicamentId: "med-rotavec", nom: "ROTAVEC CORONA", voie: "IM" },
   ], AUJOURDHUI);
-  assert.equal(resultat.blocs.length, 1, "ROTAVEC ne crée pas un second bloc pharmacie hors protocole");
+  assert.equal(resultat.blocs.length, 2, "ROTAVEC secondaire garde son bloc pharmacie visible à côté du protocole historique");
+  assert.equal(resultat.blocs.filter((bloc) => bloc.medicamentId === "med-rotavec").length, 1);
   const cryptoCellule = resultat.lignes[0].cellules[cryptium.id];
   const rotaCellule = resultat.lignes[0].cellules[rotavec.id];
   assert.equal(cryptoCellule.historiquesAValider.length, 0);
