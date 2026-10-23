@@ -61,7 +61,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { nom, label, ordre, ageMinJours, ageMaxJours, urgenceJours, estRappel, primoNom, delaiRappelJours, urgenceRappelJours, obligatoireVente, description, categories, sexeCible, stadeReproduction, gestante, rangVelageMin, rangVelageMax, lotCible, etapes, configurationQuestionnaire, extraireDepuisProtocoleId, empreinteExtractionPrevue } = body;
+  const { nom, label, ordre, ageMinJours, ageMaxJours, urgenceJours, estRappel, primoNom, delaiRappelJours, urgenceRappelJours, obligatoireVente, description, categories, sexeCible, stadeReproduction, gestante, rangVelageMin, rangVelageMax, lotCible, etapes, configurationQuestionnaire, extraireDepuisProtocoleId, empreinteExtractionPrevue, creerSansRepriseHistorique } = body;
   if (!nom?.trim() || !label?.trim()) {
     return NextResponse.json({ error: "nom et label requis" }, { status: 400 });
   }
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
           protocoleId: questionnaireExistant.id,
         }, { status: 409 });
       }
-      const resolution = resoudreLegacyParMedicament(await prisma.protocoleVaccin.findMany({
+      const resolution = creerSansRepriseHistorique === true ? { type: "AUCUN" as const } : resoudreLegacyParMedicament(await prisma.protocoleVaccin.findMany({
         where: {
           configurationQuestionnaireJson: null,
           etapes: { some: { medicaments: { some: { medicamentId: configuration.medicamentId } } } },
