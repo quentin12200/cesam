@@ -641,3 +641,22 @@ test("CRYPTO / ROTAVEC : ROTAVEC secondaire reste visible dans sa propre colonne
   const blocsSepares = construireBlocsVaccinaux([mixte, separe], vaccins);
   assert.equal(blocsSepares.filter((b) => b.medicamentId === "med-rotavec").length, 1);
 });
+
+test("dose unique ROTAVEC : une injection reelle affiche FAIT meme rattachee a l'ancien protocole", () => {
+  const rotavec = { ...etapePrimo, id: "rotavec-dose", medicamentId: "med-rotavec",
+    medicamentNom: "ROTAVEC CORONA", medicaments: [{ medicament: { id: "med-rotavec", nom: "ROTAVEC CORONA" } }] };
+  const configuration = { version: 1, medicamentId: "med-rotavec", cible: { tousBovins: true, categories: [] },
+    demarrage: { type: "DOSE_UNIQUE", etapeDoseId: rotavec.id, preconisationId: "preco", calendrier: { type: "SANS_REGLE" } },
+    entretien: { actif: false } };
+  const protocole = { ...protocoleBovigrip, id: "rotavec-propre", nom: "ROTAVEC", label: "ROTAVEC CORONA",
+    configurationQuestionnaireJson: JSON.stringify(configuration), etapes: [rotavec] };
+  const date = new Date("2026-10-12T12:00:00Z");
+  const a = animal({ actes: [{ date, vaccin: "ROTAVEC CORONA", medicamentId: "med-rotavec",
+    protocoleId: "ancien-crypto-rotavec", etapeProtocoleId: "ancienne-etape",
+    gestationId: null, statut: "FAIT" }] });
+  const grille = construireGrilleVaccinale([a], [protocole], [], AUJOURDHUI);
+  const cellule = grille.lignes[0].cellules[rotavec.id];
+  assert.equal(cellule.statut, "FAIT");
+  assert.equal(cellule.date?.getTime(), date.getTime());
+  assert.equal(cellule.actes.length, 1);
+});
