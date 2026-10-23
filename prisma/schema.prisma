@@ -181,6 +181,8 @@ model Vaccination {
   id         String    @id @default(cuid())
   animalId   String
   animal     Animal    @relation(fields: [animalId], references: [id])
+  evenementId String?
+  evenement EvenementSanitaire? @relation(fields: [evenementId], references: [id], onDelete: SetNull)
   vaccin     String
   date       DateTime
   voie       String?
@@ -206,6 +208,7 @@ model Vaccination {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  @@index([evenementId])
   @@index([medicamentId])
   @@index([protocoleId])
   @@index([etapeProtocoleId])
@@ -229,6 +232,7 @@ model EvenementSanitaire {
 
   symptomes   EvenementSymptome[]
   traitements Traitement[]
+  vaccinations Vaccination[]
   reponses    QuestionReponse[]
   parage      Parage?
 
