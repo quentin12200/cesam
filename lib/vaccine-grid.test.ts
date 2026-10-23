@@ -572,3 +572,22 @@ test("statut A_CONFIRMER expose la cause sans créer de dose", () => {
   assert.equal(lignes[0].cellules["bovigrip-primo"].motifSansEcheance, "CALCUL_A_CONFIRMER");
   assert.equal(lignes[0].cellules["bovigrip-primo"].statut, "VIDE");
 });
+
+test("CRYPTO | ROTAVEC : un acte d'un produit sans etape compatible n'est pas range sous CRYPTIUM", () => {
+  const cryptium = { ...etapePrimo, id: "cryptium-etape", medicamentId: "med-cryptium", medicamentNom: "BOVILIS CRYPTIUM",
+    medicaments: [{ medicament: { id: "med-cryptium", nom: "BOVILIS CRYPTIUM" } }] };
+  const rotavec = { ...etapeRappel, id: "rotavec-etape", medicamentId: "med-rotavec", medicamentNom: "ROTAVEC CORONA",
+    medicaments: [{ medicament: { id: "med-rotavec", nom: "ROTAVEC CORONA" } }] };
+  const protocole = { ...protocoleBovigrip, id: "crypto-rotavec", nom: "CRYPTO_ROTAVEC", label: "CRYPTO | ROTAVEC",
+    etapes: [cryptium, rotavec] };
+  const injection = { sourceType: "VACCINATION" as const, sourceId: "acte-rotavec",
+    date: new Date("2025-11-20T12:00:00Z"), vaccin: "ROTAVEC CORONA", medicamentId: "med-rotavec",
+    protocoleId: protocole.id, etapeProtocoleId: null, gestationId: null, statut: "FAIT" };
+  const resultat = construireGrilleVaccinale([animal({ actes: [injection] })], [protocole], [], AUJOURDHUI);
+  const cryptoCellule = resultat.lignes[0].cellules[cryptium.id];
+  const rotaCellule = resultat.lignes[0].cellules[rotavec.id];
+  assert.equal(cryptoCellule.historiquesAValider.length, 0);
+  assert.equal(cryptoCellule.actes.length, 0);
+  assert.equal(rotaCellule.historiquesAValider.length, 1);
+  assert.equal(rotaCellule.historiquesAValider[0].medicamentId, "med-rotavec");
+});
