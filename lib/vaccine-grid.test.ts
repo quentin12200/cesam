@@ -623,3 +623,21 @@ test("CRYPTO | ROTAVEC : un ancien médicament incompatible reste dans la ligne 
   assert.deepEqual(Object.values(ligne.cellules).flatMap((cellule) => [...cellule.actes, ...cellule.historiquesAValider]), []);
   assert.deepEqual(ligne.actes.map((item) => item.sourceId), [acte.sourceId]);
 });
+
+test("CRYPTO / ROTAVEC : ROTAVEC secondaire reste visible dans sa propre colonne", () => {
+  const crypto = { ...etapePrimo, id: "crypto-dose", medicamentId: "med-crypto",
+    medicamentNom: "BOVILIS CRYPTIUM", medicaments: [{ medicament: { id: "med-crypto", nom: "BOVILIS CRYPTIUM" } }] };
+  const rotavec = { ...etapeRappel, id: "rotavec-dose", medicamentId: "med-rotavec",
+    medicamentNom: "ROTAVEC CORONA", medicaments: [{ medicament: { id: "med-rotavec", nom: "ROTAVEC CORONA" } }] };
+  const mixte = { ...protocoleBovigrip, id: "mixte", nom: "CRYPTO_ROTAVEC", label: "CRYPTO | ROTAVEC",
+    etapes: [crypto, rotavec] };
+  const vaccins = [{ medicamentId: "med-crypto", nom: "BOVILIS CRYPTIUM", voie: "SC" },
+    { medicamentId: "med-rotavec", nom: "ROTAVEC CORONA", voie: "IM" }];
+  const blocs = construireBlocsVaccinaux([mixte], vaccins);
+  assert.equal(blocs.filter((b) => b.medicamentId === "med-rotavec").length, 1);
+  assert.equal(blocs.find((b) => b.medicamentId === "med-rotavec")?.nom, "ROTAVEC CORONA");
+  assert.equal(blocs.find((b) => b.medicamentId === "med-rotavec")?.protocoleId, null);
+  const separe = { ...mixte, id: "rotavec-separe", label: "ROTAVEC", etapes: [rotavec] };
+  const blocsSepares = construireBlocsVaccinaux([mixte, separe], vaccins);
+  assert.equal(blocsSepares.filter((b) => b.medicamentId === "med-rotavec").length, 1);
+});

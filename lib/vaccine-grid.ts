@@ -223,15 +223,12 @@ export function construireBlocsVaccinaux(
   vaccinsPharmacie: readonly VaccinPharmacieGrille[]
 ): BlocVaccinGrille[] {
   const blocs = new Map<string, BlocVaccinGrille>();
-  const medicamentsCouverts = new Set<string>();
 
   for (const protocole of protocoles) {
     if (protocole.etapes.length === 0) continue;
     const medicament = medicamentPrincipal(protocole);
     const cle = medicament?.id ?? protocole.id;
     for (const etape of protocole.etapes) {
-      if (etape.medicamentId) medicamentsCouverts.add(etape.medicamentId);
-      for (const liaison of etape.medicaments) medicamentsCouverts.add(liaison.medicament.id);
     }
     const voie = vaccinsPharmacie.find((v) => v.medicamentId === medicament?.id)?.voie ?? null;
     if (!blocs.has(cle)) {
@@ -278,7 +275,9 @@ export function construireBlocsVaccinaux(
   }
 
   for (const vaccin of vaccinsPharmacie) {
-    if (medicamentsCouverts.has(vaccin.medicamentId) || blocs.has(vaccin.medicamentId)) continue;
+    // Un produit secondaire d'un protocole mixte doit rester visible dans sa propre colonne
+    // Pharmacie tant qu'aucun bloc de protocole ne le représente directement.
+    if (blocs.has(vaccin.medicamentId)) continue;
     blocs.set(vaccin.medicamentId, {
       cle: vaccin.medicamentId,
       nom: vaccin.nom,
