@@ -6,8 +6,8 @@ export default async function RegistrePage({ searchParams }: { searchParams: Pro
   const p = await searchParams;
   const [soins, observations] = await Promise.all([getCarnetSanitaireRows(), getEvenementsCarnetRows()]);
   const actes = [
-    ...soins.map(a => ({ key: a.sourceType + ":" + a.id, type: a.sourceType as string, date: a.date, animal: a.animalNutrav, produit: a.produit, executant: a.executant, detail: a.dose })),
-    ...observations.map(a => ({ key: "EVENEMENT:" + a.id, type: "EVENEMENT", date: a.date, animal: a.animalNutrav, produit: a.type, executant: a.constatePar, detail: a.description ?? "" })),
+    ...soins.map(a => ({ key: a.sourceType + ":" + a.id, type: a.sourceType as string, date: a.date, animal: a.animalNutrav, produit: a.produit, executant: a.executant, detail: a.dose, evenementId: a.evenementId })),
+    ...observations.map(a => ({ key: "EVENEMENT:" + a.id, type: "EVENEMENT", date: a.date, animal: a.animalNutrav, produit: a.type, executant: a.constatePar, detail: a.description ?? "", evenementId: null as string | null })),
   ];
   const query = (p.recherche ?? "").toLowerCase();
   const type = p.type ?? "tous";
@@ -28,6 +28,7 @@ export default async function RegistrePage({ searchParams }: { searchParams: Pro
     <div className="divide-y rounded border bg-white">{visibles.map(a => <article key={a.key} className="p-3">
       <div className="flex justify-between gap-2"><b>{a.animal} · {a.produit}</b><span className="text-xs">{a.date.toLocaleDateString("fr-FR")}</span></div>
       <div className="mt-1 text-xs text-gray-600">{a.type} · {a.executant || "Exécutant non renseigné"} · {a.detail || ""}</div>
+      {a.evenementId && <p className="text-xs text-green-800">Événement lié : {a.evenementId}</p>}
       <div className="mt-1 font-mono text-[10px] text-gray-400">{a.key}</div>
     </article>)}</div>
   </main>;
