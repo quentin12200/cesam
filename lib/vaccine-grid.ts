@@ -525,6 +525,26 @@ export function construireGrilleVaccinale(
         cellules[etapeId] = cellule;
       }
     }
+    // Dose unique : la preuve d'administration est le médicament réellement enregistré,
+    // indépendamment du protocole historique auquel l'acte était rattaché.
+    // On garde l'échéance calculée éventuelle pour une gestation ultérieure.
+    for (const protocole of protocolesAvecEtapes) {
+      const config = lireConfigurationQuestionnaire(protocole.configurationQuestionnaireJson);
+      if (!config || config.demarrage.type !== "DOSE_UNIQUE" || protocole.etapes.length !== 1) continue;
+      const etape = protocole.etapes[0];
+      const medicamentId = config.medicamentId;
+      const actes = animal.actes.filter((acte) => acte.statut === "FAIT" &&
+        (acte.medicamentId ? acte.medicamentId === medicamentId :
+          etape.medicaments.some((m) => nomVaccinComparable(m.medicament.nom) === nomVaccinComparable(acte.vaccin))))
+        .sort((a, b) => b.date.getTime() - a.date.getTime());
+      if (!actes.length) continue;
+      const existante = cellules[etape.id] ?? celluleVide();
+      const prochaine = existante.statut !== "FAIT" && existante.fenetre && existante.date
+        ? { statut: existante.statut as Exclude<StatutCelluleGrille, "FAIT" | "VIDE">, date: existante.date, fenetre: existante.fenetre }
+        : existante.prochaine;
+      cellules[etape.id] = { ...existante, statut: "FAIT", date: actes[0].date,
+        aValider: false, historiquesAValider: [], actes: [...actes].reverse().map(versActeCellule), prochaine };
+    }
     // Vaccins de pharmacie sans protocole configuré : une seule sous-colonne, "fait" si un acte
     // existe, sinon vide (aucune fenêtre calculable sans étape).
     for (const bloc of blocs) {
