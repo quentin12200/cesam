@@ -99,6 +99,7 @@ export interface EvenementCarnetRow {
   animalNom: string | null;
   categorie: string | null;
   type: string;
+  produits: string[];
   symptomes: string[];
   temperature: number | null;
   moment: string | null;
@@ -112,6 +113,7 @@ export async function getEvenementsCarnetRows(): Promise<EvenementCarnetRow[]> {
     include: {
       animal: { select: { id: true, nutrav: true, nobovi: true } },
       symptomes: { select: { libelle: true } },
+      traitements: { select: { medicamentNom: true } },
     },
     orderBy: { date: "asc" },
   });
@@ -124,6 +126,7 @@ export async function getEvenementsCarnetRows(): Promise<EvenementCarnetRow[]> {
     animalNom: e.animal.nobovi,
     categorie: e.categorie,
     type: e.type,
+    produits: [...new Set(e.traitements.map((t) => t.medicamentNom).filter(Boolean))],
     symptomes: e.symptomes.map((s) => s.libelle),
     temperature: e.temperature,
     moment: e.moment,
