@@ -170,6 +170,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [donneesManquantes, setDonneesManquantes] = useState(false);
   const [ajustements, setAjustements] = useState<Record<string, AjustementGroupe>>({});
   const [enregistrement, setEnregistrement] = useState(false);
+  const enregistrementEnCoursRef = useRef(false);
   const [erreur, setErreur] = useState("");
   const [rattachementEnCours, setRattachementEnCours] = useState(false);
   const [etapeChoisie, setEtapeChoisie] = useState("");
@@ -390,12 +391,15 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   }
 
   async function validerSession(administrations = ajustements) {
+    // Le verrou synchrone évite deux soumissions avant le prochain rendu React.
+    if (enregistrementEnCoursRef.current) return;
     setErreur("");
     const voieManquante = groupesSession.find((groupe) => !administrations[groupe.cle]?.voie.trim());
     if (voieManquante) {
       setErreur(`Indique la voie pour ${voieManquante.bloc.nom} — ${voieManquante.etape.label}.`);
       return;
     }
+    enregistrementEnCoursRef.current = true;
     setEnregistrement(true);
     const enregistres = new Set<string>();
     try {
@@ -455,6 +459,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       if (enregistres.size > 0) setActesSelectionnes((actuels) => new Set([...actuels].filter((cle) => !enregistres.has(cle))));
       setErreur(cause instanceof Error ? cause.message : "La séance n’a pas pu être enregistrée.");
     } finally {
+      enregistrementEnCoursRef.current = false;
       setEnregistrement(false);
     }
   }
