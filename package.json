@@ -4,14 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/migrate-turso.js && prisma generate && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "test:field-weighing": "node --test --experimental-strip-types lib/field-weighing.test.ts",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "db:backfill-sevrage": "npx ts-node --transpile-only --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node10\"}' scripts/backfill-sevrage-dates.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:migrate:turso": "node scripts/migrate-turso.js"
   },
   "prisma": {
     "seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts"
