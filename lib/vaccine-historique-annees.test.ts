@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { unifierActesVaccinaux, type ActeTraitementVaccin, type ActeVaccination } from "./vaccine-acts.ts";
 import { construireGrilleVaccinale, type AnimalGrille, type EtapeGrille, type ProtocoleGrille } from "./vaccine-grid.ts";
-import { actesDuVaccin, actesHistoriquesEtape, anneesDisponibles, datesCompactes, filtrerParAnnees, type ActeHistorique } from "./vaccine-history-view.ts";
+import { actesDuVaccin, actesHistoriquesEtape, actesVaccinauxNonClasses, anneesDisponibles, datesCompactes, filtrerParAnnees, type ActeHistorique } from "./vaccine-history-view.ts";
 import { comparerDateVelage } from "./vaccine-table-presentation.ts";
 
 const NAISSANCE = new Date("2025-03-01T12:00:00Z");
@@ -40,6 +40,14 @@ const enActeHistorique = (acte: { sourceType?: string; sourceId?: string | null;
   sourceType: (acte.sourceType ?? "VACCINATION") as ActeHistorique["sourceType"], sourceId: acte.sourceId ?? null, date: acte.date.toISOString(),
   vaccin: acte.vaccin, medicamentId: acte.medicamentId, protocoleId: acte.protocoleId, etapeProtocoleId: acte.etapeProtocoleId,
   gestationId: null, voie: null, dose: null, uniteDosage: null,
+});
+
+test("les actes sans cellule compatible restent accessibles séparément, sans dupliquer les actes classés", () => {
+  const cryptium = enActeHistorique(vaccination("cryptium", "2025-10-01", "primo"));
+  const rotavec = enActeHistorique(vaccination("rotavec", "2025-10-01", null, { vaccin: "ROTAVEC CORONA", medicamentId: "med-rotavec" }));
+  const ancien = enActeHistorique(vaccination("ancien", "2024-10-01", null, { vaccin: "ANCIEN PRODUIT", medicamentId: "med-ancien" }));
+  const cellules = { primo: { actes: [cryptium], historiquesAValider: [rotavec] } };
+  assert.deepEqual(actesVaccinauxNonClasses([cryptium, rotavec, ancien], cellules).map((acte) => acte.sourceId), ["ancien"]);
 });
 
 test("A. historique global : tous les actes réels du vaccin, dans l'ordre, rattachés ou non", () => {

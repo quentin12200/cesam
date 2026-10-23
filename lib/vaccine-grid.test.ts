@@ -573,7 +573,7 @@ test("statut A_CONFIRMER expose la cause sans créer de dose", () => {
   assert.equal(lignes[0].cellules["bovigrip-primo"].statut, "VIDE");
 });
 
-test("CRYPTO | ROTAVEC : un acte d'un produit sans etape compatible n'est pas range sous CRYPTIUM", () => {
+test("CRYPTO | ROTAVEC : ROTAVEC sans étape renseignée reste sous son produit, jamais sous CRYPTIUM", () => {
   const cryptium = { ...etapePrimo, id: "cryptium-etape", medicamentId: "med-cryptium", medicamentNom: "BOVILIS CRYPTIUM",
     medicaments: [{ medicament: { id: "med-cryptium", nom: "BOVILIS CRYPTIUM" } }] };
   const rotavec = { ...etapeRappel, id: "rotavec-etape", medicamentId: "med-rotavec", medicamentNom: "ROTAVEC CORONA",
@@ -583,11 +583,43 @@ test("CRYPTO | ROTAVEC : un acte d'un produit sans etape compatible n'est pas ra
   const injection = { sourceType: "VACCINATION" as const, sourceId: "acte-rotavec",
     date: new Date("2025-11-20T12:00:00Z"), vaccin: "ROTAVEC CORONA", medicamentId: "med-rotavec",
     protocoleId: protocole.id, etapeProtocoleId: null, gestationId: null, statut: "FAIT" };
-  const resultat = construireGrilleVaccinale([animal({ actes: [injection] })], [protocole], [], AUJOURDHUI);
+  const resultat = construireGrilleVaccinale([animal({ actes: [injection] })], [protocole], [
+    { medicamentId: "med-cryptium", nom: "BOVILIS CRYPTIUM", voie: "SC" },
+    { medicamentId: "med-rotavec", nom: "ROTAVEC CORONA", voie: "IM" },
+  ], AUJOURDHUI);
+  assert.equal(resultat.blocs.length, 1, "ROTAVEC ne crée pas un second bloc pharmacie hors protocole");
   const cryptoCellule = resultat.lignes[0].cellules[cryptium.id];
   const rotaCellule = resultat.lignes[0].cellules[rotavec.id];
   assert.equal(cryptoCellule.historiquesAValider.length, 0);
   assert.equal(cryptoCellule.actes.length, 0);
   assert.equal(rotaCellule.historiquesAValider.length, 1);
   assert.equal(rotaCellule.historiquesAValider[0].medicamentId, "med-rotavec");
+});
+
+test("CRYPTO | ROTAVEC : un rattachement historique à la mauvaise étape ne prouve pas CRYPTIUM", () => {
+  const cryptium = { ...etapePrimo, id: "cryptium-etape", medicamentId: "med-cryptium", medicamentNom: "BOVILIS CRYPTIUM",
+    medicaments: [{ medicament: { id: "med-cryptium", nom: "BOVILIS CRYPTIUM" } }] };
+  const rotavec = { ...etapeRappel, id: "rotavec-etape", medicamentId: "med-rotavec", medicamentNom: "ROTAVEC CORONA",
+    medicaments: [{ medicament: { id: "med-rotavec", nom: "ROTAVEC CORONA" } }] };
+  const protocole = { ...protocoleBovigrip, id: "crypto-rotavec", etapes: [cryptium, rotavec] };
+  const acte = { sourceType: "VACCINATION" as const, sourceId: "acte-rotavec", date: jours(20), vaccin: "ROTAVEC CORONA",
+    medicamentId: "med-rotavec", protocoleId: protocole.id, etapeProtocoleId: cryptium.id, gestationId: null, statut: "FAIT" };
+  const ligne = construireGrilleVaccinale([animal({ actes: [acte] })], [protocole], [], AUJOURDHUI).lignes[0];
+  assert.notEqual(ligne.cellules[cryptium.id].statut, "FAIT");
+  assert.equal(ligne.cellules[cryptium.id].actes.length, 0);
+  assert.deepEqual(ligne.cellules[rotavec.id].historiquesAValider.map((item) => item.sourceId), [acte.sourceId]);
+  assert.deepEqual(ligne.actes.map((item) => item.sourceId), [acte.sourceId]);
+});
+
+test("CRYPTO | ROTAVEC : un ancien médicament incompatible reste dans la ligne sans fausse étape", () => {
+  const cryptium = { ...etapePrimo, id: "cryptium-etape", medicamentId: "med-cryptium", medicamentNom: "BOVILIS CRYPTIUM",
+    medicaments: [{ medicament: { id: "med-cryptium", nom: "BOVILIS CRYPTIUM" } }] };
+  const rotavec = { ...etapeRappel, id: "rotavec-etape", medicamentId: "med-rotavec", medicamentNom: "ROTAVEC CORONA",
+    medicaments: [{ medicament: { id: "med-rotavec", nom: "ROTAVEC CORONA" } }] };
+  const protocole = { ...protocoleBovigrip, id: "crypto-rotavec", etapes: [cryptium, rotavec] };
+  const acte = { sourceType: "TRAITEMENT" as const, sourceId: "ancien", date: jours(20), vaccin: "ANCIEN PRODUIT",
+    medicamentId: "med-ancien", protocoleId: protocole.id, etapeProtocoleId: null, gestationId: null, statut: "FAIT" };
+  const ligne = construireGrilleVaccinale([animal({ actes: [acte] })], [protocole], [], AUJOURDHUI).lignes[0];
+  assert.deepEqual(Object.values(ligne.cellules).flatMap((cellule) => [...cellule.actes, ...cellule.historiquesAValider]), []);
+  assert.deepEqual(ligne.actes.map((item) => item.sourceId), [acte.sourceId]);
 });

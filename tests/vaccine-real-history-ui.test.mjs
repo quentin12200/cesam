@@ -83,6 +83,31 @@ await page.evaluate(p=>window.renderView(p),free);const freeCell=page.locator('t
 assert.equal(await page.getByRole('columnheader',{name:'Injection',exact:true}).count(),0);assert.equal(await freeCell.getByRole('button',{name:/enregistrer/}).getAttribute('title'),'Enregistrer une vaccination faite sans échéance calculée');
 const real={...a('v3','2026-10-01T12:00:00Z','libre'),vaccin:'VACCIN LIBRE',medicamentId:'m2',protocoleId:null};free.lignes[0].actes=[real];free.lignes[0].cellules.libre.actes=[real];
 await page.evaluate(p=>window.renderView(p),free);await freeCell.getByRole('button',{name:/Ouvrir l’historique/}).waitFor();assert.match(await freeCell.innerText(),/✓\s*01\/10/);
+const combines=structuredClone(props);
+const crypto={...a('crypto','2025-11-20T12:00:00Z','primo'),vaccin:'BOVILIS CRYPTIUM',medicamentId:'med-cryptium'};
+const rota={...a('rota','2025-11-20T12:00:00Z','rappel'),vaccin:'ROTAVEC CORONA',medicamentId:'med-rotavec'};
+combines.blocs[0].nom='CRYPTO | ROTAVEC';combines.blocs[0].medicamentIds=['med-cryptium','med-rotavec'];
+combines.blocs[0].etapes[0].medicamentIds=['med-cryptium'];combines.blocs[0].etapes[1].medicamentIds=['med-rotavec'];
+Object.assign(combines.blocs[0].sousColonnes[0],{medicamentId:'med-cryptium',medicamentNom:'BOVILIS CRYPTIUM'});
+Object.assign(combines.blocs[0].sousColonnes[1],{medicamentId:'med-rotavec',medicamentNom:'ROTAVEC CORONA'});
+combines.lignes[0].actes=[crypto,rota];combines.lignes[0].cellules={primo:cell(crypto,'primo'),rappel:cell(rota,'rappel')};
+await page.evaluate(p=>window.renderView(p),combines);await page.getByRole('button',{name:/Ouvrir l’historique Primo/}).click();
+assert.equal(await page.getByRole('dialog',{name:'Historique — BOVILIS CRYPTIUM'}).locator('li').count(),1);
+await page.getByRole('dialog').getByRole('button',{name:'Fermer'}).click();
+await page.getByRole('button',{name:/Ouvrir l’historique Rappel/}).click();
+assert.equal(await page.getByRole('dialog',{name:'Historique — ROTAVEC CORONA'}).locator('li').count(),1);
+await page.getByRole('dialog').getByRole('button',{name:'Fermer'}).click();
+const nonClasses=structuredClone(props);
+nonClasses.lignes[0].actes.push(
+  {...a('mauvaise-etape','2025-11-20T12:00:00Z','primo'),vaccin:'ROTAVEC CORONA',medicamentId:'m2'},
+  {...a('ancien-produit','2024-10-01T12:00:00Z',null),vaccin:'ANCIEN PRODUIT',medicamentId:'m3',protocoleId:'p1'},
+);
+await page.evaluate(p=>window.renderView(p),nonClasses);
+const boutonNonClasses=page.getByRole('button',{name:/Voir 2 acte\(s\) vaccinaux non classés/});await boutonNonClasses.waitFor();
+assert.doesNotMatch(await page.getByRole('button',{name:/Ouvrir l’historique Primo/}).getAttribute('aria-label'),/20\/11/);
+await boutonNonClasses.click();const panneauNonClasses=page.getByRole('dialog',{name:'Actes vaccinaux non classés'});await panneauNonClasses.waitFor();
+await panneauNonClasses.getByText('ROTAVEC CORONA',{exact:false}).waitFor();await panneauNonClasses.getByText('ANCIEN PRODUIT',{exact:false}).waitFor();
+assert.equal(await panneauNonClasses.locator('li').count(),2);await panneauNonClasses.getByRole('button',{name:'Fermer'}).click();
 assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
 await page.setViewportSize({width:1280,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);assert.equal(writes,0);
 });

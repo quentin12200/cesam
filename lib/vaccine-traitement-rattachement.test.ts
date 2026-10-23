@@ -96,9 +96,9 @@ test("grille : aucune étape compatible quand le médicament réel n'est lié à
   const orphelins = unifierActesVaccinaux([], [traitement(), traitement({ id: "t2", dateDebut: new Date("2026-10-02T12:00:00Z") })]);
   const { lignes } = construireGrilleVaccinale([animal(orphelins)], protocoles, [], AUJOURDHUI);
   const historiques = Object.values(lignes[0].cellules).flatMap((c) => c.historiquesAValider);
-  // Rattachés par nom au protocole seulement si le médicament y figure : ici rien de compatible.
-  assert.ok(historiques.length > 0);
-  for (const historique of historiques) assert.deepEqual(historique.etapesCompatibles, []);
+  // Aucun vaccin erroné n'est signalé dans une étape, mais les deux actes réels restent consultables.
+  assert.deepEqual(historiques, []);
+  assert.deepEqual(lignes[0].actes.map((acte) => acte.sourceId), ["t1", "t2"]);
 });
 
 test("après rattachement : l'étape est FAIT à la vraie date et le rappel part de cette date", () => {

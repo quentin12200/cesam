@@ -1,5 +1,6 @@
 import { lireConfigurationQuestionnaire } from "./vaccine-protocol-questionnaire.ts";
 import { vaccinationAppartientAuCycleCourant } from "./vaccination-session.ts";
+import { medicamentCompatibleAvecEtape } from "./vaccine-attachment.ts";
 
 export interface VaccinationHistorique {
   sourceType?: "VACCINATION" | "TRAITEMENT";
@@ -119,14 +120,29 @@ export function interpreterHistoriqueVaccinal<T extends VaccinationHistorique>(
   options: { protocoleLieAuVelage: boolean; medicamentPartage: boolean; gestationId: string | null },
 ) {
   const ids = protocole.etapes.map((e) => e.id);
-  const fiables = actes.filter((v) => fait(v) && v.protocoleId === protocole.id && v.etapeProtocoleId && ids.includes(v.etapeProtocoleId));
+  const configurationEtapes = { etapes: protocole.etapes.map((etape) => ({
+    id: etape.id, reference: etape.reference,
+    medicaments: etape.medicaments.map(({ medicament }) => ({ medicamentId: medicament.id })),
+  })) };
+  const produitCompatibleAvecEtape = (acte: T): boolean => {
+    if (!acte.etapeProtocoleId) return false;
+    if (acte.medicamentId) return medicamentCompatibleAvecEtape(configurationEtapes, acte.etapeProtocoleId, acte.medicamentId);
+    const produitsNommes = protocole.etapes.flatMap((etape) => etape.medicaments)
+      .filter(({ medicament }) => nomVaccinComparable(medicament.nom) === nomVaccinComparable(acte.vaccin));
+    // Sans identité produit reconnue, un ancien rattachement structuré reste une preuve historique.
+    return produitsNommes.length === 0 || produitsNommes.some(({ medicament }) =>
+      medicamentCompatibleAvecEtape(configurationEtapes, acte.etapeProtocoleId!, medicament.id));
+  };
+  const rattaches = actes.filter((v) => fait(v) && v.protocoleId === protocole.id && v.etapeProtocoleId && ids.includes(v.etapeProtocoleId));
+  const fiables = rattaches.filter(produitCompatibleAvecEtape);
+  const incompatibles = rattaches.filter((acte) => !produitCompatibleAvecEtape(acte));
   const acteInfere = rattacherInjectionOrpheline(actes, protocole, options);
   const historique = acteInfere ? [...fiables, { ...acteInfere, protocoleId: protocole.id, etapeProtocoleId: initiales(protocole)[0].id }] : fiables;
   return {
     acteInfere,
     historique,
     vaccinations: historique.filter((v) => vaccinationAppartientAuCycleCourant(options.protocoleLieAuVelage, v.gestationId ?? null, options.gestationId)),
-    aConfirmer: vaccinationsSansEtapeFiable(actes, { ...protocole, etapeIds: ids }).filter((v) => v !== acteInfere),
+    aConfirmer: [...vaccinationsSansEtapeFiable(actes, { ...protocole, etapeIds: ids }).filter((v) => v !== acteInfere), ...incompatibles],
   };
 }
 

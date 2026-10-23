@@ -19,6 +19,23 @@ export interface ActeHistorique {
   uniteDosage: string | null;
 }
 
+type IdentiteActe = Pick<ActeHistorique, "sourceType" | "sourceId" | "date" | "vaccin" | "medicamentId">;
+
+export function memeActeVaccinal(a: IdentiteActe, b: IdentiteActe): boolean {
+  if (a.sourceId && b.sourceId) return a.sourceType === b.sourceType && a.sourceId === b.sourceId;
+  return a.sourceType === b.sourceType && a.date === b.date
+    && a.medicamentId === b.medicamentId && a.vaccin === b.vaccin;
+}
+
+/** Actes réels conservés dans la ligne, mais sans cellule compatible où les consulter. */
+export function actesVaccinauxNonClasses<T extends ActeHistorique>(
+  actes: readonly T[],
+  cellules: Readonly<Record<string, { actes: readonly IdentiteActe[]; historiquesAValider: readonly IdentiteActe[] }>>,
+): T[] {
+  const visibles = Object.values(cellules).flatMap((cellule) => [...cellule.actes, ...cellule.historiquesAValider]);
+  return actes.filter((acte) => !visibles.some((visible) => memeActeVaccinal(acte, visible)));
+}
+
 export const anneeDeDate = (iso: string): number => new Date(iso).getFullYear();
 
 /** Années réellement présentes dans l'historique + année actuelle, de la plus récente à la plus ancienne. */

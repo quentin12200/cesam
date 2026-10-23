@@ -229,7 +229,10 @@ export function construireBlocsVaccinaux(
     if (protocole.etapes.length === 0) continue;
     const medicament = medicamentPrincipal(protocole);
     const cle = medicament?.id ?? protocole.id;
-    if (medicament) medicamentsCouverts.add(medicament.id);
+    for (const etape of protocole.etapes) {
+      if (etape.medicamentId) medicamentsCouverts.add(etape.medicamentId);
+      for (const liaison of etape.medicaments) medicamentsCouverts.add(liaison.medicament.id);
+    }
     const voie = vaccinsPharmacie.find((v) => v.medicamentId === medicament?.id)?.voie ?? null;
     if (!blocs.has(cle)) {
       blocs.set(cle, {

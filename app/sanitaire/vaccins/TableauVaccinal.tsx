@@ -11,7 +11,7 @@ import MedicamentPicker, { type MedicamentOption } from "@/app/sanitaire/nouvel-
 import { medicamentCompatibleAvecEtape } from "@/lib/vaccine-attachment";
 import { actionsSelectionAnimaux, basculerSelectionVisibles, celluleVaccinaleSelectionnable, etatSelectionMaitre, libelleAnimauxSelectionnes } from "@/lib/vaccine-selection";
 import { construireChargeSoin } from "@/lib/vaccine-soin-seance";
-import { actesDuVaccin, actesHistoriquesEtape, anneesDisponibles, datesCompactes, type ActeHistorique } from "@/lib/vaccine-history-view";
+import { actesDuVaccin, actesVaccinauxNonClasses, anneesDisponibles, datesCompactes, memeActeVaccinal, type ActeHistorique } from "@/lib/vaccine-history-view";
 import { classeStatutVaccinal, comparerDateVelage, comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
 import { libelleFenetreVaccinale, selectionDepuisGroupeAgenda, type ActionAgenda, type GroupeAgenda } from "@/lib/vaccine-agenda";
 import { useVaccinWorkspace, type VaccinMode } from "./useVaccinWorkspace";
@@ -176,6 +176,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [anneesAffichees, setAnneesAffichees] = useState<Set<number>>(() => new Set([new Date().getFullYear()]));
   const [toutHistorique, setToutHistorique] = useState(false);
   const [panneauHistorique, setPanneauHistorique] = useState<{ animalId: string; blocCle: string; etapeId: string } | null>(null);
+  const [historiqueNonClasseAnimalId, setHistoriqueNonClasseAnimalId] = useState<string | null>(null);
   const [acteEnEdition, setActeEnEdition] = useState<string | null>(null);
   const [soinOuvert, setSoinOuvert] = useState(false);
   const [medicamentsSoins, setMedicamentsSoins] = useState<MedicamentOption[]>([]);
@@ -249,6 +250,9 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       return signe * a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
     });
   }, [animauxSelectionnes, blocsAffiches, directionTri, lignes, recherche, statuts, tri, uniquementSelection]);
+  const nonClassesParAnimal = useMemo(() => new Map(lignes.map((ligne) => [
+    ligne.animalId, actesVaccinauxNonClasses(ligne.actes, ligne.cellules),
+  ])), [lignes]);
 
   // Le même jeu de lignes filtrées que celui réellement affiché : aucun nouveau calcul sanitaire.
   const compteursVaccin = useMemo(() => compterVaccinationsVisibles(resultat, blocsAffiches), [resultat, blocsAffiches]);
@@ -505,11 +509,8 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     const bloc = blocs.find((item) => item.sousColonnes.some((sousColonne) => sousColonne.id === etape.id));
     const selectionne = actesSelectionnes.has(cleActe(ligne.animalId, etape.id));
     const disponible = celluleVaccinaleSelectionnable(cellule, etape.medicamentId);
-    const historiqueEtape = actesHistoriquesEtape(ligne.actes, etape.id);
-    // La grille peut reconnaître une ancienne étape en lecture, sans modifier l'acte stocké.
-    for (const acte of cellule.actes) {
-      if (!historiqueEtape.some((v) => v.sourceType === acte.sourceType && v.sourceId === acte.sourceId && v.date === acte.date && v.medicamentId === acte.medicamentId)) historiqueEtape.push(acte);
-    }
+    // Seules les preuves acceptées par la grille peuvent apparaître en vert sous cette étape.
+    const historiqueEtape = cellule.actes;
     const tousLesActes = historiqueEtape.map((acte) => afficherDate(acte.date)).join(", ");
     const datesInitiales = datesCompactes(historiqueEtape, anneesFiltre, 1);
     const historique = historiqueEtape.length > 0 && bloc
@@ -584,14 +585,15 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     // Source unique : les actes réels unifiés (Vaccination + Traitement VACCIN) de lib/vaccine-acts.ts.
     const actesDuProduit = actesDuVaccin(ligne.actes, { id: medicamentId, nom: nomVaccin });
     const aRattacher = ligne.cellules[etapeCliquee.id]?.historiquesAValider ?? [];
-    const actesVaccin = ligne.actes.filter((acte) => actesDuProduit.includes(acte) || aRattacher.some((v) =>
-      v.sourceType === acte.sourceType && v.sourceId === acte.sourceId && v.date === acte.date && v.medicamentId === acte.medicamentId));
+    const actesEtape = ligne.cellules[etapeCliquee.id]?.actes ?? [];
+    const actesVaccin = ligne.actes.filter((acte) => actesDuProduit.includes(acte)
+      || aRattacher.some((historique) => memeActeVaccinal(acte, historique))
+      || actesEtape.some((preuve) => memeActeVaccinal(acte, preuve)));
     const configEtapes = { etapes: bloc.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicamentIds.map((idMedicament) => ({ medicamentId: idMedicament })) })) };
     const etapeDe = (acte: ActeHistorique) => {
-      const structuree = bloc.protocoleId && acte.protocoleId === bloc.protocoleId && acte.etapeProtocoleId
-        ? bloc.sousColonnes.find((sousColonne) => sousColonne.id === acte.etapeProtocoleId) : null;
-      return structuree ?? bloc.sousColonnes.find((colonne) => ligne.cellules[colonne.id]?.actes.some((v) =>
-        v.sourceType === acte.sourceType && v.sourceId === acte.sourceId && v.date === acte.date && v.medicamentId === acte.medicamentId)) ?? null;
+      return bloc.sousColonnes.find((colonne) => ligne.cellules[colonne.id]?.actes.some((preuve) => memeActeVaccinal(acte, preuve)))
+        ?? bloc.sousColonnes.find((colonne) => ligne.cellules[colonne.id]?.historiquesAValider.some((historique) =>
+          historique.raison.startsWith("Acte réel rattaché à une autre gestation") && memeActeVaccinal(acte, historique))) ?? null;
     };
     const nonRattaches = actesVaccin.filter((acte) => !etapeDe(acte)).length;
     const cleEdition = (acte: ActeHistorique) => `${acte.sourceType}:${acte.sourceId}`;
@@ -645,6 +647,25 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
       <button type="button" disabled={rattachementEnCours} onClick={fermer} className="mt-4 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Fermer</button>
     </div></div>;
+  }
+
+  function renduPanneauNonClasses() {
+    if (!historiqueNonClasseAnimalId) return null;
+    const ligne = lignes.find((item) => item.animalId === historiqueNonClasseAnimalId);
+    if (!ligne) return null;
+    const actesNonClasses = nonClassesParAnimal.get(ligne.animalId) ?? [];
+    return <div className="vaccin-print-hidden fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Actes vaccinaux non classés">
+      <div className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
+        <h2 className="text-lg font-black text-gray-900">Actes vaccinaux non classés</h2>
+        <p className="text-sm font-bold text-gray-700">{ligne.nutrav} {ligne.nom}</p>
+        <p className="mt-2 text-xs text-gray-600">Ces actes réels restent dans le carnet sanitaire. Aucune étape du tableau ne leur est attribuée automatiquement.</p>
+        <ul className="mt-3 divide-y rounded-xl border">{actesNonClasses.map((acte, index) => <li key={`${acte.sourceType}:${acte.sourceId ?? index}:${acte.date}`} className="p-3 text-sm">
+          <b className="tabular-nums">{afficherDate(acte.date)}</b> · {acte.vaccin} <span className="text-xs text-gray-500">({acte.sourceType === "TRAITEMENT" ? "Traitement" : "Vaccination"})</span>
+        </li>)}</ul>
+        <Link href={`/troupeau/${ligne.nutrav}`} className="mt-3 inline-block text-sm font-semibold text-green-800 underline">Voir le carnet de l’animal</Link>
+        <button type="button" onClick={() => setHistoriqueNonClasseAnimalId(null)} className="mt-4 min-h-11 w-full rounded-lg border font-semibold text-gray-700">Fermer</button>
+      </div>
+    </div>;
   }
 
   // Séance de travail : un soin non vaccinal (ex. bolus) appliqué au même lot, même date, même exécutant.
@@ -827,7 +848,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
           </thead>
           <tbody className="divide-y">{resultat.map((ligne) => <tr key={ligne.animalId}>
             <td className="animal-selection-column sticky left-0 z-30 border-r bg-white p-1 text-center"><input type="checkbox" checked={animauxSelectionnes.has(ligne.animalId)} onChange={() => basculerDansSet(setAnimauxSelectionnes, ligne.animalId)} aria-label={`Sélectionner l’animal ${ligne.nutrav}`} className="h-5 w-5 accent-green-700" /></td>
-            <th scope="row" className="animal-fixed z-20 border-r bg-white p-1" style={{ left: decalageColonne("numero"), width: largeurColonne.numero, minWidth: largeurColonne.numero }}><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono text-sm font-black text-green-800 underline">{ligne.nutrav}</Link></th>
+            <th scope="row" className="animal-fixed z-20 border-r bg-white p-1" style={{ left: decalageColonne("numero"), width: largeurColonne.numero, minWidth: largeurColonne.numero }}><Link href={`/troupeau/${ligne.nutrav}`} className="font-mono text-sm font-black text-green-800 underline">{ligne.nutrav}</Link>{(nonClassesParAnimal.get(ligne.animalId)?.length ?? 0) > 0 && <button type="button" onClick={() => setHistoriqueNonClasseAnimalId(ligne.animalId)} aria-label={`Voir ${nonClassesParAnimal.get(ligne.animalId)?.length} acte(s) vaccinaux non classés pour ${ligne.nutrav}`} className="vaccin-print-hidden mt-0.5 block min-h-8 w-full rounded border border-amber-700 bg-amber-50 text-[10px] font-bold text-amber-950">⚠ {nonClassesParAnimal.get(ligne.animalId)?.length}</button>}</th>
             {!colonnesMasquees.has("nom") && <td className="animal-fixed z-20 max-w-24 border-r bg-white p-1 text-xs text-gray-600" style={{ left: decalageColonne("nom"), width: largeurColonne.nom, minWidth: largeurColonne.nom }}><span className="block truncate">{ligne.nom || "—"}</span></td>}
             {!colonnesMasquees.has("mere") && <td className="animal-fixed z-20 border-r bg-white p-1 text-xs text-gray-700" style={{ left: decalageColonne("mere"), width: largeurColonne.mere, minWidth: largeurColonne.mere }} title={ligne.mereNom ? `${ligne.mereNutrav ?? ""} — ${ligne.mereNom}` : ligne.mereNutrav ?? undefined}>{ligne.mereNutrav ? (ligne.mereLiee ? <Link href={`/troupeau/${ligne.mereNutrav}`} className="font-mono font-bold text-green-800 underline">{ligne.mereNutrav}</Link> : <span className="font-mono font-semibold">{ligne.mereNutrav}</span>) : "—"}</td>}
             {!colonnesMasquees.has("age") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("age"), width: largeurColonne.age, minWidth: largeurColonne.age }}>{formatAgeTerrain(ligne.danaisIso)}</td>}
@@ -875,6 +896,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       </div></div>}
 
       {renduPanneauHistorique()}
+      {renduPanneauNonClasses()}
       {renduPanneauSoin()}
       <style jsx global>{`
         #tableau-vaccinal-impression .animal-fixed { position: sticky; }
