@@ -18,7 +18,7 @@ import RechercheActesCarnet from "./RechercheActes";
 
 interface PageProps {
   searchParams: Promise<{ order?: string; sort?: string; du?: string; au?: string; animal?: string; produit?: string;
-    acteTri?: string; acteDirection?: string; compare?: string }>;
+    acteTri?: string; acteDirection?: string }>;
 }
 
 async function getExploitationConfig() {
@@ -34,19 +34,17 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
   const { order: orderParam, sort: sortParam } = params;
   const sort = sortParam === "animal" || sortParam === "produit" ? sortParam : "date";
   const order = orderParam === "animal" ? "animal" : "chrono";
-  const comparer = params.compare === "rotavec-cryptium";
   const recherche: RechercheActes = {
     du: params.du, au: params.au, animal: params.animal, produit: params.produit,
     tri: params.acteTri === "animal" || params.acteTri === "produit" || params.acteTri === "executant" ? params.acteTri : "date",
     direction: params.acteDirection === "asc" ? "asc" : "desc",
   };
 
-  const [rows, evenements, config, actes, tequila] = await Promise.all([
+  const [rows, evenements, config, actes] = await Promise.all([
     getCarnetSanitaireRows(),
     getEvenementsCarnetRows(),
     getExploitationConfig(),
     getActesSanitairesReels(),
-    comparer ? prisma.animal.findUnique({ where: { nutrav: "7926" }, select: { id: true, nutrav: true, nobovi: true } }) : Promise.resolve(null),
   ]);
   const now = new Date();
   const printDate = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
@@ -107,10 +105,10 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
       </div>
 
       <div className="px-4 py-4 max-w-6xl mx-auto">
-        <RechercheActesCarnet actes={actes} recherche={recherche} comparer={comparer} tequila={tequila} />
+        <RechercheActesCarnet actes={actes} recherche={recherche} />
         <div className="mb-6 rounded-xl overflow-hidden shadow-sm border border-green-800 print:border-2">
           <div className="bg-green-700 text-white px-6 py-5 text-center">
-            <p className="text-xs uppercase tracking-widest text-green-100">{config?.raisonSociale ?? "GAEC Samuel & Céline"}</p>
+            <p className="text-xs uppercase tracking-widest text-green-100">{config?.raisonSociale ?? "Exploitation"}</p>
             <h1 className="text-2xl font-bold mt-1">Carnet sanitaire</h1>
             <p className="text-xs text-green-100 mt-1">
               {order === "chrono" ? "Ordre chronologique" : "Par animal"} — {rows.length} enregistrement{rows.length > 1 ? "s" : ""}

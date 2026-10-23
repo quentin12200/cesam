@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { comparerRotavecCryptium, rechercherActes, unifierActesDuCarnet, type ActeSanitaireReel,
+import { rechercherActes, unifierActesDuCarnet, type ActeSanitaireReel,
   type TraitementCarnet, type VaccinationCarnet } from "./carnet-actes.ts";
 
 const tequila = { id: "a7926", nutrav: "7926", nom: "TEQUILA" };
@@ -76,24 +76,10 @@ test("filtres par période, médicament et animal, puis quatre tris cliquables",
   assert.deepEqual(rechercherActes(actes, { tri: "executant", direction: "desc" }).map((a) => a.nutrav), ["7926", "7510"]);
 });
 
-test("comparaison du 12/10/2026 : les deux, ROTAVEC seul et CRYPTIUM seul sans doubler l'animal", () => {
-  const autre = { id: "a9000", nutrav: "9000", nom: "AUTRE" };
-  const actes = unifierActesDuCarnet([
-    vaccination(), vaccination({ id: "v2", animal: voisine }),
-    vaccination({ id: "v3", animal: autre, medicamentId: "crypto", medicamentNom: "BOVILIS CRYPTIUM" }),
-  ], [traitement(), traitement({ id: "t2", medicamentId: "crypto", medicamentNom: "BOVILIS CRYPTIUM" })]);
-  const comparaison = comparerRotavecCryptium(actes);
-  assert.deepEqual(comparaison.deuxProduits.map((a) => a.nutrav), ["7926"]);
-  assert.deepEqual(comparaison.rotavecSeul.map((a) => a.nutrav), ["7510"]);
-  assert.deepEqual(comparaison.cryptiumSeul.map((a) => a.nutrav), ["9000"]);
-  assert.ok(comparaison.rotavec.has(tequila.id) && comparaison.cryptium.has(tequila.id));
-});
-
-test("un acte non classé et non rattaché participe à la comparaison", () => {
-  const acte: ActeSanitaireReel = { id: "traitement:ancien", animalId: tequila.id, nutrav: "7926", nom: "TEQUILA",
-    date: jour, produit: "ROTAVEC-CORONA", medicamentId: null, source: "Traitement",
+test("un traitement non classé reste trouvable par ses données propres, quel que soit le médicament", () => {
+  const acte: ActeSanitaireReel = { id: "traitement:ancien", animalId: "a1234", nutrav: "1234", nom: "NUAGE",
+    date: new Date("2026-09-07T12:00:00Z"), produit: "PRODUIT-EXEMPLE", medicamentId: null, source: "Traitement",
     executant: null, protocoleNom: null, etapeNom: null };
-  const comparaison = comparerRotavecCryptium([acte]);
-  assert.deepEqual(comparaison.rotavecSeul.map((a) => a.nutrav), ["7926"]);
-  assert.equal(rechercherActes([acte], { produit: "rotavec corona" }).length, 1);
+  assert.deepEqual(rechercherActes([acte], { du: "2026-09-07", au: "2026-09-07",
+    produit: "produit exemple", animal: "nuage" }), [acte]);
 });
