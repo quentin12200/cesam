@@ -15,7 +15,7 @@ import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 import ImportHistoriqueButton from "./ImportHistoriqueButton";
 
 interface PageProps {
-  searchParams: Promise<{ order?: string }>;
+  searchParams: Promise<{ order?: string; sort?: string }>;
 }
 
 async function getExploitationConfig() {
@@ -27,7 +27,8 @@ async function getExploitationConfig() {
 }
 
 export default async function CarnetSanitairePage({ searchParams }: PageProps) {
-  const { order: orderParam } = await searchParams;
+  const { order: orderParam, sort: sortParam } = await searchParams;
+  const sort = sortParam === "animal" || sortParam === "produit" ? sortParam : "date";
   const order = orderParam === "animal" ? "animal" : "chrono";
 
   const [rows, evenements, config] = await Promise.all([
@@ -38,7 +39,12 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
   const now = new Date();
   const printDate = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const groupes = order === "animal" ? groupRowsByAnimal(rows) : [];
-  const groupesEvenements = order === "animal" ? groupEvenementsByAnimal(evenements) : [];
+  const evenementsTries = [...evenements].sort((a, b) => sort === "animal"
+    ? a.animalNutrav.localeCompare(b.animalNutrav, "fr", { numeric: true }) || b.date.getTime() - a.date.getTime()
+    : sort === "produit"
+      ? a.produits.join(", ").localeCompare(b.produits.join(", "), "fr") || b.date.getTime() - a.date.getTime()
+      : b.date.getTime() - a.date.getTime());
+  const groupesEvenements = order === "animal" ? groupEvenementsByAnimal(evenementsTries) : [];
 
   return (
     <>
@@ -76,6 +82,13 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
         >
           Par animal
         </Link>
+        <span className="text-sm text-gray-600">Trier les événements :</span>
+        {(["date", "animal", "produit"] as const).map((key) => (
+          <Link key={key} href={`/sanitaire/carnet?order=${order}&sort=${key}`}
+            className={`text-sm px-3 py-1.5 rounded-lg border ${sort === key ? "bg-green-700 text-white" : "bg-white text-gray-600 border-gray-200"}`}>
+            {key === "date" ? "Date ↓" : key === "animal" ? "Animal" : "Produit"}
+          </Link>
+        ))}
         <div className="ml-auto">
           <ImportHistoriqueButton />
         </div>
@@ -105,7 +118,7 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
             {evenements.length > 0 && (
               <>
                 <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide mt-6 mb-2">Événements sanitaires</h2>
-                <EvenementsTable rows={evenements} showAnimal />
+                <EvenementsTable rows={evenementsTries} showAnimal />
               </>
             )}
           </>
@@ -176,6 +189,7 @@ function EvenementsTable({ rows, showAnimal }: { rows: EvenementCarnetRow[]; sho
           {showAnimal && <Th>Nom</Th>}
           <Th>Catégorie</Th>
           <Th>Événement</Th>
+          <Th>Produit administré</Th>
           <Th>Commentaire</Th>
           <Th>Constaté par</Th>
           <Th>Statut</Th>
@@ -193,6 +207,7 @@ function EvenementsTable({ rows, showAnimal }: { rows: EvenementCarnetRow[]; sho
               {r.symptomes.length > 1 ? r.symptomes.join(" • ") : r.type}
               {r.temperature != null ? ` (${r.temperature}°C)` : ""}
             </Td>
+            <Td className="font-medium">{r.produits.length ? r.produits.join(" • ") : "—"}</Td>
             <Td>{r.description ?? "—"}</Td>
             <Td>{r.constatePar ?? "—"}</Td>
             <Td className={!r.resolu ? "font-semibold text-red-700" : ""}>{r.resolu ? "Résolu" : "En cours"}</Td>
