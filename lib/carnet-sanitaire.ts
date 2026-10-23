@@ -4,6 +4,8 @@ import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 export interface CarnetSanitaireRow {
   id: string;
   sourceType: "TRAITEMENT" | "VACCINATION";
+  /** Lien factuel existant : un traitement peut appartenir à un événement sanitaire. */
+  evenementId: string | null;
   executant: string | null;
   date: Date;
   animalId: string;
@@ -44,6 +46,7 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
     rows.push({
       id: t.id,
       sourceType: "TRAITEMENT",
+      evenementId: t.evenementId,
       executant: t.executant,
       date: t.dateDebut,
       animalId: t.animal.id,
@@ -65,6 +68,7 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
     rows.push({
       id: v.id,
       sourceType: "VACCINATION",
+      evenementId: null,
       executant: null,
       date: v.date,
       animalId: v.animal.id,
