@@ -588,6 +588,10 @@ test("CRYPTO | ROTAVEC : ROTAVEC sans étape renseignée reste sous son produit,
     { medicamentId: "med-rotavec", nom: "ROTAVEC CORONA", voie: "IM" },
   ], AUJOURDHUI);
   assert.equal(resultat.blocs.length, 2, "ROTAVEC secondaire garde son bloc pharmacie visible à côté du protocole historique");
+  const blocCryptium = resultat.blocs.find((bloc) => bloc.medicamentId === "med-cryptium");
+  const blocRotavec = resultat.blocs.find((bloc) => bloc.medicamentId === "med-rotavec");
+  assert.deepEqual(blocCryptium?.sousColonnes.map((colonne) => colonne.id), [cryptium.id], "CRYPTIUM ne contient jamais la sous-colonne ROTAVEC");
+  assert.deepEqual(blocRotavec?.sousColonnes.map((colonne) => colonne.id), ["med-rotavec"], "ROTAVEC reste dans sa colonne autonome");
   assert.equal(resultat.blocs.filter((bloc) => bloc.medicamentId === "med-rotavec").length, 1);
   const cryptoCellule = resultat.lignes[0].cellules[cryptium.id];
   const rotaCellule = resultat.lignes[0].cellules[rotavec.id];
