@@ -78,7 +78,7 @@ export default async function VaccinsPage() {
     // Les blocs de la grille viennent de la pharmacie, pas seulement des protocoles configurés :
     // un vaccin comme Bovigrip doit avoir son bloc même sans protocole actif.
     prisma.medicament.findMany({
-      where: { categorie: "VACCIN", actif: true },
+      where: { OR: [{ categorie: "VACCIN", actif: true }, { nom: { contains: "BULTAVO" } }, { nom: { contains: "FCO3" } }] },
       select: { id: true, nom: true, voie: true },
       orderBy: { nom: "asc" },
     }),
