@@ -172,6 +172,14 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [enregistrement, setEnregistrement] = useState(false);
   const [erreur, setErreur] = useState("");
   const [rattachementEnCours, setRattachementEnCours] = useState(false);
+  const [lotCorrectionOuvert, setLotCorrectionOuvert] = useState(false);
+  const [lotVaccinId, setLotVaccinId] = useState("");
+  const [lotEtapeId, setLotEtapeId] = useState("");
+  const [lotSelection, setLotSelection] = useState<Set<string>>(new Set());
+  const [lotEnCours, setLotEnCours] = useState(false);
+  const [lotErreur, setLotErreur] = useState("");
+  const [lotRapport, setLotRapport] = useState("");
+
   const [etapeChoisie, setEtapeChoisie] = useState("");
   const [anneesAffichees, setAnneesAffichees] = useState<Set<number>>(() => new Set([new Date().getFullYear()]));
   const [toutHistorique, setToutHistorique] = useState(false);
@@ -497,6 +505,51 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     }
   }
 
+
+  // Correction par lot : choix explicite des actes, aucune nouvelle injection créée.
+  const blocsCorrection = blocs.filter((bloc) => bloc.protocoleId && bloc.sousColonnes.length > 0 && bloc.medicamentId);
+  const blocCorrection = blocsCorrection.find((bloc) => bloc.cle === lotVaccinId);
+  const actesCorrection = blocCorrection ? lignes.flatMap((ligne) => ligne.actes
+    .filter((acte) => acte.medicamentId === blocCorrection.medicamentId && acte.sourceId)
+    .map((acte) => ({ ...acte, animalId: ligne.animalId, numero: ligne.nutrav, nomAnimal: ligne.nom,
+      cle: `${acte.sourceType}:${acte.sourceId}` })))
+    .filter((acte, index, tous) => tous.findIndex((a) => a.cle === acte.cle) === index)
+    .sort((a, b) => a.numero.localeCompare(b.numero, "fr", { numeric: true }) || new Date(a.date).getTime() - new Date(b.date).getTime())
+    : [];
+  async function corrigerLot() {
+    if (!blocCorrection?.protocoleId || !lotEtapeId || lotEnCours) return;
+    const etape = blocCorrection.sousColonnes.find((candidate) => candidate.id === lotEtapeId);
+    if (!etape) return;
+    const choisis = actesCorrection.filter((acte) => lotSelection.has(acte.cle)
+      && medicamentCompatibleAvecEtape({ etapes: blocCorrection.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicamentIds.map((medicamentId) => ({ medicamentId })) })) }, etape.id, acte.medicamentId!));
+    if (!choisis.length) return;
+    if (!window.confirm(`Modifier uniquement l'étape de ${choisis.length} acte(s) ${blocCorrection.nom} en « ${etape.label} » ? Les dates et les produits resteront inchangés.`)) return;
+    setLotEnCours(true); setLotErreur(""); setLotRapport("");
+    let reussis = 0;
+    for (const acte of choisis) {
+      try {
+        const reponse = await fetch(acte.sourceType === "TRAITEMENT"
+          ? `/api/traitements/${encodeURIComponent(acte.sourceId!)}/rattachement-vaccinal`
+          : `/api/vaccinations/${encodeURIComponent(acte.sourceId!)}/rattachement`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ protocoleId: blocCorrection.protocoleId, etapeProtocoleId: etape.id,
+            gestationId: blocCorrection.protocoleLieAuVelage ? acte.gestationId : null }),
+        });
+        if (!reponse.ok) {
+          const data = await reponse.json().catch(() => ({}));
+          throw new Error(data.error || `Échec pour ${acte.numero}`);
+        }
+        reussis++;
+      } catch (error) {
+        setLotErreur(error instanceof Error ? error.message : "Erreur de correction.");
+        break;
+      }
+    }
+    setLotRapport(`${reussis} acte(s) modifié(s) sur ${choisis.length}. Aucune injection ajoutée.`);
+    setLotEnCours(false);
+    if (reussis) { setLotSelection(new Set()); router.refresh(); }
+  }
+
   function ouvrirHistorique(ligne: Ligne, bloc: Bloc, etape: SousColonne) {
     setEtapeChoisie("");
     setActeEnEdition(null);
@@ -775,6 +828,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     <section id="tableau-vaccinal-impression" className="rounded-2xl bg-white shadow-sm">
       {messageBrouillon && <p role="status" className="vaccin-print-hidden m-3 rounded-lg bg-amber-50 p-2 text-sm text-amber-950">{messageBrouillon}</p>}
       <h1 className="hidden text-lg font-black print:block">Tableau vaccinal</h1>
+      <div className="vaccin-print-hidden px-3 pt-2"><button type="button" onClick={() => { setLotCorrectionOuvert(true); setLotErreur(""); setLotRapport(""); }} className="rounded-lg border border-green-800 px-3 py-2 text-sm font-semibold text-green-900">Modifier plusieurs injections (étape)</button></div>
       <div className="vaccin-print-hidden flex flex-wrap items-start gap-2 p-3">
         <div className="inline-flex min-h-10 rounded-lg border bg-white p-1 text-sm font-semibold">
           <button type="button" aria-pressed={vue === "TABLEAU"} onClick={() => setVue("TABLEAU")} className={`rounded-md px-3 ${vue === "TABLEAU" ? "bg-green-800 text-white" : "text-gray-700"}`}>Tableau</button>
@@ -902,6 +956,25 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         <div className="mt-4 grid grid-cols-2 gap-2"><button type="button" disabled={enregistrement} onClick={() => { setDonneesManquantes(false); setErreur(""); }} className="min-h-11 rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Annuler</button><button type="button" disabled={enregistrement} onClick={() => void validerSession()} className="min-h-11 rounded-lg bg-green-800 font-bold text-white disabled:opacity-50">{enregistrement ? "Enregistrement…" : "Enregistrer"}</button></div>
       </div></div>}
 
+
+      {lotCorrectionOuvert && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2" role="dialog" aria-modal="true" aria-label="Modifier les étapes en lot">
+        <div className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-xl bg-white p-4 shadow-xl">
+          <div className="flex items-center justify-between gap-2"><h2 className="text-lg font-bold">Modifier plusieurs injections</h2><button type="button" onClick={() => setLotCorrectionOuvert(false)} disabled={lotEnCours} className="rounded border px-3 py-2">Fermer</button></div>
+          <p className="text-sm text-gray-600">Sélectionne le vaccin, les injections réelles et leur nouvelle étape. Les dates, doses et médicaments ne changent pas.</p>
+          <div className="my-3 grid gap-2 sm:grid-cols-2">
+            <label className="text-sm font-semibold">Vaccin<select className="mt-1 w-full rounded border p-2" value={lotVaccinId} onChange={(e) => { setLotVaccinId(e.target.value); setLotEtapeId(""); setLotSelection(new Set()); }}>{<option value="">Choisir le vaccin</option>}{blocsCorrection.map((bloc) => <option key={bloc.cle} value={bloc.cle}>{bloc.nom}</option>)}</select></label>
+            <label className="text-sm font-semibold">Nouvelle étape<select className="mt-1 w-full rounded border p-2" value={lotEtapeId} onChange={(e) => setLotEtapeId(e.target.value)}>{<option value="">Choisir une étape</option>}{blocCorrection?.sousColonnes.map((etape) => <option key={etape.id} value={etape.id}>{etape.label}</option>)}</select></label>
+          </div>
+          <p className="mb-2 text-sm font-semibold">{lotSelection.size} injection(s) sélectionnée(s) · {actesCorrection.length} acte(s) du vaccin</p>
+          <div className="min-h-0 flex-1 overflow-y-auto rounded border">{actesCorrection.map((acte) =>
+            <label key={acte.cle} className="flex items-center gap-3 border-b p-2 text-sm hover:bg-gray-50">
+              <input type="checkbox" checked={lotSelection.has(acte.cle)} disabled={lotEnCours} onChange={(event) => setLotSelection((ancien) => { const suivant = new Set(ancien); if (event.target.checked) suivant.add(acte.cle); else suivant.delete(acte.cle); return suivant; })}/>
+              <span className="w-20 font-bold">{acte.numero}</span><span className="min-w-0 flex-1">{acte.nomAnimal || "—"}</span><span>{afficherDate(acte.date)}</span><span className="text-gray-500">{blocCorrection?.sousColonnes.find((etape) => etape.id === acte.etapeProtocoleId)?.label || "Non classée / ancienne étape"}</span>
+            </label>)}</div>
+          {lotErreur && <p role="alert" className="mt-2 text-sm text-red-800">{lotErreur}</p>}
+          {lotRapport && <p role="status" className="mt-2 text-sm text-green-800">{lotRapport}</p>}
+          <button type="button" disabled={lotEnCours || !lotEtapeId || lotSelection.size === 0} onClick={() => void corrigerLot()} className="mt-3 min-h-11 rounded-lg bg-green-800 p-2 font-bold text-white disabled:opacity-40">{lotEnCours ? "Modification en cours…" : `Modifier ${lotSelection.size} injection(s)`}</button>
+        </div></div>}
       {renduPanneauHistorique()}
       {renduPanneauNonClasses()}
       {renduPanneauSoin()}
