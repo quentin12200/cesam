@@ -521,7 +521,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     const etape = blocCorrection.sousColonnes.find((candidate) => candidate.id === lotEtapeId);
     if (!etape) return;
     const choisis = actesCorrection.filter((acte) => lotSelection.has(acte.cle)
-      && medicamentCompatibleAvecEtape({ etapes: blocCorrection.etapes }, etape.id, acte.medicamentId!));
+      && medicamentCompatibleAvecEtape({ etapes: blocCorrection.etapes.map((item) => ({ id: item.id, reference: item.reference, medicaments: item.medicamentIds.map((medicamentId) => ({ medicamentId })) })) }, etape.id, acte.medicamentId!));
     if (!choisis.length) return;
     if (!window.confirm(`Modifier uniquement l'étape de ${choisis.length} acte(s) ${blocCorrection.nom} en « ${etape.label} » ? Les dates et les produits resteront inchangés.`)) return;
     setLotEnCours(true); setLotErreur(""); setLotRapport("");
