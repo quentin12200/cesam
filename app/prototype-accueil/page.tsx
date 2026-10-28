@@ -12,7 +12,7 @@ const LABELS: Record<string, string> = {
 
 export default function PrototypeAccueilPage() {
   const [action, setAction] = useState("");
-  const DESTINATIONS: Partial<Record<string,string>> = { pesee:"/troupeau/pesee", vaccination:"/sanitaire/vaccins", parage:"/parage", liste_velages:"/velage", bouclage:"/troupeau/identification" };
+  const DESTINATIONS: Partial<Record<string,string>> = { velage:"/velage?nouveau=1", chaleur:"/reproduction", saillie:"/reproduction", echographie:"/reproduction", traitement:"/sanitaire/nouvel-evenement", pesee:"/troupeau/pesee", vaccination:"/sanitaire/vaccins", parage:"/parage", liste_velages:"/velage", bouclage:"/troupeau/identification" };
   const [animal, setAnimal] = useState("");
   const [notes, setNotes] = useState<string[]>([]);
   const [message, setMessage] = useState("");
@@ -38,7 +38,7 @@ export default function PrototypeAccueilPage() {
         </div>
       </section>
       {notes.length > 0 && <section className="rounded-2xl bg-white p-4 shadow-sm"><h2 className="mb-2 font-bold">Notes rapides</h2>{notes.map((note, i) => <p key={i} className="border-b py-2 text-sm">{note}</p>)}</section>}
-      {action && DESTINATIONS[action] && <section className="rounded-2xl bg-white p-4 shadow-sm"><h2 className="font-bold">{LABELS[action]}</h2><p className="my-2 text-sm">Ce bouton utilise le module CESAM existant.</p><Link className="block rounded-xl bg-blue-600 p-3 text-center font-semibold text-white" href={DESTINATIONS[action]!}>Ouvrir {LABELS[action]}</Link><button type="button" onClick={()=>setAction("")} className="mt-3 text-sm text-slate-600">Annuler</button></section>}
+      {action && DESTINATIONS[action] && <section className="rounded-2xl bg-white p-4 shadow-sm"><h2 className="font-bold">{LABELS[action]}</h2><p className="my-2 text-sm">Accès au module CESAM existant. Certaines actions de reproduction demandent encore de sélectionner l’animal dans le module.</p><Link className="block rounded-xl bg-blue-600 p-3 text-center font-semibold text-white" href={DESTINATIONS[action]!}>Ouvrir {LABELS[action]}</Link><button type="button" onClick={()=>setAction("")} className="mt-3 text-sm text-slate-600">Annuler</button></section>}
       {action && !DESTINATIONS[action] && <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between"><h2 className="font-bold">Nouvel enregistrement · {LABELS[action]}</h2><button type="button" onClick={() => setAction("")} className="text-sm text-blue-700">Fermer</button></div>
         <label htmlFor="animal-prototype" className="block text-sm font-medium">Numéro de l'animal</label>
