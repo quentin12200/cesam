@@ -5,7 +5,11 @@ import { isValidSubscriptionCredentials } from "@/lib/notification-preferences";
 export async function POST(request: NextRequest) {
   try {
     const { endpoint, keys, device } = await request.json();
-    if (typeof endpoint !== "string" || endpoint.length > 2048 || !/^https:\/\//.test(endpoint) ||\n        !keys || typeof keys.p256dh !== "string" || typeof keys.auth !== "string" ||\n        keys.p256dh.length < 16 || keys.p256dh.length > 256 ||\n        keys.auth.length < 8 || keys.auth.length > 256 ||\n        (device != null && (typeof device !== "string" || device.length > 100))) {
+    if (typeof endpoint !== "string" || endpoint.length > 2048 || !/^https:\/\//.test(endpoint) ||
+        !keys || typeof keys.p256dh !== "string" || typeof keys.auth !== "string" ||
+        keys.p256dh.length < 16 || keys.p256dh.length > 256 ||
+        keys.auth.length < 8 || keys.auth.length > 256 ||
+        (device != null && (typeof device !== "string" || device.length > 100))) {
       return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
     }
     await prisma.pushSubscription.upsert({
