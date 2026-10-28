@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, CalendarDays, ChevronDown, ChevronUp, Plus, House, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import LabCreatePanel from "./LabCreatePanel";
-import AccueilRadialMenu from "@/app/components/AccueilRadialMenu";
 
 type Animal = {
   id: string;
@@ -83,7 +82,7 @@ export default function LabExplorer({
           </div>
         </section>
       )}
-      {vue === "accueil" && <AccueilRadialMenu onAction={() => {}} onSaveNote={async () => {}} />}
+      {vue === "accueil" && <p className="text-xs">Test technique du LAB</p>}
       {vue === "creer" && <LabCreatePanel animaux={animaux}/>}
 
       {vue === "animaux" && (
