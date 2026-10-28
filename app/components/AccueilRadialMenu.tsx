@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Baby, Heart, HeartPulse, Plus, Scale, Scan, Syringe, X, Pencil, Check, Stethoscope, Tag, ClipboardPlus, Footprints } from "lucide-react";
+import { Baby, Heart, HeartPulse, Plus, Scale, Scan, Syringe, X, Pencil, Check, Stethoscope, Tag, ClipboardPlus, Footprints, ListChecks } from "lucide-react";
 
-export type ActionId = "velage" | "chaleur" | "saillie" | "echographie" | "vaccination" | "traitement" | "pesee" | "bouclage" | "sanitaire" | "parage";
+export type ActionId = "velage" | "chaleur" | "saillie" | "echographie" | "vaccination" | "traitement" | "pesee" | "bouclage" | "sanitaire" | "parage" | "liste_velages";
 type Action = { id: ActionId; label: string; color: string; icon: typeof Baby; next?: "repro" | "health" };
 const ROOT: Action[] = [
   { id: "velage", label: "Vêlage", color: "#EAA5BA", icon: Baby },
@@ -15,6 +15,7 @@ const REPRO: Action[] = [
   { id: "chaleur", label: "Chaleurs", color: "#F5C7D5", icon: Heart },
   { id: "saillie", label: "Saillie / IA", color: "#DB8FB5", icon: HeartPulse },
   { id: "echographie", label: "Échographie", color: "#F0D06C", icon: Scan },
+  { id: "liste_velages", label: "Liste des vêlages", color: "#E9A5BA", icon: ListChecks },
 ];
 const HEALTH: Action[] = [
   { id: "traitement", label: "Événement sanitaire", color: "#83B8EE", icon: ClipboardPlus },
@@ -53,7 +54,7 @@ export default function AccueilRadialMenu({ onAction, onSaveNote }: AccueilRadia
           <div role="dialog" aria-label={level === "root" ? "Actions rapides" : level === "repro" ? "Reproduction" : "Sanitaire"} className="relative z-10 w-full max-w-[360px] rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl">
             <div className="relative mx-auto aspect-square w-full max-w-[330px]">
               {actions.map((action, index) => {
-                const angle = actions.length === 3 ? [-90, 30, 150][index] : [-90, -18, 54, 126, 198][index];
+                const angle = actions.length === 3 ? [-90, 30, 150][index] : actions.length === 4 ? [-90, 0, 90, 180][index] : [-90, -18, 54, 126, 198][index];
                 const rad = angle * Math.PI / 180;
                 const left = 50 + 36 * Math.cos(rad), top = 50 + 36 * Math.sin(rad);
                 return (
