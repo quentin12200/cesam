@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { erreurRythmePreconisation } from "@/lib/preconisation-schedule";
 
 const FIELDS = [
   "indicationMotif", "categorieAnimaux", "agePoidsConcerne",
@@ -17,6 +18,8 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
+  const erreurRythme = erreurRythmePreconisation(body);
+  if (erreurRythme) return NextResponse.json({ error: erreurRythme }, { status: 400 });
 
   const prev = await prisma.preconisation.findUnique({ where: { id } });
   if (!prev) return NextResponse.json({ error: "Préconisation non trouvée" }, { status: 404 });
@@ -35,7 +38,12 @@ export async function PATCH(
       data[field] = val;
     }
   }
-  if (body.frequence === "DOSE_UNIQUE") { data.dureeValeur = null; data.dureeUnite = null; data.nombreAdministrations = 1; }
+  if (body.frequence === "DOSE_UNIQUE") {
+    for (const field of ["dureeValeur", "dureeUnite", "nombreAdministrations"] as const) prevFields[field] = prev[field];
+    data.dureeValeur = null;
+    data.dureeUnite = null;
+    data.nombreAdministrations = 1;
+  }
 
   const preconisation = await prisma.preconisation.update({ where: { id }, data });
 
