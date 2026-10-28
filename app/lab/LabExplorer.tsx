@@ -53,7 +53,7 @@ export default function LabExplorer({
   const prochaines = [...echeances].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 15);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-[calc(env(safe-area-inset-bottom)+10rem)]">
       <nav className="grid grid-cols-3 gap-2" aria-label="Sections du CESAM LAB">
         <button type="button" onClick={() => setVue("accueil")} className={vue==="accueil"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><House className="mx-auto mb-1" size={20}/>Accueil</button>
         <button type="button" onClick={() => setVue("animaux")} className={vue==="animaux"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><Search className="mx-auto mb-1" size={20}/>Troupeau</button>
