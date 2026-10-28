@@ -87,7 +87,7 @@ export default function AccueilRadialMenu({ onAction, onSaveNote }: AccueilRadia
           </div>
         </div>
       )}
-      <button type="button" aria-label="Ouvrir les actions rapides" aria-expanded={open} onClick={() => { setOpen(true); setLevel("root"); }} className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg"><Plus size={30}/></button>
+      <button type="button" aria-label="Ouvrir les actions rapides" aria-expanded={open} onClick={() => { setOpen(true); setLevel("root"); }} className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl ring-4 ring-white/80"><Plus size={30}/></button>
     </div>
   );
 }
