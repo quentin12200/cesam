@@ -45,6 +45,7 @@ export default function LabExplorer({
   const [demoNotes, setDemoNotes] = useState<string[]>([]);
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState<string | null>(null);
+  const animalContexte = vue === "animaux" ? animaux.find(a => a.id === ouvert)?.nutrav ?? null : null;
   const [tri, setTri] = useState<{champ: Tri | null; sens: 0 | 1 | -1}>({champ:null,sens:0});
   function changerTri(champ: Tri) { setTri(p => p.champ !== champ ? {champ,sens:1} : p.sens===1 ? {champ,sens:-1} : {champ:null,sens:0}); }
   const visibles = animaux.filter((a) =>
@@ -59,7 +60,7 @@ export default function LabExplorer({
         <button type="button" onClick={() => setVue("animaux")} className={vue==="animaux"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><Search className="mx-auto mb-1" size={20}/>Troupeau</button>
         <button type="button" onClick={() => setVue("creer")} className={vue==="creer"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-green-50 p-3 text-sm font-bold text-green-800"}><Plus className="mx-auto mb-1" size={20}/>Créer</button>
       </nav>
-      <AccueilRadialMenu onAction={setDemoAction} onSaveNote={async (content) => { setDemoNotes(prev => [content, ...prev]); }} />
+      <AccueilRadialMenu animalNumero={animalContexte} onAction={setDemoAction} onSaveNote={async (content) => { setDemoNotes(prev => [content, ...prev]); }} />
       {vue === "accueil" && (
         <section className="space-y-3">
           <h2 className="text-xl font-black">À faire et à prévoir</h2>
