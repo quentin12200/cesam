@@ -45,6 +45,7 @@ export default function LabExplorer({
   const [demoNotes, setDemoNotes] = useState<string[]>([]);
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState<string | null>(null);
+  const animalContexte = vue === "animaux" ? animaux.find(a => a.id === ouvert)?.nutrav ?? null : null;
   const [tri, setTri] = useState<{champ: Tri | null; sens: 0 | 1 | -1}>({champ:null,sens:0});
   function changerTri(champ: Tri) { setTri(p => p.champ !== champ ? {champ,sens:1} : p.sens===1 ? {champ,sens:-1} : {champ:null,sens:0}); }
   const visibles = animaux.filter((a) =>
@@ -53,12 +54,13 @@ export default function LabExplorer({
   const prochaines = [...echeances].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 15);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-[calc(env(safe-area-inset-bottom)+10rem)]">
       <nav className="grid grid-cols-3 gap-2" aria-label="Sections du CESAM LAB">
         <button type="button" onClick={() => setVue("accueil")} className={vue==="accueil"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><House className="mx-auto mb-1" size={20}/>Accueil</button>
         <button type="button" onClick={() => setVue("animaux")} className={vue==="animaux"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><Search className="mx-auto mb-1" size={20}/>Troupeau</button>
         <button type="button" onClick={() => setVue("creer")} className={vue==="creer"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-green-50 p-3 text-sm font-bold text-green-800"}><Plus className="mx-auto mb-1" size={20}/>Créer</button>
       </nav>
+      <AccueilRadialMenu animalNumero={animalContexte} onAction={setDemoAction} onSaveNote={async (content) => { setDemoNotes(prev => [content, ...prev]); }} />
       {vue === "accueil" && (
         <section className="space-y-3">
           <h2 className="text-xl font-black">À faire et à prévoir</h2>
@@ -89,7 +91,7 @@ export default function LabExplorer({
         <section className="space-y-3 rounded-xl border bg-white p-4">
           <h3 className="font-bold">Menu circulaire · démonstration</h3>
           <p className="text-xs text-gray-500">Actions et notes simulées : aucune donnée du troupeau modifiée.</p>
-          <AccueilRadialMenu onAction={setDemoAction} onSaveNote={async (content) => { setDemoNotes(prev => [content, ...prev]); }} />
+          
           {demoAction && <p role="status" className="rounded-lg bg-green-50 p-3 text-sm">Action choisie : <strong>{demoAction.replaceAll("_", " ")}</strong> · simulation uniquement</p>}
           {demoNotes.length > 0 && <div className="space-y-2"><h4 className="text-sm font-bold">Notes de cette session</h4>{demoNotes.map((note, i) => <p key={i} className="rounded-lg bg-gray-50 p-3 text-sm">{note}</p>)}</div>}
         </section>
