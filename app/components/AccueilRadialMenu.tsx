@@ -24,11 +24,20 @@ const HEALTH: Action[] = [
 ];
 export type AccueilRadialMenuProps = {
   onAction: (action: ActionId) => void;
+  animalNumero?: string | null;
   onSaveNote: (content: string) => Promise<void>;
 };
 /** Prototype isolé : callbacks de démonstration, aucune écriture directe en base. */
-export default function AccueilRadialMenu({ onAction, onSaveNote }: AccueilRadialMenuProps) {
+export default function AccueilRadialMenu({ onAction, onSaveNote, animalNumero }: AccueilRadialMenuProps) {
   const [open, setOpen] = useState(false);
+  const [inputActive, setInputActive] = useState(false);
+  useEffect(() => {
+    function onFocus(event: FocusEvent) { const el = event.target; if (el instanceof HTMLElement && el.matches("input, textarea, select, [contenteditable=true]")) setInputActive(true); }
+    function onBlur() { setTimeout(() => { const el = document.activeElement; setInputActive(el instanceof HTMLElement && el.matches("input, textarea, select, [contenteditable=true]")); }, 0); }
+    document.addEventListener("focusin", onFocus);
+    document.addEventListener("focusout", onBlur);
+    return () => { document.removeEventListener("focusin", onFocus); document.removeEventListener("focusout", onBlur); };
+  }, []);
   const [level, setLevel] = useState<"root" | "repro" | "health">("root");
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState("");
@@ -52,6 +61,7 @@ export default function AccueilRadialMenu({ onAction, onSaveNote }: AccueilRadia
         <div className="fixed inset-0 z-40 flex items-center justify-center p-3">
           <button type="button" aria-label="Revenir au cercle précédent" onClick={back} className="absolute inset-0 bg-slate-800/35 backdrop-blur-sm" />
           <div role="dialog" aria-label={level === "root" ? "Actions rapides" : level === "repro" ? "Reproduction" : "Sanitaire"} className="relative z-10 w-full max-w-[360px] rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl">
+            {animalNumero && <p className="text-center text-sm font-semibold text-green-800">Animal sélectionné : {animalNumero} · démonstration</p>}
             <div className="relative mx-auto aspect-square w-full max-w-[330px]">
               {actions.map((action, index) => {
                 const angle = actions.length === 3 ? [-90, 30, 150][index] : actions.length === 4 ? [-90, 0, 90, 180][index] : [-90, -18, 54, 126, 198][index];
@@ -87,7 +97,7 @@ export default function AccueilRadialMenu({ onAction, onSaveNote }: AccueilRadia
           </div>
         </div>
       )}
-      <button type="button" aria-label="Ouvrir les actions rapides" aria-expanded={open} onClick={() => { setOpen(true); setLevel("root"); }} className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl ring-4 ring-white/80"><Plus size={30}/></button>
+      {!inputActive && <button type="button" aria-label="Ouvrir les actions rapides" aria-expanded={open} onClick={() => { setOpen(true); setLevel("root"); }} className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl ring-4 ring-white/80"><Plus size={30}/></button>}
     </div>
   );
 }
