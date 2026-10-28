@@ -21,7 +21,6 @@ import { obtenirLotBouclesActif } from "@/lib/lot-boucles";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import AccueilTodoSection, { type AccueilTodoGroup } from "@/app/components/AccueilTodoSection";
 import NotesTerrain from "@/app/components/NotesTerrain";
-import RapportGestationButton from "@/app/components/RapportGestationButton";
 import PrintSectionButton from "@/app/components/PrintSectionButton";
 import AutoPrint from "@/app/components/AutoPrint";
 import ActiveHeatAction from "@/app/components/ActiveHeatAction";
@@ -429,7 +428,6 @@ export default async function Dashboard({ searchParams }: PageProps) {
         {!printMode && <PrintSectionButton printKey="repro-velage" />}
       </h3>
       <div className="mb-3">
-        <RapportGestationButton />
       </div>
       <div className="space-y-2">
         {data.vachesVidesEnRetard > 0 && (
