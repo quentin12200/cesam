@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, CalendarDays, ChevronDown, ChevronUp, Plus, House, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import LabCreatePanel from "./LabCreatePanel";
-import AccueilRadialMenu, { type ActionId } from "@/app/components/AccueilRadialMenu";
+import AccueilRadialMenu from "@/app/components/AccueilRadialMenu";
 
 type Animal = {
   id: string;
@@ -41,7 +41,7 @@ export default function LabExplorer({
   echeances: Echeance[];
 }) {
   const [vue, setVue] = useState<Vue>("accueil");
-  const [demoAction, setDemoAction] = useState<ActionId | null>(null);
+  const [demoAction, setDemoAction] = useState<string | null>(null);
   const [demoNotes, setDemoNotes] = useState<string[]>([]);
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState<string | null>(null);
