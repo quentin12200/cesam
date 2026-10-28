@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, CalendarDays, ChevronDown, ChevronUp, Plus, House, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import LabCreatePanel from "./LabCreatePanel";
+import AccueilRadialMenu from "@/app/components/AccueilRadialMenu";
 
 type Animal = {
   id: string;
@@ -40,6 +41,8 @@ export default function LabExplorer({
   echeances: Echeance[];
 }) {
   const [vue, setVue] = useState<Vue>("accueil");
+  const [demoAction, setDemoAction] = useState<string | null>(null);
+  const [demoNotes, setDemoNotes] = useState<string[]>([]);
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState<string | null>(null);
   const [tri, setTri] = useState<{champ: Tri | null; sens: 0 | 1 | -1}>({champ:null,sens:0});
@@ -80,6 +83,15 @@ export default function LabExplorer({
               <Link href="/troupeau/pesee" className="rounded-lg bg-gray-50 p-3 text-sm font-semibold">Pesées →</Link>
             </div>
           </div>
+        </section>
+      )}
+      {vue === "accueil" && (
+        <section className="space-y-3 rounded-xl border bg-white p-4">
+          <h3 className="font-bold">Menu circulaire · démonstration</h3>
+          <p className="text-xs text-gray-500">Actions et notes simulées : aucune donnée du troupeau modifiée.</p>
+          <AccueilRadialMenu onAction={setDemoAction} onSaveNote={async (content) => { setDemoNotes(prev => [content, ...prev]); }} />
+          {demoAction && <p role="status" className="rounded-lg bg-green-50 p-3 text-sm">Action choisie : <strong>{demoAction.replaceAll("_", " ")}</strong> · simulation uniquement</p>}
+          {demoNotes.length > 0 && <div className="space-y-2"><h4 className="text-sm font-bold">Notes de cette session</h4>{demoNotes.map((note, i) => <p key={i} className="rounded-lg bg-gray-50 p-3 text-sm">{note}</p>)}</div>}
         </section>
       )}
       {vue === "creer" && <LabCreatePanel animaux={animaux}/>}
