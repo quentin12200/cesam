@@ -101,6 +101,13 @@ export default function AccueilRadialMenu({ onAction, onSaveNote, animalNumero }
                 <button type="button" aria-label={`Descendre ${index + 1}`} disabled={index === 4} onClick={() => moveShortcut(index, 1)} className="rounded-lg bg-slate-100 p-2 disabled:opacity-30"><ArrowDown size={17}/></button>
               </div>)}
               <button type="button" onClick={() => updateShortcuts([...DEFAULT_SHORTCUTS])} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold">Réinitialiser</button>
+            </div> : level === "other" ? <div className="max-h-[65dvh] overflow-y-auto rounded-2xl bg-slate-900/80 p-3">
+              <h3 className="mb-2 text-center text-sm font-bold text-white">Autres interventions</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {actions.map(action => <button key={action.id} type="button" onClick={() => { if (action.next) setLevel(action.next); else { onAction(action.id as ActionId); setOpen(false); } }} className="flex min-h-14 items-center gap-2 rounded-xl bg-white/95 p-2 text-left text-xs font-semibold text-slate-800">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: action.color }}><action.icon size={19}/></span>{action.label}
+                </button>)}
+              </div>
             </div> : <div className="relative mx-auto aspect-square w-full max-w-[330px]">
               {actions.map((action, index) => {
                 const angle = actions.length > 6 ? (index * 360 / actions.length - 90) : actions.length === 6 ? [-90, -30, 30, 90, 150, 210][index] : actions.length === 3 ? [-90, 30, 150][index] : actions.length === 4 ? [-90, 0, 90, 180][index] : [-90, -18, 54, 126, 198][index];
@@ -118,7 +125,7 @@ export default function AccueilRadialMenu({ onAction, onSaveNote, animalNumero }
               <div className="absolute left-1/2 top-1/2 flex h-[125px] w-[125px] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-amber-200 bg-amber-50 p-2 text-center">
                 {level !== "root" ? (
                   <button type="button" onClick={back} className="flex h-full w-full flex-col items-center justify-center text-sm font-semibold text-slate-700">
-                    <span>{level === "health" ? "Sanitaire" : "Reproduction"}</span><span className="mt-1 text-xs font-normal">Toucher autour pour revenir</span>
+                    <span>{level === "health" ? "Sanitaire" : level === "other" ? "Autres" : "Reproduction"}</span><span className="mt-1 text-xs font-normal">Toucher autour pour revenir</span>
                   </button>
                 ) : editing ? (
                   <>
