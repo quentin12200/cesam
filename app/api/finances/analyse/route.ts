@@ -4,6 +4,9 @@ import OpenAI from "openai";
 export async function POST(req: NextRequest) {
   try {
     const { stats } = await req.json();
+    if (!Array.isArray(stats) || stats.length > 30 || !stats.every((s) => s && typeof s === "object" && Number.isFinite(s.annee) && Number.isFinite(s.caTotal))) {
+      return NextResponse.json({ error: "Données financières invalides" }, { status: 400 });
+    }
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: "Clé API OpenAI non configurée (OPENAI_API_KEY manquant)" }, { status: 500 });
@@ -57,7 +60,6 @@ Réponds en français, clairement, sans jargon inutile. Maximum 250 mots.`,
     return NextResponse.json({ analyse: text });
   } catch (err) {
     console.error("POST /api/finances/analyse error:", err);
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Erreur lors de l'analyse : ${msg}` }, { status: 500 });
+    return NextResponse.json({ error: "L’analyse financière est momentanément indisponible." }, { status: 500 });
   }
 }
