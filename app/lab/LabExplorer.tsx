@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, CalendarDays, ChevronDown, ChevronUp, Plus, House, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import LabCreatePanel from "./LabCreatePanel";
+import AccueilRadialMenu, { type ActionId } from "@/app/components/AccueilRadialMenu";
 
 type Animal = {
   id: string;
@@ -40,6 +41,8 @@ export default function LabExplorer({
   echeances: Echeance[];
 }) {
   const [vue, setVue] = useState<Vue>("accueil");
+  const [demoAction, setDemoAction] = useState<ActionId | null>(null);
+  const [demoNotes, setDemoNotes] = useState<string[]>([]);
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState<string | null>(null);
   const [tri, setTri] = useState<{champ: Tri | null; sens: 0 | 1 | -1}>({champ:null,sens:0});
@@ -82,7 +85,8 @@ export default function LabExplorer({
           </div>
         </section>
       )}
-      {vue === "creer" && <LabCreatePanel animaux={animaux}/>}
+      {vue === "accueil" && <section className="rounded-2xl border-2 border-green-200 bg-green-50 p-3"><h3 className="mb-2 text-sm font-black text-green-900">Nouveau menu circulaire · essai sans enregistrement</h3><AccueilRadialMenu onAction={setDemoAction} onSaveNote={async (content) => { setDemoNotes((prev) => [content, ...prev]); }}/>{demoAction && <div className="mt-3 rounded-xl bg-white p-3 text-sm"><b>Action sélectionnée :</b> {demoAction}<p className="mt-1 text-xs text-gray-500">Simulation uniquement : aucune donnée sanitaire ou animale enregistrée.</p><button type="button" onClick={()=>setDemoAction(null)} className="mt-2 font-bold text-green-800">Fermer</button></div>}{demoNotes.length>0 && <div className="mt-3 rounded-xl bg-white p-3 text-sm"><b>Notes temporaires</b>{demoNotes.map((note,index)=><p key={index} className="mt-1">{note}</p>)}</div>}</section>}
+      {vue === "creer" && <LabCreatePanel animaux={animaux}/> }
 
       {vue === "animaux" && (
         <section className="space-y-3">
