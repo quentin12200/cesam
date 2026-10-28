@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { differenceInDays } from "date-fns";
 import { sendRapportGestation } from "@/lib/email-rapport-gestation";
+import { getAuthorizedEmail } from "@/lib/cesam-auth";
 
 const DESTINATAIRES = ["leyrat.quentin@gmail.com", "gaec.cesam@gmail.com"];
 
@@ -19,8 +20,8 @@ export async function GET(request: NextRequest) {
 
   // Appel manuel : vérifier le cookie de session
   if (isManual) {
-    const cookie = request.headers.get("cookie") ?? "";
-    if (!cookie.includes("cesam_session=")) {
+    const email = await getAuthorizedEmail(request.headers.get("cookie"));
+    if (!email) {
       return NextResponse.json({ error: "Non connecté" }, { status: 401 });
     }
   }
