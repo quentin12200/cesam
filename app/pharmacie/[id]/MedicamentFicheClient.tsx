@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatFrequence, formatDureePreconisation } from "@/lib/preconisation-schedule";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Star, Pencil, ChevronDown, ChevronUp, Stethoscope, ArrowLeft, Package, Milk, Beef, Syringe } from "lucide-react";
@@ -117,11 +118,11 @@ const STATUT_CLASSES: Record<string, string> = {
   "Vérifié": "bg-green-100 text-green-700",
   "Archivé": "bg-gray-100 text-gray-400",
 };
-const FREQUENCE_LABELS: Record<string, string> = { DOSE_UNIQUE: "Dose unique", "1_PAR_JOUR": "1 fois / jour", "2_PAR_JOUR": "2 fois / jour", "3_PAR_JOUR": "3 fois / jour", "1_PAR_24H": "1 fois / 24 h", "1_PAR_48H": "1 fois / 48 h", "1_PAR_SEMAINE": "1 fois / semaine" };
 
 function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicamentId: string }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [erreur, setErreur] = useState("");
   const [form, setForm] = useState<Record<string, string>>({
     indicationMotif: p.indicationMotif ?? "", categorieAnimaux: p.categorieAnimaux ?? "", agePoidsConcerne: p.agePoidsConcerne ?? "", dose: p.dose != null ? String(p.dose) : "", unite: p.unite ?? "", doseBase: p.doseBase ?? "ANIMAL", voie: p.voie ?? "", frequence: p.frequence ?? "", dureeValeur: p.dureeValeur != null ? String(p.dureeValeur) : "", dureeUnite: p.dureeUnite ?? "JOUR", nombreAdministrations: p.nombreAdministrations != null ? String(p.nombreAdministrations) : "", precautions: p.precautions ?? "", delaiAttenteViandeJ: p.delaiAttenteViandeJ != null ? String(p.delaiAttenteViandeJ) : "", delaiAttenteLaitTraites: p.delaiAttenteLaitTraites != null ? String(p.delaiAttenteLaitTraites) : "",
   });
@@ -129,12 +130,20 @@ function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicame
   const precautionsTexte = formatPrecautions(p.precautions);
   const animauxTexte = [p.categorieAnimaux, p.agePoidsConcerne].filter(Boolean).join(" · ");
 
-  async function enregistrer() { await fetch(`/api/preconisations/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); setEditing(false); router.refresh(); }
+  async function enregistrer() {
+    setErreur("");
+    try {
+      const response = await fetch(`/api/preconisations/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      if (!response.ok) { setErreur((await response.json()).error || "Enregistrement impossible."); return; }
+      setEditing(false);
+      router.refresh();
+    } catch { setErreur("Enregistrement impossible. Vérifiez votre connexion."); }
+  }
   async function dupliquer() { await fetch("/api/preconisations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, medicamentId, statut: "A_VERIFIER", source: "Duplication" }) }); router.refresh(); }
   async function archiver() { await fetch(`/api/preconisations/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ statut: "ARCHIVE" }) }); router.refresh(); }
   async function supprimer() { await fetch(`/api/preconisations/${p.id}`, { method: "DELETE" }); router.refresh(); }
 
-  if (editing) return <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 space-y-3"><PreconisationFields form={form} onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))} /><div className="flex gap-2"><button type="button" onClick={() => void enregistrer()} className="min-h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white">Enregistrer</button><button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg border bg-white px-4 text-sm">Annuler</button></div></div>;
+  if (editing) return <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 space-y-3"><PreconisationFields form={form} onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))} />{erreur && <p role="alert" className="text-sm text-red-700">{erreur}</p>}<div className="flex gap-2"><button type="button" onClick={() => void enregistrer()} className="min-h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white">Enregistrer</button><button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg border bg-white px-4 text-sm">Annuler</button></div></div>;
 
   return (
     <div className="relative min-h-32 overflow-hidden rounded-xl border border-gray-200 bg-white py-3 pl-20 pr-3 text-sm shadow-sm space-y-2 sm:pl-24">
@@ -147,9 +156,9 @@ function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicame
         {animauxTexte && <span>{animauxTexte}</span>}
         {p.dose != null && <span><b className="block text-gray-400 font-medium">Dose</b>{p.dose} {p.unite} {formatDoseBase(p.doseBase)}</span>}
         {p.voie && <span><b className="block text-gray-400 font-medium">Voie</b>{formatVoie(p.voie)}</span>}
-        <span><b className="block text-gray-400 font-medium">Fréquence</b>{FREQUENCE_LABELS[p.frequence ?? ""] ?? p.frequence ?? "Dose unique"}</span>
-        {p.dureeValeur != null && <span><b className="block text-gray-400 font-medium">Durée</b>{p.dureeValeur} {p.dureeUnite === "48H" ? "× 48h" : "jour(s)"}</span>}
-        {p.nombreAdministrations != null && <span>{p.nombreAdministrations} administration{p.nombreAdministrations > 1 ? "s" : ""}</span>}
+        <span><b className="block text-gray-400 font-medium">Fréquence</b>{formatFrequence(p.frequence)}</span>
+        {p.dureeValeur != null && <span><b className="block text-gray-400 font-medium">Durée</b>{formatDureePreconisation(p.dureeValeur, p.dureeUnite)}</span>}
+        {p.nombreAdministrations != null && <span>{p.nombreAdministrations} prise{p.nombreAdministrations > 1 ? "s" : ""} au total</span>}
       </div>
       {(p.delaiAttenteViandeJ != null || p.delaiAttenteLaitTraites != null) && (
         <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs text-gray-600">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import FrequenceFields from "./FrequenceFields";
 
 interface Option {
   value: string;
@@ -39,16 +40,6 @@ const UNITES: readonly Option[] = [
   { value: "bolus", label: "bolus" },
   { value: "sachet", label: "sachet" },
   { value: "dose", label: "dose" },
-];
-
-const FREQUENCES: readonly Option[] = [
-  { value: "DOSE_UNIQUE", label: "Dose unique" },
-  { value: "1_PAR_JOUR", label: "Donner 1 fois par jour" },
-  { value: "2_PAR_JOUR", label: "Donner 2 fois par jour" },
-  { value: "3_PAR_JOUR", label: "Donner 3 fois par jour" },
-  { value: "1_PAR_24H", label: "Donner 1 fois par 24 h" },
-  { value: "1_PAR_48H", label: "Donner 1 fois par 48 h" },
-  { value: "1_PAR_SEMAINE", label: "Donner 1 fois par semaine" },
 ];
 
 const CATEGORIES_ANIMAUX: readonly Option[] = [
@@ -216,55 +207,51 @@ export default function PreconisationFields({ form, onChange }: PreconisationFie
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="col-span-2 block">
-          <span className="text-xs text-gray-500 block mb-1">Fréquence</span>
-          <SelectAvecAjout
-            value={form.frequence}
-            onChange={(value) => { onChange("frequence", value); const prises = value.match(/^(\d+)_PAR_/)?.[1]; if (prises) onChange("nombreAdministrations", prises); }}
-            options={options("FREQUENCE", FREQUENCES)}
-            placeholder="Sélectionner"
-            autreLabel="+ Autre fréquence…"
-            autrePlaceholder="Nouvelle fréquence"
-          />
-        </label>
-        {!doseUnique && <label className="block">
-          <span className="text-xs text-gray-500 block mb-1">Durée</span>
-          <input
-            type="number"
-            min={0}
-            value={form.dureeValeur}
-            onChange={(event) => onChange("dureeValeur", event.target.value)}
-            placeholder="0"
-            className="w-full border rounded-lg px-2.5 py-2 text-sm"
-          />
-        </label>}
-        {!doseUnique && <label className="block">
-          <span className="text-xs text-gray-500 block mb-1">Unité de durée</span>
-          <select
-            value={form.dureeUnite}
-            onChange={(event) => onChange("dureeUnite", event.target.value)}
-            className="w-full border rounded-lg px-2.5 py-2 text-sm bg-white"
-          >
-            <option value="JOUR">jour(s)</option>
-            <option value="HEURE">heure(s)</option>
-            <option value="48H">période(s) de 48 h</option>
-            <option value="SEMAINE">semaine(s)</option>
-            <option value="MOIS">mois</option>
-          </select>
-        </label>}
-        {!doseUnique && <label className="hidden">
-          <span className="text-xs text-gray-500 block mb-1">Nb d’administrations</span>
-          <input
-            type="number"
-            min={1}
-            value={form.nombreAdministrations}
-            onChange={(event) => onChange("nombreAdministrations", event.target.value)}
-            placeholder="1"
-            className="w-full border rounded-lg px-2.5 py-2 text-sm"
-          />
-        </label>}
-      </div>
+      <fieldset className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 space-y-2.5">
+        <legend className="px-1 text-sm font-semibold text-gray-700">Rythme et durée du traitement</legend>
+        <FrequenceFields value={form.frequence} onChange={(value) => onChange("frequence", value)} />
+        <div className="grid grid-cols-2 gap-2">
+          {!doseUnique && <label className="block">
+            <span className="text-xs text-gray-500 block mb-1">Durée recommandée</span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={form.dureeValeur}
+              onChange={(event) => onChange("dureeValeur", event.target.value)}
+              placeholder="Ex. 4"
+              className="w-full border rounded-lg px-2.5 py-2 text-sm"
+            />
+          </label>}
+          {!doseUnique && <label className="block">
+            <span className="text-xs text-gray-500 block mb-1">Unité de durée</span>
+            <select
+              value={form.dureeUnite}
+              onChange={(event) => onChange("dureeUnite", event.target.value)}
+              className="w-full border rounded-lg px-2.5 py-2 text-sm bg-white"
+            >
+              <option value="JOUR">jour(s)</option>
+              <option value="HEURE">heure(s)</option>
+              <option value="48H">période(s) de 48 h</option>
+              <option value="SEMAINE">semaine(s)</option>
+              <option value="MOIS">mois</option>
+            </select>
+          </label>}
+          {!doseUnique && <label className="col-span-2 block">
+            <span className="text-xs text-gray-500 block mb-1">Nombre total de prises (facultatif)</span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={form.nombreAdministrations}
+              onChange={(event) => onChange("nombreAdministrations", event.target.value)}
+              placeholder="1"
+              className="w-full border rounded-lg px-2.5 py-2 text-sm"
+            />
+          </label>}
+          {!doseUnique && <p className="col-span-2 text-xs text-gray-500">Le total concerne tout le traitement : 2 prises par jour pendant 4 jours correspondent à 8 prises prévues.</p>}
+        </div>
+      </fieldset>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
@@ -292,12 +279,12 @@ export default function PreconisationFields({ form, onChange }: PreconisationFie
       </div>
 
       <label className="block">
-        <span className="text-xs text-gray-500 block mb-1">Précautions particulières</span>
+        <span className="text-xs text-gray-500 block mb-1">Consigne complémentaire du vétérinaire / précautions</span>
         <textarea
           value={form.precautions}
           onChange={(event) => onChange("precautions", event.target.value)}
           rows={2}
-          placeholder="Informations complémentaires utiles"
+          placeholder="Précisions sur la durée, les conditions de renouvellement…"
           className="w-full border rounded-lg px-2.5 py-2 text-sm resize-none"
         />
       </label>

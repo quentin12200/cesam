@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatFrequence, formatDureePreconisation } from "@/lib/preconisation-schedule";
 import { useRouter } from "next/navigation";
 import { Save, CheckCircle2, Plus, AlertTriangle, ShieldCheck } from "lucide-react";
 import { getCategoriesMedicamentUtilisees } from "@/lib/medicament-categories";
@@ -59,17 +60,9 @@ const DOSE_BASE_LABEL: Record<string, string> = {
   QUARTIER: "/ quartier",
 };
 
-const DUREE_UNITE_LABEL: Record<string, string> = {
-  JOUR: "jour(s)",
-  HEURE: "heure(s)",
-  "48H": "période(s) de 48 h",
-  SEMAINE: "semaine(s)",
-  MOIS: "mois",
-};
-
 const emptyPreco = {
   indicationMotif: "", categorieAnimaux: "", agePoidsConcerne: "",
-  dose: "", unite: "ml", doseBase: "ANIMAL", voie: "", frequence: "DOSE_UNIQUE",
+  dose: "", unite: "ml", doseBase: "ANIMAL", voie: "", frequence: "",
   dureeValeur: "", dureeUnite: "JOUR", nombreAdministrations: "",
   precautions: "", delaiAttenteViandeJ: "", delaiAttenteLaitTraites: "",
 };
@@ -94,6 +87,7 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const [erreurPreconisation, setErreurPreconisation] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Record<string, string>>({});
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
@@ -129,6 +123,7 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
   }
 
   function commencerEdition(p: PreconisationData) {
+    setErreurPreconisation("");
     setEditingId(p.id);
     setEditForm({
       indicationMotif: p.indicationMotif ?? "",
@@ -148,12 +143,17 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
     });
   }
 
+  async function sauvegarderPreconisation(url: string, method: string, body: Record<string, string>) {
+    setErreurPreconisation("");
+    try {
+      const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!response.ok) { setErreurPreconisation((await response.json()).error || "Enregistrement impossible."); return false; }
+      return true;
+    } catch { setErreurPreconisation("Enregistrement impossible. Vérifiez votre connexion."); return false; }
+  }
+
   async function enregistrerEdition(id: string) {
-    await fetch(`/api/preconisations/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editForm),
-    });
+    if (!await sauvegarderPreconisation(`/api/preconisations/${id}`, "PATCH", editForm)) return;
     setEditingId(null);
     router.refresh();
   }
@@ -174,11 +174,7 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
 
   async function ajouter(e: React.FormEvent) {
     e.preventDefault();
-    await fetch("/api/preconisations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...nouvelleForm, medicamentId: medicament.id, statut: "A_VERIFIER", source: "Saisie manuelle" }),
-    });
+    if (!await sauvegarderPreconisation("/api/preconisations", "POST", { ...nouvelleForm, medicamentId: medicament.id, statut: "A_VERIFIER", source: "Saisie manuelle" })) return;
     setNouvelleForm({ ...emptyPreco, voie: medicament.voie ?? "" });
     setAjoutOuvert(false);
     router.refresh();
@@ -285,6 +281,8 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
           </form>
         )}
 
+        {erreurPreconisation && <p role="alert" className="text-sm text-red-700">{erreurPreconisation}</p>}
+
         {preconisations.length === 0 && !ajoutOuvert && (
           <p className="text-sm text-gray-400 text-center py-4">Aucune préconisation enregistrée</p>
         )}
@@ -320,10 +318,11 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
                         <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                           {p.dose != null && <span>{p.dose} {p.unite} {DOSE_BASE_LABEL[p.doseBase ?? ""] ?? ""}</span>}
                           {p.voie && <span>{p.voie}</span>}
-                          {p.frequence && <span>{p.frequence}</span>}
+                          <span>{formatFrequence(p.frequence)}</span>
                           {p.dureeValeur != null && (
-                            <span>{p.dureeValeur} {DUREE_UNITE_LABEL[p.dureeUnite ?? "JOUR"] ?? p.dureeUnite}</span>
+                            <span>{formatDureePreconisation(p.dureeValeur, p.dureeUnite)}</span>
                           )}
+                          {p.nombreAdministrations != null && <span>{p.nombreAdministrations} prise(s) au total</span>}
                           {p.categorieAnimaux && <span>{p.categorieAnimaux}</span>}
                           {p.agePoidsConcerne && <span>{p.agePoidsConcerne}</span>}
                         </div>

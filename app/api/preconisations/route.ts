@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { erreurRythmePreconisation } from "@/lib/preconisation-schedule";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -21,6 +22,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
+  const erreurRythme = erreurRythmePreconisation(body);
+  if (erreurRythme) return NextResponse.json({ error: erreurRythme }, { status: 400 });
   const {
     medicamentId, indicationMotif, categorieAnimaux, agePoidsConcerne,
     dose, unite, doseBase, voie, frequence, dureeValeur, dureeUnite, nombreAdministrations,
