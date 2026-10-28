@@ -82,6 +82,7 @@ export default function LabExplorer({
           </div>
         </section>
       )}
+      {vue === "accueil" && <p>Test de compilation du LAB sans menu</p>}
       {vue === "creer" && <LabCreatePanel animaux={animaux}/>}
 
       {vue === "animaux" && (
