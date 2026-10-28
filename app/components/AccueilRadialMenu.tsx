@@ -53,24 +53,29 @@ export default function AccueilRadialMenu({ onAction, onSaveNote }: AccueilRadia
     <div className="relative flex flex-col items-center gap-2">
       {open && (
         <div className="w-full max-w-[360px] rounded-3xl border border-slate-200 bg-white p-3 shadow-xl">
-          <div className="grid grid-cols-3 gap-3">
-            {ACTIONS.slice(0, 3).map((action) => <ActionButton key={action.id} action={action} onClick={() => { onAction(action.id); setOpen(false); }} />)}
-            <ActionButton action={ACTIONS[3]} onClick={() => { onAction("echographie"); setOpen(false); }} />
-            <div className="flex min-h-28 flex-col items-center justify-center gap-1 rounded-2xl bg-amber-50 p-2">
+          <div className="relative mx-auto aspect-square w-full max-w-[330px]" aria-label="Menu circulaire des actions">
+            {ACTIONS.map((action, index) => {
+              const angles = [-145, -95, -45, -180, 0, 145, 45];
+              const radians = angles[index] * Math.PI / 180;
+              const left = 50 + 39 * Math.cos(radians);
+              const top = 50 + 39 * Math.sin(radians);
+              return (
+                <div key={action.id} className="absolute w-[76px] -translate-x-1/2 -translate-y-1/2" style={{ left: `${left}%`, top: `${top}%` }}>
+                  <ActionButton action={action} onClick={() => { onAction(action.id); setOpen(false); }} />
+                </div>
+              );
+            })}
+            <div className="absolute left-1/2 top-1/2 flex h-[132px] w-[132px] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-amber-200 bg-amber-50 p-3 text-center">
               {editing ? (
                 <>
                   <label htmlFor="accueil-note-rapide" className="text-xs font-semibold">Note rapide</label>
-                  <textarea id="accueil-note-rapide" ref={inputRef} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Écris ici…" rows={2} className="w-full resize-none rounded-lg border border-amber-200 bg-white p-1 text-sm" />
-                  <button type="button" disabled={saving || !note.trim()} onClick={() => void save()} className="flex items-center gap-1 rounded-lg bg-amber-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-40"><Check size={14} /> Enregistrer</button>
+                  <textarea id="accueil-note-rapide" ref={inputRef} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Écris ici…" rows={2} className="mt-1 w-full resize-none rounded-lg border border-amber-200 bg-white p-1 text-sm" />
+                  <button type="button" disabled={saving || !note.trim()} onClick={() => void save()} className="mt-1 flex items-center gap-1 rounded-lg bg-amber-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-40"><Check size={14} /> OK</button>
                 </>
               ) : (
-                <button type="button" onClick={() => setEditing(true)} className="flex h-full w-full flex-col items-center justify-center gap-1 text-center text-sm font-semibold text-amber-900"><Pencil size={20} /> Écrire une note</button>
+                <button type="button" onClick={() => setEditing(true)} className="flex h-full w-full flex-col items-center justify-center gap-1 text-sm font-semibold text-amber-900"><Pencil size={20} /> Écrire une note</button>
               )}
             </div>
-            <ActionButton action={ACTIONS[4]} onClick={() => { onAction("vaccination"); setOpen(false); }} />
-            <ActionButton action={ACTIONS[5]} onClick={() => { onAction("traitement"); setOpen(false); }} />
-            <div />
-            <ActionButton action={ACTIONS[6]} onClick={() => { onAction("pesee"); setOpen(false); }} />
           </div>
           {error && <p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}
         </div>
@@ -84,7 +89,7 @@ export default function AccueilRadialMenu({ onAction, onSaveNote }: AccueilRadia
 
 function ActionButton({ action, onClick }: { action: Action; onClick: () => void }) {
   const Icon = action.icon;
-  return <button type="button" onClick={onClick} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl p-1 text-center text-xs font-semibold text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">
+  return <button type="button" onClick={onClick} className="flex min-h-[70px] w-full flex-col items-center justify-center gap-1 rounded-xl p-1 text-center text-[11px] font-semibold leading-tight text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">
     <span className="flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: action.color }}><Icon size={23} /></span>
     <span>{action.label}</span>
   </button>;
