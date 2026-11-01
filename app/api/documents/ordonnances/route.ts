@@ -8,6 +8,7 @@ import {
 } from "@/lib/ordonnance-scan-diagnostics";
 
 const EXTRACTIONS_PREFIX = "ordonnances/extractions/";
+const MAX_DOCUMENT_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
 async function requireAuthorized(request: NextRequest) {
@@ -42,12 +43,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Document invalide" }, { status: 400 });
     }
 
-    const bytes = Buffer.from(dataUrl.slice(separator + 1), "base64");
+    const encoded = dataUrl.slice(separator + 1);
+    if (encoded.length > Math.ceil(MAX_DOCUMENT_BYTES / 3) * 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length % 4 !== 0) {
+      return NextResponse.json({ error: "Document invalide ou trop volumineux" }, { status: 413 });
+    }
+    const bytes = Buffer.from(encoded, "base64");
     if (bytes.length === 0) {
       return NextResponse.json({ error: "Document vide" }, { status: 400 });
     }
-    if (bytes.length > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: "Document trop volumineux (10 Mo maximum)" }, { status: 413 });
+    const header = bytes.subarray(0, 12);
+    const validSignature = contentType === "application/pdf" ? header.subarray(0, 5).toString("ascii") === "%PDF-"
+      : contentType === "image/jpeg" ? header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff
+      : contentType === "image/png" ? header.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
+      : contentType === "image/webp" ? header.subarray(0, 4).toString("ascii") === "RIFF" && header.subarray(8, 12).toString("ascii") === "WEBP"
+      : contentType === "image/heic" || contentType === "image/heif" ? header.subarray(4, 8).toString("ascii") === "ftyp"
+      : false;
+    if (!validSignature) return NextResponse.json({ error: "Le contenu du fichier ne correspond pas au format annoncé" }, { status: 400 });
+    if (bytes.length > MAX_DOCUMENT_BYTES) {
+      return NextResponse.json({ error: "Document trop volumineux (3 Mo maximum)" }, { status: 413 });
     }
 
     const path = `${EXTRACTIONS_PREFIX}${Date.now()}-${randomUUID()}.${extensionFor(contentType)}`;
