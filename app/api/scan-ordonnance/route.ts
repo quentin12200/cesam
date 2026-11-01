@@ -16,6 +16,20 @@ export const maxDuration = 60;
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
 const PROMPT_VERSION = "ordonnance-v8-conditionnement-structure";
+const MAX_SCAN_PAGES = 4;
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+const MAX_REQUEST_BYTES = 13 * 1024 * 1024;
+const SCAN_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+function validScanImage(image: ImageEntree): boolean {
+  if (!SCAN_IMAGE_TYPES.has(image.mimeType) || !/^[A-Za-z0-9+/]+={0,2}$/.test(image.data)) return false;
+  if (image.data.length % 4 !== 0 || image.data.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4) return false;
+  const bytes = Buffer.from(image.data, "base64");
+  if (bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) return false;
+  if (image.mimeType === "image/jpeg") return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (image.mimeType === "image/png") return bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+  return bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP";
+}
 
 interface OrdonnanceResult extends PropositionOrdonnance {
   raw: string;
@@ -222,6 +236,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "OPENAI_API_KEY non configuree" }, { status: 500 });
   }
 
+  const contentLength = Number(req.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) return failureResponse("document", 413);
   let body: { images?: ImageEntree[]; image?: string; mimeType?: string };
   try {
     body = await req.json();
@@ -237,6 +253,10 @@ export async function POST(req: NextRequest) {
   if (images.length === 0) {
     logOrdonnanceScanFailure("document", new Error("Aucune image fournie"));
     return failureResponse("document", 400);
+  }
+
+  if (images.length > MAX_SCAN_PAGES || images.some((image) => !validScanImage(image))) {
+    return NextResponse.json({ error: "Photos invalides ou trop volumineuses (4 photos maximum, 3 Mo chacune)" }, { status: 413 });
   }
 
   let response: Response;
