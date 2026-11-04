@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fullNational, sameBullCandidates } from "@/lib/bull-identity";
+import { fullNational, sameBullCandidates, canonicalName, canonicalNational } from "@/lib/bull-identity";
 
 // Fusion explicitement demandée dans le répertoire ; jamais déclenchée
 // depuis la recherche de filiation. Réaffectation atomique des liens.
@@ -26,8 +26,22 @@ export async function POST(request: NextRequest) {
       if (!fullNational(keep.nupere)) throw new Error("KEEP_FULL_NATIONAL");
       const confidence = sameBullCandidates(keep, remove);
       if (!confidence) throw new Error("CONFLICT");
-      // En cas de correspondance probable, le nom et les 4 chiffres
-      // doivent concorder (vérifié par sameBullCandidates).
+      // Si on ne connaît que quatre chiffres, refuser une fusion lorsque
+      // plusieurs taureaux complets pourraient correspondre au même nom.
+      if (confidence === "A_VERIFIER") {
+        const possible = await tx.taureau.findMany({
+          where: { nopere: { not: null } },
+          select: { id: true, nupere: true, nopere: true },
+        });
+        const candidates = possible.filter((bull) =>
+          fullNational(bull.nupere) &&
+          canonicalNational(bull.nupere).endsWith(canonicalNational(remove.nupere).slice(-4)) &&
+          canonicalName(bull.nopere) === canonicalName(remove.nopere)
+        );
+        if (candidates.length !== 1 || candidates[0].id !== keepId) {
+          throw new Error("AMBIGUOUS");
+        }
+      }
       const animals = await tx.animal.updateMany({
         where: { taureauId: removeId },
         data: { taureauId: keepId },
@@ -48,6 +62,7 @@ export async function POST(request: NextRequest) {
       NOT_FOUND: "Une fiche a disparu ; recharge la page.",
       KEEP_FULL_NATIONAL: "Conserve la fiche ayant un numéro national complet.",
       CONFLICT: "Correspondance insuffisante : fusion refusée pour protéger la généalogie.",
+      AMBIGUOUS: "Plusieurs identités possibles. Aucun lien n’a été modifié.",
     };
     return NextResponse.json({ error: messages[code] ?? "Fusion impossible. Aucune modification partielle n'a été conservée." }, { status: 409 });
   }
