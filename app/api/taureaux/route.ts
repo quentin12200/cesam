@@ -64,37 +64,71 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+
+// Une correction de nom est possible sans toucher aux liens biologiques.
+// Changer un identifiant national lié à des animaux nécessite un audit séparé.
+export async function PATCH(request: NextRequest) {
   try {
-    const { id } = await request.json();
-    if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
-
-    const sailliesCount = await prisma.saillie.count({ where: { taureauId: id } });
-    if (sailliesCount > 0) {
-      return NextResponse.json(
-        { error: `Impossible : lié à ${sailliesCount} saillie(s)` },
-        { status: 409 }
-      );
+    const body = await request.json().catch(() => null);
+    const id = typeof body?.id === "string" ? body.id : "";
+    const name = typeof body?.nopere === "string" ? body.nopere.trim() : null;
+    if (!id || name === null || name.length > 120) {
+      return NextResponse.json({ error: "Identifiant ou nom invalide." }, { status: 400 });
     }
-
-    const taureau = await prisma.taureau.findUnique({ where: { id } });
-    if (!taureau) return NextResponse.json({ error: "Taureau non trouvé" }, { status: 404 });
-
-    await prisma.taureau.delete({ where: { id } });
-
-    const desc = `Taureau ${taureau.nopere ?? taureau.nupere} supprimé`;
-    let undoId = "";
+    const bull = await prisma.taureau.findUnique({ where: { id } });
+    if (!bull) return NextResponse.json({ error: "Taureau introuvable." }, { status: 404 });
+    const updated = await prisma.taureau.update({ where: { id }, data: { nopere: name || null } });
     try {
-      undoId = await logAction("DELETE_TAUREAU", desc, {
-        op: "create",
-        model: "taureau",
-        data: { id: taureau.id, nupere: taureau.nupere, nopere: taureau.nopere, traper: taureau.traper, present: taureau.present, updatedAt: new Date() },
+      await logAction("PATCH_TAUREAU_NOM", `Nom du taureau ${bull.nupere} modifié`, {
+        op: "update", model: "taureau", where: { id }, data: { nopere: bull.nopere },
       });
     } catch {}
+    return NextResponse.json({ ok: true, taureau: updated });
+  } catch {
+    return NextResponse.json({ error: "Correction impossible." }, { status: 500 });
+  }
+}
 
-    return NextResponse.json({ ok: true, _undoId: undoId, _undoDesc: desc });
-  } catch (err) {
-    console.error("DELETE /api/taureaux error:", err);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+async function referencesForBull(bull: { id: string; nupere: string }) {
+  const normalized = normalizeGenealogyNational(bull.nupere);
+  const suffix = normalized.slice(-Math.min(normalized.length, 8));
+  const [animals, breedings, manual, calvings] = await Promise.all([
+    prisma.animal.count({ where: { taureauId: bull.id } }),
+    prisma.saillie.count({ where: { taureauId: bull.id } }),
+    prisma.animal.findMany({ where: { pereNationalManuel: { contains: suffix } }, select: { pereNationalManuel: true } }),
+    prisma.velage.findMany({ where: { pereNunati: { contains: suffix } }, select: { pereNunati: true } }),
+  ]);
+  return {
+    animals, breedings,
+    manual: manual.filter((item) => normalizeGenealogyNational(item.pereNationalManuel) === normalized).length,
+    calvings: calvings.filter((item) => normalizeGenealogyNational(item.pereNunati) === normalized).length,
+  };
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json().catch(() => null);
+    const id = typeof body?.id === "string" ? body.id : "";
+    if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
+    const bull = await prisma.taureau.findUnique({ where: { id } });
+    if (!bull) return NextResponse.json({ error: "Taureau non trouvé" }, { status: 404 });
+    const refs = await referencesForBull(bull);
+    const total = refs.animals + refs.breedings + refs.manual + refs.calvings;
+    if (total > 0) {
+      return NextResponse.json({
+        error: `Suppression refusée : ${refs.animals} lien(s) animal, ${refs.breedings} saillie(s), ${refs.manual} référence(s) manuelle(s) et ${refs.calvings} vêlage(s). Corrige ou fusionne d'abord les références.`,
+        references: refs,
+      }, { status: 409 });
+    }
+    await prisma.taureau.delete({ where: { id } });
+    try {
+      await logAction("DELETE_TAUREAU", `Taureau ${bull.nopere ?? bull.nupere} supprimé`, {
+        op: "create", model: "taureau",
+        data: { id: bull.id, nupere: bull.nupere, nopere: bull.nopere, traper: bull.traper, present: bull.present, updatedAt: new Date() },
+      });
+    } catch {}
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Suppression impossible. Vérifie les liens existants." }, { status: 409 });
   }
 }
