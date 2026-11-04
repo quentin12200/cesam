@@ -94,11 +94,68 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json().catch(() => null);
     const id = typeof body?.id === "string" ? body.id : "";
     const name = typeof body?.nopere === "string" ? body.nopere.trim() : null;
-    if (!id || name === null || name.length > 120) {
+    const newNational = typeof body?.nupere === "string" ? body.nupere.replace(/\s+/g, "").toUpperCase() : null;
+    if (!id || (name === null && newNational === null) || (name !== null && name.length > 120)) {
       return NextResponse.json({ error: "Identifiant ou nom invalide." }, { status: 400 });
     }
     const bull = await prisma.taureau.findUnique({ where: { id } });
     if (!bull) return NextResponse.json({ error: "Taureau introuvable." }, { status: 404 });
+    if (newNational !== null) {
+      const target = nationalWithCountry(newNational);
+      // Un numéro complet, avec pays explicite, est obligatoire.
+      if (!/^[A-Z]{2}[0-9]{8,15}$/.test(target)) {
+        return NextResponse.json({ error: "Saisis le numéro national complet avec FR ou UK." }, { status: 400 });
+      }
+      // On complète une référence courte existante. Ne pas renommer librement
+      // une identité nationale déjà établie depuis cette vue.
+      if (fullNational(bull.nupere) && nationalWithCountry(bull.nupere) !== target) {
+        return NextResponse.json({ error: "Ce taureau possède déjà un numéro national complet. Vérifie ses filiations avant de le remplacer." }, { status: 409 });
+      }
+      // Ne pas mélanger deux pays : ne retirer FR que pour comparer une ancienne
+      // représentation française à dix chiffres.
+      const allBulls = await prisma.taureau.findMany({ select: { id: true, nupere: true } });
+      if (allBulls.some((other) => other.id !== id && nationalWithCountry(other.nupere) === target)) {
+        return NextResponse.json({ error: "Ce numéro national appartient déjà à une autre fiche. Utilise la fusion plutôt que de le réattribuer." }, { status: 409 });
+      }
+      const [linkedAnimals, linkedBreedings] = await Promise.all([
+        prisma.animal.findMany({
+          where: { taureauId: id },
+          select: { nutrav: true, pereNationalManuel: true, velageVeau: { select: { pereNunati: true } } },
+        }),
+        prisma.saillie.findMany({
+          where: { taureauId: id },
+          select: { gestation: { select: { velage: { select: { pereNunati: true } } } } },
+        }),
+      ]);
+      const contradictory = [
+        ...linkedAnimals.flatMap((animal) => [animal.pereNationalManuel, animal.velageVeau?.pereNunati]),
+        ...linkedBreedings.map((breeding) => breeding.gestation?.velage?.pereNunati),
+      ].filter((value): value is string => Boolean(value))
+        .some((value) => {
+          const normalized = nationalWithCountry(value);
+          return /^[A-Z]{2}[0-9]{8,15}$/.test(normalized) && normalized !== target;
+        });
+      if (contradictory) {
+        return NextResponse.json({
+          error: "Une filiation liée indique un autre numéro national complet. Correction bloquée : vérifie les vêlages et veaux concernés.",
+        }, { status: 409 });
+      }
+      // Conserver l'identifiant de la fiche : les saillies et veaux déjà liés
+      // gardent le même taureauId. Aucun événement ni historique n'est réécrit.
+      try {
+        const updated = await prisma.taureau.update({
+          where: { id },
+          data: { nupere: target, ...(name !== null ? { nopere: name || null } : {}) },
+        });
+        await logAction("PATCH_TAUREAU_IDENTITE", `Identité du taureau ${bull.nupere} corrigée en ${target}`, {
+          op: "update", model: "taureau", where: { id },
+          data: { nupere: bull.nupere, nopere: bull.nopere },
+        }).catch(() => undefined);
+        return NextResponse.json({ ok: true, taureau: updated });
+      } catch {
+        return NextResponse.json({ error: "Numéro non modifié : doublon ou erreur de validation." }, { status: 409 });
+      }
+    }
     const updated = await prisma.taureau.update({ where: { id }, data: { nopere: name || null } });
     try {
       await logAction("PATCH_TAUREAU_NOM", `Nom du taureau ${bull.nupere} modifié`, {
