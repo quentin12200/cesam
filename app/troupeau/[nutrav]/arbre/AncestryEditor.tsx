@@ -129,6 +129,14 @@ export default function AncestryEditor({
           </div>
         )}
 
+        {parent === "PERE" && (
+          <p className="mt-2 text-xs text-gray-600">
+            Un père déjà saisi peut être retrouvé ici. Avec son numéro national complet,
+            il sera aussi enregistré dans le répertoire des taureaux pour les prochaines fois.
+            Sans numéro complet, ses informations restent conservées dans la généalogie.
+          </p>
+        )}
+
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <label className="text-xs font-semibold text-gray-700">
             N° complet (facultatif)
