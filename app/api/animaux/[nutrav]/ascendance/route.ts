@@ -39,7 +39,7 @@ export async function GET(
     normalizeGenealogyNational(query),
   ].filter(Boolean))];
 
-  const [animals, bulls, calvings] = await Promise.all([
+  const [animals, bulls, calvings, manuallyRecordedFathers] = await Promise.all([
     prisma.animal.findMany({
       where: {
         OR: searchTerms.flatMap((term) => [
@@ -76,6 +76,20 @@ export async function GET(
           where: { OR: searchTerms.flatMap((term) => [{ pereNunati: { contains: term } }, { pereNom: { contains: term } }]) },
           take: 12,
           select: { id: true, pereNunati: true, pereNom: true },
+        })
+      : Promise.resolve([]),
+    parent === "PERE"
+      ? prisma.animal.findMany({
+          where: {
+            pereTravailManuel: { not: null },
+            OR: searchTerms.flatMap((term) => [
+              { pereTravailManuel: { contains: term } },
+              { pereNationalManuel: { contains: term } },
+              { pereNomManuel: { contains: term } },
+            ]),
+          },
+          take: 20,
+          select: { id: true, pereTravailManuel: true, pereNationalManuel: true, pereNomManuel: true },
         })
       : Promise.resolve([]),
   ]);
@@ -153,6 +167,20 @@ export async function GET(
       nationalNumber: calving.pereNunati,
       name: calving.pereNom,
       status: linked?.status ?? null,
+    });
+  }
+
+  // Les pères saisis sur d'autres arbres restent recherchables sans créer
+  // de taureau fictif lorsqu'on ne connaît que les 4 derniers chiffres.
+  for (const previous of manuallyRecordedFathers) {
+    matches.push({
+      key: `manuel-${previous.id}`,
+      source: "HISTORIQUE",
+      sourceId: null,
+      workNumber: previous.pereTravailManuel,
+      nationalNumber: previous.pereNationalManuel,
+      name: previous.pereNomManuel,
+      status: null,
     });
   }
 
@@ -238,6 +266,43 @@ export async function POST(
     candidateNationalNumber: nationalNumber,
   })) {
     return NextResponse.json({ error: "Un animal ne peut pas être son propre parent." }, { status: 400 });
+  }
+
+  // Une identification nationale complète est une clé assez fiable pour
+  // mutualiser le père dans le répertoire existant des taureaux.
+  // Sans elle, on garde la saisie manuelle (et la recherche ci-dessus).
+  if (parent === "PERE" && source !== "ANIMAL" && source !== "TAUREAU" && nationalNumber) {
+    const normalizedNational = normalizeGenealogyNational(nationalNumber);
+    if (/^[0-9]{8,15}$/.test(normalizedNational)) {
+      const variants = [...new Set([nationalNumber, normalizedNational, `FR${normalizedNational}`])];
+      const existing = await prisma.taureau.findFirst({
+        where: { nupere: { in: variants } },
+        select: { id: true, nopere: true },
+      });
+      if (existing?.nopere && name && existing.nopere.trim().toLocaleLowerCase("fr") !== name.trim().toLocaleLowerCase("fr")) {
+        return NextResponse.json({
+          error: "Ce numéro national correspond déjà à un reproducteur portant un autre nom. Vérifie l'identification avant d'enregistrer.",
+        }, { status: 409 });
+      }
+      const bull = existing ?? await prisma.taureau.upsert({
+        where: { nupere: normalizedNational },
+        create: { nupere: normalizedNational, nopere: name, present: false },
+        update: {},
+        select: { id: true, nopere: true },
+      });
+      // Conserver aussi la saisie lisible sur l'animal : aucun historique
+      // de vêlage ou de saillie n'est modifié par cette opération.
+      await prisma.animal.update({
+        where: { nutrav },
+        data: {
+          taureauId: bull.id,
+          pereTravailManuel: workNumber || null,
+          pereNationalManuel: nationalNumber,
+          pereNomManuel: name,
+        },
+      });
+      return NextResponse.json({ ok: true, nutrav });
+    }
   }
 
   const data = buildAncestryUpdate({ parent, source, sourceId, workNumber, nationalNumber, name });
