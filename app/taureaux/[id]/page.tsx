@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import BackButton from "@/app/components/BackButton";
+import { nationalWithCountry } from "@/lib/bull-identity";
 
 function normalized(value: string | null | undefined): string {
   return (value ?? "").replace(/\s+/g, "").replace(/^FR/i, "").toUpperCase();
@@ -50,7 +51,7 @@ export default async function TaureauDescendancePage({ params }: { params: Promi
         <BackButton className="rounded-lg bg-white p-2 shadow" iconSize={18} />
         <div>
           <h1 className="text-xl font-bold">Descendance · {bull.nopere ?? bull.nupere}</h1>
-          <p className="text-xs text-gray-500">{bull.nupere}</p>
+          <p className="text-xs text-gray-500">{nationalWithCountry(bull.nupere)}</p>
         </div>
       </div>
       <p className="text-sm text-gray-600">{offspring.length} descendants directs · {present.length} présents · {absent.length} sortis</p>
