@@ -11,7 +11,6 @@ import {
   type AncestrySource,
 } from "@/lib/animal-genealogy";
 import { findAnimalsByExactNational, normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
-import { reconcileFatherSearch } from "@/lib/bull-identity";
 
 function includes(value: string | null | undefined, query: string) {
   if (!value) return false;
@@ -149,7 +148,7 @@ export async function GET(
       workNumber: workNumberFromHistoricalNational(bull.nupere),
       nationalNumber: bull.nupere,
       name: bull.nopere,
-      status: bull.present ? "ACTIF" : "EXTERIEUR",
+      status: bull.present ? "ACTIF" : "SORTI",
     });
   }
   for (const calving of calvings) {
@@ -191,9 +190,30 @@ export async function GET(
     candidateWorkNumber: match.workNumber,
     candidateNationalNumber: match.nationalNumber,
   }));
-  const uniqueMatches = parent === "PERE"
-    ? reconcileFatherSearch(validMatches)
-    : validMatches;
+  // Regrouper les historiques et le répertoire par numéro national canonique.
+  // Si la base possède déjà DEUX fiches Taureau avec le même numéro, les
+  // conserver distinctes pour permettre un audit manuel des liens existants.
+  const grouped = new Map<string, AncestrySearchMatch[]>();
+  for (const match of validMatches) {
+    const national = normalizeGenealogyNational(match.nationalNumber);
+    const key = national.length >= 8
+      ? `national:${national}`
+      : `${match.source}:${match.sourceId ?? ""}:${match.workNumber ?? ""}:${match.name ?? ""}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), match]);
+  }
+  const priority: Record<AncestrySource, number> = {
+    ANIMAL: 0, TAUREAU: 1, HISTORIQUE: 2, VELAGE: 3,
+  };
+  const uniqueMatches: AncestrySearchMatch[] = [];
+  for (const group of grouped.values()) {
+    const distinctBulls = new Map(group.filter((match) => match.source === "TAUREAU" && match.sourceId)
+      .map((match) => [match.sourceId, match]));
+    if (distinctBulls.size > 1) {
+      uniqueMatches.push(...distinctBulls.values());
+    } else {
+      uniqueMatches.push(group.sort((a, b) => priority[a.source] - priority[b.source])[0]);
+    }
+  }
   return NextResponse.json({ matches: rankAncestryMatches(uniqueMatches, query).slice(0, 12) });
 }
 
