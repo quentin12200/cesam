@@ -328,6 +328,14 @@ export async function POST(
   }
 
   const data = buildAncestryUpdate({ parent, source, sourceId, workNumber, nationalNumber, name });
+  if (parent === "PERE") {
+    // Remplacer réellement l'ancien père, y compris lorsqu'il était lié
+    // au répertoire. Ne pas conserver une ancienne saisie en parallèle.
+    data.taureauId = source === "TAUREAU" ? sourceId : null;
+    data.pereTravailManuel = workNumber || null;
+    data.pereNationalManuel = nationalNumber || null;
+    data.pereNomManuel = name || null;
+  }
   const animal = await prisma.animal.update({ where: { nutrav }, data });
   return NextResponse.json({ ok: true, nutrav: animal.nutrav });
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight, ChevronUp, Settings2, X } from "lucide-react";
 import QuickActionsBar from "./[nutrav]/QuickActionsBar";
 import AncestryEditor from "./[nutrav]/arbre/AncestryEditor";
+import AnimalRowActions from "./AnimalRowActions";
 import { differenceInDays } from "date-fns";
 import NutravBadge from "@/app/components/NutravBadge";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
@@ -200,6 +201,7 @@ export default function TroupeauMobileList({
                 </span>
                 <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-gray-400" />
               </Link>
+              <AnimalRowActions nutrav={animal.nutrav} />
               {animal.statut === "ACTIF" && <button type="button" aria-label={`Actions pour ${animal.nutrav}`}
                 aria-expanded={expandedId === animal.id}
                 onClick={() => setExpandedId((current) => current === animal.id ? null : animal.id)}
