@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Network } from "lucide-react";
+import Link from "next/link";
 import GeneaClient from "./GeneaClient";
 import { GENEA_DATA, type GeneaEntry } from "@/app/api/genealogie-import/data";
 
@@ -124,6 +125,11 @@ export default async function GenealogiePage() {
           </div>
         </div>
 
+        <div className="mb-4 flex justify-end">
+          <Link href="/taureaux" className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-100">
+            Taureaux · fiches de descendance
+          </Link>
+        </div>
         <GeneaClient roots={roots} geneaData={GENEA_DATA} />
       </div>
     </div>

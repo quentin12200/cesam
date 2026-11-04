@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 
@@ -77,6 +78,7 @@ export default function TaureauxClient({ initialTaureaux }: { initialTaureaux: T
             <div className="flex-1">
               <div className="font-semibold text-gray-800">{t.nopere ?? <span className="text-gray-400 italic">Sans nom</span>}</div>
               <div className="text-xs text-gray-400">{t._count.saillies} saillie{t._count.saillies > 1 ? "s" : ""} enregistrée{t._count.saillies > 1 ? "s" : ""}</div>
+              <Link href={`/taureaux/${t.id}`} className="mt-1 inline-block text-xs font-semibold text-green-700 underline underline-offset-2">Voir la fiche et la descendance</Link>
             </div>
             <RecordActionsMenu actions={[{
               label: t._count.saillies > 0 ? "Suppression impossible : saillies liées" : "Supprimer le taureau",
