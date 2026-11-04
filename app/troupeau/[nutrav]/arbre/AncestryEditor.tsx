@@ -55,7 +55,7 @@ export default function AncestryEditor({
   }
 
   async function save() {
-    const completeNational = nationalNumber.trim() ? `${country}${nationalNumber.trim().replace(/\\s+/g, "").replace(/^[A-Za-z]{2}/, "")}` : "";
+    const completeNational = nationalNumber.trim() ? `${country}${nationalNumber.trim().replace(/\s+/g, "").replace(/^[A-Za-z]{2}/, "")}` : "";
     if (!selected && !workNumber.trim()) {
       setError("Le N° de travail est requis.");
       return;
