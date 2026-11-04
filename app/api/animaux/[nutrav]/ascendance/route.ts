@@ -274,32 +274,49 @@ export async function POST(
   if (parent === "PERE" && source !== "ANIMAL" && source !== "TAUREAU" && nationalNumber) {
     const normalizedNational = normalizeGenealogyNational(nationalNumber);
     if (/^[0-9]{8,15}$/.test(normalizedNational)) {
-      const variants = [...new Set([nationalNumber, normalizedNational, `FR${normalizedNational}`])];
-      const existing = await prisma.taureau.findFirst({
-        where: { nupere: { in: variants } },
-        select: { id: true, nopere: true },
+      // Les identifiants peuvent déjà exister en base avec FR ou des espaces.
+      // Comparer la forme normalisée avant toute création, sans se baser sur le nom.
+      const candidates = await prisma.taureau.findMany({
+        where: {
+          OR: [
+            { nupere: { contains: normalizedNational } },
+            { nupere: { contains: normalizedNational.slice(-8) } },
+          ],
+        },
+        select: { id: true, nupere: true, nopere: true },
       });
+      const exactMatches = candidates.filter(
+        (candidate) => normalizeGenealogyNational(candidate.nupere) === normalizedNational,
+      );
+      if (exactMatches.length > 1) {
+        return NextResponse.json({
+          error: "Plusieurs fiches de reproducteur portent ce numéro national. Vérifie le répertoire avant de continuer.",
+        }, { status: 409 });
+      }
+      const existing = exactMatches[0] ?? null;
       if (existing?.nopere && name && existing.nopere.trim().toLocaleLowerCase("fr") !== name.trim().toLocaleLowerCase("fr")) {
         return NextResponse.json({
           error: "Ce numéro national correspond déjà à un reproducteur portant un autre nom. Vérifie l'identification avant d'enregistrer.",
         }, { status: 409 });
       }
-      const bull = existing ?? await prisma.taureau.upsert({
-        where: { nupere: normalizedNational },
-        create: { nupere: normalizedNational, nopere: name, present: false },
-        update: {},
-        select: { id: true, nopere: true },
-      });
-      // Conserver aussi la saisie lisible sur l'animal : aucun historique
-      // de vêlage ou de saillie n'est modifié par cette opération.
-      await prisma.animal.update({
-        where: { nutrav },
-        data: {
-          taureauId: bull.id,
-          pereTravailManuel: workNumber || null,
-          pereNationalManuel: nationalNumber,
-          pereNomManuel: name,
-        },
+      // Transaction : ne pas conserver un nouveau reproducteur orphelin si
+      // la mise à jour de l'animal échoue.
+      await prisma.$transaction(async (tx) => {
+        const bull = existing ?? await tx.taureau.upsert({
+          where: { nupere: normalizedNational },
+          create: { nupere: normalizedNational, nopere: name, present: false },
+          update: {},
+          select: { id: true },
+        });
+        await tx.animal.update({
+          where: { nutrav },
+          data: {
+            taureauId: bull.id,
+            pereTravailManuel: workNumber || null,
+            pereNationalManuel: nationalNumber,
+            pereNomManuel: name,
+          },
+        });
       });
       return NextResponse.json({ ok: true, nutrav });
     }
