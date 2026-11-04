@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       const [directChildren, linkedBreedings] = await Promise.all([
         tx.animal.findMany({
           where: { taureauId: removeId },
-          select: { pereNationalManuel: true, nutrav: true },
+          select: { pereNationalManuel: true, nutrav: true, velageVeau: { select: { pereNunati: true } } },
         }),
         tx.saillie.findMany({
           where: { taureauId: removeId },
@@ -58,7 +58,9 @@ export async function POST(request: NextRequest) {
       const normalizedKeep = canonicalNational(keep.nupere);
       const incompatibleChild = directChildren.find((animal) => {
         const found = fullNational(animal.pereNationalManuel);
-        return found !== null && canonicalNational(found) !== normalizedKeep;
+        const fromCalving = fullNational(animal.velageVeau?.pereNunati);
+        return (found !== null && canonicalNational(found) !== normalizedKeep)
+          || (fromCalving !== null && canonicalNational(fromCalving) !== normalizedKeep);
       });
       const incompatibleBreeding = linkedBreedings.find((breeding) => {
         const father = breeding.gestation?.velage?.pereNunati;
