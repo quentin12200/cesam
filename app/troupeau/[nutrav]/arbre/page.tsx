@@ -286,8 +286,9 @@ async function getArbreData(nutrav: string): Promise<ArbreData | null> {
   };
 }
 
-export default async function ArbrePage({ params }: { params: Promise<{ nutrav: string }> }) {
+export default async function ArbrePage({ params, searchParams }: { params: Promise<{ nutrav: string }>; searchParams: Promise<{ edit?: string }> }) {
   const { nutrav } = await params;
+  const { edit } = await searchParams;
   const data = await getArbreData(nutrav);
 
   if (!data) notFound();
@@ -309,7 +310,7 @@ export default async function ArbrePage({ params }: { params: Promise<{ nutrav: 
           </div>
         </div>
 
-        <ArbreClient data={data} />
+        <ArbreClient data={data} editFather={edit === "pere"} />
       </div>
     </div>
   );
