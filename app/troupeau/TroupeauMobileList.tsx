@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, ChevronUp, Settings2, X } from "lucide-react";
 import QuickActionsBar from "./[nutrav]/QuickActionsBar";
+import AncestryEditor from "./[nutrav]/arbre/AncestryEditor";
 import { differenceInDays } from "date-fns";
 import NutravBadge from "@/app/components/NutravBadge";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
@@ -236,8 +237,20 @@ export default function TroupeauMobileList({
                   {animal.sexbov === "F" ? "♀" : "♂"} {categoryLabel}
                 </span>
               )}
-              {isVisible("mother") && <span className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-800">Mère {animal.mereNutrav ?? "—"}</span>}
-              {isVisible("father") && <span className="max-w-full truncate rounded-full bg-sky-50 px-2 py-0.5 text-sky-800">Père {father}</span>}
+              {isVisible("mother") && (animal.mereLieeNutrav ? (
+                <Link href={`/troupeau/${animal.mereLieeNutrav}`} className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-800 underline">
+                  Mère {animal.mereNutrav}
+                </Link>
+              ) : animal.mereNutrav ? (
+                <Link href={`/troupeau/${animal.nutrav}/arbre`} className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-800 underline decoration-dotted">
+                  Mère {animal.mereNutrav}
+                </Link>
+              ) : <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-violet-800">Mère <AncestryEditor animalNutrav={animal.nutrav} parent="MERE" /></span>)}
+              {isVisible("father") && (animal.pereNom || animal.pereNumero ? (
+                <Link href={`/troupeau/${animal.nutrav}/arbre`} className="max-w-full truncate rounded-full bg-sky-50 px-2 py-0.5 text-sky-800 underline decoration-dotted">
+                  Père {father}
+                </Link>
+              ) : <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-sky-800">Père <AncestryEditor animalNutrav={animal.nutrav} parent="PERE" /></span>)}
               {isVisible("notWeaned") && !animal.sevreFait && shouldDisplayNonWeaned(birthDate, animal.sevreFait) && (
                 <span className="rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">🍼 Non sevrée</span>
               )}

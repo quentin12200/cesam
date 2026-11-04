@@ -12,6 +12,7 @@ import {
   type EtatGestation,
 } from "@/lib/utils";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
+import AncestryEditor from "./[nutrav]/arbre/AncestryEditor";
 import { getMotherWeaningDisplay } from "@/lib/troupeau-mother-weaning";
 import { formatFather, shouldDisplayNonWeaned } from "@/lib/troupeau-display";
 import ReproductionCycleSummary, { type ReproductionSummaryRow } from "./ReproductionCycleSummary";
@@ -35,6 +36,7 @@ export interface AnimalRow {
   velageDate: string | null;
   reproductionSummary: ReproductionSummaryRow;
   mereNutrav: string | null;
+  mereLieeNutrav: string | null;
   pereNom: string | null;
   pereNumero: string | null;
   sevreFait: boolean;
@@ -406,14 +408,50 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                       <span className="text-gray-200 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5">
-                    <span className="font-mono text-xs font-bold text-gray-800">{motherWeaning.motherLabel}</span>
+                  <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
+                    {animal.mereLieeNutrav ? (
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/troupeau/${animal.mereLieeNutrav}`)}
+                        className="font-mono text-xs font-bold text-green-700 underline underline-offset-2 hover:text-green-900"
+                        title="Ouvrir la fiche de la mère"
+                      >
+                        {motherWeaning.motherLabel}
+                      </button>
+                    ) : animal.mereNutrav ? (
+                      <button type="button" onClick={() => router.push(`/troupeau/${animal.nutrav}/arbre`)}
+                        className="font-mono text-xs font-semibold text-gray-700 underline decoration-dotted"
+                        title="Voir ou compléter la parenté"
+                      >
+                        {animal.mereNutrav}
+                      </button>
+                    ) : <AncestryEditor animalNutrav={animal.nutrav} parent="MERE" />}
                   </td>
-                  <td className="max-w-[9rem] px-3 py-2.5 text-xs font-semibold text-gray-700">
-                    <span className="line-clamp-2">{father}</span>
+                  <td className="max-w-[9rem] px-3 py-2.5 text-xs font-semibold text-gray-700" onClick={(event) => event.stopPropagation()}>
+                    {animal.pereNumero || animal.pereNom ? (
+                      <button type="button" onClick={() => router.push(`/troupeau/${animal.nutrav}/arbre`)}
+                        className="line-clamp-2 text-left underline decoration-dotted underline-offset-2"
+                        title="Voir le père dans l'arbre généalogique"
+                      >{father}</button>
+                    ) : <AncestryEditor animalNutrav={animal.nutrav} parent="PERE" />}
                   </td>
-                  <td className="px-3 py-2.5">
-                    {displayNonWeaned && motherWeaning.statusLabel && <span className="whitespace-nowrap text-[10px] font-semibold text-blue-700">🍼 {motherWeaning.statusLabel}</span>}
+                  <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
+                    {animal.activeCalves.length > 0 ? (
+                      <div className="space-y-1">
+                        <div className="font-semibold text-blue-700">🍼 Veau à sevrer</div>
+                        <div className="flex flex-wrap gap-1">
+                          {animal.activeCalves.map((calf) => calf.href ? (
+                            <button key={calf.nutrav} type="button"
+                              onClick={() => router.push(calf.href!)}
+                              className="font-mono text-green-700 underline"
+                              title="Ouvrir la fiche du veau"
+                            >{calf.nutrav}</button>
+                          ) : <span key={calf.nutrav} className="font-mono text-gray-600">{calf.nutrav}</span>)}
+                        </div>
+                      </div>
+                    ) : displayNonWeaned && motherWeaning.statusLabel ? (
+                      <span className="whitespace-nowrap font-semibold text-blue-700">🍼 {motherWeaning.statusLabel}</span>
+                    ) : <span className="text-gray-400">Aucun veau non sevré lié</span>}
                   </td>
                 </tr>
               );
