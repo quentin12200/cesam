@@ -247,10 +247,13 @@ export default function ArbreClient({ data }: { data: ArbreData }) {
                 ? <NodeCard node={data.mere} label="Mère" showNational />
                 : <UnknownCard label="Mère" animalNutrav={data.animal.nutrav} parent="MERE" />}
             </div>
-            <div ref={refPere} className="flex justify-center">
-              {data.pere
-                ? <NodeCard node={data.pere} label="Père" showNational />
-                : <UnknownCard label="Père" animalNutrav={data.animal.nutrav} parent="PERE" />}
+            <div ref={refPere} className="flex flex-col items-center justify-center gap-1">
+              {data.pere ? (
+                <>
+                  <NodeCard node={data.pere} label="Père" showNational />
+                  <AncestryEditor animalNutrav={data.animal.nutrav} parent="PERE" edit />
+                </>
+              ) : <UnknownCard label="Père" animalNutrav={data.animal.nutrav} parent="PERE" />}
             </div>
           </div>
 
