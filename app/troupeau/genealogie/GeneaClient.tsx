@@ -554,7 +554,7 @@ function VueConsanguinite({ roots }: { roots: AnimalGeneaNode[] }) {
 }
 
 /* ─── Vue par père ──────────────────────────────────── */
-function VueParPere({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData: GeneaEntry[] }) {
+function VueParPere({ roots, geneaData, bulls }: { roots: AnimalGeneaNode[]; geneaData: GeneaEntry[]; bulls: Array<{ id: string; nupere: string }> }) {
   // Build a set of nutravs that exist in the DB
   const dbNutravs = useMemo(() => {
     const set = new Set<string>();
@@ -609,6 +609,11 @@ function VueParPere({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData:
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         {groupes.map(({ pere, veaux, nb }) => {
           const nbInDb = veaux.filter(v => dbNutravs.has(nutravFromNat(v.veauNat))).length;
+          const nationalNumbers = [...new Set(veaux.map((v) => v.pereNat.replace(/\\s+/g, "").replace(/^FR/i, "")))];
+          const matchingBulls = nationalNumbers.length === 1
+            ? bulls.filter((b) => b.nupere.replace(/\\s+/g, "").replace(/^FR/i, "") === nationalNumbers[0])
+            : [];
+          const bullId = matchingBulls.length === 1 ? matchingBulls[0].id : null;
           return (
             <div key={pere} className="border-b border-gray-100 last:border-0">
               <button
@@ -619,6 +624,11 @@ function VueParPere({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData:
                   ? <ChevronDown size={15} className="text-blue-500 flex-shrink-0" />
                   : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />}
                 <span className="font-semibold text-blue-700 text-sm">{pere}</span>
+                {bullId && (
+                  <Link href={`/taureaux/${bullId}`} onClick={(event) => event.stopPropagation()}
+                    className="text-xs font-semibold text-green-700 underline underline-offset-2"
+                  >Fiche et descendance</Link>
+                )}
                 <span className="ml-auto flex items-center gap-2">
                   <span className="text-xs text-emerald-600 font-medium">{nbInDb} en DB</span>
                   <span className="text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full">
@@ -674,7 +684,7 @@ function VueParPere({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData:
 }
 
 /* ─── Vue globale ───────────────────────────────────── */
-export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNode[]; geneaData: GeneaEntry[] }) {
+export default function GeneaClient({ roots, geneaData, bulls }: { roots: AnimalGeneaNode[]; geneaData: GeneaEntry[]; bulls: Array<{ id: string; nupere: string }> }) {
   const [search, setSearch] = useState("");
   const [vue, setVue] = useState<"arbre" | "paysage" | "mere" | "pere" | "consang">("arbre");
 
@@ -813,7 +823,7 @@ export default function GeneaClient({ roots, geneaData }: { roots: AnimalGeneaNo
 
       {vue === "paysage" && <VuePaysage roots={filteredRoots} highlight={highlight} />}
       {vue === "mere"    && <VueParMere roots={roots} />}
-      {vue === "pere"    && <VueParPere roots={roots} geneaData={geneaData} />}
+      {vue === "pere"    && <VueParPere roots={roots} geneaData={geneaData} bulls={bulls} />}
       {vue === "consang" && <VueConsanguinite roots={roots} />}
 
       {/* Lien discret pour relancer l'import si nécessaire */}
