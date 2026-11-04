@@ -34,7 +34,6 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
   const [expanded, setExpanded] = useState<string | null>(null);
   const [mergeFrom, setMergeFrom] = useState<string | null>(null);
   const [mergeInto, setMergeInto] = useState("");
-  const [mergeConfirm, setMergeConfirm] = useState("");
 
   const visible = useMemo(() => rows.filter((row) => {
     const phrase = [row.number, nationalWithCountry(row.number), row.name ?? "", ...row.childNumbers].join(" ").toLocaleLowerCase("fr");
@@ -90,7 +89,8 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
   async function mergeAlias() {
     const from = rows.find((row) => row.id === mergeFrom);
     const into = rows.find((row) => row.id === mergeInto);
-    if (!from || !into || mergeConfirm !== "FUSIONNER") return;
+    if (!from || !into) return;
+    if (!window.confirm(`Même reproducteur ?\n\nConserver ${nationalWithCountry(into.number)} · ${into.name ?? ""}\nRegrouper ${from.number} · ${from.name ?? ""}\n\n${from.breeding} saillies (dont ${from.inseminations} IA) et ${from.direct} liens animaux seront transférés. Les dates et les vaches restent inchangées. Confirmer ?`)) return;
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/taureaux/fusion", {
@@ -103,7 +103,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Fusion refusée");
-      setMergeFrom(null); setMergeInto(""); setMergeConfirm("");
+      setMergeFrom(null); setMergeInto("");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fusion impossible");
@@ -165,27 +165,42 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
           && fullNational(candidate.number)
           && canonicalName(candidate.name) === canonicalName(from.name)
         );
-        const target = choices.find((item) => item.id === mergeInto);
+        const into = choices.find((item) => item.id === mergeInto);
         return from ? (
-          <section className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">
-            <h2 className="font-bold text-amber-950">Fusion contrôlée · {from.name ?? from.number}</h2>
-            <p className="text-sm text-gray-700">Fiche à retirer : <strong>{from.number}</strong>. {from.direct} animaux liés, {from.breeding} saillies dont {from.inseminations} IA. Les dates, vaches et gestations restent inchangées.</p>
-            <label className="block text-sm font-semibold text-gray-800">Fiche à conserver
-              <select value={mergeInto} onChange={(e) => { setMergeInto(e.target.value); setMergeConfirm(""); }} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-2">
-                <option value="">Choisir le numéro national vérifié</option>
-                {choices.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name} — {nationalWithCountry(candidate.number)} · {candidate.offspring} veaux</option>)}
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !busy) { setMergeFrom(null); setMergeInto(""); }
+            }}>
+            <section role="dialog" aria-modal="true" aria-labelledby="merge-title"
+              className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-2xl">
+              <div className="flex items-center justify-between gap-2">
+                <h2 id="merge-title" className="text-lg font-bold">Fusionner {from.name ?? from.number}</h2>
+                <button type="button" disabled={busy} onClick={() => { setMergeFrom(null); setMergeInto(""); }}
+                  aria-label="Fermer" className="rounded-lg px-2 py-1 text-xl text-gray-500">×</button>
+              </div>
+              <p className="text-sm text-gray-700">Regrouper <strong>{from.number}</strong> ({from.breeding} saillies dont {from.inseminations} IA) dans :</p>
+              <select aria-label="Fiche à conserver" value={mergeInto} onChange={(e) => setMergeInto(e.target.value)}
+                className="min-h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm font-semibold">
+                <option value="">Choisir le bon taureau</option>
+                {choices.map((candidate) => <option key={candidate.id} value={candidate.id}>
+                  {candidate.name ?? "Sans nom"} · {nationalWithCountry(candidate.number)}
+                </option>)}
               </select>
-            </label>
-            {choices.length === 0 && <p className="text-sm text-red-800">Aucune fiche complète avec le même nom : fusion bloquée. Utilise la vérification des doublons pour les autres cas.</p>}
-            {target && <p className="text-sm text-amber-900">Après fusion, les {from.breeding} saillies / IA de cette fiche seront rattachées à <strong>{nationalWithCountry(target.number)}</strong>. Les fils et vêlages déjà liés resteront conservés. Si leurs numéros se contredisent, le serveur bloquera la fusion.</p>}
-            <label className="block text-sm text-gray-700">Pour confirmer que c’est bien le même reproducteur, écris <strong>FUSIONNER</strong> :
-              <input value={mergeConfirm} onChange={(e) => setMergeConfirm(e.target.value.toUpperCase())} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3" placeholder="FUSIONNER" />
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={busy || !mergeInto || mergeConfirm !== "FUSIONNER"} onClick={mergeAlias} className="rounded-lg bg-green-700 px-4 py-2 font-semibold text-white disabled:opacity-40">Confirmer la fusion</button>
-              <button type="button" onClick={() => { setMergeFrom(null); setMergeInto(""); setMergeConfirm(""); }} className="rounded-lg border px-4 py-2 text-sm">Annuler</button>
-            </div>
-          </section>
+              {into && <p className="text-sm text-gray-600">
+                Après la fusion : <strong>{into.offspring} veaux déjà identifiés + {from.breeding} saillies</strong> rattachés au taureau conservé.
+              </p>}
+              {choices.length === 0 && <p className="text-sm text-red-700">Aucune fiche complète compatible. Fusion indisponible.</p>}
+              <div className="flex gap-2">
+                <button type="button" disabled={busy || !into} onClick={mergeAlias}
+                  className="min-h-11 flex-1 rounded-lg bg-green-700 px-3 font-semibold text-white disabled:opacity-40">
+                  {busy ? "Fusion en cours…" : "Fusionner"}
+                </button>
+                <button type="button" disabled={busy} onClick={() => { setMergeFrom(null); setMergeInto(""); }}
+                  className="min-h-11 rounded-lg border border-gray-300 px-4">Annuler</button>
+              </div>
+              <p className="text-xs text-gray-500">CESAM contrôle les filiations et bloque toute fusion contradictoire.</p>
+            </section>
+          </div>
         ) : null;
       })()}
 
@@ -247,7 +262,10 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
                   <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); }}
                     className="text-green-800 underline">Corriger le nom</button>
                   {!fullNational(row.number) && (
-                    <button type="button" onClick={() => { setMergeFrom(row.id); setMergeInto(""); setMergeConfirm(""); setError(""); }}
+                    <button type="button" onClick={() => {
+                      const choices = rows.filter((candidate) => candidate.id !== row.id && fullNational(candidate.number) && canonicalName(candidate.name) === canonicalName(row.name));
+                      setMergeFrom(row.id); setMergeInto(choices.length === 1 ? choices[0].id : ""); setError("");
+                    }}
                       className="text-amber-900 underline">Fusionner</button>
                   )}
                   <Link href={`/taureaux/${row.id}`} className="text-blue-700 underline">Fiche</Link>
