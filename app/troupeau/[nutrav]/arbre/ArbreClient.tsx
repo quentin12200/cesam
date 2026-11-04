@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import type { ArbreData, TreeNode } from "./page";
 import AncestryEditor from "./AncestryEditor";
+import { nationalWithCountry } from "@/lib/bull-identity";
 import type { AncestryParent } from "@/lib/animal-genealogy";
 
 /* ─── Couleurs par rôle ─────────────────────────────── */
@@ -54,7 +55,7 @@ function NodeCard({
         </div>
       )}
       <div className="font-bold text-sm leading-tight truncate">
-        {showNational ? node.nationalNumber ?? node.nutrav : node.nutrav}
+        {showNational ? (node.nationalNumber ? nationalWithCountry(node.nationalNumber) : node.nutrav) : node.nutrav}
       </div>
       {node.nobovi && (
         <div className="text-xs opacity-85 truncate mt-0.5">{node.nobovi}</div>

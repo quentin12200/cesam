@@ -45,7 +45,7 @@ export default function AncestryEditor({
   function choose(match: AncestrySearchMatch) {
     setSelected(match);
     setWorkNumber(match.workNumber ?? "");
-    setNationalNumber(match.nationalNumber ?? "");
+    setNationalNumber(nationalWithCountry(match.nationalNumber));
     setName(match.name ?? "");
     setMatches([]);
   }
