@@ -15,6 +15,7 @@ import TroupeauFilters from "./TroupeauFilters";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
 import { getCurrentReproductionSummary } from "@/lib/current-reproduction-summary";
 import { classifyWeaningWindow } from "@/lib/weaning-dry-off";
+import { workNumberFromHistoricalNational } from "@/lib/animal-genealogy";
 import {
   buildTroupeauWhere,
   belongsToEchoActionList,
@@ -68,7 +69,9 @@ async function getAnimaux(params: TroupeauFilterParams) {
         categorie: true,
         groupeId: true,
         sevreFait: true,
-        mere: { select: { nutrav: true } },
+        mere: { select: { nutrav: true, nobovi: true } },
+        nomeip: true,
+        mereNomManuel: true,
         mereTravailManuel: true,
         mereNationalManuel: true,
         numeip: true,
@@ -78,7 +81,7 @@ async function getAnimaux(params: TroupeauFilterParams) {
         taureau: { select: { nopere: true, nupere: true } },
         velageVeau: {
           select: {
-            vache: { select: { nutrav: true } },
+            vache: { select: { nutrav: true, nobovi: true } },
             pereNom: true,
             pereNunati: true,
             gestation: {
@@ -280,8 +283,9 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       },
       mereNutrav: animal.mere?.nutrav ?? animal.velageVeau?.vache?.nutrav ?? animal.mereTravailManuel ?? (animal.numeip ? animal.numeip.slice(-4) : animal.mereNationalManuel?.slice(-4)) ?? null,
       mereLieeNutrav: animal.mere?.nutrav ?? animal.velageVeau?.vache?.nutrav ?? null,
+      mereNom: animal.mere?.nobovi ?? animal.velageVeau?.vache?.nobovi ?? animal.nomeip ?? animal.mereNomManuel ?? null,
       pereNom: animal.taureau?.nopere ?? bull?.nopere ?? animal.velageVeau?.pereNom ?? animal.pereNomManuel ?? null,
-      pereNumero: animal.taureau?.nupere ?? bull?.nupere ?? animal.velageVeau?.pereNunati ?? animal.pereNationalManuel ?? animal.pereTravailManuel ?? null,
+      pereNumero: animal.pereTravailManuel ?? workNumberFromHistoricalNational(animal.taureau?.nupere ?? bull?.nupere ?? animal.velageVeau?.pereNunati ?? animal.pereNationalManuel) ?? null,
       sevreFait: animal.sevreFait,
       activeCalves: [...activeCalves.values()],
       dernierPoids: animal.pesees[0]?.poids ?? null,
