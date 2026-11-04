@@ -14,7 +14,7 @@ import {
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 import AncestryEditor from "./[nutrav]/arbre/AncestryEditor";
 import { getMotherWeaningDisplay } from "@/lib/troupeau-mother-weaning";
-import { formatFather, shouldDisplayNonWeaned } from "@/lib/troupeau-display";
+import { shouldDisplayNonWeaned } from "@/lib/troupeau-display";
 import ReproductionCycleSummary, { type ReproductionSummaryRow } from "./ReproductionCycleSummary";
 
 export interface AnimalRow {
@@ -324,7 +324,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                 motherNutrav: animal.mereNutrav,
                 sevreFait: animal.sevreFait,
               });
-              const father = formatFather(animal.pereNom, animal.pereNumero);
+              const father = [animal.pereNumero, animal.pereNom].filter(Boolean).join(" · ") || "—";
               const selectable = eligibleIds.has(animal.id);
               const displayNonWeaned = shouldDisplayNonWeaned(danais, animal.sevreFait);
 
