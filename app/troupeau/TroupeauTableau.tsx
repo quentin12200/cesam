@@ -13,6 +13,7 @@ import {
 } from "@/lib/utils";
 import ReproductionListBadge from "@/app/components/ReproductionListBadge";
 import AncestryEditor from "./[nutrav]/arbre/AncestryEditor";
+import AnimalRowActions from "./AnimalRowActions";
 import { getMotherWeaningDisplay } from "@/lib/troupeau-mother-weaning";
 import { shouldDisplayNonWeaned } from "@/lib/troupeau-display";
 import ReproductionCycleSummary, { type ReproductionSummaryRow } from "./ReproductionCycleSummary";
@@ -289,6 +290,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
               <th className="px-3 py-2.5 text-left font-semibold">Mère</th>
               <th className="px-3 py-2.5 text-left font-semibold">Père</th>
               <th className="px-3 py-2.5 text-left font-semibold">Sevrage</th>
+              <th className="w-12 px-2 py-2.5 text-center">⋯</th>
             </tr>
           </thead>
           <tbody>
@@ -455,6 +457,9 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                     ) : displayNonWeaned && motherWeaning.statusLabel ? (
                       <span className="whitespace-nowrap font-semibold text-blue-700">🍼 {motherWeaning.statusLabel}</span>
                     ) : null}
+                  </td>
+                  <td className="px-2 py-2.5" onClick={(event) => event.stopPropagation()}>
+                    <AnimalRowActions nutrav={animal.nutrav} />
                   </td>
                 </tr>
               );
