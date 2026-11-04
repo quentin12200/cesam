@@ -250,7 +250,7 @@ export default function TroupeauMobileList({
                 <Link href={`/troupeau/${animal.nutrav}/arbre`} className="max-w-full truncate rounded-full bg-sky-50 px-2 py-0.5 text-sky-800 underline decoration-dotted">
                   Père {father}
                 </Link>
-              ) : <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-sky-800">Père <AncestryEditor animalNutrav={animal.nutrav} parent="PERE" /></span>))}
+              ) : <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-sky-800">Père <AncestryEditor animalNutrav={animal.nutrav} parent="PERE" /></span>)}
               {isVisible("notWeaned") && !animal.sevreFait && shouldDisplayNonWeaned(birthDate, animal.sevreFait) && (
                 <span className="rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">🍼 Non sevrée</span>
               )}
