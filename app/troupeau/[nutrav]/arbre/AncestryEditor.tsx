@@ -4,19 +4,21 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AncestryParent, AncestrySearchMatch } from "@/lib/animal-genealogy";
 import { nationalWithCountry } from "@/lib/bull-identity";
-import { Pencil } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 
 export default function AncestryEditor({
   animalNutrav,
   parent,
   edit = false,
+  editInitially = false,
 }: {
   animalNutrav: string;
   parent: AncestryParent;
   edit?: boolean;
+  editInitially?: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(editInitially);
   const [workNumber, setWorkNumber] = useState("");
   const [nationalNumber, setNationalNumber] = useState("");
   const [country, setCountry] = useState("FR");
@@ -96,7 +98,7 @@ export default function AncestryEditor({
         aria-label="Modifier le père"
         className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-full bg-white text-blue-700 shadow hover:bg-blue-50"
       >
-        <Pencil size={14} />
+        <MoreHorizontal size={17} />
       </button>
     ) : (
       <button
