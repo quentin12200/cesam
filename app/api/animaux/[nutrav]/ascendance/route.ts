@@ -11,7 +11,7 @@ import {
   type AncestrySource,
 } from "@/lib/animal-genealogy";
 import { findAnimalsByExactNational, normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
-import { reconcileFatherSearch } from "@/lib/bull-identity";
+import { reconcileFatherSearch, nationalWithCountry } from "@/lib/bull-identity";
 
 function includes(value: string | null | undefined, query: string) {
   if (!value) return false;
@@ -273,7 +273,7 @@ export async function POST(
   // Sans elle, on garde la saisie manuelle (et la recherche ci-dessus).
   if (parent === "PERE" && source !== "ANIMAL" && source !== "TAUREAU" && nationalNumber) {
     const normalizedNational = normalizeGenealogyNational(nationalNumber);
-    if (/^[0-9]{8,15}$/.test(normalizedNational)) {
+    if (/^(?:[0-9]{8,15}|[A-Z]{2}[0-9]{8,15})$/.test(normalizedNational)) {
       // Les identifiants peuvent déjà exister en base avec FR ou des espaces.
       // Comparer la forme normalisée avant toute création, sans se baser sur le nom.
       const candidates = await prisma.taureau.findMany({
@@ -303,8 +303,8 @@ export async function POST(
       // la mise à jour de l'animal échoue.
       await prisma.$transaction(async (tx) => {
         const bull = existing ?? await tx.taureau.upsert({
-          where: { nupere: normalizedNational },
-          create: { nupere: normalizedNational, nopere: name, present: false },
+          where: { nupere: nationalWithCountry(nationalNumber) },
+          create: { nupere: nationalWithCountry(nationalNumber), nopere: name, present: false },
           update: {},
           select: { id: true },
         });
