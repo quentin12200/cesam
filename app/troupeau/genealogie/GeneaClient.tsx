@@ -624,11 +624,6 @@ function VueParPere({ roots, geneaData, bulls }: { roots: AnimalGeneaNode[]; gen
                   ? <ChevronDown size={15} className="text-blue-500 flex-shrink-0" />
                   : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />}
                 <span className="font-semibold text-blue-700 text-sm">{pere}</span>
-                {bullId && (
-                  <Link href={`/taureaux/${bullId}`} onClick={(event) => event.stopPropagation()}
-                    className="text-xs font-semibold text-green-700 underline underline-offset-2"
-                  >Fiche et descendance</Link>
-                )}
                 <span className="ml-auto flex items-center gap-2">
                   <span className="text-xs text-emerald-600 font-medium">{nbInDb} en DB</span>
                   <span className="text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full">
@@ -636,6 +631,11 @@ function VueParPere({ roots, geneaData, bulls }: { roots: AnimalGeneaNode[]; gen
                   </span>
                 </span>
               </button>
+              {bullId && (
+                <Link href={`/taureaux/${bullId}`}
+                  className="mb-2 ml-10 inline-block text-xs font-semibold text-green-700 underline underline-offset-2"
+                >Voir la fiche et la descendance de {pere}</Link>
+              )}
               {openPeres.has(pere) && (
                 <div className="px-4 pb-3 flex flex-wrap gap-1.5">
                   {veaux
