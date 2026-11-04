@@ -119,6 +119,9 @@ export default function GlobalSettingsButton() {
               <span aria-hidden="true">›</span>
             </Link>
 
+            <Link href="/taureaux/controle" onClick={() => setOpen(false)} className="mt-3 flex min-h-12 items-center justify-between rounded-xl border border-green-200 bg-green-50 px-3 text-sm font-bold text-green-900">
+              <span>Tableau des pères · Coulisses CESAM</span><span aria-hidden="true">›</span>
+            </Link>
             <IdentificationSettings />
             <div className="mt-5 border-t border-gray-100 pt-4">
               <h3 className="text-sm font-bold text-gray-800">Reproduction</h3>
