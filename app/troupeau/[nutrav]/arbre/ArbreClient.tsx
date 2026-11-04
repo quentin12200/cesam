@@ -145,7 +145,7 @@ function Connector({ fromRef, toRef, containerRef, color = "#d1d5db" }: {
 }
 
 /* ─── Composant principal ─────────────────────────────── */
-export default function ArbreClient({ data }: { data: ArbreData }) {
+export default function ArbreClient({ data, editFather = false }: { data: ArbreData; editFather?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Refs pour les nœuds (on en crée un par slot fixe)
@@ -251,7 +251,7 @@ export default function ArbreClient({ data }: { data: ArbreData }) {
               {data.pere ? (
                 <>
                   <NodeCard node={data.pere} label="Père" showNational />
-                  <AncestryEditor animalNutrav={data.animal.nutrav} parent="PERE" edit />
+                  <AncestryEditor animalNutrav={data.animal.nutrav} parent="PERE" edit editInitially={editFather} />
                 </>
               ) : <UnknownCard label="Père" animalNutrav={data.animal.nutrav} parent="PERE" />}
             </div>
