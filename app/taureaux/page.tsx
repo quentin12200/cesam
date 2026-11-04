@@ -23,6 +23,7 @@ export default async function TaureauxPage() {
         <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <h2 className="text-xl font-bold text-gray-800">Taureaux</h2>
       </div>
+      <Link href="/taureaux/controle" className="inline-flex rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-bold text-green-900">Tableau des pères · Contrôler et corriger</Link>
       <Link href="/taureaux/doublons" className="inline-flex rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">Vérifier les doublons des reproducteurs</Link>
       <TaureauxClient initialTaureaux={taureaux} />
     </div>
