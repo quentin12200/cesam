@@ -40,7 +40,7 @@ export interface AnimalRow {
   pereNom: string | null;
   pereNumero: string | null;
   sevreFait: boolean;
-  activeCalves: { nutrav: string; href: string | null }[];
+  activeCalves: { nutrav: string; href: string | null; toWean: boolean }[];
   dernierPoids: number | null;
   dernierePeseeDate: string | null;
   enAttente: boolean;
@@ -437,21 +437,23 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   </td>
                   <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
                     {animal.activeCalves.length > 0 ? (
-                      <div className="space-y-1">
-                        <div className="font-semibold text-blue-700">🍼 Veau à sevrer</div>
-                        <div className="flex flex-wrap gap-1">
-                          {animal.activeCalves.map((calf) => calf.href ? (
-                            <button key={calf.nutrav} type="button"
-                              onClick={() => router.push(calf.href!)}
-                              className="font-mono text-green-700 underline"
-                              title="Ouvrir la fiche du veau"
-                            >{calf.nutrav}</button>
-                          ) : <span key={calf.nutrav} className="font-mono text-gray-600">{calf.nutrav}</span>)}
-                        </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {animal.activeCalves.map((calf) => (
+                          <span key={calf.nutrav} className="inline-flex items-center gap-1">
+                            {calf.href ? (
+                              <button type="button"
+                                onClick={() => router.push(calf.href!)}
+                                className={`font-mono font-bold underline underline-offset-2 ${calf.toWean ? "text-red-700" : "text-blue-700"}`}
+                                title="Ouvrir la fiche du veau"
+                              >{calf.nutrav}</button>
+                            ) : <span className={`font-mono font-bold ${calf.toWean ? "text-red-700" : "text-gray-700"}`}>{calf.nutrav}</span>}
+                            {calf.toWean && <span className="whitespace-nowrap rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-800">À sevrer</span>}
+                          </span>
+                        ))}
                       </div>
                     ) : displayNonWeaned && motherWeaning.statusLabel ? (
                       <span className="whitespace-nowrap font-semibold text-blue-700">🍼 {motherWeaning.statusLabel}</span>
-                    ) : <span className="text-gray-400">Aucun veau non sevré lié</span>}
+                    ) : null}
                   </td>
                 </tr>
               );
