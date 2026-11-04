@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { nationalWithCountry } from "@/lib/bull-identity";
 import { Plus } from "lucide-react";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 
@@ -73,7 +74,7 @@ export default function TaureauxClient({ initialTaureaux }: { initialTaureaux: T
         {taureaux.map((t) => (
           <div key={t.id} className="flex items-center gap-3 px-4 py-3">
             <div className="bg-green-700 text-white font-bold font-mono text-sm px-2.5 py-1 rounded-lg min-w-[4rem] text-center">
-              {t.nupere}
+              {nationalWithCountry(t.nupere)}
             </div>
             <div className="flex-1">
               <div className="font-semibold text-gray-800">{t.nopere ?? <span className="text-gray-400 italic">Sans nom</span>}</div>

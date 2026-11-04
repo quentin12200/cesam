@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AncestryParent, AncestrySearchMatch } from "@/lib/animal-genealogy";
+import { nationalWithCountry } from "@/lib/bull-identity";
 
 export default function AncestryEditor({
   animalNutrav,
@@ -124,7 +125,7 @@ export default function AncestryEditor({
               >
                 <span className="block text-sm font-bold text-gray-900">
                   <span className="font-mono">{match.workNumber ?? "—"}</span>
-                  {` — ${match.name ?? "—"} — ${match.nationalNumber ?? "—"}`}
+                  {` — ${match.name ?? "—"} — ${match.nationalNumber ? nationalWithCountry(match.nationalNumber) : "—"}`}
                 </span>
                 {match.status && match.status !== "ACTIF" && (
                   <span className="block text-xs text-gray-500">{match.status}</span>

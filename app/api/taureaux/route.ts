@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
+import { nationalWithCountry } from "@/lib/bull-identity";
 
 export async function GET() {
   const taureaux = await prisma.taureau.findMany({
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     const taureau = await prisma.taureau.create({
       data: {
-        nupere: nupere.trim(),
+        nupere: nationalWithCountry(nupere.trim()),
         nopere: nopere?.trim() || null,
         traper: traper?.trim() || null,
         present: present !== false,
