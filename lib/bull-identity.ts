@@ -38,6 +38,19 @@ export function sameBullCandidates(a: { nupere: string; nopere: string | null },
   return "A_VERIFIER";
 }
 
+// Une référence IA saisie avec son nom (ARGUS/Argus) est un alias
+// possible, jamais une preuve suffisante pour un regroupement automatique.
+export function isNamedBullAlias(
+  keep: { nupere: string; nopere: string | null },
+  remove: { nupere: string; nopere: string | null },
+): boolean {
+  if (!fullNational(keep.nupere) || fullNational(remove.nupere)) return false;
+  const name = canonicalName(keep.nopere);
+  return name.length >= 3
+    && name === canonicalName(remove.nopere)
+    && canonicalName(remove.nupere) === name;
+}
+
 // Une référence historique courte n'est masquée que si un seul taureau
 // correspond au numéro de travail ET au nom, sinon on la laisse visible.
 export function reconcileFatherSearch(matches: AncestrySearchMatch[]): AncestrySearchMatch[] {

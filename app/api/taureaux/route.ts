@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
-import { nationalWithCountry } from "@/lib/bull-identity";
+import { nationalWithCountry, canonicalName, fullNational } from "@/lib/bull-identity";
 
 export async function GET() {
   const taureaux = await prisma.taureau.findMany({
@@ -39,6 +39,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         error: `Ce reproducteur existe déjà sous le numéro ${existing.nupere}${existing.nopere ? ` (${existing.nopere})` : ""}. Sélectionne sa fiche existante.`,
       }, { status: 409 });
+    }
+
+    // Une simple référence nominale (ex. ARGUS) ne doit jamais créer une
+    // deuxième fiche si le même nom existe sous un numéro national complet.
+    // L'utilisateur doit sélectionner la fiche existante, sans rapprochement
+    // automatique sur un nom qui peut être partagé par plusieurs taureaux.
+    if (!fullNational(nupere.trim())) {
+      const enteredName = canonicalName(nopere?.trim() || nupere.trim());
+      if (enteredName) {
+        const all = await prisma.taureau.findMany({
+          select: { id: true, nupere: true, nopere: true },
+        });
+        const sameNames = all.filter((bull) =>
+          canonicalName(bull.nopere) === enteredName ||
+          canonicalName(bull.nupere) === enteredName
+        );
+        if (sameNames.length > 0) {
+          return NextResponse.json({
+            error: `Un reproducteur portant ce nom existe déjà (${sameNames.map((b) => b.nupere).join(", ")}). Sélectionne sa fiche avant d'enregistrer l'IA ; aucune nouvelle fiche n'a été créée.`,
+          }, { status: 409 });
+        }
+      }
     }
 
     const taureau = await prisma.taureau.create({
