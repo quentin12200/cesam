@@ -205,7 +205,10 @@ async function getArbreData(nutrav: string): Promise<ArbreData | null> {
   ]);
   const motherNode = motherRecord ? toNode(motherRecord) : identityToNode(motherIdentity, "F");
 
-  const linkedFather = animal.taureau ?? birthVelage?.gestation?.saillie?.taureau ?? null;
+  // La filiation corrigée sur la fiche animal prime sur un ancien
+  // père seulement conservé dans le vêlage historique.
+  const linkedFather = animal.taureau ?? null;
+  const manualFather = animal.pereTravailManuel || animal.pereNationalManuel || animal.pereNomManuel;
   const fatherIdentity = resolveAncestryIdentity([
     linkedFather
       ? {
@@ -215,20 +218,22 @@ async function getArbreData(nutrav: string): Promise<ArbreData | null> {
           linkedAnimalNutrav: null,
         }
       : null,
-    birthVelage
+    manualFather
       ? {
           workNumber: animal.pereTravailManuel,
-          nationalNumber: birthVelage.pereNunati ?? animal.pereNationalManuel,
-          name: birthVelage.pereNom ?? animal.pereNomManuel,
+          nationalNumber: animal.pereNationalManuel,
+          name: animal.pereNomManuel,
           linkedAnimalNutrav: null,
         }
       : null,
-    {
-      workNumber: animal.pereTravailManuel,
-      nationalNumber: animal.pereNationalManuel,
-      name: animal.pereNomManuel,
-      linkedAnimalNutrav: null,
-    },
+    birthVelage
+      ? {
+          workNumber: null,
+          nationalNumber: birthVelage.gestation?.saillie?.taureau?.nupere ?? birthVelage.pereNunati,
+          name: birthVelage.gestation?.saillie?.taureau?.nopere ?? birthVelage.pereNom,
+          linkedAnimalNutrav: null,
+        }
+      : null,
   ]);
   const pereAnimal = identityToNode(fatherIdentity, "T");
 
