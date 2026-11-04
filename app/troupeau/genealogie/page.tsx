@@ -105,7 +105,10 @@ async function getGeneaData(): Promise<AnimalGeneaNode[]> {
 }
 
 export default async function GenealogiePage() {
-  const roots = await getGeneaData();
+  const [roots, bulls] = await Promise.all([
+    getGeneaData(),
+    prisma.taureau.findMany({ select: { id: true, nupere: true } }),
+  ]);
   const totalAnimaux = countAll(roots);
 
   return (
@@ -124,7 +127,7 @@ export default async function GenealogiePage() {
           </div>
         </div>
 
-        <GeneaClient roots={roots} geneaData={GENEA_DATA} />
+        <GeneaClient roots={roots} geneaData={GENEA_DATA} bulls={bulls} />
       </div>
     </div>
   );
