@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { canonicalName, canonicalNational } from "@/lib/bull-identity";
 import { ACTION_VISUALS } from "@/components/action-visuals";
 import {
   showOriginConfirmation,
@@ -127,7 +128,9 @@ function ReproductionActionModal({
 
   const animalIds = request.animals.map((animal) => animal.id);
   const farmBulls = bulls.filter((bull) => bull.present);
-  const iaBulls = bulls.filter((bull) => !bull.present);
+  // Un reproducteur IA peut avoir été enregistré anciennement comme présent.
+  // Ne pas le masquer, sinon l’utilisateur recrée une fiche en doublon.
+  const iaBulls = bulls;
 
   function simulatedWriteIsBlocked() {
     if (!request.simulationAware) return false;
@@ -181,15 +184,24 @@ function ReproductionActionModal({
         }),
       });
       if (response.status === 409) {
-        return bulls.find((bull) =>
-          bull.nupere === naturalBullName.trim() || bull.nopere === naturalBullName.trim()
-        )?.id;
+        const details = await response.json().catch(() => null);
+        throw new Error(details?.error ?? "Taureau déjà enregistré : sélectionne sa fiche.");
       }
       const created = await response.json().catch(() => null);
       if (!response.ok) throw new Error(created?.error ?? "Création du taureau impossible");
       return created.id as string;
     }
     if (type === "IA" && iaReference.trim()) {
+      const reference = canonicalNational(iaReference.trim());
+      const matches = bulls.filter((bull) => canonicalNational(bull.nupere) === reference);
+      if (matches.length === 1) return matches[0].id;
+      if (matches.length > 1) throw new Error("Plusieurs taureaux portent cette référence. Sélectionne la bonne fiche.");
+      const named = bulls.filter((bull) =>
+        iaName.trim() && canonicalName(bull.nopere) === canonicalName(iaName.trim())
+      );
+      if (named.length > 0) {
+        throw new Error("Un taureau portant ce nom existe déjà : sélectionne-le dans la liste au lieu de créer une autre référence.");
+      }
       const response = await fetch("/api/taureaux", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -201,12 +213,14 @@ function ReproductionActionModal({
         }),
       });
       if (response.status === 409) {
-        return bulls.find((bull) => bull.nupere === iaReference.trim())?.id;
+        const details = await response.json().catch(() => null);
+        throw new Error(details?.error ?? "Reproducteur déjà enregistré : sélectionne sa fiche.");
       }
       const created = await response.json().catch(() => null);
       if (!response.ok) throw new Error(created?.error ?? "Création de l’IA impossible");
       return created.id as string;
     }
+    if (type === "IA") throw new Error("Sélectionne un taureau ou renseigne sa référence avant d’enregistrer l’IA.");
     return undefined;
   }
 
@@ -332,11 +346,12 @@ function ReproductionActionModal({
 
             {!bullsLoading && type === "IA" && (
               <div className="space-y-3">
+                <p className="text-xs text-gray-600">Sélectionne le reproducteur existant, y compris s’il apparaît parmi les taureaux de monte naturelle. Aucune nouvelle fiche ne sera créée si son nom est déjà enregistré.</p>
                 {iaBulls.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {iaBulls.map((bull) => (
                       <button key={bull.id} type="button" onClick={() => { setSelectedBullId((id) => id === bull.id ? "" : bull.id); setIaReference(""); }} className={`rounded-full border-2 px-3 py-1.5 text-xs font-medium ${selectedBullId === bull.id ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-white text-gray-600"}`}>
-                        {bull.nopere ?? bull.nupere}{bull.traper ? ` · ${bull.traper}` : ""}
+                        {bull.nopere ?? bull.nupere} · {bull.nupere}{bull.traper ? ` · ${bull.traper}` : ""}
                       </button>
                     ))}
                   </div>
