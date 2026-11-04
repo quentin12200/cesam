@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
 
 export async function GET() {
   const taureaux = await prisma.taureau.findMany({
@@ -20,9 +21,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Le numéro du taureau est requis" }, { status: 400 });
     }
 
-    const existing = await prisma.taureau.findUnique({ where: { nupere: nupere.trim() } });
+    const normalized = normalizeGenealogyNational(nupere.trim());
+    const candidates = await prisma.taureau.findMany({
+      where: {
+        OR: [
+          { nupere: { contains: normalized } },
+          { nupere: { contains: normalized.slice(-Math.min(8, normalized.length)) } },
+        ],
+      },
+      select: { id: true, nupere: true, nopere: true },
+    });
+    const existing = candidates.find(
+      (candidate) => normalizeGenealogyNational(candidate.nupere) === normalized,
+    );
     if (existing) {
-      return NextResponse.json({ error: "Ce numéro existe déjà" }, { status: 409 });
+      return NextResponse.json({
+        error: `Ce reproducteur existe déjà sous le numéro ${existing.nupere}${existing.nopere ? ` (${existing.nopere})` : ""}. Sélectionne sa fiche existante.`,
+      }, { status: 409 });
     }
 
     const taureau = await prisma.taureau.create({
