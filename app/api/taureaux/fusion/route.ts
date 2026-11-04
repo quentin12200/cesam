@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fullNational, sameBullCandidates, canonicalName, canonicalNational } from "@/lib/bull-identity";
+import { fullNational, sameBullCandidates, canonicalName, canonicalNational, isNamedBullAlias } from "@/lib/bull-identity";
 
 // Fusion explicitement demandée dans le répertoire ; jamais déclenchée
 // depuis la recherche de filiation. Réaffectation atomique des liens.
@@ -24,8 +24,48 @@ export async function POST(request: NextRequest) {
       // Le numéro de référence conservé doit être complet pour éviter
       // qu'une fiche courte remplace une identité mieux documentée.
       if (!fullNational(keep.nupere)) throw new Error("KEEP_FULL_NATIONAL");
-      const confidence = sameBullCandidates(keep, remove);
-      if (!confidence) throw new Error("CONFLICT");
+      const originalConfidence = sameBullCandidates(keep, remove);
+      const isAlias = isNamedBullAlias(keep, remove);
+      if (!originalConfidence && !isAlias) throw new Error("CONFLICT");
+      const confidence = isAlias ? "ALIAS_NOMINAL" : originalConfidence!;
+      if (isAlias) {
+        // Un alias purement nominal nécessite une sélection et validation
+        // explicites et ne peut pas pointer vers plusieurs numéros complets.
+        if (body?.confirmation !== "FUSIONNER" || body?.aliasConfirmed !== true) throw new Error("ALIAS_CONFIRM");
+        const all = await tx.taureau.findMany({
+          select: { id: true, nupere: true, nopere: true },
+        });
+        const possible = all.filter((bull) =>
+          fullNational(bull.nupere) && canonicalName(bull.nopere) === canonicalName(remove.nopere)
+        );
+        if (possible.length !== 1 || possible[0].id !== keepId) throw new Error("AMBIGUOUS");
+      }
+      // Ne pas rediriger des filiations contradictoires vers la mauvaise
+      // identité. Le contrôleur de fusion doit signaler ces cas.
+      const [directChildren, linkedBreedings] = await Promise.all([
+        tx.animal.findMany({
+          where: { taureauId: removeId },
+          select: { pereNationalManuel: true, nutrav: true },
+        }),
+        tx.saillie.findMany({
+          where: { taureauId: removeId },
+          select: {
+            id: true,
+            gestation: { select: { velage: { select: { pereNunati: true } } } },
+          },
+        }),
+      ]);
+      const normalizedKeep = canonicalNational(keep.nupere);
+      const incompatibleChild = directChildren.find((animal) => {
+        const found = fullNational(animal.pereNationalManuel);
+        return found !== null && canonicalNational(found) !== normalizedKeep;
+      });
+      const incompatibleBreeding = linkedBreedings.find((breeding) => {
+        const father = breeding.gestation?.velage?.pereNunati;
+        const found = fullNational(father);
+        return found !== null && canonicalNational(found) !== normalizedKeep;
+      });
+      if (incompatibleChild || incompatibleBreeding) throw new Error("FILIATION_CONFLICT");
       // Si on ne connaît que quatre chiffres, refuser une fusion lorsque
       // plusieurs taureaux complets pourraient correspondre au même nom.
       if (confidence === "A_VERIFIER") {
@@ -63,6 +103,8 @@ export async function POST(request: NextRequest) {
       KEEP_FULL_NATIONAL: "Conserve la fiche ayant un numéro national complet.",
       CONFLICT: "Correspondance insuffisante : fusion refusée pour protéger la généalogie.",
       AMBIGUOUS: "Plusieurs identités possibles. Aucun lien n’a été modifié.",
+      ALIAS_CONFIRM: "La fusion d’un alias doit être vérifiée et confirmée manuellement.",
+      FILIATION_CONFLICT: "Au moins une filiation liée contredit le numéro du taureau conservé. Fusion refusée : vérifie les veaux et les vêlages.",
     };
     return NextResponse.json({ error: messages[code] ?? "Fusion impossible. Aucune modification partielle n'a été conservée." }, { status: 409 });
   }
