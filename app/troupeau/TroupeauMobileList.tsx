@@ -18,7 +18,6 @@ import {
 } from "@/lib/utils";
 import {
   DEFAULT_MOBILE_DISPLAY_PREFERENCES,
-  formatFather,
   gestationDaysForDisplay,
   parseMobileDisplayPreferences,
   serializeMobileDisplayPreferences,
@@ -189,7 +188,7 @@ export default function TroupeauMobileList({
           reproduction === "VERT" && animal.gestationEtat === "VERT" && animal.saillieDate
             ? differenceInDays(new Date(), new Date(animal.saillieDate))
             : null;
-        const father = formatFather(animal.pereNom, animal.pereNumero);
+        const father = [animal.pereNumero, animal.pereNom].filter(Boolean).join(" · ") || "—";
 
         return (
           <article key={animal.id} className={`rounded-xl border bg-white px-3 py-2 shadow-sm ${expandedId === animal.id ? "border-green-300" : "border-transparent"}`}>
@@ -239,11 +238,11 @@ export default function TroupeauMobileList({
               )}
               {isVisible("mother") && (animal.mereLieeNutrav ? (
                 <Link href={`/troupeau/${animal.mereLieeNutrav}`} className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-800 underline">
-                  Mère {animal.mereNutrav}
+                  Mère {animal.mereNutrav}{animal.mereNom ? ` · ${animal.mereNom}` : ""}
                 </Link>
               ) : animal.mereNutrav ? (
                 <Link href={`/troupeau/${animal.nutrav}/arbre`} className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-800 underline decoration-dotted">
-                  Mère {animal.mereNutrav}
+                  Mère {animal.mereNutrav}{animal.mereNom ? ` · ${animal.mereNom}` : ""}
                 </Link>
               ) : <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-violet-800">Mère <AncestryEditor animalNutrav={animal.nutrav} parent="MERE" /></span>)}
               {isVisible("father") && (animal.pereNom || animal.pereNumero ? (
@@ -260,12 +259,18 @@ export default function TroupeauMobileList({
               {animal.enAttente && (
                 <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700">⛔ Vente interdite</span>
               )}
-              {animal.activeCalves.map((calf) => calf.href ? (
-                <Link key={calf.nutrav} href={calf.href} className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono font-bold text-blue-700">
-                  🍼{calf.nutrav}
-                </Link>
-              ) : (
-                <span key={calf.nutrav} className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono font-bold text-blue-700">🍼{calf.nutrav}</span>
+              {animal.activeCalves.map((calf) => (
+                calf.href ? (
+                  <Link key={calf.nutrav} href={calf.href}
+                    className={`rounded-full px-2 py-0.5 font-mono font-bold ${calf.toWean ? "bg-red-100 text-red-800" : "bg-blue-50 text-blue-700"}`}>
+                    {calf.nutrav}{calf.toWean ? " · À sevrer" : ""}
+                  </Link>
+                ) : (
+                  <span key={calf.nutrav}
+                    className={`rounded-full px-2 py-0.5 font-mono font-bold ${calf.toWean ? "bg-red-100 text-red-800" : "bg-blue-50 text-blue-700"}`}>
+                    {calf.nutrav}{calf.toWean ? " · À sevrer" : ""}
+                  </span>
+                )
               ))}
             </div>
             {expandedId === animal.id && (
