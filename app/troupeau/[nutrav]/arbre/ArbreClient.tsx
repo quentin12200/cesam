@@ -83,10 +83,12 @@ function UnknownCard({
   label,
   animalNutrav,
   parent,
+  editInitially = false,
 }: {
   label: string;
   animalNutrav?: string;
   parent?: AncestryParent;
+  editInitially?: boolean;
 }) {
   return (
     <div className="rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-3 py-2.5 min-w-[110px] max-w-[140px] text-center">
@@ -94,7 +96,7 @@ function UnknownCard({
         {label}
       </div>
       <div className="text-gray-400 text-xs">Inconnu</div>
-      {animalNutrav && parent && <AncestryEditor animalNutrav={animalNutrav} parent={parent} />}
+      {animalNutrav && parent && <AncestryEditor animalNutrav={animalNutrav} parent={parent} editInitially={editInitially} />}
     </div>
   );
 }
@@ -253,7 +255,7 @@ export default function ArbreClient({ data, editFather = false }: { data: ArbreD
                   <NodeCard node={data.pere} label="Père" showNational />
                   <AncestryEditor animalNutrav={data.animal.nutrav} parent="PERE" edit editInitially={editFather} />
                 </>
-              ) : <UnknownCard label="Père" animalNutrav={data.animal.nutrav} parent="PERE" />}
+              ) : <UnknownCard label="Père" animalNutrav={data.animal.nutrav} parent="PERE" editInitially={editFather} />}
             </div>
           </div>
 
