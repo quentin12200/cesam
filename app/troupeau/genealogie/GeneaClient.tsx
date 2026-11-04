@@ -609,9 +609,9 @@ function VueParPere({ roots, geneaData, bulls }: { roots: AnimalGeneaNode[]; gen
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         {groupes.map(({ pere, veaux, nb }) => {
           const nbInDb = veaux.filter(v => dbNutravs.has(nutravFromNat(v.veauNat))).length;
-          const nationalNumbers = [...new Set(veaux.map((v) => v.pereNat.replace(/\\s+/g, "").replace(/^FR/i, "")))];
+          const nationalNumbers = [...new Set(veaux.map((v) => v.pereNat.replace(/\s+/g, "").replace(/^FR/i, "")))];
           const matchingBulls = nationalNumbers.length === 1
-            ? bulls.filter((b) => b.nupere.replace(/\\s+/g, "").replace(/^FR/i, "") === nationalNumbers[0])
+            ? bulls.filter((b) => b.nupere.replace(/\s+/g, "").replace(/^FR/i, "") === nationalNumbers[0])
             : [];
           const bullId = matchingBulls.length === 1 ? matchingBulls[0].id : null;
           return (
