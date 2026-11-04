@@ -20,6 +20,7 @@ export default function TaureauxClient({ initialTaureaux }: { initialTaureaux: T
   const [taureaux, setTaureaux] = useState(initialTaureaux);
   const [nopere, setNopere] = useState("");
   const [nupere, setNupere] = useState("");
+  const [country, setCountry] = useState("FR");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export default function TaureauxClient({ initialTaureaux }: { initialTaureaux: T
       const res = await fetch("/api/taureaux", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nupere, nopere }),
+        body: JSON.stringify({ nupere: `${country}${nupere.trim().replace(/^[A-Za-z]{2}/, "")}`, nopere }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
@@ -109,14 +110,25 @@ export default function TaureauxClient({ initialTaureaux }: { initialTaureaux: T
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Numéro *</label>
-              <input
-                type="text"
-                value={nupere}
-                onChange={(e) => setNupere(e.target.value)}
-                placeholder="ex: 5482"
-                required
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+              <div className="flex overflow-hidden rounded-lg border border-gray-200 focus-within:ring-2 focus-within:ring-green-500">
+                <select aria-label="Pays du taureau" value={country} onChange={(e) => setCountry(e.target.value)}
+                  className="border-r border-gray-200 bg-gray-50 px-2 py-2 text-sm font-bold">
+                  <option value="FR">FR</option>
+                  <option value="UK">UK</option>
+                </select>
+                <input type="text" aria-label="Numéro du taureau sans code pays"
+                  value={nupere}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\s+/g, "").toUpperCase();
+                    const match = raw.match(/^(FR|UK)(.*)$/);
+                    if (match) setCountry(match[1]);
+                    setNupere(match ? match[2] : raw);
+                  }}
+                  placeholder="Numéro national"
+                  required
+                  className="min-w-0 w-full px-2 py-2 text-sm focus:outline-none"
+                />
+              </div>
             </div>
           </div>
           {error && (

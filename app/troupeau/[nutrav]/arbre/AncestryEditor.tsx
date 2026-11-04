@@ -16,6 +16,7 @@ export default function AncestryEditor({
   const [open, setOpen] = useState(false);
   const [workNumber, setWorkNumber] = useState("");
   const [nationalNumber, setNationalNumber] = useState("");
+  const [country, setCountry] = useState("FR");
   const [name, setName] = useState("");
   const [matches, setMatches] = useState<AncestrySearchMatch[]>([]);
   const [selected, setSelected] = useState<AncestrySearchMatch | null>(null);
@@ -45,12 +46,16 @@ export default function AncestryEditor({
   function choose(match: AncestrySearchMatch) {
     setSelected(match);
     setWorkNumber(match.workNumber ?? "");
-    setNationalNumber(nationalWithCountry(match.nationalNumber));
+    const full = nationalWithCountry(match.nationalNumber);
+    const prefix = full.match(/^([A-Z]{2})(.+)$/);
+    setCountry(prefix?.[1] ?? "FR");
+    setNationalNumber(prefix?.[2] ?? full);
     setName(match.name ?? "");
     setMatches([]);
   }
 
   async function save() {
+    const completeNational = nationalNumber.trim() ? `${country}${nationalNumber.trim().replace(/\s+/g, "").replace(/^[A-Za-z]{2}/, "")}` : "";
     if (!selected && !workNumber.trim()) {
       setError("Le N° de travail est requis.");
       return;
@@ -65,7 +70,7 @@ export default function AncestryEditor({
         source: selected?.source ?? "MANUEL",
         sourceId: selected?.sourceId ?? null,
         workNumber,
-        nationalNumber,
+        nationalNumber: completeNational,
         name,
       }),
     });
@@ -146,11 +151,30 @@ export default function AncestryEditor({
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <label className="text-xs font-semibold text-gray-700">
             N° complet (facultatif)
-            <input
-              value={nationalNumber}
-              onChange={(event) => setNationalNumber(event.target.value)}
-              className="mt-1 min-h-10 w-full rounded-lg border border-gray-300 px-2 text-sm font-normal"
-            />
+            <div className="mt-1 flex overflow-hidden rounded-lg border border-gray-300">
+              <select
+                aria-label="Pays du père"
+                value={country}
+                onChange={(event) => setCountry(event.target.value)}
+                className="min-h-10 border-r border-gray-300 bg-gray-50 px-2 text-sm font-bold"
+              >
+                <option value="FR">FR</option>
+                <option value="UK">UK</option>
+              </select>
+              <input
+                aria-label="Numéro national sans code pays"
+                value={nationalNumber}
+                onChange={(event) => {
+                  const raw = event.target.value.replace(/\s+/g, "").toUpperCase();
+                  const prefix = raw.match(/^(FR|UK)(.*)$/);
+                  if (prefix) setCountry(prefix[1]);
+                  setNationalNumber(prefix ? prefix[2] : raw);
+                  setSelected(null);
+                }}
+                placeholder="Numéro national"
+                className="min-w-0 min-h-10 flex-1 px-2 text-sm font-normal"
+              />
+            </div>
           </label>
           <label className="text-xs font-semibold text-gray-700">
             Nom (facultatif)
