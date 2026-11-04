@@ -239,11 +239,11 @@ export default function TroupeauMobileList({
               )}
               {isVisible("mother") && (animal.mereLieeNutrav ? (
                 <Link href={`/troupeau/${animal.mereLieeNutrav}`} className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-800 underline">
-                  Mère {animal.mereNutrav}
+                  Mère {animal.mereNutrav}{animal.mereNom ? ` · ${animal.mereNom}` : ""}
                 </Link>
               ) : animal.mereNutrav ? (
                 <Link href={`/troupeau/${animal.nutrav}/arbre`} className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-800 underline decoration-dotted">
-                  Mère {animal.mereNutrav}
+                  Mère {animal.mereNutrav}{animal.mereNom ? ` · ${animal.mereNom}` : ""}
                 </Link>
               ) : <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-violet-800">Mère <AncestryEditor animalNutrav={animal.nutrav} parent="MERE" /></span>)}
               {isVisible("father") && (animal.pereNom || animal.pereNumero ? (
