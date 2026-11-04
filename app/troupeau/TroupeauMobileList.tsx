@@ -260,12 +260,18 @@ export default function TroupeauMobileList({
               {animal.enAttente && (
                 <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700">⛔ Vente interdite</span>
               )}
-              {animal.activeCalves.map((calf) => calf.href ? (
-                <Link key={calf.nutrav} href={calf.href} className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono font-bold text-blue-700">
-                  🍼{calf.nutrav}
-                </Link>
-              ) : (
-                <span key={calf.nutrav} className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono font-bold text-blue-700">🍼{calf.nutrav}</span>
+              {animal.activeCalves.map((calf) => (
+                calf.href ? (
+                  <Link key={calf.nutrav} href={calf.href}
+                    className={`rounded-full px-2 py-0.5 font-mono font-bold ${calf.toWean ? "bg-red-100 text-red-800" : "bg-blue-50 text-blue-700"}`}>
+                    {calf.nutrav}{calf.toWean ? " · À sevrer" : ""}
+                  </Link>
+                ) : (
+                  <span key={calf.nutrav}
+                    className={`rounded-full px-2 py-0.5 font-mono font-bold ${calf.toWean ? "bg-red-100 text-red-800" : "bg-blue-50 text-blue-700"}`}>
+                    {calf.nutrav}{calf.toWean ? " · À sevrer" : ""}
+                  </span>
+                )
               ))}
             </div>
             {expandedId === animal.id && (
