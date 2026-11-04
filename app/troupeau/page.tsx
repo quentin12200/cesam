@@ -14,6 +14,7 @@ import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import TroupeauFilters from "./TroupeauFilters";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
 import { getCurrentReproductionSummary } from "@/lib/current-reproduction-summary";
+import { classifyWeaningWindow } from "@/lib/weaning-dry-off";
 import {
   buildTroupeauWhere,
   belongsToEchoActionList,
@@ -123,12 +124,12 @@ async function getAnimaux(params: TroupeauFilterParams) {
           take: 1,
           select: {
             date: true,
-            veau: { select: { nutrav: true, statut: true, sevreFait: true } },
+            veau: { select: { nutrav: true, danais: true, statut: true, sevreFait: true } },
             veauxDetails: {
               select: {
                 statut: true,
                 nutrav: true,
-                animal: { select: { nutrav: true, statut: true, sevreFait: true } },
+                animal: { select: { nutrav: true, danais: true, statut: true, sevreFait: true } },
               },
             },
           },
@@ -153,7 +154,7 @@ async function getAnimaux(params: TroupeauFilterParams) {
     prisma.groupe.findMany({ orderBy: { nom: "asc" } }),
     prisma.exploitationConfig.findUnique({
       where: { id: "singleton" },
-      select: { reproReposObjectifJours: true },
+      select: { reproReposObjectifJours: true, tarissementVeauAgeMois: true },
     }).catch(() => null),
   ]);
 
@@ -174,6 +175,7 @@ async function getAnimaux(params: TroupeauFilterParams) {
     total: animaux.length,
     groupes,
     postCalvingRestDays: reproductionConfig?.reproReposObjectifJours ?? 60,
+    weaningThresholdMonths: Math.max(1, Math.round(reproductionConfig?.tarissementVeauAgeMois ?? 6)),
   };
 }
 
@@ -190,7 +192,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const tri = params.tri;
   const showForm = params.nouveau === "1";
 
-  const { animaux, total, groupes, postCalvingRestDays } = await getAnimaux({
+  const { animaux, total, groupes, postCalvingRestDays, weaningThresholdMonths } = await getAnimaux({
     sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri,
   });
 
@@ -219,12 +221,15 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       animal.saillies,
       dernierVelage?.date ?? null,
     );
-    const activeCalves = new Map<string, { nutrav: string; href: string | null }>();
+    const activeCalves = new Map<string, { nutrav: string; href: string | null; toWean: boolean }>();
+    const isDueForWeaning = (birthDate: Date | null | undefined) =>
+      birthDate ? classifyWeaningWindow(birthDate, weaningThresholdMonths, today).window === "NOW" : false;
 
     if (!animal.tarieFaite && dernierVelage?.veau?.statut === "ACTIF" && !dernierVelage.veau.sevreFait) {
       activeCalves.set(dernierVelage.veau.nutrav, {
         nutrav: dernierVelage.veau.nutrav,
         href: `/troupeau/${dernierVelage.veau.nutrav}`,
+        toWean: isDueForWeaning(dernierVelage.veau.danais),
       });
     }
     if (!animal.tarieFaite) {
@@ -236,6 +241,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
           activeCalves.set(nutrav, {
             nutrav,
             href: detail.animal ? `/troupeau/${detail.animal.nutrav}` : null,
+            toWean: isDueForWeaning(detail.animal?.danais),
           });
         }
       }
