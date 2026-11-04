@@ -109,6 +109,11 @@ export default function AncestryEditor({
         />
 
         {matches.length > 0 && (
+          <p className="mt-2 text-xs font-medium text-green-800">
+            Sélectionne le reproducteur déjà enregistré ci-dessous plutôt que de le ressaisir.
+          </p>
+        )}
+        {matches.length > 0 && (
           <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-1">
             {matches.map((match) => (
               <button
