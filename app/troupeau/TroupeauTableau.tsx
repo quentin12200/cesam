@@ -36,6 +36,7 @@ export interface AnimalRow {
   velageDate: string | null;
   reproductionSummary: ReproductionSummaryRow;
   mereNutrav: string | null;
+  mereNom: string | null;
   mereLieeNutrav: string | null;
   pereNom: string | null;
   pereNumero: string | null;
@@ -416,14 +417,14 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                         className="font-mono text-xs font-bold text-green-700 underline underline-offset-2 hover:text-green-900"
                         title="Ouvrir la fiche de la mère"
                       >
-                        {motherWeaning.motherLabel}
+                        {motherWeaning.motherLabel}{animal.mereNom ? ` · ${animal.mereNom}` : ""}
                       </button>
                     ) : animal.mereNutrav ? (
                       <button type="button" onClick={() => router.push(`/troupeau/${animal.nutrav}/arbre`)}
                         className="font-mono text-xs font-semibold text-gray-700 underline decoration-dotted"
                         title="Voir ou compléter la parenté"
                       >
-                        {animal.mereNutrav}
+                        {animal.mereNutrav}{animal.mereNom ? ` · ${animal.mereNom}` : ""}
                       </button>
                     ) : <AncestryEditor animalNutrav={animal.nutrav} parent="MERE" />}
                   </td>
