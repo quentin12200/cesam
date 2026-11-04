@@ -190,10 +190,24 @@ export async function GET(
     candidateWorkNumber: match.workNumber,
     candidateNationalNumber: match.nationalNumber,
   }));
-  const uniqueMatches = [...new Map(validMatches.map((match) => [
-    `${match.source}:${match.sourceId ?? ""}:${match.workNumber ?? ""}:${match.nationalNumber ?? ""}:${match.name ?? ""}`,
-    match,
-  ])).values()];
+  // Une seule suggestion par identité nationale, indépendamment du préfixe FR,
+  // du formatage et de l'origine (répertoire, vêlage ou saisie historique).
+  // Priorité au lien existant TAUREAU / ANIMAL pour ne pas créer une deuxième fiche.
+  const priority: Record<AncestrySource, number> = {
+    ANIMAL: 0, TAUREAU: 1, HISTORIQUE: 2, VELAGE: 3,
+  };
+  const deduplicated = new Map<string, AncestrySearchMatch>();
+  for (const match of validMatches) {
+    const national = normalizeGenealogyNational(match.nationalNumber);
+    const key = national.length >= 8
+      ? `national:${national}`
+      : `${match.source}:${match.sourceId ?? ""}:${match.workNumber ?? ""}:${match.name ?? ""}`;
+    const current = deduplicated.get(key);
+    if (!current || priority[match.source] < priority[current.source]) {
+      deduplicated.set(key, match);
+    }
+  }
+  const uniqueMatches = [...deduplicated.values()];
   return NextResponse.json({ matches: rankAncestryMatches(uniqueMatches, query).slice(0, 12) });
 }
 
