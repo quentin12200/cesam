@@ -18,7 +18,6 @@ import {
 } from "@/lib/utils";
 import {
   DEFAULT_MOBILE_DISPLAY_PREFERENCES,
-  formatFather,
   gestationDaysForDisplay,
   parseMobileDisplayPreferences,
   serializeMobileDisplayPreferences,
@@ -189,7 +188,7 @@ export default function TroupeauMobileList({
           reproduction === "VERT" && animal.gestationEtat === "VERT" && animal.saillieDate
             ? differenceInDays(new Date(), new Date(animal.saillieDate))
             : null;
-        const father = formatFather(animal.pereNom, animal.pereNumero);
+        const father = [animal.pereNumero, animal.pereNom].filter(Boolean).join(" · ") || "—";
 
         return (
           <article key={animal.id} className={`rounded-xl border bg-white px-3 py-2 shadow-sm ${expandedId === animal.id ? "border-green-300" : "border-transparent"}`}>
