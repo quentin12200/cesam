@@ -8,9 +8,9 @@ export function canonicalNational(value: string | null | undefined): string {
 // Les anciens numéros français à 10 chiffres reçoivent FR ; un UK explicite
 // n'est jamais converti en FR. Les numéros courts restent courts.
 export function nationalWithCountry(value: string | null | undefined): string {
-  const raw = (value ?? "").replace(/\\s+/g, "").toUpperCase();
+  const raw = (value ?? "").replace(/\s+/g, "").toUpperCase();
   if (/^[A-Z]{2}[A-Z0-9]+$/.test(raw)) return raw;
-  if (/^\\d{10}$/.test(raw)) return `FR${raw}`;
+  if (/^\d{10}$/.test(raw)) return `FR${raw}`;
   return raw;
 }
 
