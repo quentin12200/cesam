@@ -40,7 +40,7 @@ export default async function BullDuplicateAuditPage() {
       <p className="text-sm text-gray-600">
         Cette page recherche les fiches ayant le même numéro national, ou un numéro court
         et un nom correspondant à une fiche complète. Une référence historique
-        dans un vêlage n'est pas forcément une deuxième fiche Taureau.
+        dans un vêlage n&apos;est pas forcément une deuxième fiche Taureau.
       </p>
       <BullDuplicatesClient pairs={pairs} />
       <p className="text-xs text-gray-500">
