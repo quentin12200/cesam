@@ -194,7 +194,10 @@ export async function GET(
   const uniqueMatches = parent === "PERE"
     ? reconcileFatherSearch(validMatches)
     : validMatches;
-  return NextResponse.json({ matches: rankAncestryMatches(uniqueMatches, query).slice(0, 12) });
+  return NextResponse.json({ matches: rankAncestryMatches(uniqueMatches, query).slice(0, 12).map((match) => ({
+    ...match,
+    nationalNumber: match.nationalNumber ? nationalWithCountry(match.nationalNumber) : null,
+  })) });
 }
 
 export async function POST(
@@ -250,7 +253,7 @@ export async function POST(
       select: { nupere: true, nopere: true },
     });
     if (!bull) return NextResponse.json({ error: "Père introuvable." }, { status: 404 });
-    nationalNumber = bull.nupere;
+    nationalNumber = nationalWithCountry(bull.nupere);
     name = bull.nopere;
   } else {
     sourceId = null;
@@ -258,6 +261,8 @@ export async function POST(
       return NextResponse.json({ error: "Le N° de travail est requis." }, { status: 400 });
     }
   }
+
+  if (nationalNumber) nationalNumber = nationalWithCountry(nationalNumber);
 
   if (isSameAncestryIdentity({
     targetWorkNumber: target.nutrav,
@@ -313,7 +318,7 @@ export async function POST(
           data: {
             taureauId: bull.id,
             pereTravailManuel: workNumber || null,
-            pereNationalManuel: nationalNumber,
+            pereNationalManuel: nationalWithCountry(nationalNumber),
             pereNomManuel: name,
           },
         });
