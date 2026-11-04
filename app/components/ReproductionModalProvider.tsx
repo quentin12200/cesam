@@ -12,7 +12,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
-import { canonicalName, canonicalNational } from "@/lib/bull-identity";
+import { canonicalName, canonicalNational, fullNational } from "@/lib/bull-identity";
 import { ACTION_VISUALS } from "@/components/action-visuals";
 import {
   showOriginConfirmation,
@@ -172,7 +172,15 @@ function ReproductionActionModal({
   }
 
   async function createBullIfNeeded() {
-    if (selectedBullId) return selectedBullId;
+    if (selectedBullId) {
+      const chosen = bulls.find((bull) => bull.id === selectedBullId);
+      if (type === "IA" && chosen && !fullNational(chosen.nupere) && bulls.some((bull) =>
+        fullNational(bull.nupere) && canonicalName(bull.nopere) === canonicalName(chosen.nopere)
+      )) {
+        throw new Error("Cette ancienne référence a une fiche avec numéro national complet. Sélectionne la fiche complète pour l'IA.");
+      }
+      return selectedBullId;
+    }
     if (type === "NATURELLE" && naturalBullName.trim()) {
       const response = await fetch("/api/taureaux", {
         method: "POST",
@@ -194,7 +202,15 @@ function ReproductionActionModal({
     if (type === "IA" && iaReference.trim()) {
       const reference = canonicalNational(iaReference.trim());
       const matches = bulls.filter((bull) => canonicalNational(bull.nupere) === reference);
-      if (matches.length === 1) return matches[0].id;
+      if (matches.length === 1) {
+        const matched = matches[0];
+        if (!fullNational(matched.nupere) && bulls.some((bull) =>
+          fullNational(bull.nupere) && canonicalName(bull.nopere) === canonicalName(matched.nopere)
+        )) {
+          throw new Error("Cette référence ancienne possède une fiche avec numéro national complet. Sélectionne cette fiche dans la liste.");
+        }
+        return matched.id;
+      }
       if (matches.length > 1) throw new Error("Plusieurs taureaux portent cette référence. Sélectionne la bonne fiche.");
       const named = bulls.filter((bull) =>
         iaName.trim() && canonicalName(bull.nopere) === canonicalName(iaName.trim())
