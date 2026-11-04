@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { nationalWithCountry } from "@/lib/bull-identity";
+import { nationalWithCountry, canonicalName, fullNational } from "@/lib/bull-identity";
+import { useRouter } from "next/navigation";
 
 export type BullControlRow = {
   id: string; number: string; name: string | null; present: boolean;
@@ -19,6 +20,7 @@ function csvCell(value: string | number) {
 }
 
 export default function FatherControlTable({ rows: initial, conflicts }: { rows: BullControlRow[]; conflicts: FatherConflict[] }) {
+  const router = useRouter();
   const [rows, setRows] = useState(initial);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
@@ -30,6 +32,9 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
   const [error, setError] = useState("");
   const [showConflicts, setShowConflicts] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [mergeFrom, setMergeFrom] = useState<string | null>(null);
+  const [mergeInto, setMergeInto] = useState("");
+  const [mergeConfirm, setMergeConfirm] = useState("");
 
   const visible = useMemo(() => rows.filter((row) => {
     const phrase = [row.number, nationalWithCountry(row.number), row.name ?? "", ...row.childNumbers].join(" ").toLocaleLowerCase("fr");
@@ -82,6 +87,29 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
     } finally { setBusy(false); }
   }
 
+  async function mergeAlias() {
+    const from = rows.find((row) => row.id === mergeFrom);
+    const into = rows.find((row) => row.id === mergeInto);
+    if (!from || !into || mergeConfirm !== "FUSIONNER") return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/taureaux/fusion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keepId: into.id, removeId: from.id,
+          confirmation: "FUSIONNER", aliasConfirmed: true,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Fusion refusée");
+      setMergeFrom(null); setMergeInto(""); setMergeConfirm("");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Fusion impossible");
+    } finally { setBusy(false); }
+  }
+
   function exportCsv() {
     const header = ["Nom", "Numéro national", "Animaux liés", "Références manuelles", "Références vêlages", "Descendants identifiés", "Saillies", "IA identifiées"];
     const values = visible.map((r) => [r.name ?? "", nationalWithCountry(r.number), r.direct, r.manual, r.calving, r.offspring, r.breeding, r.inseminations]);
@@ -129,6 +157,37 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
             </div>}
         </section>
       )}
+
+      {mergeFrom && (() => {
+        const from = rows.find((item) => item.id === mergeFrom);
+        const choices = rows.filter((candidate) => from
+          && candidate.id !== from.id
+          && fullNational(candidate.number)
+          && canonicalName(candidate.name) === canonicalName(from.name)
+        );
+        const target = choices.find((item) => item.id === mergeInto);
+        return from ? (
+          <section className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">
+            <h2 className="font-bold text-amber-950">Fusion contrôlée · {from.name ?? from.number}</h2>
+            <p className="text-sm text-gray-700">Fiche à retirer : <strong>{from.number}</strong>. {from.direct} animaux liés, {from.breeding} saillies dont {from.inseminations} IA. Les dates, vaches et gestations restent inchangées.</p>
+            <label className="block text-sm font-semibold text-gray-800">Fiche à conserver
+              <select value={mergeInto} onChange={(e) => { setMergeInto(e.target.value); setMergeConfirm(""); }} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-2">
+                <option value="">Choisir le numéro national vérifié</option>
+                {choices.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name} — {nationalWithCountry(candidate.number)} · {candidate.offspring} veaux</option>)}
+              </select>
+            </label>
+            {choices.length === 0 && <p className="text-sm text-red-800">Aucune fiche complète avec le même nom : fusion bloquée. Utilise la vérification des doublons pour les autres cas.</p>}
+            {target && <p className="text-sm text-amber-900">Après fusion, les {from.breeding} saillies / IA de cette fiche seront rattachées à <strong>{nationalWithCountry(target.number)}</strong>. Les fils et vêlages déjà liés resteront conservés. Si leurs numéros se contredisent, le serveur bloquera la fusion.</p>}
+            <label className="block text-sm text-gray-700">Pour confirmer que c’est bien le même reproducteur, écris <strong>FUSIONNER</strong> :
+              <input value={mergeConfirm} onChange={(e) => setMergeConfirm(e.target.value.toUpperCase())} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3" placeholder="FUSIONNER" />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={busy || !mergeInto || mergeConfirm !== "FUSIONNER"} onClick={mergeAlias} className="rounded-lg bg-green-700 px-4 py-2 font-semibold text-white disabled:opacity-40">Confirmer la fusion</button>
+              <button type="button" onClick={() => { setMergeFrom(null); setMergeInto(""); setMergeConfirm(""); }} className="rounded-lg border px-4 py-2 text-sm">Annuler</button>
+            </div>
+          </section>
+        ) : null;
+      })()}
 
       <div className="flex flex-wrap items-center gap-2">
         <input type="search" aria-label="Rechercher un taureau ou un veau" value={query} onChange={(e) => setQuery(e.target.value)}
@@ -187,6 +246,10 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
                 <div className="flex items-center gap-3 whitespace-nowrap">
                   <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); }}
                     className="text-green-800 underline">Corriger le nom</button>
+                  {!fullNational(row.number) && (
+                    <button type="button" onClick={() => { setMergeFrom(row.id); setMergeInto(""); setMergeConfirm(""); setError(""); }}
+                      className="text-amber-900 underline">Fusionner</button>
+                  )}
                   <Link href={`/taureaux/${row.id}`} className="text-blue-700 underline">Fiche</Link>
                   <button type="button" disabled={busy} onClick={() => deleteBull(row)}
                     className="text-red-700 underline disabled:opacity-40">Supprimer</button>
