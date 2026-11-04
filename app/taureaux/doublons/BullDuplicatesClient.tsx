@@ -25,7 +25,7 @@ export default function BullDuplicatesClient({ pairs }: { pairs: DuplicatePair[]
         ? "Attention : correspondance probable seulement (numéro court et nom identiques). Confirme le numéro national avant la fusion."
         : "Numéro national complet identique.",
       "Cette opération est irréversible depuis cet écran. Confirmer la fusion ?",
-    ].join("\\n");
+    ].join("\n");
     if (!window.confirm(message)) return;
     setBusy(pair.remove.id);
     setError(null);
