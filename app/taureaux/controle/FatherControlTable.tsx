@@ -28,6 +28,8 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
   const [filter, setFilter] = useState("tous");
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editingNumber, setEditingNumber] = useState<string | null>(null);
+  const [newNational, setNewNational] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [showConflicts, setShowConflicts] = useState(false);
@@ -67,6 +69,32 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
       setEditing(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
+    } finally { setBusy(false); }
+  }
+
+  async function saveNational(row: BullControlRow) {
+    const target = newNational.replace(/\s+/g, "").toUpperCase();
+    if (!/^([A-Z]{2})[0-9]{8,15}$/.test(target)) {
+      setError("Indique le numéro complet avec son pays, par exemple FR4635275482.");
+      return;
+    }
+    if (!window.confirm(`Remplacer ${row.number} par ${target} pour ${row.name ?? "ce taureau"} ?\\n\\nLes ${row.breeding} saillies, dont ${row.inseminations} IA, restent liées à la même fiche. Aucune date ni généalogie historique ne sera modifiée.`)) return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/taureaux", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: row.id, nupere: target }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Correction refusée");
+      setRows((current) => current.map((item) =>
+        item.id === row.id ? { ...item, number: result.taureau.nupere } : item
+      ));
+      setEditingNumber(null); setNewNational("");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Correction impossible");
     } finally { setBusy(false); }
   }
 
@@ -237,7 +265,19 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
           </thead>
           <tbody>{visible.map((row) => (
             <tr key={row.id} className="border-t border-gray-100 hover:bg-green-50/40">
-              <td className="px-3 py-2 font-mono font-semibold text-green-900">{nationalWithCountry(row.number)}</td>
+              <td className="px-3 py-2 font-mono font-semibold text-green-900">
+                {editingNumber === row.id ? (
+                  <div className="flex min-w-[230px] items-center gap-2">
+                    <input aria-label="Numéro national corrigé" value={newNational}
+                      onChange={(event) => setNewNational(event.target.value.toUpperCase())}
+                      className="min-h-10 w-40 rounded border border-green-400 px-2 text-sm" />
+                    <button type="button" disabled={busy} onClick={() => saveNational(row)}
+                      className="text-sm font-semibold text-green-800 underline">OK</button>
+                    <button type="button" disabled={busy} onClick={() => setEditingNumber(null)}
+                      className="text-xs text-gray-600 underline">Annuler</button>
+                  </div>
+                ) : nationalWithCountry(row.number)}
+              </td>
               <td className="px-3 py-2">
                 {editing === row.id ? (
                   <div className="flex gap-1">
@@ -259,6 +299,11 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
               <td className="px-3 py-2 text-center">{row.inseminations}</td>
               <td className="px-3 py-2">
                 <div className="flex items-center gap-3 whitespace-nowrap">
+                  {!fullNational(row.number) && (
+                    <button type="button"
+                      onClick={() => { setEditingNumber(row.id); setNewNational(""); setError(""); }}
+                      className="text-green-800 underline">Corriger le numéro</button>
+                  )}
                   <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); }}
                     className="text-green-800 underline">Corriger le nom</button>
                   {!fullNational(row.number) && (
