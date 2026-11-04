@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, X, Save } from "lucide-react";
 
@@ -21,6 +21,9 @@ export default function EditAnimalDrawer({
 }: EditAnimalDrawerProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("edit") === "1") setOpen(true);
+  }, []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
