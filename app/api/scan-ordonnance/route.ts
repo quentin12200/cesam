@@ -15,7 +15,7 @@ export const maxDuration = 60;
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
-const PROMPT_VERSION = "ordonnance-v8-conditionnement-structure";
+const PROMPT_VERSION = "ordonnance-v9-lecture-visuelle-prescripteur";
 
 interface OrdonnanceResult extends PropositionOrdonnance {
   raw: string;
@@ -123,6 +123,14 @@ Reponds uniquement en JSON valide, sans markdown, avec cette structure :
 }
 
 Regles obligatoires :
+- L’ordonnance est une liste de médicaments prescrits ou délivrés, PAS la preuve qu’un traitement a été administré à un animal.
+- Lis en priorité le numéro d’ordonnance, la date de prescription et le nom du vétérinaire prescripteur.
+- Sur les ordonnances manuscrites, un nom entouré ou coché peut désigner le prescripteur : examine les marques visuelles, mais ne déduis jamais le nom uniquement de sa position dans une liste de vétérinaires.
+- Si plusieurs vétérinaires sont imprimés et qu’aucun n’est clairement désigné, veterinaire reste null.
+- Distingue impérativement date de prescription, date de dernière visite et date de délivrance.
+- Un animal mentionné sur le document n’implique jamais que tous les médicaments lui sont destinés : ne fais aucune attribution de médicament à un animal.
+- Préserve tous les médicaments et leurs quantités, même si la posologie est absente ou incertaine.
+- Pour les mentions manuscrites ou entourées, ne transforme pas une supposition en certitude : utilise null et conserve la transcription lisible en cas de doute.
 - Commence par transcrire les lignes utiles fidelement dans transcription, dans leur ordre de lecture.
 - Ne reformule, ne corrige et ne normalise aucune valeur, date ou unite dans transcription.
 - Une ligne appartient a un seul bloc metier. Ne place jamais un delai d'attente dans renouvellement,
@@ -255,7 +263,7 @@ export async function POST(req: NextRequest) {
             content: [
               ...images.map((image) => ({
                 type: "image_url" as const,
-                image_url: { url: `data:${image.mimeType};base64,${image.data}`, detail: "auto" as const },
+                image_url: { url: `data:${image.mimeType};base64,${image.data}`, detail: "high" as const },
               })),
               { type: "text", text: "Analyse toutes les pages de cette ordonnance." },
             ],

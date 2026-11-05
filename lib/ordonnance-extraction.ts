@@ -389,7 +389,13 @@ export function trouverMedicament(
   const matches = trouverCorrespondancesMedicaments(nomExtrait, substanceActive, candidats);
   const premier = matches[0];
   const second = matches[1];
-  if (!premier || premier.score < 0.9 || (second && premier.score - second.score < 0.08)) return null;
+  // Ne jamais rattacher automatiquement un nom partiel : une variante peut avoir une autre composition.
+  // Les noms complets normalisés (ou alias explicites) restent éligibles.
+  const nomNormalise = nomExtrait ? normaliserNomMedicament(nomExtrait) : "";
+  const candidatOriginal = candidats.find((item) => item.id === premier?.id);
+  const identiteConfirmee = Boolean(candidatOriginal && [candidatOriginal.nom, ...candidatOriginal.aliases]
+    .some((item) => normaliserNomMedicament(item) === nomNormalise));
+  if (!premier || !identiteConfirmee || (second && premier.score - second.score < 0.08)) return null;
   return premier;
 }
 
