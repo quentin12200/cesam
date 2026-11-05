@@ -404,7 +404,7 @@ export default function VerificationOrdonnanceClient({
       <section className="space-y-4">
         <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold text-gray-800">Ordonnance</h2>
-          <p className="mb-3 text-xs text-gray-600">Cette validation archive la prescription et les médicaments ; elle ne signifie pas qu’un traitement a été administré.</p>
+          <p className="mb-3 text-xs text-gray-600">Cette validation range les médicaments dans la pharmacie (fiche existante ou nouvelle fiche) et archive l’ordonnance. Aucun traitement n’est enregistré.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Date de l’ordonnance *"><input type="date" required value={prescriptionDate} onChange={(event) => setPrescriptionDate(event.target.value)} className={inputClass} /></Field>
             {lastVisitDate && <Field label="Dernière visite"><input type="date" value={lastVisitDate} onChange={(event) => setLastVisitDate(event.target.value)} className={inputClass} /></Field>}
@@ -451,7 +451,7 @@ export default function VerificationOrdonnanceClient({
             <p>🟠 À vérifier : {medicamentsAConfirmer}</p>
             {medicamentsAConfirmer === 0
               ? <p className="font-semibold text-green-800">✅ Tous les médicaments sont prêts à être enregistrés.</p>
-              : <p className="font-semibold text-amber-800">Choisissez une fiche ou confirmez la création avant de valider.</p>}
+              : <p className="font-semibold text-amber-800">Associez chaque médicament à sa fiche Pharmacie, ou créez une nouvelle fiche avant de valider.</p>}
           </div>
           <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Link href={returnTo ?? "/ordonnances"} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-600">Vérifier plus tard</Link>
