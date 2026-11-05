@@ -404,6 +404,7 @@ export default function VerificationOrdonnanceClient({
       <section className="space-y-4">
         <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold text-gray-800">Ordonnance</h2>
+          <p className="mb-3 text-xs text-gray-600">Cette validation archive la prescription et les médicaments ; elle ne signifie pas qu’un traitement a été administré.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Date de l’ordonnance *"><input type="date" required value={prescriptionDate} onChange={(event) => setPrescriptionDate(event.target.value)} className={inputClass} /></Field>
             {lastVisitDate && <Field label="Dernière visite"><input type="date" value={lastVisitDate} onChange={(event) => setLastVisitDate(event.target.value)} className={inputClass} /></Field>}
@@ -411,7 +412,7 @@ export default function VerificationOrdonnanceClient({
             <Field label="Numéro ou référence"><input value={ordonnanceNumero} onChange={(event) => setOrdonnanceNumero(event.target.value)} className={inputClass} /></Field>
             <Field label="Vétérinaire ou prescripteur" wide><input value={veterinaire} onChange={(event) => setVeterinaire(event.target.value)} className={inputClass} /></Field>
             <Field label="Motif ou diagnostic"><input value={motif} onChange={(event) => setMotif(event.target.value)} className={inputClass} /></Field>
-            <Field label="Animaux concernés"><input value={animaux} onChange={(event) => setAnimaux(event.target.value)} className={inputClass} placeholder="N° travail, lot ou catégorie" /></Field>
+            <Field label="Animal mentionné (facultatif, sans attribution de traitement)" wide><input value={animaux} onChange={(event) => setAnimaux(event.target.value)} className={inputClass} placeholder="À renseigner manuellement si utile" /></Field>
           </div>
           {propositionInitiale.evidence && Object.keys(propositionInitiale.evidence).length > 0 && (
             <details className="mt-3 text-xs text-gray-500"><summary className="cursor-pointer font-semibold">Voir la lecture IA</summary><div className="mt-2 space-y-1">{Object.entries(propositionInitiale.evidence).map(([key, evidence]) => <p key={key}>{key} : {evidence.sourceText ?? "source non disponible"} · confiance {Math.round(evidence.confidence * 100)} %</p>)}</div></details>
