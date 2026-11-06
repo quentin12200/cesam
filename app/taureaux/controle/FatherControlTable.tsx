@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 export type BullControlRow = {
   id: string; number: string; name: string | null; present: boolean;
-  direct: number; manual: number; calving: number; offspring: number; presentOffspring: number;
+  direct: number; manual: number; calving: number; offspring: number;
   breeding: number; inseminations: number; childNumbers: string[];
 };
 export type FatherConflict = {
@@ -32,7 +32,6 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
   const [error, setError] = useState("");
   const [showConflicts, setShowConflicts] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [mergeFrom, setMergeFrom] = useState<string | null>(null);
   const [mergeInto, setMergeInto] = useState("");
 
@@ -112,8 +111,8 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
   }
 
   function exportCsv() {
-    const header = ["Nom", "Numéro national", "Descendants connus", "Descendants présents"];
-    const values = visible.map((r) => [r.name ?? "", nationalWithCountry(r.number), r.offspring, r.presentOffspring]);
+    const header = ["Nom", "Numéro national", "Animaux liés", "Références manuelles", "Références vêlages", "Descendants identifiés", "Saillies", "IA identifiées"];
+    const values = visible.map((r) => [r.name ?? "", nationalWithCountry(r.number), r.direct, r.manual, r.calving, r.offspring, r.breeding, r.inseminations]);
     const csv = [header, ...values].map((r) => r.map(csvCell).join(";")).join("\r\n");
     const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -225,28 +224,54 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
         <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
           <thead className="sticky top-0 bg-green-800 text-white">
             <tr>
-              <th className="px-3 py-3">Numéro national</th>
-              <th className="px-3 py-3">Nom du taureau</th>
-              <th className="px-3 py-3 text-center">{sortHeader("offspring", "Descendants connus")}</th>
-              <th className="px-3 py-3 text-center">Présents</th>
+              <th className="px-3 py-3">{sortHeader("number", "Numéro national")}</th>
+              <th className="px-3 py-3">{sortHeader("name", "Nom")}</th>
+              <th className="px-3 py-3 text-center">{sortHeader("direct", "Animaux liés")}</th>
+              <th className="px-3 py-3 text-center">Mentions manuelles</th>
+              <th className="px-3 py-3 text-center">Vêlages</th>
+              <th className="px-3 py-3 text-center">{sortHeader("offspring", "Veaux")}</th>
+              <th className="px-3 py-3 text-center">{sortHeader("breeding", "Saillies")}</th>
+              <th className="px-3 py-3 text-center">{sortHeader("inseminations", "IA")}</th>
               <th className="px-3 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>{visible.map((row) => (
             <tr key={row.id} className="border-t border-gray-100 hover:bg-green-50/40">
-              <td className="px-3 py-2 font-mono font-semibold text-green-900"><Link className="underline" href={`/taureaux/${row.id}`}>{fullNational(row.number) ? nationalWithCountry(row.number) : "Numéro à compléter"}</Link></td>
-              <td className="px-3 py-2"><Link className="text-green-800 underline" href={`/taureaux/${row.id}`}>{row.name || "Sans nom"}</Link></td>
-              <td className="px-3 py-2 text-center"><Link className="text-blue-700 underline" href={`/taureaux/${row.id}`}>{row.offspring}</Link></td>
-              <td className="px-3 py-2 text-center"><Link className="text-blue-700 underline" href={`/taureaux/${row.id}`}>{row.presentOffspring}</Link></td>
-              <td className="px-3 py-2 relative">
-                <button type="button" aria-label={`Actions pour ${row.name ?? row.number}`} aria-expanded={menuOpen === row.id} onClick={() => setMenuOpen(menuOpen === row.id ? null : row.id)} className="rounded border px-3 py-1 font-bold">⋯</button>
-                {menuOpen === row.id && <div className="absolute right-2 z-20 min-w-44 rounded-lg border bg-white p-2 shadow-lg space-y-2">
-                  <button type="button" className="block text-left text-green-800 underline" onClick={() => {setEditing(row.id);setEditName(row.name ?? "");setMenuOpen(null);}}>Corriger le nom</button>
-                  <Link className="block text-blue-700 underline" href={`/taureaux/${row.id}`}>Voir la fiche</Link>
-                  {!fullNational(row.number) && <button type="button" className="block text-left text-amber-900 underline" onClick={() => { const choices = rows.filter(candidate => candidate.id !== row.id && fullNational(candidate.number) && canonicalName(candidate.name) === canonicalName(row.name));setMergeFrom(row.id);setMergeInto(choices.length === 1 ? choices[0].id : "");setMenuOpen(null);}}>Fusionner</button>}
-                  <button type="button" className="block text-left text-red-700 underline" onClick={() => {setMenuOpen(null);void deleteBull(row);}}>Supprimer</button>
-                  <span className="block text-xs text-gray-500">Correction du numéro national : sécurisation nécessaire</span>
-                </div>}
+              <td className="px-3 py-2 font-mono font-semibold text-green-900">{nationalWithCountry(row.number)}</td>
+              <td className="px-3 py-2">
+                {editing === row.id ? (
+                  <div className="flex gap-1">
+                    <input aria-label="Nouveau nom du taureau" value={editName} onChange={(e) => setEditName(e.target.value)}
+                      className="w-32 rounded border px-2 py-1 text-sm" />
+                    <button type="button" disabled={busy} onClick={() => saveName(row)} className="text-green-700 underline">OK</button>
+                    <button type="button" onClick={() => setEditing(null)} className="text-gray-500 underline">Annuler</button>
+                  </div>
+                ) : <span>{row.name || "Sans nom"}</span>}
+              </td>
+              <td className="px-3 py-2 text-center">{row.direct}</td>
+              <td className="px-3 py-2 text-center">{row.manual}</td>
+              <td className="px-3 py-2 text-center">{row.calving}</td>
+              <td className="px-3 py-2 text-center">
+                <button type="button" aria-label={`Afficher les veaux du taureau ${row.number}`} onClick={() => setExpanded(expanded === row.id ? null : row.id)}
+                  className="font-semibold text-blue-700 underline">{row.offspring}</button>
+              </td>
+              <td className="px-3 py-2 text-center">{row.breeding}</td>
+              <td className="px-3 py-2 text-center">{row.inseminations}</td>
+              <td className="px-3 py-2">
+                <div className="flex items-center gap-3 whitespace-nowrap">
+                  <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); }}
+                    className="text-green-800 underline">Corriger le nom</button>
+                  {!fullNational(row.number) && (
+                    <button type="button" onClick={() => {
+                      const choices = rows.filter((candidate) => candidate.id !== row.id && fullNational(candidate.number) && canonicalName(candidate.name) === canonicalName(row.name));
+                      setMergeFrom(row.id); setMergeInto(choices.length === 1 ? choices[0].id : ""); setError("");
+                    }}
+                      className="text-amber-900 underline">Fusionner</button>
+                  )}
+                  <Link href={`/taureaux/${row.id}`} className="text-blue-700 underline">Fiche</Link>
+                  <button type="button" disabled={busy} onClick={() => deleteBull(row)}
+                    className="text-red-700 underline disabled:opacity-40">Supprimer</button>
+                </div>
               </td>
             </tr>
           ))}</tbody>
