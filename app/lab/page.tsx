@@ -26,8 +26,8 @@ export default async function CesamLabPage() {
     }),
     getGestationCalendar(),
     prisma.exploitationConfig.findUnique({ where: { id: "singleton" }, select: { reproReposObjectifJours: true } }).catch(() => null),
-    prisma.taureau.findMany({ select: { id: true, nupere: true, nopere: true, present: true } }),
-    prisma.animal.findMany({ select: { nutrav: true, nobovi: true, sexbov: true, danais: true, statut: true, taureauId: true, pereNationalManuel: true, velageVeau: { select: { pereNunati: true, gestation: { select: { saillie: { select: { taureauId: true } } } } } } } }),
+    prisma.taureau.findMany({ select: { id: true, nupere: true, nopere: true, copaip: true, present: true } }),
+    prisma.animal.findMany({ select: { nutrav: true, nobovi: true, sexbov: true, danais: true, statut: true, taureauId: true, pereNationalManuel: true, mereTravailManuel: true, mereNomManuel: true, mere: { select: { nutrav: true, nobovi: true } }, velageVeau: { select: { pereNunati: true, gestation: { select: { saillie: { select: { taureauId: true } } } } } } } }),
   ]);
 
   return (
@@ -42,7 +42,7 @@ export default async function CesamLabPage() {
         fathers={bulls.map(bull => {
           const number = normalizeGenealogyNational(bull.nupere);
           const linked = children.filter(a => a.taureauId === bull.id || a.velageVeau?.gestation?.saillie?.taureauId === bull.id || (number.length >= 8 && (normalizeGenealogyNational(a.pereNationalManuel) === number || normalizeGenealogyNational(a.velageVeau?.pereNunati) === number)));
-          return { id: bull.id, number: bull.nupere, name: bull.nopere, present: bull.present, offspring: linked.length, presentOffspring: linked.filter(a => a.statut === "ACTIF").length, children: linked.map(a => ({ number: a.nutrav, name: a.nobovi, sex: a.sexbov, birth: a.danais?.toISOString() ?? null, mother: null, status: a.statut })) };
+          return { id: bull.id, number: bull.nupere, country: bull.copaip, name: bull.nopere, present: bull.present, offspring: linked.length, presentOffspring: linked.filter(a => a.statut === "ACTIF").length, children: linked.map(a => ({ number: a.nutrav, name: a.nobovi, sex: a.sexbov, birth: a.danais?.toISOString() ?? null, mother: a.mere?.nobovi ?? a.mere?.nutrav ?? a.mereNomManuel ?? a.mereTravailManuel ?? null, status: a.statut })) };
         })}
         animaux={animaux.map((animal) => {
           const dernierVelage = animal.velagesVache[0]?.date ?? null;
