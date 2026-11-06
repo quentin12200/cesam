@@ -27,7 +27,7 @@ export default async function CesamLabPage() {
     getGestationCalendar(),
     prisma.exploitationConfig.findUnique({ where: { id: "singleton" }, select: { reproReposObjectifJours: true } }).catch(() => null),
     prisma.taureau.findMany({ select: { id: true, nupere: true, nopere: true, copaip: true, present: true } }),
-    prisma.animal.findMany({ select: { nutrav: true, nobovi: true, sexbov: true, danais: true, statut: true, taureauId: true, pereNationalManuel: true, mereTravailManuel: true, mereNomManuel: true, mere: { select: { nutrav: true, nobovi: true } }, velageVeau: { select: { pereNunati: true, gestation: { select: { saillie: { select: { taureauId: true } } } } } } } }),
+    prisma.animal.findMany({ select: { nutrav: true, nobovi: true, sexbov: true, danais: true, statut: true, taureauId: true, pereNationalManuel: true, pereNomManuel: true, pereTravailManuel: true, mereTravailManuel: true, mereNomManuel: true, mere: { select: { nutrav: true, nobovi: true } }, velageVeau: { select: { pereNunati: true, pereNom: true, gestation: { select: { saillie: { select: { taureauId: true } } } } } } } }),
   ]);
 
   return (
@@ -41,7 +41,15 @@ export default async function CesamLabPage() {
       <LabExplorer
         fathers={bulls.map(bull => {
           const number = normalizeGenealogyNational(bull.nupere);
-          const linked = children.filter(a => a.taureauId === bull.id || a.velageVeau?.gestation?.saillie?.taureauId === bull.id || (number.length >= 8 && (normalizeGenealogyNational(a.pereNationalManuel) === number || normalizeGenealogyNational(a.velageVeau?.pereNunati) === number)));
+          const bullName = bull.nopere?.trim().toLocaleUpperCase("fr") ?? "";
+          const uniqueName = bullName.length >= 3 && bulls.filter(b => b.nopere?.trim().toLocaleUpperCase("fr") === bullName).length === 1;
+          const linked = children.filter(a => {
+            if (a.taureauId === bull.id || a.velageVeau?.gestation?.saillie?.taureauId === bull.id) return true;
+            if (number.length >= 8 && [a.pereNationalManuel, a.velageVeau?.pereNunati].some(n => normalizeGenealogyNational(n) === number)) return true;
+            // Historical names are used only when they identify exactly one bull, and no conflicting national ID is recorded.
+            if (!uniqueName || a.taureauId || a.pereNationalManuel || a.velageVeau?.pereNunati) return false;
+            return [a.pereNomManuel, a.velageVeau?.pereNom].some(n => n?.trim().toLocaleUpperCase("fr") === bullName);
+          });
           return { id: bull.id, number: bull.nupere, country: bull.copaip, name: bull.nopere, present: bull.present, offspring: linked.length, presentOffspring: linked.filter(a => a.statut === "ACTIF").length, children: linked.map(a => ({ number: a.nutrav, name: a.nobovi, sex: a.sexbov, birth: a.danais?.toISOString() ?? null, mother: a.mere?.nobovi ?? a.mere?.nutrav ?? a.mereNomManuel ?? a.mereTravailManuel ?? null, status: a.statut })) };
         })}
         animaux={animaux.map((animal) => {
