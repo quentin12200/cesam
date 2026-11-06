@@ -4,9 +4,10 @@ import Link from "next/link";
 import { nationalWithCountry } from "@/lib/bull-identity";
 
 type Child = { number: string; name: string | null; sex: string; birth: string | null; mother: string | null; status: string };
-export type LabFather = { id: string; number: string; name: string | null; present: boolean; offspring: number; presentOffspring: number; children: Child[] };
+export type LabFather = { id: string; number: string; country: string; name: string | null; present: boolean; offspring: number; presentOffspring: number; children: Child[] };
 type Sort = "number" | "name" | "sex" | "age" | "mother";
 const workNumber = (value: string) => value.replace(/\s/g, "").slice(-4);
+const displayedNational = (f: LabFather) => {const n = nationalWithCountry(f.number); return /^[0-9]{8,15}$/.test(n) && /^[A-Z]{2}$/.test(f.country) ? f.country + n : n;};
 function age(date: string | null, today: number) {
   if (!date) return "—";
   const months = Math.max(0, Math.floor((today - new Date(date).getTime()) / (365.2425 / 12 * 86400000)));
