@@ -7,7 +7,7 @@ type Child = { number: string; name: string | null; sex: string; birth: string |
 export type LabFather = { id: string; number: string; country: string; name: string | null; present: boolean; offspring: number; presentOffspring: number; children: Child[] };
 type Sort = "number" | "name" | "sex" | "age" | "mother";
 const workNumber = (value: string) => value.replace(/\s/g, "").slice(-4);
-const displayedNational = (f: LabFather) => { const n = f.number.replace(/\\s/g, "").toUpperCase(); return /^[A-Z]{2}[A-Z0-9]+$/.test(n) ? n : /^\\d{8,15}$/.test(n) && /^[A-Z]{2}$/.test(f.country) ? f.country + n : nationalWithCountry(n); };
+const displayedNational = (f: LabFather) => { const n = f.number.replace(/\s/g, "").toUpperCase(); return /^[A-Z]{2}[A-Z0-9]+$/.test(n) ? n : /^\d{8,15}$/.test(n) && /^[A-Z]{2}$/.test(f.country) ? f.country + n : nationalWithCountry(n); };
 function age(date: string | null, today: number) {
   if (!date) return "—";
   const months = Math.max(0, Math.floor((today - new Date(date).getTime()) / (365.2425 / 12 * 86400000)));
