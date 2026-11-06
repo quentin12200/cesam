@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, CalendarDays, ChevronDown, ChevronUp, Plus, House, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import LabCreatePanel from "./LabCreatePanel";
+import LabFathers, { type LabFather } from "./LabFathers";
 import AccueilRadialMenu from "@/app/components/AccueilRadialMenu";
 
 type Animal = {
@@ -16,7 +17,7 @@ type Animal = {
   reproduction: "VERT" | "ROSE" | "JAUNE" | "ROUGE" | "REPOS" | "GRIS" | null;
 };
 type Echeance = { id: string; nutrav: string; nom: string | null; date: string };
-type Vue = "accueil" | "animaux" | "creer";
+type Vue = "accueil" | "animaux" | "creer" | "peres";
 type Tri = "numero" | "sexe" | "age" | "repro";
 
 const reproLabels: Record<string, string> = { VERT: "Gestante", ROSE: "Vêlage imminent", JAUNE: "À écho", ROUGE: "Vide", REPOS: "Repos", GRIS: "En attente" };
@@ -36,9 +37,11 @@ const seances = ["Échographies", "Vaccinations", "Antiparasitaires", "Soins / t
 export default function LabExplorer({
   animaux,
   echeances,
+  fathers,
 }: {
   animaux: Animal[];
   echeances: Echeance[];
+  fathers: LabFather[];
 }) {
   const [vue, setVue] = useState<Vue>("accueil");
   const [demoAction, setDemoAction] = useState<string | null>(null);
@@ -55,9 +58,10 @@ export default function LabExplorer({
 
   return (
     <div className="space-y-4 pb-[calc(env(safe-area-inset-bottom)+10rem)]">
-      <nav className="grid grid-cols-3 gap-2" aria-label="Sections du CESAM LAB">
+      <nav className="grid grid-cols-4 gap-2" aria-label="Sections du CESAM LAB">
         <button type="button" onClick={() => setVue("accueil")} className={vue==="accueil"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><House className="mx-auto mb-1" size={20}/>Accueil</button>
         <button type="button" onClick={() => setVue("animaux")} className={vue==="animaux"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><Search className="mx-auto mb-1" size={20}/>Troupeau</button>
+        <button type="button" onClick={() => setVue("peres")} className={vue==="peres"?"rounded-xl bg-green-700 p-2 text-xs font-bold text-white":"rounded-xl bg-white p-2 text-xs font-bold text-gray-700"}>Pères</button>
         <button type="button" onClick={() => setVue("creer")} className={vue==="creer"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-green-50 p-3 text-sm font-bold text-green-800"}><Plus className="mx-auto mb-1" size={20}/>Créer</button>
       </nav>
       <AccueilRadialMenu animalNumero={animalContexte} onAction={setDemoAction} onSaveNote={async (content) => { setDemoNotes(prev => [content, ...prev]); }} />
@@ -97,6 +101,7 @@ export default function LabExplorer({
         </section>
       )}
       {vue === "creer" && <LabCreatePanel animaux={animaux}/>}
+      {vue === "peres" && <LabFathers fathers={fathers}/> }
 
       {vue === "animaux" && (
         <section className="space-y-3">

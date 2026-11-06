@@ -2,13 +2,14 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
 import LabExplorer from "./LabExplorer";
+import { normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
 import { getEtatGestation } from "@/lib/utils";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
 
 export const dynamic = "force-dynamic";
 
 export default async function CesamLabPage() {
-  const [animaux, echeances, reproConfig] = await Promise.all([
+  const [animaux, echeances, reproConfig, bulls, children] = await Promise.all([
     prisma.animal.findMany({
       where: { statut: "ACTIF" },
       select: {
@@ -25,6 +26,8 @@ export default async function CesamLabPage() {
     }),
     getGestationCalendar(),
     prisma.exploitationConfig.findUnique({ where: { id: "singleton" }, select: { reproReposObjectifJours: true } }).catch(() => null),
+    prisma.taureau.findMany({ select: { id: true, nupere: true, nopere: true } }),
+    prisma.animal.findMany({ select: { nutrav: true, statut: true, taureauId: true, pereNationalManuel: true, velageVeau: { select: { pereNunati: true } } } }),
   ]);
 
   return (
@@ -36,6 +39,11 @@ export default async function CesamLabPage() {
         </div>
       </header>
       <LabExplorer
+        fathers={bulls.map(bull => {
+          const number = normalizeGenealogyNational(bull.nupere);
+          const linked = children.filter(a => a.taureauId === bull.id || (number.length >= 8 && (normalizeGenealogyNational(a.pereNationalManuel) === number || normalizeGenealogyNational(a.velageVeau?.pereNunati) === number)));
+          return { id: bull.id, number: bull.nupere, name: bull.nopere, offspring: linked.length, presentOffspring: linked.filter(a => a.statut === "ACTIF").length, children: linked.map(a => a.nutrav) };
+        })}
         animaux={animaux.map((animal) => {
           const dernierVelage = animal.velagesVache[0]?.date ?? null;
           const saillie = getCurrentCycleBreeding(animal.saillies, dernierVelage);
