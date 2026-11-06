@@ -18,7 +18,7 @@ export default async function FatherControlPage() {
     }),
     prisma.animal.findMany({
       select: {
-        nutrav: true, nobovi: true, statut: true, taureauId: true, pereNationalManuel: true,
+        nutrav: true, nobovi: true, taureauId: true, pereNationalManuel: true,
         velageVeau: {
           select: {
             pereNunati: true,
@@ -47,7 +47,6 @@ export default async function FatherControlPage() {
       manual: manual.length,
       calving: calving.length,
       offspring: unique.size,
-      presentOffspring: animals.filter((animal) => unique.has(animal.nutrav) && animal.statut === "ACTIF").length,
       breeding: associated.length,
       inseminations: associated.filter((breeding) => /IA|INSEMIN/i.test(breeding.type ?? "")).length,
       childNumbers: [...unique].sort(),
