@@ -6,9 +6,9 @@ type Child = { number: string; name: string | null; sex: string; birth: string |
 export type LabFather = { id: string; number: string; name: string | null; present: boolean; offspring: number; presentOffspring: number; children: Child[] };
 type Sort = "number" | "name" | "sex" | "age" | "mother";
 const workNumber = (value: string) => value.replace(/\s/g, "").slice(-4);
-function age(date: string | null) {
+function age(date: string | null, today: number) {
   if (!date) return "—";
-  const months = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / (365.2425 / 12 * 86400000)));
+  const months = Math.max(0, Math.floor((today - new Date(date).getTime()) / (365.2425 / 12 * 86400000)));
   return months < 24 ? `${months} mois` : `${Math.floor(months / 12)} an${months >= 24 ? "s" : ""}`;
 }
 export default function LabFathers({ fathers }: { fathers: LabFather[] }) {
@@ -18,6 +18,7 @@ export default function LabFathers({ fathers }: { fathers: LabFather[] }) {
   const [menu, setMenu] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("number");
   const [reverse, setReverse] = useState(false);
+  const [today] = useState(() => Date.now());
   const visible = useMemo(() => fathers.filter(f =>
     (kind === "ALL" || (kind === "FARM" ? f.present : !f.present)) &&
     [f.name ?? "", f.number, workNumber(f.number), ...f.children.map(c => c.number)].join(" ").toLocaleLowerCase("fr").includes(search.toLocaleLowerCase("fr").trim())
@@ -55,7 +56,7 @@ export default function LabFathers({ fathers }: { fathers: LabFather[] }) {
       {selected===f.id && <div className="mt-3 overflow-x-auto">
         <div className="mb-2 flex items-center justify-between"><strong className="text-sm">Descendance de {f.name ?? f.number}</strong><button className="text-xs underline" onClick={() => setSelected(null)}>Fermer</button></div>
         <div className="mb-2 flex flex-wrap items-center gap-2"><label className="text-xs" htmlFor="father-sort">Trier par</label><select id="father-sort" className="rounded border p-1 text-xs" value={sort} onChange={e => setSort(e.target.value as Sort)}><option value="number">Numéro</option><option value="name">Nom</option><option value="sex">Sexe</option><option value="age">Âge</option><option value="mother">Mère</option></select><button className="rounded border px-2 py-1 text-xs" onClick={() => setReverse(!reverse)}>Inverser ↕</button></div>
-        <table className="w-full min-w-[360px] text-left text-xs"><thead><tr className="border-b text-gray-500"><th className="py-2">Animal</th><th>Âge</th><th>Mère</th><th>Statut</th></tr></thead><tbody>{descendants.map(c => <tr key={c.number} className="border-b last:border-0"><td className="py-2"><Link href={`/troupeau/${encodeURIComponent(c.number)}`} className={`inline-block rounded-lg px-2 py-1 underline ${c.sex==="F"?"bg-pink-50 text-pink-800":"bg-blue-50 text-blue-800"}`}><strong>{c.number}</strong>{c.name && <span className="block text-[10px]">{c.name}</span>}</Link></td><td>{age(c.birth)}</td><td>{c.mother ?? "—"}</td><td>{c.status==="ACTIF"?"Présent":"Sorti"}</td></tr>)}</tbody></table>
+        <table className="w-full min-w-[360px] text-left text-xs"><thead><tr className="border-b text-gray-500"><th className="py-2">Animal</th><th>Âge</th><th>Mère</th><th>Statut</th></tr></thead><tbody>{descendants.map(c => <tr key={c.number} className="border-b last:border-0"><td className="py-2"><Link href={`/troupeau/${encodeURIComponent(c.number)}`} className={`inline-block rounded-lg px-2 py-1 underline ${c.sex==="F"?"bg-pink-50 text-pink-800":"bg-blue-50 text-blue-800"}`}><strong>{c.number}</strong>{c.name && <span className="block text-[10px]">{c.name}</span>}</Link></td><td>{age(c.birth, today)}</td><td>{c.mother ?? "—"}</td><td>{c.status==="ACTIF"?"Présent":"Sorti"}</td></tr>)}</tbody></table>
         {descendants.length===0 && <p className="py-3 text-sm text-gray-500">Aucun descendant relié à cette fiche. Cela ne prouve pas l'absence de descendants dans les données historiques.</p>}
       </div>}
     </div>)}</div>
