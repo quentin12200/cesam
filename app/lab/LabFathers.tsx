@@ -18,7 +18,7 @@ export default function LabFathers({ fathers }: { fathers: LabFather[] }) {
   const [menu, setMenu] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("number");
   const [reverse, setReverse] = useState(false);
-  const today = new Date("2026-11-06T12:00:00Z").getTime();
+  const [today] = useState(() => new Date().getTime());
   const visible = useMemo(() => fathers.filter(f =>
     (kind === "ALL" || (kind === "FARM" ? f.present : !f.present)) &&
     [f.name ?? "", f.number, workNumber(f.number), ...f.children.map(c => c.number)].join(" ").toLocaleLowerCase("fr").includes(search.toLocaleLowerCase("fr").trim())
