@@ -11,6 +11,6 @@ export function validateBreedingInput(body: unknown) {
   const parsedDate = new Date(date);
   if (Number.isNaN(parsedDate.getTime()) || (date.length === 10 && parsedDate.toISOString().slice(0, 10) !== date)) return { ok: false as const, error: "Date invalide." };
   if (input.taureauId != null && (typeof input.taureauId !== "string" || !input.taureauId.trim())) return { ok: false as const, error: "Taureau invalide." };
-  if (input.tentative != null && (!Number.isInteger(input.tentative) || (input.tentative as number) < 1)) return { ok: false as const, error: "Tentative invalide." };
+  if (input.tentative != null && (typeof input.tentative !== "number" || !Number.isInteger(input.tentative) || input.tentative < 1)) return { ok: false as const, error: "Tentative invalide." };
   return { ok: true as const, animalIds, date: parsedDate, type, taureauId: input.taureauId as string | undefined | null, tentative: (input.tentative as number | undefined) ?? 1 };
 }
