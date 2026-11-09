@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { canonicalName, sameBullCandidates } from "@/lib/bull-identity";
 import { normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
 import FatherControlTable, { type BullControlRow, type FatherConflict } from "./FatherControlTable";
 
@@ -13,15 +14,15 @@ function normalizedFull(value: string | null | undefined): string | null {
 export default async function FatherControlPage() {
   const [bulls, animals, breedings] = await Promise.all([
     prisma.taureau.findMany({
-      select: { id: true, nupere: true, nopere: true, present: true, _count: { select: { animaux: true, saillies: true } } },
+      select: { id: true, nupere: true, nopere: true, copaip: true, present: true, _count: { select: { animaux: true, saillies: true } } },
       orderBy: { nopere: "asc" },
     }),
     prisma.animal.findMany({
       select: {
-        nutrav: true, nobovi: true, taureauId: true, pereNationalManuel: true,
+        nutrav: true, nobovi: true, taureauId: true, pereNationalManuel: true, pereNomManuel: true,
         velageVeau: {
           select: {
-            pereNunati: true,
+            pereNunati: true, pereNom: true,
             gestation: { select: { saillie: { select: { taureauId: true } } } },
           },
         },
@@ -33,14 +34,21 @@ export default async function FatherControlPage() {
   const byId = new Map(bulls.map((bull) => [bull.id, bull]));
   const rows: BullControlRow[] = bulls.map((bull) => {
     const national = normalizedFull(bull.nupere);
+    const name = canonicalName(bull.nopere);
+    const uniqueName = name.length >= 3 && bulls.filter((b) => canonicalName(b.nopere) === name).length === 1;
     const directlyLinked = animals.filter((animal) => animal.taureauId === bull.id);
     const manual = national ? animals.filter((animal) => normalizedFull(animal.pereNationalManuel) === national) : [];
     const calving = national ? animals.filter((animal) => normalizedFull(animal.velageVeau?.pereNunati) === national) : [];
-    const unique = new Set([...directlyLinked, ...manual, ...calving].map((animal) => animal.nutrav));
+    const historical = uniqueName ? animals.filter((animal) => !animal.taureauId && !normalizedFull(animal.pereNationalManuel) && !normalizedFull(animal.velageVeau?.pereNunati) && [animal.pereNomManuel, animal.velageVeau?.pereNom].some((value) => canonicalName(value) === name)) : [];
+    const unique = new Set([...directlyLinked, ...manual, ...calving, ...historical].map((animal) => animal.nutrav));
+    const duplicateCandidates = bulls.filter((other) => other.id !== bull.id && (sameBullCandidates(bull, other) || (name.length >= 3 && canonicalName(other.nopere) === name))).map((other) => ({ id: other.id, name: other.nopere, number: other.nupere }));
     const associated = breedings.filter((breeding) => breeding.taureauId === bull.id);
     return {
       id: bull.id,
       number: bull.nupere,
+      country: bull.copaip,
+      duplicateCandidates,
+      historical: historical.length,
       name: bull.nopere,
       present: bull.present,
       direct: directlyLinked.length,
