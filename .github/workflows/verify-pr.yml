@@ -17,6 +17,6 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx tsc --noEmit
-      - run: node --test --experimental-strip-types lib/validate-breeding.test.ts lib/gestation-calving-selection.test.ts
+      - run: node --test --experimental-strip-types lib/validate-breeding.test.ts lib/gestation-calving-selection.test.ts lib/pregnancy-confirmation.test.ts
       # Full production build is verified by Vercel, which has the configured database.
       # This isolated runner intentionally has no access to production data.
