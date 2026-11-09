@@ -30,6 +30,8 @@ export default async function RenewalPage() {
       select: {
         id: true, nutrav: true, nobovi: true, danais: true, sexbov: true, statut: true, estGenisse: true, categorie: true,
         mere: { select: { id: true, nutrav: true, nobovi: true } },
+        taureau: { select: { id: true, nopere: true, nupere: true } },
+        pereNomManuel: true, pereNationalManuel: true, pereTravailManuel: true,
         velageVeau: {
           select: {
             pereNom: true, pereNunati: true,
@@ -77,7 +79,8 @@ export default async function RenewalPage() {
       const reliableExpectedDate = expected?.dateVelagePrevue && ["VERT", "ROSE"].includes(expected.etat) ? expected.dateVelagePrevue : null;
       const entryDate = estimateMotherEntryDate({ birthDate: animal.danais, expectedCalvingDate: reliableExpectedDate, firstCalvingAverageMonths: firstCalvingAverage.medianMonths });
       const calvingFather = animal.velageVeau?.pereNom || animal.velageVeau?.pereNunati ? { name: animal.velageVeau.pereNom, nationalNumber: animal.velageVeau.pereNunati } : null;
-      const parents = resolveCandidateParents({ directMother: identity(animal.mere), calvingMother: identity(animal.velageVeau?.vache), breedingBull: identity(animal.velageVeau?.gestation?.saillie?.taureau), calvingFather });
+      const manualFather = animal.pereNomManuel || animal.pereNationalManuel || animal.pereTravailManuel ? { name: animal.pereNomManuel, nationalNumber: animal.pereNationalManuel, workNumber: animal.pereTravailManuel } : null;
+      const parents = resolveCandidateParents({ directMother: identity(animal.mere), calvingMother: identity(animal.velageVeau?.vache), breedingBull: identity(animal.taureau) ?? identity(animal.velageVeau?.gestation?.saillie?.taureau), calvingFather: calvingFather ?? manualFather });
       return {
         id: animal.id, nutrav: animal.nutrav, name: animal.nobovi,
         birthDate: animal.danais.toISOString(), category: category as RenewalStage, categoryLabel: getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie),
