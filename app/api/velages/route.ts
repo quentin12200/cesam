@@ -19,6 +19,9 @@ export async function POST(request: NextRequest) {
     const qualificatif = ["NORMAL", "DIFFICILE", "AVORTEMENT", "MORT_NEE"].includes(body.qualificatif) ? body.qualificatif : "NORMAL";
     if (!vacheNutrav || !date) return NextResponse.json({ error: "La vache et la date sont requises" }, { status: 400 });
 
+    const dateVelage = new Date(date);
+    if (Number.isNaN(dateVelage.getTime())) return NextResponse.json({ error: "Date de vêlage invalide" }, { status: 400 });
+
     const vache = await prisma.animal.findUnique({ where: { nutrav: vacheNutrav }, include: { _count: { select: { velagesVache: true } } } });
     if (!vache) return NextResponse.json({ error: `Vache ${vacheNutrav} non trouvée` }, { status: 404 });
     const prevTarieFaite = vache.tarieFaite;
@@ -77,8 +80,6 @@ export async function POST(request: NextRequest) {
       resolus.push({ saisi, animalId: animal.id, cree, precedent });
     }
 
-    const dateVelage = new Date(date);
-    if (Number.isNaN(dateVelage.getTime())) return NextResponse.json({ error: "Date de vêlage invalide" }, { status: 400 });
     const gestationsCandidates = await prisma.gestation.findMany({
       where: { saillie: { animalId: vache.id }, etat: { in: ["VERT", "GRIS", "ROSE"] } },
       include: { saillie: { include: { taureau: true } } },
