@@ -80,11 +80,16 @@ export async function POST(request: NextRequest) {
       resolus.push({ saisi, animalId: animal.id, cree, precedent });
     }
 
+    const dernierVelage = await prisma.velage.findFirst({
+      where: { vacheId: vache.id, date: { lt: dateVelage } },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
     const gestationsCandidates = await prisma.gestation.findMany({
       where: { saillie: { animalId: vache.id }, etat: { in: ["VERT", "GRIS", "ROSE"] } },
       include: { saillie: { include: { taureau: true } } },
     });
-    const gestation = selectGestationForCalving(gestationsCandidates, dateVelage);
+    const gestation = selectGestationForCalving(gestationsCandidates, dateVelage, dernierVelage?.date ?? null);
     const premierVivant = resolus.find((v) => v.saisi.statut === "VIVANT" && v.animalId);
     const velage = await prisma.$transaction(async (tx) => {
       const cree = await tx.velage.create({ data: {
