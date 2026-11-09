@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest) {
     const id = typeof body?.id === "string" ? body.id : "";
     const name = typeof body?.nopere === "string" ? body.nopere.trim() : null;
     const work = typeof body?.traper === "string" ? body.traper.trim() : null;
-    const national = typeof body?.nupere === "string" ? body.nupere.replace(/\\s+/g, "").toUpperCase() : null;
+    const national = typeof body?.nupere === "string" ? body.nupere.replace(/\s+/g, "").toUpperCase() : null;
     if (!id || name === null || work === null || national === null || name.length > 120 || work.length > 40 || !/^(?:[A-Z]{2})?[A-Z0-9]{3,17}$/.test(national)) {
       return NextResponse.json({ error: "Nom, numéro de travail ou numéro national invalide." }, { status: 400 });
     }
