@@ -218,6 +218,7 @@ function ReproductionActionModal({
       if (named.length > 0) {
         throw new Error("Un taureau portant ce nom existe déjà : sélectionne-le dans la liste au lieu de créer une autre référence.");
       }
+      if (!iaName.trim()) throw new Error("Renseigne le nom du nouveau taureau d’IA en plus de son numéro.");
       const response = await fetch("/api/taureaux", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
