@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { logAction } from "@/lib/action-log";
+import { normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -102,6 +103,32 @@ export async function POST(request: NextRequest) {
     }
     if (existNunati) {
       return NextResponse.json({ error: "Ce N° National existe déjà" }, { status: 409 });
+    }
+
+    // Reject the same full national identity even when FR or whitespace differs.
+    // A short work number is not sufficient to establish biological identity.
+    const normalizedNational = normalizeGenealogyNational(nunati.trim());
+    if (normalizedNational.length >= 8) {
+      const suffix = normalizedNational.slice(-8);
+      const potentialDuplicates = await prisma.animal.findMany({
+        where: {
+          OR: [
+            { nunati: { contains: suffix } },
+            { numeroNational: { contains: suffix } },
+          ],
+        },
+        select: { nutrav: true, nunati: true, numeroNational: true },
+      });
+      const duplicate = potentialDuplicates.find((candidate) =>
+        [candidate.nunati, candidate.numeroNational].some((value) =>
+          normalizeGenealogyNational(value) === normalizedNational
+        )
+      );
+      if (duplicate) {
+        return NextResponse.json({
+          error: `Cet animal existe déjà sous le numéro de travail ${duplicate.nutrav}. Sélectionne sa fiche existante.`,
+        }, { status: 409 });
+      }
     }
 
     // Résoudre la mère
