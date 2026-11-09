@@ -63,7 +63,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
   }
 
   async function saveIdentity(row: BullControlRow) {
-    const changingNational = editNational.replace(/\\s+/g, "").toUpperCase() !== row.number.replace(/\\s+/g, "").toUpperCase();
+    const changingNational = editNational.replace(/\s+/g, "").toUpperCase() !== row.number.replace(/\s+/g, "").toUpperCase();
     if (changingNational && !window.confirm("Modifier le numéro national ? Les anciennes filiations ne seront pas réécrites. CESAM bloquera les doublons et les références historiques.")) return;
     setBusy(true); setError("");
     try {
