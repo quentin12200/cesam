@@ -7,22 +7,33 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { animalId, animalIds: requestedAnimalIds, date, type, groupage, taureauId, tentative, estimation } = body;
     const typeNormalise = typeof type === "string" ? type.trim().toUpperCase() : "";
+    const parsedDate = typeof date === "string" && /^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(date) ? new Date(date) : new Date(NaN);
+    const validDate = !Number.isNaN(parsedDate.getTime());
+    const validTaureauId = taureauId == null || (typeof taureauId === "string" && taureauId.trim().length > 0);
+    const validTentative = tentative == null || (Number.isInteger(tentative) && tentative >= 1);
     const animalIds = [...new Set<string>(
       Array.isArray(requestedAnimalIds) ? requestedAnimalIds.filter((id): id is string => typeof id === "string" && id.length > 0) : animalId ? [animalId] : []
     )];
 
-    if (animalIds.length === 0 || !date || !["NATURELLE", "IA"].includes(typeNormalise)) {
+    if (animalIds.length === 0 || !validDate || !validTaureauId || !validTentative || !["NATURELLE", "IA"].includes(typeNormalise)) {
       return NextResponse.json({ error: "Champs manquants: animalId(s), date, type requis" }, { status: 400 });
     }
 
     const animaux = await prisma.animal.findMany({ where: { id: { in: animalIds } }, select: { nutrav: true, nobovi: true } });
+    if (animaux.length !== animalIds.length) {
+      return NextResponse.json({ error: "Un ou plusieurs animaux sont introuvables." }, { status: 400 });
+    }
+    if (taureauId != null) {
+      const taureau = await prisma.taureau.findUnique({ where: { id: taureauId }, select: { id: true } });
+      if (!taureau) return NextResponse.json({ error: "Taureau introuvable." }, { status: 400 });
+    }
     const creations = await prisma.$transaction(async (tx) => {
       const resultats = [];
       for (const id of animalIds) {
         const saillie = await tx.saillie.create({
           data: {
             animalId: id,
-            date: new Date(date),
+            date: parsedDate,
             type: typeNormalise,
             estimation: estimation === true,
             groupage: groupage ?? false,
