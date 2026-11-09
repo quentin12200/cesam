@@ -1,28 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { validateBreedingInput } from "@/lib/validate-breeding";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { animalId, animalIds: requestedAnimalIds, date, type, groupage, taureauId, tentative, estimation } = body;
-    const typeNormalise = typeof type === "string" ? type.trim().toUpperCase() : "";
-    const animalIds = [...new Set<string>(
-      Array.isArray(requestedAnimalIds) ? requestedAnimalIds.filter((id): id is string => typeof id === "string" && id.length > 0) : animalId ? [animalId] : []
-    )];
-
-    if (animalIds.length === 0 || !date || !["NATURELLE", "IA"].includes(typeNormalise)) {
-      return NextResponse.json({ error: "Champs manquants: animalId(s), date, type requis" }, { status: 400 });
-    }
+    const validated = validateBreedingInput(body);
+    if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: 400 });
+    const { animalIds, date: parsedDate, type: typeNormalise, taureauId, tentative } = validated;
+    const { groupage, estimation } = body;
 
     const animaux = await prisma.animal.findMany({ where: { id: { in: animalIds } }, select: { nutrav: true, nobovi: true } });
+    if (animaux.length !== animalIds.length) {
+      return NextResponse.json({ error: "Un ou plusieurs animaux sont introuvables." }, { status: 400 });
+    }
+    if (taureauId != null) {
+      const taureau = await prisma.taureau.findUnique({ where: { id: taureauId }, select: { id: true } });
+      if (!taureau) return NextResponse.json({ error: "Taureau introuvable." }, { status: 400 });
+    }
     const creations = await prisma.$transaction(async (tx) => {
       const resultats = [];
       for (const id of animalIds) {
         const saillie = await tx.saillie.create({
           data: {
             animalId: id,
-            date: new Date(date),
+            date: parsedDate,
             type: typeNormalise,
             estimation: estimation === true,
             groupage: groupage ?? false,
