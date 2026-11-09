@@ -17,5 +17,17 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx tsc --noEmit
-      # Full production build is verified by Vercel, which has the configured database.
-      # This isolated runner intentionally has no access to production data.
+      # Compile production code in isolation. No production secrets, migrations or data access.
+      - name: Prepare disposable local SQLite schema (no production database)
+        run: npx prisma db push --url file:./ci-build-only.db
+        env:
+          DATABASE_URL: 'file:./ci-build-only.db'
+          TURSO_DATABASE_URL: 'file:./ci-build-only.db'
+          TURSO_AUTH_TOKEN: 'ci-build-only'
+      - name: Build Next.js without production credentials
+        run: npm run build
+        env:
+          DATABASE_URL: 'file:./ci-build-only.db'
+          TURSO_DATABASE_URL: 'file:./ci-build-only.db'
+          TURSO_AUTH_TOKEN: 'ci-build-only'
+          NEXT_TELEMETRY_DISABLED: '1'

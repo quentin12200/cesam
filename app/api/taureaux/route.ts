@@ -87,27 +87,43 @@ export async function POST(request: NextRequest) {
 }
 
 
-// Une correction de nom est possible sans toucher aux liens biologiques.
-// Changer un identifiant national lié à des animaux nécessite un audit séparé.
+// Édition contrôlée : les anciennes filiations ne sont jamais réécrites.
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null);
     const id = typeof body?.id === "string" ? body.id : "";
     const name = typeof body?.nopere === "string" ? body.nopere.trim() : null;
-    if (!id || name === null || name.length > 120) {
-      return NextResponse.json({ error: "Identifiant ou nom invalide." }, { status: 400 });
+    const work = typeof body?.traper === "string" ? body.traper.trim() : null;
+    const national = typeof body?.nupere === "string" ? body.nupere.replace(/\s+/g, "").toUpperCase() : null;
+    if (!id || name === null || work === null || national === null || name.length > 120 || work.length > 40 || !/^(?:[A-Z]{2})?[A-Z0-9]{3,17}$/.test(national)) {
+      return NextResponse.json({ error: "Nom, numéro de travail ou numéro national invalide." }, { status: 400 });
     }
     const bull = await prisma.taureau.findUnique({ where: { id } });
     if (!bull) return NextResponse.json({ error: "Taureau introuvable." }, { status: 404 });
-    const updated = await prisma.taureau.update({ where: { id }, data: { nopere: name || null } });
+    const newNational = nationalWithCountry(national);
+    const numberChanged = newNational !== bull.nupere;
+    if (numberChanged) {
+      if (!fullNational(newNational)) return NextResponse.json({ error: "Saisis un numéro national complet (8 à 15 chiffres, avec code pays si connu)." }, { status: 400 });
+      const others = await prisma.taureau.findMany({ where: { id: { not: id } }, select: { id: true, nupere: true, nopere: true } });
+      const collision = others.find((other) => normalizeGenealogyNational(other.nupere) === normalizeGenealogyNational(newNational) || (canonicalName(other.nopere) === canonicalName(name) && canonicalName(name).length >= 3));
+      if (collision) return NextResponse.json({ error: `Doublon possible avec ${collision.nopere ?? collision.nupere} (${collision.nupere}). Vérifie les fiches avant de corriger.` }, { status: 409 });
+      const refs = await referencesForBull(bull);
+      if (refs.manual || refs.calvings) return NextResponse.json({ error: "Correction du national bloquée : des références historiques utilisent l'ancien numéro. Vérifie les filiations avant toute modification.", references: refs }, { status: 409 });
+      if (body?.confirmation !== "CORRIGER") return NextResponse.json({ error: "Confirmation explicite requise." }, { status: 400 });
+    }
+    const updated = await prisma.taureau.update({
+      where: { id },
+      data: { nopere: name || null, traper: work || null, ...(numberChanged ? { nupere: newNational } : {}) },
+    });
     try {
-      await logAction("PATCH_TAUREAU_NOM", `Nom du taureau ${bull.nupere} modifié`, {
-        op: "update", model: "taureau", where: { id }, data: { nopere: bull.nopere },
+      await logAction("PATCH_TAUREAU_IDENTITE", `Identité du taureau ${bull.nupere} modifiée`, {
+        op: "update", model: "taureau", where: { id },
+        data: { nopere: bull.nopere, traper: bull.traper, nupere: bull.nupere },
       });
     } catch {}
     return NextResponse.json({ ok: true, taureau: updated });
   } catch {
-    return NextResponse.json({ error: "Correction impossible." }, { status: 500 });
+    return NextResponse.json({ error: "Correction impossible : vérifier les numéros et les doublons." }, { status: 409 });
   }
 }
 
