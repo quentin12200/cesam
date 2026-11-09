@@ -6,13 +6,19 @@ import { nationalWithCountry, canonicalName, fullNational } from "@/lib/bull-ide
 import { useRouter } from "next/navigation";
 
 export type BullControlRow = {
-  id: string; number: string; name: string | null; present: boolean;
+  id: string; number: string; country: string; name: string | null; present: boolean;
+  historical: number; duplicateCandidates: Array<{ id: string; number: string; name: string | null }>;
   direct: number; manual: number; calving: number; offspring: number;
   breeding: number; inseminations: number; childNumbers: string[];
 };
 export type FatherConflict = {
   nutrav: string; name: string | null; bull: string | null;
   manual: string | null; calving: string | null;
+};
+const displayNumber = (row: BullControlRow) => {
+  const raw = row.number.replace(/\s+/g, "").toUpperCase();
+  if (/^[A-Z]{2}[A-Z0-9]+$/.test(raw)) return raw;
+  return /^\d{8,15}$/.test(raw) && /^[A-Z]{2}$/.test(row.country) ? row.country + raw : raw;
 };
 type SortKey = "number" | "name" | "offspring" | "breeding" | "inseminations" | "direct";
 function csvCell(value: string | number) {
@@ -36,7 +42,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
   const [mergeInto, setMergeInto] = useState("");
 
   const visible = useMemo(() => rows.filter((row) => {
-    const phrase = [row.number, nationalWithCountry(row.number), row.name ?? "", ...row.childNumbers].join(" ").toLocaleLowerCase("fr");
+    const phrase = [row.number, displayNumber(row), row.name ?? "", ...row.childNumbers].join(" ").toLocaleLowerCase("fr");
     if (!phrase.includes(query.trim().toLocaleLowerCase("fr"))) return false;
     if (filter === "avec-liens") return row.offspring > 0 || row.breeding > 0;
     if (filter === "sans-liens") return row.offspring === 0 && row.breeding === 0;
@@ -111,8 +117,8 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
   }
 
   function exportCsv() {
-    const header = ["Nom", "Numéro national", "Animaux liés", "Références manuelles", "Références vêlages", "Descendants identifiés", "Saillies", "IA identifiées"];
-    const values = visible.map((r) => [r.name ?? "", nationalWithCountry(r.number), r.direct, r.manual, r.calving, r.offspring, r.breeding, r.inseminations]);
+    const header = ["Nom", "Numéro national ou référence", "Animaux liés", "Références manuelles", "Références vêlages", "Descendants identifiés", "Saillies", "IA identifiées"];
+    const values = visible.map((r) => [r.name ?? "", displayNumber(r), r.direct, r.manual, r.calving, r.offspring, r.breeding, r.inseminations]);
     const csv = [header, ...values].map((r) => r.map(csvCell).join(";")).join("\r\n");
     const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -138,6 +144,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
         </button>
       </section>
 
+      <p className="text-sm text-amber-900">À contrôler : {rows.filter(r => !fullNational(r.number)).length} numéros incomplets · {rows.filter(r => r.duplicateCandidates.length > 0).length} fiches avec doublon possible. Ces alertes ne prouvent pas une erreur.</p>
       {showConflicts && (
         <section className="rounded-xl border border-amber-200 bg-white p-3">
           <h2 className="font-semibold text-gray-900">Pères différents selon les sources</h2>
@@ -224,7 +231,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
         <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
           <thead className="sticky top-0 bg-green-800 text-white">
             <tr>
-              <th className="px-3 py-3">{sortHeader("number", "Numéro national")}</th>
+              <th className="px-3 py-3">{sortHeader("number", "Numéro / identité")}</th>
               <th className="px-3 py-3">{sortHeader("name", "Nom")}</th>
               <th className="px-3 py-3 text-center">{sortHeader("direct", "Animaux liés")}</th>
               <th className="px-3 py-3 text-center">Mentions manuelles</th>
@@ -237,7 +244,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
           </thead>
           <tbody>{visible.map((row) => (
             <tr key={row.id} className="border-t border-gray-100 hover:bg-green-50/40">
-              <td className="px-3 py-2 font-mono font-semibold text-green-900">{nationalWithCountry(row.number)}</td>
+              <td className="px-3 py-2"><strong className="block font-mono text-green-900">{displayNumber(row)}</strong>{!fullNational(row.number) && <span className="text-xs font-semibold text-amber-800">Référence courte · national à vérifier</span>}{row.duplicateCandidates.length > 0 && <span className="block text-xs text-amber-800">Doublon possible : {row.duplicateCandidates.map(x => x.name ?? x.number).join(", ")}</span>}</td>
               <td className="px-3 py-2">
                 {editing === row.id ? (
                   <div className="flex gap-1">
@@ -249,7 +256,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
                 ) : <span>{row.name || "Sans nom"}</span>}
               </td>
               <td className="px-3 py-2 text-center">{row.direct}</td>
-              <td className="px-3 py-2 text-center">{row.manual}</td>
+              <td className="px-3 py-2 text-center">{row.manual}{row.historical > 0 && <span className="block text-xs text-amber-800">+{row.historical} par nom</span>}</td>
               <td className="px-3 py-2 text-center">{row.calving}</td>
               <td className="px-3 py-2 text-center">
                 <button type="button" aria-label={`Afficher les veaux du taureau ${row.number}`} onClick={() => setExpanded(expanded === row.id ? null : row.id)}
@@ -288,7 +295,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
         </section> : null;
       })()}
       <p className="text-xs text-gray-500">
-        Correction du numéro national et fusion de références historiques : accès contrôlé après vérification.
+        Les numéros courts ne sont pas des numéros nationaux complets. Vérifier les doublons et les filiations avant toute fusion ou correction.
         La suppression est refusée par CESAM dès qu&apos;une filiation, saillie ou mention de vêlage utilise le père.
       </p>
     </div>
