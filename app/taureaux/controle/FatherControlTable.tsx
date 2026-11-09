@@ -177,7 +177,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
             <label className="block text-sm">Numéro de travail<input value={editWork} onChange={e => setEditWork(e.target.value)} className="mt-1 w-full rounded-lg border p-3" placeholder="Ex. 5482" /></label>
             <label className="block text-sm">Numéro national ou référence actuelle<input value={editNational} onChange={e => setEditNational(e.target.value)} className="mt-1 w-full rounded-lg border p-3 font-mono" /></label>
             <p className="text-xs text-amber-900">Ne remplace pas un numéro court par un numéro supposé. {row.direct} lien(s) animal, {row.manual} mention(s) manuelle(s), {row.calving} vêlage(s), {row.breeding} saillie(s). Les filiations ne seront pas modifiées.</p>
-            {row.duplicateCandidates.length > 0 && <p className="text-sm text-amber-900">Doublons possibles : {row.duplicateCandidates.map(x => `${x.name ?? "Sans nom"} (${x.number})`).join(", ")}. Vérifie avant d'enregistrer.</p>}
+            {row.duplicateCandidates.length > 0 && <p className="text-sm text-amber-900">Doublons possibles : {row.duplicateCandidates.map(x => `${x.name ?? "Sans nom"} (${x.number})`).join(", ")}. Vérifie avant d&apos;enregistrer.</p>}
             {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
             <div className="flex gap-2"><button type="button" disabled={busy} onClick={() => saveIdentity(row)} className="flex-1 rounded-lg bg-green-700 p-3 font-semibold text-white disabled:opacity-50">Enregistrer</button><button type="button" disabled={busy} onClick={() => setEditing(null)} className="rounded-lg border p-3">Annuler</button></div>
           </section>
