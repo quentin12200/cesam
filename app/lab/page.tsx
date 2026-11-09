@@ -65,7 +65,7 @@ export default async function CesamLabPage() {
             if (existing && (existing.taureauId || existing.pereNationalManuel || existing.velageVeau?.pereNunati)) return false;
             return true;
           });
-          return { id: bull.id, number: bull.nupere, country: bull.copaip, name: bull.nopere, present: bull.present, offspring: linked.length + historicalOnly.length, presentOffspring: linked.filter(a => a.statut === "ACTIF").length, children: linked.map(a => ({ number: a.nutrav, name: a.nobovi, sex: a.sexbov, birth: a.danais?.toISOString() ?? null, mother: a.mere?.nobovi ?? a.mere?.nutrav ?? a.mereNomManuel ?? a.mereTravailManuel ?? null, status: a.statut, source: "CESAM" as const })), ...historicalOnly.map(entry => ({ number: entry.veauNat.slice(-4), name: entry.nom, sex: entry.sexe, birth: entry.danais, mother: entry.mereNat, status: "HISTORIQUE", source: "HISTORIQUE" as const }))] };
+          return { id: bull.id, number: bull.nupere, country: bull.copaip, name: bull.nopere, present: bull.present, offspring: linked.length + historicalOnly.length, presentOffspring: linked.filter(a => a.statut === "ACTIF").length, children: [...linked.map(a => ({ number: a.nutrav, name: a.nobovi, sex: a.sexbov, birth: a.danais?.toISOString() ?? null, mother: a.mere?.nobovi ?? a.mere?.nutrav ?? a.mereNomManuel ?? a.mereTravailManuel ?? null, status: a.statut, source: "CESAM" as const })), ...historicalOnly.map(entry => ({ number: entry.veauNat.slice(-4), name: entry.nom, sex: entry.sexe, birth: entry.danais, mother: entry.mereNat, status: "HISTORIQUE", source: "HISTORIQUE" as const }))] };
         })}
         animaux={animaux.map((animal) => {
           const dernierVelage = animal.velagesVache[0]?.date ?? null;
