@@ -14,7 +14,7 @@ function normalizedFull(value: string | null | undefined): string | null {
 export default async function FatherControlPage() {
   const [bulls, animals, breedings] = await Promise.all([
     prisma.taureau.findMany({
-      select: { id: true, nupere: true, nopere: true, copaip: true, present: true, _count: { select: { animaux: true, saillies: true } } },
+      select: { id: true, nupere: true, nopere: true, traper: true, copaip: true, present: true, _count: { select: { animaux: true, saillies: true } } },
       orderBy: { nopere: "asc" },
     }),
     prisma.animal.findMany({
@@ -46,6 +46,7 @@ export default async function FatherControlPage() {
     return {
       id: bull.id,
       number: bull.nupere,
+      work: bull.traper,
       country: bull.copaip,
       duplicateCandidates,
       historical: historical.length,
@@ -84,7 +85,7 @@ export default async function FatherControlPage() {
         <h1 className="text-xl font-black text-gray-900">Coulisses CESAM · Tableau des pères</h1>
         <p className="mt-1 text-sm text-gray-600">
           Vue type Excel reliée aux données de CESAM : trier, rechercher, contrôler les filiations,
-          corriger le nom d&apos;un reproducteur ou accéder aux opérations de fusion.
+          corriger l&apos;identité d&apos;un reproducteur et contrôler les doublons avant toute fusion.
         </p>
       </div>
       <FatherControlTable rows={rows} conflicts={conflicts} />
