@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GENEA_DATA } from "@/app/api/genealogie-import/data";
 import { prisma } from "@/lib/prisma";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
 import LabExplorer from "./LabExplorer";
@@ -27,7 +28,7 @@ export default async function CesamLabPage() {
     getGestationCalendar(),
     prisma.exploitationConfig.findUnique({ where: { id: "singleton" }, select: { reproReposObjectifJours: true } }).catch(() => null),
     prisma.taureau.findMany({ select: { id: true, nupere: true, nopere: true, copaip: true, present: true } }),
-    prisma.animal.findMany({ select: { nutrav: true, nobovi: true, sexbov: true, danais: true, statut: true, taureauId: true, pereNationalManuel: true, pereNomManuel: true, pereTravailManuel: true, mereTravailManuel: true, mereNomManuel: true, mere: { select: { nutrav: true, nobovi: true } }, velageVeau: { select: { pereNunati: true, pereNom: true, gestation: { select: { saillie: { select: { taureauId: true } } } } } } } }),
+    prisma.animal.findMany({ select: { nunati: true, nutrav: true, nobovi: true, sexbov: true, danais: true, statut: true, taureauId: true, pereNationalManuel: true, pereNomManuel: true, pereTravailManuel: true, mereTravailManuel: true, mereNomManuel: true, mere: { select: { nutrav: true, nobovi: true } }, velageVeau: { select: { pereNunati: true, pereNom: true, gestation: { select: { saillie: { select: { taureauId: true } } } } } } } }),
   ]);
 
   return (
@@ -50,7 +51,21 @@ export default async function CesamLabPage() {
             if (!uniqueName || a.taureauId || a.pereNationalManuel || a.velageVeau?.pereNunati) return false;
             return [a.pereNomManuel, a.velageVeau?.pereNom].some(n => n?.trim().toLocaleUpperCase("fr") === bullName);
           });
-          return { id: bull.id, number: bull.nupere, country: bull.copaip, name: bull.nopere, present: bull.present, offspring: linked.length, presentOffspring: linked.filter(a => a.statut === "ACTIF").length, children: linked.map(a => ({ number: a.nutrav, name: a.nobovi, sex: a.sexbov, birth: a.danais?.toISOString() ?? null, mother: a.mere?.nobovi ?? a.mere?.nutrav ?? a.mereNomManuel ?? a.mereTravailManuel ?? null, status: a.statut })) };
+          // Historical genealogy is read-only; match on full national numbers, never on a name or last four digits.
+          const historical = number.length >= 8
+            ? GENEA_DATA.filter(entry => normalizeGenealogyNational(entry.pereNat) === number)
+            : [];
+          const byNational = new Map(children.map(a => [normalizeGenealogyNational(a.nunati), a]));
+          const linkedNationals = new Set(linked.map(a => normalizeGenealogyNational(a.nunati)));
+          const historicalOnly = historical.filter(entry => {
+            const nat = normalizeGenealogyNational(entry.veauNat);
+            if (linkedNationals.has(nat)) return false;
+            // A conflicting father in CESAM must be reviewed, not silently overwritten.
+            const existing = byNational.get(nat);
+            if (existing && (existing.taureauId || existing.pereNationalManuel || existing.velageVeau?.pereNunati)) return false;
+            return true;
+          });
+          return { id: bull.id, number: bull.nupere, country: bull.copaip, name: bull.nopere, present: bull.present, offspring: linked.length + historicalOnly.length, presentOffspring: linked.filter(a => a.statut === "ACTIF").length, children: [...linked.map(a => ({ number: a.nutrav, name: a.nobovi, sex: a.sexbov, birth: a.danais?.toISOString() ?? null, mother: a.mere?.nobovi ?? a.mere?.nutrav ?? a.mereNomManuel ?? a.mereTravailManuel ?? null, status: a.statut, source: "CESAM" as const })), ...historicalOnly.map(entry => ({ number: entry.veauNat.slice(-4), name: entry.nom, sex: entry.sexe, birth: entry.danais, mother: entry.mereNat, status: "HISTORIQUE", source: "HISTORIQUE" as const }))] };
         })}
         animaux={animaux.map((animal) => {
           const dernierVelage = animal.velagesVache[0]?.date ?? null;
