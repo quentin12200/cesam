@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { addDays, differenceInDays } from "date-fns";
 import { logAction, RevertStep } from "@/lib/action-log";
 import { buildStandaloneNegativeEchoPlan } from "@/lib/standalone-negative-echo";
-import { supersededPregnancyIds } from "@/lib/pregnancy-confirmation";
 
 const DUREE_GESTATION = 285; // jours — Blonde Aquitaine
 
@@ -133,10 +132,6 @@ export async function POST(request: NextRequest) {
       const bull = await prisma.taureau.findUnique({ where: { id: taureauId }, select: { id: true } });
       if (!bull) return NextResponse.json({ error: "Taureau introuvable : sélectionne une fiche existante." }, { status: 400 });
     }
-    const otherConfirmed = resultat === "PLEINE"
-      ? await prisma.gestation.findMany({ where: { saillie: { animalId: saillie.animalId }, etat: "VERT" }, select: { id: true, etat: true } })
-      : [];
-    const supersededIds = supersededPregnancyIds(otherConfirmed, saillie.gestation?.id ?? "");
 
     // Capture previous states for undo
     const prevGestation = saillie.gestation ? { ...saillie.gestation } : null;
@@ -182,7 +177,6 @@ export async function POST(request: NextRequest) {
       saillie.gestation
         ? prisma.gestation.update({ where: { id: saillie.gestation.id }, data: gestationData })
         : prisma.gestation.create({ data: { saillieId, ...gestationData } }),
-      ...(supersededIds.length ? [prisma.gestation.updateMany({ where: { id: { in: supersededIds } }, data: { etat: "REMPLACEE" } })] : []),
       // Clear the "à échographier" flag automatically
       prisma.animal.update({
         where: { id: saillie.animalId },
@@ -233,7 +227,6 @@ export async function POST(request: NextRequest) {
         // Gestation was created new — delete it
         revertSteps.push({ op: "delete", model: "gestation", id: gestation.id });
       }
-      for (const id of supersededIds) revertSteps.push({ op: "update", model: "gestation", where: { id }, data: { etat: "VERT" } });
       // Restore animal's aEchographier flag
       revertSteps.push({ op: "update", model: "animal", where: { id: saillie.animalId }, data: { aEchographier: prevAEchographier } });
       for (const echoRequest of activeRequests) {
