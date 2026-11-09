@@ -105,7 +105,7 @@ export async function PATCH(request: NextRequest) {
     if (numberChanged) {
       if (!fullNational(newNational)) return NextResponse.json({ error: "Saisis un numéro national complet (8 à 15 chiffres, avec code pays si connu)." }, { status: 400 });
       const others = await prisma.taureau.findMany({ where: { id: { not: id } }, select: { id: true, nupere: true, nopere: true } });
-      const collision = others.find((other) => normalizeGenealogyNational(other.nupere) === normalizeGenealogyNational(newNational) || canonicalName(other.nopere) === canonicalName(name) && canonicalName(name).length >= 3);
+      const collision = others.find((other) => normalizeGenealogyNational(other.nupere) === normalizeGenealogyNational(newNational) || (canonicalName(other.nopere) === canonicalName(name) && canonicalName(name).length >= 3));
       if (collision) return NextResponse.json({ error: `Doublon possible avec ${collision.nopere ?? collision.nupere} (${collision.nupere}). Vérifie les fiches avant de corriger.` }, { status: 409 });
       const refs = await referencesForBull(bull);
       if (refs.manual || refs.calvings) return NextResponse.json({ error: "Correction du national bloquée : des références historiques utilisent l'ancien numéro. Vérifie les filiations avant toute modification.", references: refs }, { status: 409 });
