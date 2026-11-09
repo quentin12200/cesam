@@ -19,7 +19,7 @@ jobs:
       - run: npx tsc --noEmit
       # Compile production code in isolation. No production secrets, migrations or data access.
       - name: Prepare disposable local SQLite schema (no production database)
-        run: npx prisma db push --skip-generate
+        run: npx prisma db push --url file:./ci-build-only.db
         env:
           DATABASE_URL: 'file:./ci-build-only.db'
           TURSO_DATABASE_URL: 'file:./ci-build-only.db'
