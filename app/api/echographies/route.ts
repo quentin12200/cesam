@@ -124,6 +124,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Saillie non trouvée" }, { status: 404 });
     }
 
+    const echoDate = new Date(date);
+    if (Number.isNaN(echoDate.getTime())) return NextResponse.json({ error: "Date d’échographie invalide" }, { status: 400 });
+    if (echoDate < saillie.date) return NextResponse.json({ error: "L’échographie précède la saillie." }, { status: 400 });
+    if (updateTaureau === true) {
+      if (typeof taureauId !== "string" || !taureauId.trim()) return NextResponse.json({ error: "Sélectionne un taureau existant pour confirmer le père." }, { status: 400 });
+      const bull = await prisma.taureau.findUnique({ where: { id: taureauId }, select: { id: true } });
+      if (!bull) return NextResponse.json({ error: "Taureau introuvable : sélectionne une fiche existante." }, { status: 400 });
+    }
+
     // Capture previous states for undo
     const prevGestation = saillie.gestation ? { ...saillie.gestation } : null;
     const prevAnimal = await prisma.animal.findUnique({ where: { id: saillie.animalId }, select: { aEchographier: true } });

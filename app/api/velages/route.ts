@@ -8,6 +8,7 @@ import {
 } from "@/lib/lot-boucles";
 import { consumesLoopNumber } from "@/lib/velage-safety";
 import { motherUpdateAfterCalving } from "@/lib/herd-renewal";
+import { selectGestationForCalving } from "@/lib/gestation-calving-selection";
 
 type VeauSaisi = { nutrav?: string; nunati?: string; sexe?: "M" | "F"; nom?: string; statut?: "VIVANT" | "MORT_NE" };
 
@@ -17,6 +18,9 @@ export async function POST(request: NextRequest) {
     const { vacheNutrav, date, moment, sousType, capteur, pereNom, notes } = body;
     const qualificatif = ["NORMAL", "DIFFICILE", "AVORTEMENT", "MORT_NEE"].includes(body.qualificatif) ? body.qualificatif : "NORMAL";
     if (!vacheNutrav || !date) return NextResponse.json({ error: "La vache et la date sont requises" }, { status: 400 });
+
+    const dateVelage = new Date(date);
+    if (Number.isNaN(dateVelage.getTime())) return NextResponse.json({ error: "Date de vêlage invalide" }, { status: 400 });
 
     const vache = await prisma.animal.findUnique({ where: { nutrav: vacheNutrav }, include: { _count: { select: { velagesVache: true } } } });
     if (!vache) return NextResponse.json({ error: `Vache ${vacheNutrav} non trouvée` }, { status: 404 });
@@ -76,7 +80,16 @@ export async function POST(request: NextRequest) {
       resolus.push({ saisi, animalId: animal.id, cree, precedent });
     }
 
-    const gestation = await prisma.gestation.findFirst({ where: { saillie: { animalId: vache.id }, etat: { in: ["VERT", "GRIS", "ROSE"] } }, include: { saillie: { include: { taureau: true } } }, orderBy: { createdAt: "desc" } });
+    const dernierVelage = await prisma.velage.findFirst({
+      where: { vacheId: vache.id, date: { lt: dateVelage } },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
+    const gestationsCandidates = await prisma.gestation.findMany({
+      where: { saillie: { animalId: vache.id }, etat: { in: ["VERT", "GRIS", "ROSE"] } },
+      include: { saillie: { include: { taureau: true } } },
+    });
+    const gestation = selectGestationForCalving(gestationsCandidates, dateVelage, dernierVelage?.date ?? null);
     const premierVivant = resolus.find((v) => v.saisi.statut === "VIVANT" && v.animalId);
     const velage = await prisma.$transaction(async (tx) => {
       const cree = await tx.velage.create({ data: {
