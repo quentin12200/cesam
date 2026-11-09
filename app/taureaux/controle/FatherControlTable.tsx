@@ -64,7 +64,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
 
   async function saveIdentity(row: BullControlRow) {
     const changingNational = editNational.replace(/\\s+/g, "").toUpperCase() !== row.number.replace(/\\s+/g, "").toUpperCase();
-    if (changingNational && !window.confirm("Modifier le numéro national de ce taureau ? Les anciennes mentions de filiations ne seront PAS réécrites. En cas de doublon ou de référence historique, CESAM bloquera la modification.")) return;
+    if (changingNational && !window.confirm("Modifier le numéro national ? Les anciennes filiations ne seront pas réécrites. CESAM bloquera les doublons et les références historiques.")) return;
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/taureaux", {
@@ -74,11 +74,9 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Modification refusée");
       setRows((current) => current.map((item) => item.id === row.id ? { ...item, name: result.taureau.nopere, number: result.taureau.nupere, work: result.taureau.traper } : item));
-      setEditing(null);
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
-    } finally { setBusy(false); }
+      setEditing(null); router.refresh();
+    } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setBusy(false); }
   }
 
   async function deleteBull(row: BullControlRow) {
@@ -265,16 +263,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
           <tbody>{visible.map((row) => (
             <tr key={row.id} className="border-t border-gray-100 hover:bg-green-50/40">
               <td className="px-3 py-2"><strong className="block font-mono text-green-900">{displayNumber(row)}</strong>{!fullNational(row.number) && <span className="text-xs font-semibold text-amber-800">Référence courte · national à vérifier</span>}{row.duplicateCandidates.length > 0 && <span className="block text-xs text-amber-800">Doublon possible : {row.duplicateCandidates.map(x => x.name ?? x.number).join(", ")}</span>}</td>
-              <td className="px-3 py-2">
-                {editing === row.id ? (
-                  <div className="flex gap-1">
-                    <input aria-label="Nouveau nom du taureau" value={editName} onChange={(e) => setEditName(e.target.value)}
-                      className="w-32 rounded border px-2 py-1 text-sm" />
-                    <button type="button" disabled={busy} onClick={() => saveName(row)} className="text-green-700 underline">OK</button>
-                    <button type="button" onClick={() => setEditing(null)} className="text-gray-500 underline">Annuler</button>
-                  </div>
-                ) : <span>{row.name || "Sans nom"}</span>}
-              </td>
+              <td className="px-3 py-2">{row.name || "Sans nom"}{row.work && <span className="block text-xs text-gray-500">Travail : {row.work}</span>}</td>
               <td className="px-3 py-2 text-center">{row.direct}</td>
               <td className="px-3 py-2 text-center">{row.manual}{row.historical > 0 && <span className="block text-xs text-amber-800">+{row.historical} par nom</span>}</td>
               <td className="px-3 py-2 text-center">{row.calving}</td>
@@ -285,20 +274,9 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
               <td className="px-3 py-2 text-center">{row.breeding}</td>
               <td className="px-3 py-2 text-center">{row.inseminations}</td>
               <td className="px-3 py-2">
-                <div className="flex items-center gap-3 whitespace-nowrap">
-                  <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); }}
-                    className="text-green-800 underline">Corriger le nom</button>
-                  {!fullNational(row.number) && (
-                    <button type="button" onClick={() => {
-                      const choices = rows.filter((candidate) => candidate.id !== row.id && fullNational(candidate.number) && canonicalName(candidate.name) === canonicalName(row.name));
-                      setMergeFrom(row.id); setMergeInto(choices.length === 1 ? choices[0].id : ""); setError("");
-                    }}
-                      className="text-amber-900 underline">Fusionner</button>
-                  )}
-                  <Link href={`/taureaux/${row.id}`} className="text-blue-700 underline">Fiche</Link>
-                  <button type="button" disabled={busy} onClick={() => deleteBull(row)}
-                    className="text-red-700 underline disabled:opacity-40">Supprimer</button>
-                </div>
+                <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); setEditWork(row.work ?? ""); setEditNational(row.number); setError(""); }}
+                  className="font-bold text-green-800 underline" aria-label={`Modifier ${row.name ?? row.number}`}>⋯ Modifier</button>
+                <Link href={`/taureaux/${row.id}`} className="ml-3 text-blue-700 underline">Fiche</Link>
               </td>
             </tr>
           ))}</tbody>
@@ -320,56 +298,4 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
       </p>
     </div>
   );
-}              <td className="px-3 py-2">{row.name || "Sans nom"}{row.work && <span className="block text-xs text-gray-500">Travail : {row.work}</span>}</td>
-              <td className="px-3 py-2 text-center">{row.direct}</td>
-              <td className="px-3 py-2 text-center">{row.manual}{row.historical > 0 && <span className="block text-xs text-amber-800">+{row.historical} par nom</span>}</td>
-              <td className="px-3 py-2 text-center">{row.calving}</td>
-              <td className="px-3 py-2 text-center">
-                <button type="button" aria-label={`Afficher les veaux du taureau ${row.number}`} onClick={() => setExpanded(expanded === row.id ? null : row.id)}
-                  className="font-semibold text-blue-700 underline">{row.offspring}</button>
-              </td>
-              <td className="px-3 py-2 text-center">{row.breeding}</td>
-              <td className="px-3 py-2 text-center">{row.inseminations}</td>
-              <td className="px-3 py-2">
-                <div className="flex items-center gap-3 whitespace-nowrap">
-                  <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); }}
-                    className="text-green-800 underline">Corriger le nom</button>
-                  {!fullNational(row.number) && (
-                    <button type="button" onClick={() => {
-                      const choices = rows.filter((candidate) => candidate.id !== row.id && fullNational(candidate.number) && canonicalName(candidate.name) === canonicalName(row.name));
-                      setMergeFrom(row.id); setMergeInto(choices.length === 1 ? choices[0].id : ""); setError("");
-                    }}
-                      className="text-amber-900 underline">Fusionner</button>
-                  )}
-                  <Link href={`/taureaux/${row.id}`} className="text-blue-700 underline">Fiche</Link>
-                  <button type="button" disabled={busy} onClick={() => deleteBull(row)}
-                    className="text-red-700 underline disabled:opacity-40">Supprimer</button>
-                </div>
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
-        {visible.length === 0 && <p className="p-6 text-center text-gray-500">Aucun père trouvé.</p>}
-      </div>
-
-      {expanded && (() => {
-        const row = rows.find((r) => r.id === expanded);
-        return row ? <section className="rounded-xl border bg-white p-4">
-          <h3 className="font-semibold">{row.name ?? row.number} — veaux identifiés ({row.childNumbers.length})</h3>
-          <div className="mt-2 flex flex-wrap gap-2">{row.childNumbers.length === 0 ? <span className="text-sm text-gray-500">Aucun animal identifié par ce numéro complet ou par lien direct.</span> :
-            row.childNumbers.map((number) => <Link href={`/troupeau/${encodeURIComponent(number)}/arbre?edit=pere`} key={number} className="rounded-lg bg-green-50 px-2 py-1 text-sm font-semibold text-green-700 underline">{number}</Link>)}</div>
-        </section> : null;
-      })()}
-      <p className="text-xs text-gray-500">
-        Les numéros courts ne sont pas des numéros nationaux complets. Vérifier les doublons et les filiations avant toute fusion ou correction.
-        La suppression est refusée par CESAM dès qu&apos;une filiation, saillie ou mention de vêlage utilise le père.
-      </p>
-    </div>
-  );
-}              <td className="px-3 py-2">
-                <div className="flex items-center gap-3 whitespace-nowrap">
-                  <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); setEditWork(row.work ?? ""); setEditNational(row.number); setError(""); }}
-                    className="font-bold text-green-800 underline" aria-label={`Modifier ${row.name ?? row.number}`}>⋯ Modifier</button>
-                  <Link href={`/taureaux/${row.id}`} className="text-blue-700 underline">Fiche</Link>
-                </div>
-
+}
