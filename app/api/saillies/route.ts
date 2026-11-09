@@ -1,23 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
+import { validateBreedingInput } from "@/lib/validate-breeding";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { animalId, animalIds: requestedAnimalIds, date, type, groupage, taureauId, tentative, estimation } = body;
-    const typeNormalise = typeof type === "string" ? type.trim().toUpperCase() : "";
-    const parsedDate = typeof date === "string" && /^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(date) ? new Date(date) : new Date(NaN);
-    const validDate = !Number.isNaN(parsedDate.getTime());
-    const validTaureauId = taureauId == null || (typeof taureauId === "string" && taureauId.trim().length > 0);
-    const validTentative = tentative == null || (Number.isInteger(tentative) && tentative >= 1);
-    const animalIds = [...new Set<string>(
-      Array.isArray(requestedAnimalIds) ? requestedAnimalIds.filter((id): id is string => typeof id === "string" && id.length > 0) : animalId ? [animalId] : []
-    )];
-
-    if (animalIds.length === 0 || !validDate || !validTaureauId || !validTentative || !["NATURELLE", "IA"].includes(typeNormalise)) {
-      return NextResponse.json({ error: "Champs manquants: animalId(s), date, type requis" }, { status: 400 });
-    }
+    const validated = validateBreedingInput(body);
+    if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: 400 });
+    const { animalIds, date: parsedDate, type: typeNormalise, taureauId, tentative } = validated;
+    const { groupage, estimation } = body;
 
     const animaux = await prisma.animal.findMany({ where: { id: { in: animalIds } }, select: { nutrav: true, nobovi: true } });
     if (animaux.length !== animalIds.length) {
