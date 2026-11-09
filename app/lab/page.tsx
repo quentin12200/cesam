@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getGestationCalendar } from "@/lib/gestation-calendar";
 import LabExplorer from "./LabExplorer";
 import { normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
+import { matchesRecordedFather } from "@/lib/animal-genealogy";
 import { getEtatGestation } from "@/lib/utils";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
 
@@ -44,18 +45,18 @@ export default async function CesamLabPage() {
           const number = normalizeGenealogyNational(bull.nupere);
           const bullName = bull.nopere?.trim().toLocaleUpperCase("fr") ?? "";
           const uniqueName = bullName.length >= 3 && bulls.filter(b => b.nopere?.trim().toLocaleUpperCase("fr") === bullName).length === 1;
-          const linked = children.filter(a => {
-            if (a.taureauId === bull.id || a.velageVeau?.gestation?.saillie?.taureauId === bull.id) return true;
-            if (number.length >= 8 && [a.pereNationalManuel, a.velageVeau?.pereNunati].some(n => normalizeGenealogyNational(n) === number)) return true;
-            // Historical names are used only when they identify exactly one bull, and no conflicting national ID is recorded.
-            if (!uniqueName || a.taureauId) return false;
-            const namesMatch = [a.pereNomManuel, a.velageVeau?.pereNom].some(n => n?.trim().toLocaleUpperCase("fr") === bullName);
-            if (!namesMatch) return false;
-            // A distinct full national number takes precedence over a manually entered name.
-            const recordedNationals = [a.pereNationalManuel, a.velageVeau?.pereNunati]
-              .map(normalizeGenealogyNational).filter(Boolean);
-            return recordedNationals.every(n => n.length < 8 || n === number);
-          });
+          const linked = children.filter(a => matchesRecordedFather({
+            bullId: bull.id,
+            bullNational: bull.nupere,
+            bullName: bull.nopere,
+            bullNameIsUnique: uniqueName,
+            linkedBullId: a.taureauId,
+            breedingBullId: a.velageVeau?.gestation?.saillie?.taureauId ?? null,
+            manualNational: a.pereNationalManuel,
+            birthNational: a.velageVeau?.pereNunati ?? null,
+            manualName: a.pereNomManuel,
+            birthName: a.velageVeau?.pereNom ?? null,
+          }));
           // Historical genealogy is read-only; match on full national numbers, never on a name or last four digits.
           const historical = GENEA_DATA.filter(entry =>
             (number.length >= 8 && normalizeGenealogyNational(entry.pereNat) === number) ||
