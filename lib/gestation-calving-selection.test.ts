@@ -35,3 +35,22 @@ test("refuse une date de vêlage invalide", () => assert.equal(selectGestationFo
 test("ignore une gestation confirmée dont la date de saillie est invalide", () => {
   assert.equal(selectGestationForCalving([candidate("a", "date-invalide")], calving), null);
 });
+
+test("un cycle 2026 ignore une ancienne gestation confirmée du cycle 2025", () => {
+  const gestations = [
+    candidate("cycle2025", "2025-02-01"),
+    candidate("cycle2026", "2026-02-01"),
+  ];
+  assert.equal(selectGestationForCalving(gestations, calving, new Date("2025-11-01"))?.id, "cycle2026");
+});
+test("le nouveau cycle après vêlage ne reprend pas la gestation précédente", () => {
+  assert.equal(selectGestationForCalving([candidate("cycle2025", "2025-02-01")], calving, new Date("2025-11-01")), null);
+});
+test("deux gestations confirmées dans le même cycle restent ambiguës", () => {
+  assert.equal(selectGestationForCalving([
+    candidate("a", "2026-01-01"), candidate("b", "2026-02-01"),
+  ], calving, new Date("2025-11-01")), null);
+});
+test("une gestation du jour du précédent vêlage ne devient pas le nouveau cycle", () => {
+  assert.equal(selectGestationForCalving([candidate("a", "2025-11-01")], calving, new Date("2025-11-01")), null);
+});
