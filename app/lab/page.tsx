@@ -48,13 +48,20 @@ export default async function CesamLabPage() {
             if (a.taureauId === bull.id || a.velageVeau?.gestation?.saillie?.taureauId === bull.id) return true;
             if (number.length >= 8 && [a.pereNationalManuel, a.velageVeau?.pereNunati].some(n => normalizeGenealogyNational(n) === number)) return true;
             // Historical names are used only when they identify exactly one bull, and no conflicting national ID is recorded.
-            if (!uniqueName || a.taureauId || a.pereNationalManuel || a.velageVeau?.pereNunati) return false;
-            return [a.pereNomManuel, a.velageVeau?.pereNom].some(n => n?.trim().toLocaleUpperCase("fr") === bullName);
+            if (!uniqueName || a.taureauId) return false;
+            const namesMatch = [a.pereNomManuel, a.velageVeau?.pereNom].some(n => n?.trim().toLocaleUpperCase("fr") === bullName);
+            if (!namesMatch) return false;
+            // A distinct full national number takes precedence over a manually entered name.
+            const recordedNationals = [a.pereNationalManuel, a.velageVeau?.pereNunati]
+              .map(normalizeGenealogyNational).filter(Boolean);
+            return recordedNationals.every(n => n.length < 8 || n === number);
           });
           // Historical genealogy is read-only; match on full national numbers, never on a name or last four digits.
-          const historical = number.length >= 8
-            ? GENEA_DATA.filter(entry => normalizeGenealogyNational(entry.pereNat) === number)
-            : [];
+          const historical = GENEA_DATA.filter(entry =>
+            (number.length >= 8 && normalizeGenealogyNational(entry.pereNat) === number) ||
+            (uniqueName && entry.pereNom.trim().toLocaleUpperCase("fr") === bullName &&
+              (number.length < 8 || normalizeGenealogyNational(entry.pereNat) === number))
+          );
           const byNational = new Map(children.map(a => [normalizeGenealogyNational(a.nunati), a]));
           const linkedNationals = new Set(linked.map(a => normalizeGenealogyNational(a.nunati)));
           const historicalOnly = historical.filter(entry => {
