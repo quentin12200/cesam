@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { nationalWithCountry } from "@/lib/bull-identity";
 
-type Child = { number: string; name: string | null; sex: string; birth: string | null; mother: string | null; status: string };
+type Child = { number: string; name: string | null; sex: string; birth: string | null; mother: string | null; status: string; source?: "CESAM" | "HISTORIQUE" };
 export type LabFather = { id: string; number: string; country: string; name: string | null; present: boolean; offspring: number; presentOffspring: number; children: Child[] };
 type Sort = "number" | "name" | "sex" | "age" | "mother";
 const workNumber = (value: string) => value.replace(/\s/g, "").slice(-4);
@@ -48,7 +48,7 @@ export default function LabFathers({ fathers }: { fathers: LabFather[] }) {
   }), [current, sort, reverse]);
   return <section className="space-y-3">
     <h2 className="text-xl font-black">Tableau des pères</h2>
-    <p className="text-xs text-gray-600">Choisis un père pour voir ses veaux et leurs mères.</p>
+    <p className="text-xs text-gray-600">Choisis un père pour voir ses veaux et leurs mères. Les archives sont indiquées séparément, sans modification des fiches.</p>
     <input aria-label="Rechercher un père" type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher ZEUS, un numéro ou un veau…" className="w-full rounded-xl border bg-white px-3 py-3 text-base"/>
     <div className="flex gap-2" role="group" aria-label="Type de reproducteur">
       {([["ALL","Tous"],["FARM","🐂 Ferme"],["IA","💉 IA"]] as const).map(([value,label]) => <button key={value} onClick={() => setKind(value)} aria-pressed={kind===value} className={`rounded-full border px-3 py-2 text-sm ${kind===value?"bg-green-800 text-white":"bg-white text-gray-700"}`}>{label}</button>)}
@@ -76,7 +76,7 @@ export default function LabFathers({ fathers }: { fathers: LabFather[] }) {
       {selected===f.id && <div className="mt-3 overflow-x-auto">
         <div className="mb-2 flex items-center justify-between"><strong className="text-sm">Veaux de {names[f.id] ?? f.name ?? f.number}</strong><button className="text-xs underline" onClick={() => setSelected(null)}>Fermer</button></div>
         <div className="mb-2 flex flex-wrap items-center gap-2"><label className="text-xs" htmlFor="father-sort">Trier par</label><select id="father-sort" className="rounded border p-1 text-xs" value={sort} onChange={e => setSort(e.target.value as Sort)}><option value="number">Numéro</option><option value="name">Nom</option><option value="sex">Sexe</option><option value="age">Âge</option><option value="mother">Mère</option></select><button className="rounded border px-2 py-1 text-xs" onClick={() => setReverse(!reverse)}>Inverser ↕</button></div>
-        <table className="w-full min-w-[360px] text-left text-xs"><thead><tr className="border-b text-gray-500"><th className="py-2">Animal</th><th>Âge</th><th>Mère</th><th>Statut</th></tr></thead><tbody>{descendants.map(c => <tr key={c.number} className="border-b last:border-0"><td className="py-2"><Link href={`/troupeau/${encodeURIComponent(c.number)}`} className={`inline-block rounded-lg px-2 py-1 underline ${c.sex==="F"?"bg-pink-50 text-pink-800":"bg-blue-50 text-blue-800"}`}><strong>{c.number}</strong>{c.name && <span className="block text-[10px]">{c.name}</span>}</Link></td><td>{age(c.birth, today)}</td><td>{c.mother ?? "—"}</td><td>{c.status==="ACTIF"?"Présent":"Sorti"}</td></tr>)}</tbody></table>
+        <table className="w-full min-w-[360px] text-left text-xs"><thead><tr className="border-b text-gray-500"><th className="py-2">Animal</th><th>Âge</th><th>Mère</th><th>Statut</th></tr></thead><tbody>{descendants.map(c => <tr key={c.number} className="border-b last:border-0"><td className="py-2"><Link href={c.source === "HISTORIQUE" ? "/troupeau/genealogie" : `/troupeau/${encodeURIComponent(c.number)}`} className={`inline-block rounded-lg px-2 py-1 underline ${c.sex==="F"?"bg-pink-50 text-pink-800":"bg-blue-50 text-blue-800"}`}><strong>{c.number}</strong>{c.name && <span className="block text-[10px]">{c.name}</span>}</Link></td><td>{age(c.birth, today)}</td><td>{c.mother ?? "—"}</td><td>{c.source === "HISTORIQUE" ? "Archive · présence non vérifiée" : c.status==="ACTIF"?"Présent":"Sorti"}</td></tr>)}</tbody></table>
         {descendants.length===0 && <p className="py-3 text-sm text-gray-500">Aucun veau retrouvé avec les liens et noms connus. Vérifier les fiches historiques.</p>}
       </div>}
     </div>)}</div>
