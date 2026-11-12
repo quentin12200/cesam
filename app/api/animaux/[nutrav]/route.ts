@@ -69,6 +69,7 @@ export async function PATCH(
 
   // Capture previous values for undo
   const prevFields: Record<string, unknown> = {};
+  if ("sexbov"        in body) prevFields.sexbov        = animal.sexbov;
   if ("nobovi"        in body) prevFields.nobovi        = animal.nobovi;
   if ("statut"        in body) prevFields.statut        = animal.statut;
   if ("estGenisse"    in body) prevFields.estGenisse    = animal.estGenisse;
@@ -81,7 +82,12 @@ export async function PATCH(
   if ("aEchographier" in body) prevFields.aEchographier = animal.aEchographier;
   if ("numeroNational" in body) prevFields.numeroNational = animal.numeroNational;
 
+  if ("sexbov" in body && body.sexbov !== "M" && body.sexbov !== "F") {
+    return NextResponse.json({ error: "Sexe invalide : M ou F attendu" }, { status: 400 });
+  }
+
   const data: Record<string, unknown> = { updatedAt: new Date() };
+  if ("sexbov"       in body) data.sexbov       = body.sexbov;
   if ("nobovi"       in body) data.nobovi       = body.nobovi?.trim() || null;
   if ("statut"       in body) data.statut       = body.statut;
   if ("estGenisse"   in body) data.estGenisse   = body.estGenisse;
