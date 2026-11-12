@@ -10,6 +10,7 @@ export type VeauIdentification = {
   nobovi: string | null;
   danais: string;
   ageJours: number;
+  sexbov: string;
   mereNutrav: string | null;
   mereNom: string | null;
   dateBouclage: string | null;
@@ -25,6 +26,30 @@ export default function IdentificationClient({
   const [aBoucler, setABoucler] = useState(initialABoucler);
   const [recents, setRecents] = useState(initialRecents);
   const [loading, setLoading] = useState<string | null>(null);
+  const [editingSex, setEditingSex] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function updateSexe(veau: VeauIdentification, sexbov: "M" | "F") {
+    if (loading) return;
+    setLoading(veau.id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/animaux/${veau.nutrav}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sexbov }),
+      });
+      if (!response.ok) throw new Error("Impossible de modifier le sexe du veau");
+      const update = (items: VeauIdentification[]) => items.map((item) => item.id === veau.id ? { ...item, sexbov } : item);
+      setABoucler(update);
+      setRecents(update);
+      setEditingSex(null);
+    } catch {
+      setError(`Modification impossible pour ${veau.nutrav}. Réessaie.`);
+    } finally {
+      setLoading(null);
+    }
+  }
 
   async function updateBouclage(veau: VeauIdentification, boucleFaite: boolean) {
     if (loading) return;
@@ -59,16 +84,28 @@ export default function IdentificationClient({
           </Link>
           <span className="truncate text-sm font-semibold text-gray-900">{veau.nobovi ?? "Sans nom"}</span>
         </div>
-        <p className="mt-0.5 truncate text-xs text-gray-500">
-          {veau.ageJours} j
-          {veau.mereNutrav ? ` · Mère ${veau.mereNutrav}${veau.mereNom ? ` — ${veau.mereNom}` : ""}` : ""}
-        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+          <span>{veau.ageJours} j</span>
+          <span className="inline-flex items-center gap-1">
+            <span className="font-bold text-gray-800">{veau.sexbov === "M" || veau.sexbov === "F" ? veau.sexbov : "?"}</span>
+            <button type="button" title="Modifier le sexe" aria-label={`Modifier le sexe de ${veau.nutrav}`} onClick={() => setEditingSex(editingSex === veau.id ? null : veau.id)} className="rounded p-1 text-gray-500 hover:bg-gray-100" disabled={loading !== null}><Pencil size={13} /></button>
+          </span>
+          {veau.mereNutrav && <span>Mère <strong className="text-base font-bold text-gray-900">{veau.mereNutrav}</strong>{veau.mereNom ? ` — ${veau.mereNom}` : ""}</span>}
+        </div>
+        {editingSex === veau.id && (
+          <div className="mt-2 flex gap-2" role="group" aria-label="Choisir le sexe du veau">
+            {(["M", "F"] as const).map((sexe) => (
+              <button key={sexe} type="button" disabled={loading !== null} onClick={() => updateSexe(veau, sexe)} className={`rounded-lg border px-3 py-1.5 text-sm font-bold disabled:opacity-50 ${veau.sexbov === sexe ? "border-green-700 bg-green-50 text-green-800" : "border-gray-300 text-gray-700"}`}>{sexe}</button>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       <section className="rounded-xl bg-white p-4 shadow">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
