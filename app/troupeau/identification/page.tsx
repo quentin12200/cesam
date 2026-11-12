@@ -21,6 +21,7 @@ export default async function IdentificationPage() {
         nutrav: true,
         nobovi: true,
         danais: true,
+        sexbov: true,
         dateBouclage: true,
         velageVeau: {
           select: {
@@ -42,6 +43,7 @@ export default async function IdentificationPage() {
         nutrav: true,
         nobovi: true,
         danais: true,
+        sexbov: true,
         dateBouclage: true,
         velageVeau: {
           select: {
@@ -60,6 +62,7 @@ export default async function IdentificationPage() {
       nobovi: animal.nobovi,
       danais: animal.danais.toISOString(),
       ageJours: differenceInDays(now, animal.danais),
+      sexbov: animal.sexbov,
       mereNutrav: animal.velageVeau?.vache.nutrav ?? null,
       mereNom: animal.velageVeau?.vache.nobovi ?? null,
       dateBouclage: animal.dateBouclage?.toISOString() ?? null,
