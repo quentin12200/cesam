@@ -686,3 +686,32 @@ test("ROTAVEC : une dose precedente ne coche pas la nouvelle gestation", () => {
   assert.notEqual(cellule.statut, "FAIT");
   assert.equal(cellule.actes.length, 0, "ancienne gestation absente de la cellule courante");
 });
+
+
+test("pré-vêlage : une vaccination sans gestationId dans les 300 jours ne valide pas la gestation courante", () => {
+  const etape = { ...etapePrimo, id: "rotavec-cycle", reference: "VELAGE",
+    debutValeur: 84, debutPosition: "AVANT", finValeur: 21, finPosition: "AVANT",
+    medicamentId: "med-rotavec", medicamentNom: "ROTAVEC CORONA",
+    medicaments: [{ medicament: { id: "med-rotavec", nom: "ROTAVEC CORONA" } }] };
+  const configuration = { version: 1, medicamentId: "med-rotavec", cible: { tousBovins: true, categories: [] },
+    demarrage: { type: "DOSE_UNIQUE", etapeDoseId: etape.id, preconisationId: "preco",
+      calendrier: { type: "AVANT_VELAGE", debutAvant: { valeur: 84, unite: "JOUR" },
+        finAvant: { valeur: 21, unite: "JOUR" } } }, entretien: { actif: false } };
+  const protocole = { ...protocoleBovigrip, id: "rotavec-cycle", etapes: [etape],
+    configurationQuestionnaireJson: JSON.stringify(configuration) };
+  const injection = (gestationId: string | null) => ({
+    date: new Date("2026-10-15T12:00:00Z"), vaccin: "ROTAVEC CORONA",
+    medicamentId: "med-rotavec", protocoleId: protocole.id,
+    etapeProtocoleId: etape.id, gestationId, statut: "FAIT",
+  });
+  const contexte = { gestationId: "gestation-actuelle",
+    dateVelagePrevueIso: "2026-12-01T12:00:00Z" };
+  const grille = (gestationId: string | null) => construireGrilleVaccinale(
+    [animal({ ...contexte, actes: [injection(gestationId)] })], [protocole], [], AUJOURDHUI).lignes[0];
+  const sansLien = grille(null);
+  assert.notEqual(sansLien.cellules[etape.id].statut, "FAIT");
+  assert.equal(sansLien.cellules[etape.id].actes.length, 0);
+  assert.equal(sansLien.actes.length, 1, "l'injection réelle reste consultable dans l'historique");
+  assert.notEqual(grille("autre-gestation").cellules[etape.id].statut, "FAIT");
+  assert.equal(grille("gestation-actuelle").cellules[etape.id].statut, "FAIT");
+});
