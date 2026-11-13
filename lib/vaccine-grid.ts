@@ -551,16 +551,13 @@ export function construireGrilleVaccinale(
         continue;
       }
       const medicamentId = config.medicamentId;
-      const dateVelagePrevue = animal.dateVelagePrevueIso ? new Date(animal.dateVelagePrevueIso) : null;
-      const debutGestationEstime = dateVelagePrevue && !Number.isNaN(dateVelagePrevue.getTime())
-        ? addDays(dateVelagePrevue, -300) : null;
+      // Une date comprise dans les 300 jours avant vêlage n'est PAS une preuve
+      // de rattachement : sans gestationId explicite, l'acte reste dans l'historique
+      // mais ne valide jamais le cycle courant.
       const actes = animal.actes.filter((acte) => acte.statut === "FAIT" &&
         (acte.medicamentId ? acte.medicamentId === medicamentId :
           etape.medicaments.some((m) => nomVaccinComparable(m.medicament.nom) === nomVaccinComparable(acte.vaccin))) &&
-        (acte.gestationId
-          ? acte.gestationId === animal.gestationId
-          : Boolean(debutGestationEstime && dateVelagePrevue &&
-              acte.date >= debutGestationEstime && acte.date <= dateVelagePrevue)))
+        acte.gestationId === animal.gestationId)
         .sort((a, b) => b.date.getTime() - a.date.getTime());
       if (!actes.length) {
         // Un ancien FAIT n'atteste pas la gestation actuelle.
