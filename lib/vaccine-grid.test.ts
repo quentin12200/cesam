@@ -715,3 +715,49 @@ test("pré-vêlage : une vaccination sans gestationId dans les 300 jours ne vali
   assert.notEqual(grille("autre-gestation").cellules[etape.id].statut, "FAIT");
   assert.equal(grille("gestation-actuelle").cellules[etape.id].statut, "FAIT");
 });
+
+
+test("ROTAVEC : une seule colonne et une nouvelle dose pour chaque gestation", () => {
+  const dose = { ...etapePrimo, id: "rota-dose", label: "Dose unique", reference: "VELAGE",
+    debutValeur: 84, debutPosition: "AVANT", finValeur: 21, finPosition: "AVANT",
+    medicamentId: "med-rota", medicamentNom: "ROTAVEC CORONA",
+    medicaments: [{ medicament: { id: "med-rota", nom: "ROTAVEC CORONA" } }] };
+  const entretien = { ...dose, id: "rota-entretien", label: "Entretien", cycle: "ENTRETIEN", ordre: 1 };
+  const config = {
+    version: 1, medicamentId: "med-rota", cible: { tousBovins: true, categories: [] },
+    demarrage: { type: "DOSE_UNIQUE", etapeDoseId: dose.id, preconisationId: "preco",
+      calendrier: { type: "SANS_REGLE" } },
+    entretien: { actif: true, etapeId: entretien.id, preconisationId: "preco",
+      calendrier: { type: "AVANT_VELAGE", debutAvant: { valeur: 84, unite: "JOUR" },
+        finAvant: { valeur: 21, unite: "JOUR" } } },
+  };
+  const protocole: ProtocoleGrille = { ...protocoleBovigrip, id: "rota-gestation",
+    nom: "ROTAVEC CORONA", label: "ROTAVEC CORONA",
+    configurationQuestionnaireJson: JSON.stringify(config), etapes: [dose, entretien] };
+  const ancienneInjection = { date: new Date("2025-11-13T12:00:00Z"), vaccin: "ROTAVEC CORONA",
+    medicamentId: "med-rota", protocoleId: protocole.id,
+    etapeProtocoleId: dose.id, gestationId: "g-2025", statut: "FAIT" };
+  const contexte = { categorie: "VACHE", nombreVelages: 2, danaisIso: "2020-01-01T12:00:00Z",
+    gestationId: "g-2026", dateVelagePrevueIso: "2026-12-15T12:00:00Z",
+    statutsProtocoles: [{ protocoleId: protocole.id, statut: "PROTOCOLE_ACQUIS" as const }] };
+  const courant = construireGrilleVaccinale([animal({ ...contexte, actes: [ancienneInjection] })],
+    [protocole], [], new Date("2026-11-13T12:00:00Z"));
+  assert.deepEqual(courant.blocs[0].sousColonnes.map((c) => c.label), ["Dose unique"]);
+  assert.notEqual(courant.lignes[0].cellules[dose.id].statut, "FAIT");
+  assert.equal(courant.lignes[0].actes.length, 1, "l'historique est conservé");
+  assert.ok(extraireActionsPrevues(courant).some((a) => a.etapeId === dose.id),
+    "la nouvelle gestation doit produire une échéance malgré le statut acquis");
+
+  const nouvelleInjection = { ...ancienneInjection, date: new Date("2026-11-13T12:00:00Z"), gestationId: "g-2026" };
+  const fait = construireGrilleVaccinale([animal({ ...contexte, actes: [ancienneInjection, nouvelleInjection] })],
+    [protocole], [], new Date("2026-11-13T12:00:00Z"));
+  assert.equal(fait.lignes[0].cellules[dose.id].statut, "FAIT");
+  assert.equal(extraireActionsPrevues(fait).filter((a) => a.etapeId === dose.id).length, 0);
+
+  const gestationSuivante = construireGrilleVaccinale([animal({ ...contexte, gestationId: "g-2027",
+    dateVelagePrevueIso: "2027-12-15T12:00:00Z", actes: [ancienneInjection, nouvelleInjection] })],
+    [protocole], [], new Date("2027-11-13T12:00:00Z"));
+  assert.notEqual(gestationSuivante.lignes[0].cellules[dose.id].statut, "FAIT");
+  assert.ok(extraireActionsPrevues(gestationSuivante).some((a) => a.etapeId === dose.id),
+    "à la gestation suivante, la dose doit être reproposée");
+});
