@@ -23,7 +23,9 @@ export function rotavecUneDoseParGestation<T extends {
   const regleVelage = initiale.type === "AVANT_VELAGE" ? initiale
     : entretien.type === "AVANT_VELAGE" ? entretien : null;
   if (!regleVelage) return protocole;
-  const dose = protocole.etapes.find((etape) => etape.id === configuration.demarrage.etapeDoseId);
+  const demarrage = configuration.demarrage;
+  if (demarrage.type !== "DOSE_UNIQUE") return protocole;
+  const dose = protocole.etapes.find((etape) => etape.id === demarrage.etapeDoseId);
   if (!dose) return protocole;
   const configurationCycle = {
     ...configuration,
