@@ -206,7 +206,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   // Read-only, using existing animal, weighing and exit records.
   const growthAnimals = animal.veaux.length > 0
     ? await prisma.animal.findMany({
-        where: { OR: [{ mereId: animal.id }, { mereId: { not: null } }] },
+        where: { mereId: { not: null } },
         select: {
           id: true, mereId: true, nutrav: true, danais: true, sexbov: true, estGenisse: true, categorie: true,
           pesees: { select: { date: true, poids: true } },
@@ -232,14 +232,14 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
       if (!Number.isFinite(obs.kg) || obs.kg <= 0 || ageMonths < 0 || ageMonths > 13) continue;
       if (calf.mereId === animal.id) growthPoints.push({ id: calf.id, number: calf.nutrav, sex, ageMonths, kg: obs.kg, retained, source: obs.source });
       const month = Math.round(ageMonths);
-      const key = `${sex}:${month}`;
+      const key = `${retained ? "retained" : "sold"}:${sex}:${month}`;
       const current = growthBuckets.get(key) ?? { sum: 0, count: 0 };
       growthBuckets.set(key, { sum: current.sum + obs.kg, count: current.count + 1 });
     }
   }
   const growthReference: GrowthReference[] = [...growthBuckets.entries()].map(([key, bucket]) => {
-    const [sex, month] = key.split(":");
-    return { sex, month: Number(month), kg: bucket.sum / bucket.count, count: bucket.count };
+    const [group, sex, month] = key.split(":");
+    return { group, sex, month: Number(month), kg: bucket.sum / bucket.count, count: bucket.count };
   }).sort((a, b) => a.month - b.month);
 
   // Même vérité historique que /sanitaire/vaccins : un vaccin saisi comme simple Traitement
