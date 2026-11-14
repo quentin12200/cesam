@@ -3,6 +3,7 @@ import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { undoExitInTransaction } from "@/lib/grouped-sale";
 
 export async function PATCH(
   req: NextRequest,
@@ -88,16 +89,7 @@ export async function DELETE(
 
     // Suppression et réactivation atomiques : une erreur ne laisse jamais
     // l'animal actif avec une sortie encore enregistrée.
-    const reactivated = await prisma.$transaction(async (tx) => {
-      await tx.sortie.delete({ where: { id } });
-      const remaining = await tx.sortie.count({ where: { animalId: sortie.animalId } });
-      if (remaining !== 0) return false;
-      await tx.animal.update({
-        where: { id: sortie.animalId },
-        data: { statut: "ACTIF", updatedAt: new Date() },
-      });
-      return true;
-    });
+    const reactivated = await prisma.$transaction((tx) => undoExitInTransaction(id, sortie.animalId, tx));
 
     const desc = `Sortie de ${sortie.animal.nobovi ?? sortie.animal.nutrav} annulée`;
     let undoId = "";
