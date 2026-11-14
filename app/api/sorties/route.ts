@@ -3,7 +3,7 @@ import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
-import { uniqueAnimalIds } from "@/lib/grouped-sale";
+import { uniqueAnimalIds, claimAnimalForExit } from "@/lib/grouped-sale";
 
 export async function GET(request: NextRequest) {
   try {
@@ -108,11 +108,7 @@ export async function POST(request: NextRequest) {
         for (const animal of animals) {
           // Verrou logique dans la transaction : une vente concurrente ne peut pas
           // sortir deux fois le même animal, même après la vérification initiale.
-          const claimed = await tx.animal.updateMany({
-            where: { id: animal.id, statut: "ACTIF" },
-            data: { statut: "SORTI", updatedAt: new Date() },
-          });
-          if (claimed.count !== 1) throw new Error("ANIMAL_DEJA_SORTI");
+          await claimAnimalForExit(animal.id, (args) => tx.animal.updateMany(args));
         const poidsAnimalValue = weightByAnimal[animal.id];
         const poidsAnimal = poidsAnimalValue !== null && poidsAnimalValue !== undefined && poidsAnimalValue !== ""
           ? Number(poidsAnimalValue)
