@@ -3,7 +3,8 @@ import Link from "next/link";
 import { TrendingUp } from "lucide-react";
 
 import BackButton from "@/app/components/BackButton";
-import DescendantGrowthChart, { type GrowthPoint, type GrowthReference, type DeathMarker } from "../[nutrav]/DescendantGrowthChart";
+import type { GrowthPoint, GrowthReference, DeathMarker } from "../[nutrav]/DescendantGrowthChart";
+import GmqDashboard from "./GmqDashboard";
 
 async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; reference: GrowthReference[]; deaths: DeathMarker[] }> {
   // Historique permanent en lecture seule : ne JAMAIS filtrer par statut ACTIF.
@@ -310,7 +311,7 @@ export default async function GmqPage() {
         </div>
       </div>
 
-      <DescendantGrowthChart points={croissance.points} reference={croissance.reference} deaths={croissance.deaths} title="Croissance du troupeau · 0 à 13 mois" />
+      <GmqDashboard points={croissance.points} reference={croissance.reference} deaths={croissance.deaths} />
 
       {totalVeaux === 0 && (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">
