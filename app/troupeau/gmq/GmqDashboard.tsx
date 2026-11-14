@@ -13,7 +13,7 @@ export default function GmqDashboard({ points, reference, deaths }: Props) {
   const [groups, setGroups] = useState({ sold: true, retained: true, deceased: true });
   const [chosen, setChosen] = useState<{ number: string; detail: string } | null>(null);
   const active = (group: keyof typeof groups) => groups[group];
-  const filtered = useMemo(() => points.filter(p => (sex === "ALL" || p.sex === sex) && active(p.deceased ? "deceased" : p.retained ? "retained" : "sold") && p.ageMonths >= 0 && p.ageMonths <= 13), [points, sex, groups]);
+  const filtered = useMemo(() => points.filter(p => (sex === "ALL" || p.sex === sex) && groups[p.deceased ? "deceased" : p.retained ? "retained" : "sold"] && p.ageMonths >= 0 && p.ageMonths <= 13), [points, sex, groups]);
   const dead = deaths.filter(d => (sex === "ALL" || d.sex === sex) && active("deceased") && d.ageMonths >= 0 && d.ageMonths <= 13);
   const curves = (["sold", "retained", "deceased"] as const).filter(active).map(group => {
     const rows = reference.filter(r => r.group === group && (sex === "ALL" || r.sex === sex));
@@ -57,7 +57,7 @@ export default function GmqDashboard({ points, reference, deaths }: Props) {
         {dead.map(d => <g key={d.id} role="button" tabIndex={0} aria-label={`Décès ${d.number} à ${age(d.ageMonths)} mois`} onClick={()=>setChosen({number:d.number,detail:`Décès à ${age(d.ageMonths)} mois · Cause : ${d.cause||"Non renseignée"}`})} onKeyDown={e=>{if(e.key==="Enter"||e.key===" ")setChosen({number:d.number,detail:`Décès à ${age(d.ageMonths)} mois · Cause : ${d.cause||"Non renseignée"}`});}}><line x1={x(d.ageMonths)-7} x2={x(d.ageMonths)+7} y1="250" y2="264" stroke="#dc2626" strokeWidth="3"/><line x1={x(d.ageMonths)-7} x2={x(d.ageMonths)+7} y1="264" y2="250" stroke="#dc2626" strokeWidth="3"/></g>)}
       </svg>
     </div>
-    <p className="text-xs text-gray-500">Points : pesées et poids vifs de vente connus. Pointillés : moyennes (au moins 2 veaux par âge). Croix rouges sur l'axe : âge au décès. Aucune valeur manquante n'est estimée.</p>
+    <p className="text-xs text-gray-500">Points : pesées et poids vifs de vente connus. Pointillés : moyennes (au moins 2 veaux par âge). Croix rouges sur l’axe : âge au décès. Aucune valeur manquante n’est estimée.</p>
     {chosen && <div className="rounded-lg bg-green-50 px-3 py-2 text-sm"><Link href={`/troupeau/${chosen.number}`} className="font-bold text-green-800 underline">{chosen.number}</Link><span className="text-gray-700"> · {chosen.detail}</span></div>}
     {filtered.length===0 && dead.length===0 && <p className="text-sm text-gray-500">Aucune donnée pour cette sélection.</p>}
   </section>;
