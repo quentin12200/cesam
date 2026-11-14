@@ -6,7 +6,7 @@ import Link from "next/link";
 export type GrowthPoint = { id: string; number: string; sex: string; ageMonths: number; kg: number; retained: boolean; source: string };
 export type GrowthReference = { group: string; sex: string; month: number; kg: number; count: number };
 
-export default function DescendantGrowthChart({ points, reference }: { points: GrowthPoint[]; reference: GrowthReference[] }) {
+export default function DescendantGrowthChart({ points, reference, title = "Croissance des descendants · 0 à 13 mois" }: { points: GrowthPoint[]; reference: GrowthReference[]; title?: string }) {
   const [group, setGroup] = useState<"sold" | "retained">("sold");
   const [sex, setSex] = useState<"M" | "F">("M");
   const [selected, setSelected] = useState<GrowthPoint | null>(null);
@@ -17,7 +17,7 @@ export default function DescendantGrowthChart({ points, reference }: { points: G
   const y = (kg: number) => 195 - (kg / (maxKg * 1.1)) * 175;
   return (
     <section className="rounded-xl bg-white p-3 shadow space-y-3">
-      <h3 className="font-semibold text-gray-800">Croissance des descendants · 0 à 13 mois</h3>
+      <h3 className="font-semibold text-gray-800">{title}</h3>
       <div className="flex flex-wrap gap-2">
         <button type="button" aria-pressed={group === "sold"} onClick={() => { setGroup("sold"); setSelected(null); }} className={`rounded-lg px-3 py-2 text-sm ${group === "sold" ? "bg-green-700 text-white" : "bg-gray-100"}`}>Veaux vendus</button>
         <button type="button" aria-pressed={group === "retained"} onClick={() => { setGroup("retained"); setSex("F"); setSelected(null); }} className={`rounded-lg px-3 py-2 text-sm ${group === "retained" ? "bg-green-700 text-white" : "bg-gray-100"}`}>Velles gardées</button>
