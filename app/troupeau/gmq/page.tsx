@@ -277,23 +277,21 @@ export default async function GmqPage() {
   const gmqGlobal = allGmq.length > 0 ? Math.round(allGmq.reduce((a, b) => a + b, 0) / allGmq.length) : null;
 
   return (
-    <div className="max-w-3xl mx-auto p-4 pb-24 space-y-6">
+    <div className="max-w-6xl mx-auto px-3 sm:px-5 py-4 pb-24 space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3 mt-2">
         <BackButton className="p-2 bg-white rounded-lg shadow text-gray-500 hover:bg-gray-50" iconSize={18} />
         <div className="flex-1">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <TrendingUp size={20} className="text-green-600" />
-            Performances GMQ
+            Performances des descendants
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">Gain Moyen Quotidien des veaux</p>
         </div>
       </div>
 
-      <DescendantGrowthChart points={croissance.points} reference={croissance.reference} title="Croissance du troupeau · 0 à 13 mois" />
-
       {/* Résumé global */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl shadow p-4 text-center">
           <div className="text-2xl font-bold text-gray-800">{totalVeaux}</div>
           <div className="text-xs text-gray-500 mt-1">veaux analysés</div>
@@ -306,12 +304,15 @@ export default async function GmqPage() {
         </div>
       </div>
 
+      <DescendantGrowthChart points={croissance.points} reference={croissance.reference} title="Croissance du troupeau · 0 à 13 mois" />
+
       {totalVeaux === 0 && (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">
           Aucune donnée de pesée disponible pour calculer le GMQ.
         </div>
       )}
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
       {/* Tableau par mère */}
       {parMere.length > 0 && (
         <section>
@@ -411,6 +412,7 @@ export default async function GmqPage() {
         </section>
       )}
 
+      </div>
       {/* Légende */}
       <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-500 space-y-1">
         <p className="font-semibold text-gray-600 mb-2">Méthode de calcul</p>
