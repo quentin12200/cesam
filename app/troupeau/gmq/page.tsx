@@ -58,16 +58,14 @@ async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; referenc
 }
 
 // Calcul du GMQ en g/j
-// GMQ = (poids dernière pesée - poids naissance) / age en jours à dernière pesée
-// Poids naissance = première pesée (la plus ancienne)
-// Age en jours = (date dernière pesée - date naissance du veau)
+// GMQ = (dernière pesée - première pesée) / jours écoulés ENTRE les deux pesées.
 
 interface VeauStats {
   veauId: string;
   veauNutrav: string;
   veauNobovi: string | null;
   dateNaissance: Date;
-  poidsNaissance: number | null; // première pesée
+  premierPoids: number | null; // première pesée
   dernierePoids: number | null;
   dernierePeseeDate: Date | null;
   gmq: number | null; // g/j
@@ -86,7 +84,7 @@ interface GroupeMere {
   vacheNobovi: string | null;
   nbVeaux: number;
   gmqMoyen: number | null;
-  poidsMoyNaissance: number | null;
+  poidsMoyPremier: number | null;
   poidsMoyDerniere: number | null;
 }
 
@@ -94,7 +92,7 @@ interface GroupePere {
   pereLabel: string; // nom du taureau ou "IA: xxx" ou "Inconnu"
   nbVeaux: number;
   gmqMoyen: number | null;
-  poidsMoyNaissance: number | null;
+  poidsMoyPremier: number | null;
   poidsMoyDerniere: number | null;
 }
 
@@ -146,15 +144,15 @@ async function getGmqData(): Promise<{ parMere: GroupeMere[]; parPere: GroupePer
     const veau = velage.veau;
     const pesees = veau.pesees;
 
-    const poidsNaissance = pesees.length > 0 ? pesees[0].poids : null;
+    const premierPoids = pesees.length > 0 ? pesees[0].poids : null;
     const dernierePesee = pesees.length > 1 ? pesees[pesees.length - 1] : null;
 
     let gmq: number | null = null;
-    if (poidsNaissance !== null && dernierePesee !== null) {
+    if (premierPoids !== null && dernierePesee !== null) {
       const ageJours =
-        (dernierePesee.date.getTime() - veau.danais.getTime()) / (1000 * 60 * 60 * 24);
+        (dernierePesee.date.getTime() - pesees[0].date.getTime()) / (1000 * 60 * 60 * 24);
       if (ageJours > 0) {
-        gmq = Math.round(((dernierePesee.poids - poidsNaissance) / ageJours) * 1000); // en g/j
+        gmq = Math.round(((dernierePesee.poids - premierPoids) / ageJours) * 1000); // en g/j
       }
     }
 
@@ -165,7 +163,7 @@ async function getGmqData(): Promise<{ parMere: GroupeMere[]; parPere: GroupePer
       veauNutrav: veau.nutrav,
       veauNobovi: veau.nobovi,
       dateNaissance: veau.danais,
-      poidsNaissance,
+      premierPoids,
       dernierePoids: dernierePesee?.poids ?? null,
       dernierePeseeDate: dernierePesee?.date ?? null,
       gmq,
@@ -190,7 +188,7 @@ async function getGmqData(): Promise<{ parMere: GroupeMere[]; parPere: GroupePer
   const parMere: GroupeMere[] = [];
   for (const [, veaux] of mereMap) {
     const gmqValues = veaux.map((v) => v.gmq).filter((g): g is number => g !== null);
-    const poidsNaissValues = veaux.map((v) => v.poidsNaissance).filter((p): p is number => p !== null);
+    const poidsPremierValues = veaux.map((v) => v.premierPoids).filter((p): p is number => p !== null);
     const poidsDerniereValues = veaux.map((v) => v.dernierePoids).filter((p): p is number => p !== null);
 
     parMere.push({
@@ -199,7 +197,7 @@ async function getGmqData(): Promise<{ parMere: GroupeMere[]; parPere: GroupePer
       vacheNobovi: veaux[0].vacheNobovi,
       nbVeaux: veaux.length,
       gmqMoyen: gmqValues.length > 0 ? Math.round(gmqValues.reduce((a, b) => a + b, 0) / gmqValues.length) : null,
-      poidsMoyNaissance: poidsNaissValues.length > 0 ? Math.round((poidsNaissValues.reduce((a, b) => a + b, 0) / poidsNaissValues.length) * 10) / 10 : null,
+      poidsMoyPremier: poidsPremierValues.length > 0 ? Math.round((poidsPremierValues.reduce((a, b) => a + b, 0) / poidsPremierValues.length) * 10) / 10 : null,
       poidsMoyDerniere: poidsDerniereValues.length > 0 ? Math.round((poidsDerniereValues.reduce((a, b) => a + b, 0) / poidsDerniereValues.length) * 10) / 10 : null,
     });
   }
@@ -224,7 +222,7 @@ async function getGmqData(): Promise<{ parMere: GroupeMere[]; parPere: GroupePer
   const parPere: GroupePere[] = [];
   for (const [key, veaux] of pereMap) {
     const gmqValues = veaux.map((v) => v.gmq).filter((g): g is number => g !== null);
-    const poidsNaissValues = veaux.map((v) => v.poidsNaissance).filter((p): p is number => p !== null);
+    const poidsPremierValues = veaux.map((v) => v.premierPoids).filter((p): p is number => p !== null);
     const poidsDerniereValues = veaux.map((v) => v.dernierePoids).filter((p): p is number => p !== null);
 
     // Construire le label du père
@@ -244,7 +242,7 @@ async function getGmqData(): Promise<{ parMere: GroupeMere[]; parPere: GroupePer
       pereLabel,
       nbVeaux: veaux.length,
       gmqMoyen: gmqValues.length > 0 ? Math.round(gmqValues.reduce((a, b) => a + b, 0) / gmqValues.length) : null,
-      poidsMoyNaissance: poidsNaissValues.length > 0 ? Math.round((poidsNaissValues.reduce((a, b) => a + b, 0) / poidsNaissValues.length) * 10) / 10 : null,
+      poidsMoyPremier: poidsPremierValues.length > 0 ? Math.round((poidsPremierValues.reduce((a, b) => a + b, 0) / poidsPremierValues.length) * 10) / 10 : null,
       poidsMoyDerniere: poidsDerniereValues.length > 0 ? Math.round((poidsDerniereValues.reduce((a, b) => a + b, 0) / poidsDerniereValues.length) * 10) / 10 : null,
     });
   }
@@ -329,7 +327,7 @@ export default async function GmqPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Vache</th>
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Veaux</th>
                     <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">GMQ moyen</th>
-                    <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Poids naiss.</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">1er poids</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Poids dern.</th>
                   </tr>
                 </thead>
@@ -354,7 +352,7 @@ export default async function GmqPage() {
                         <GmqBadge gmq={row.gmqMoyen} />
                       </td>
                       <td className="px-3 py-3 text-right text-gray-600 text-xs">
-                        {row.poidsMoyNaissance !== null ? `${row.poidsMoyNaissance} kg` : "—"}
+                        {row.poidsMoyPremier !== null ? `${row.poidsMoyPremier} kg` : "—"}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-600 text-xs">
                         {row.poidsMoyDerniere !== null ? `${row.poidsMoyDerniere} kg` : "—"}
@@ -382,7 +380,7 @@ export default async function GmqPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Père</th>
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Veaux</th>
                     <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">GMQ moyen</th>
-                    <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Poids naiss.</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">1er poids</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Poids dern.</th>
                   </tr>
                 </thead>
@@ -400,7 +398,7 @@ export default async function GmqPage() {
                         <GmqBadge gmq={row.gmqMoyen} />
                       </td>
                       <td className="px-3 py-3 text-right text-gray-600 text-xs">
-                        {row.poidsMoyNaissance !== null ? `${row.poidsMoyNaissance} kg` : "—"}
+                        {row.poidsMoyPremier !== null ? `${row.poidsMoyPremier} kg` : "—"}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-600 text-xs">
                         {row.poidsMoyDerniere !== null ? `${row.poidsMoyDerniere} kg` : "—"}
@@ -417,8 +415,8 @@ export default async function GmqPage() {
       {/* Légende */}
       <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-500 space-y-1">
         <p className="font-semibold text-gray-600 mb-2">Méthode de calcul</p>
-        <p>• GMQ = (poids dernière pesée − poids 1ʳᵉ pesée) ÷ âge en jours à la dernière pesée</p>
-        <p>• Poids naissance = 1ʳᵉ pesée enregistrée</p>
+        <p>• GMQ = (dernière pesée − première pesée) ÷ nombre de jours entre les deux pesées</p>
+        <p>• La première pesée enregistrée n’est pas forcément le poids de naissance</p>
         <p>• Minimum 2 pesées requises pour calculer le GMQ</p>
         <div className="flex gap-3 mt-2 flex-wrap">
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-100 inline-block"></span> ≥ 1 500 g/j excellent</span>
