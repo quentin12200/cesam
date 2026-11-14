@@ -3,9 +3,9 @@ import Link from "next/link";
 import { TrendingUp } from "lucide-react";
 
 import BackButton from "@/app/components/BackButton";
-import DescendantGrowthChart, { type GrowthPoint, type GrowthReference } from "../[nutrav]/DescendantGrowthChart";
+import DescendantGrowthChart, { type GrowthPoint, type GrowthReference, type DeathMarker } from "../[nutrav]/DescendantGrowthChart";
 
-async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; reference: GrowthReference[] }> {
+async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; reference: GrowthReference[]; deaths: DeathMarker[] }> {
   // Historique permanent en lecture seule : ne JAMAIS filtrer par statut ACTIF.
   // Les veaux SORTIS restent dans les points et la moyenne de référence,
   // avec leurs pesées antérieures et leur poids vif de vente lorsqu'il existe.
@@ -15,10 +15,11 @@ async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; referenc
     select: { veau: { select: {
       id: true, nutrav: true, danais: true, sexbov: true, estGenisse: true, categorie: true,
       pesees: { select: { date: true, poids: true } },
-      sortie: { select: { type: true, date: true, poids: true, poidsVifVente: true, poidsVif: true, modeVente: true } },
+      sortie: { select: { type: true, date: true, poids: true, poidsVifVente: true, poidsVif: true, modeVente: true, causeMortalite: true } },
     } } },
   });
   const points: GrowthPoint[] = [];
+  const deaths: DeathMarker[] = [];
   const buckets = new Map<string, Map<string, { sum: number; count: number }>>();
   const seen = new Set<string>();
   for (const velage of velages) {
@@ -27,8 +28,13 @@ async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; referenc
     seen.add(calf.id);
     const retained = calf.sexbov === "F" &&
       ["PRESELECTION_GENISSE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "GENISSE_VALIDEE"].includes(calf.categorie ?? "");
+    const deceased = calf.sortie?.type === "MORT";
     const sold = calf.sortie && ["ELEVAGE", "BOUCHERIE", "ENGRAISSEMENT"].includes(calf.sortie.type);
     const sex = calf.sexbov === "M" ? "M" : "F";
+    if (deceased && calf.sortie) {
+      const ageMonths = (calf.sortie.date.getTime() - calf.danais.getTime()) / (86400000 * 30.4375);
+      if (ageMonths >= 0 && ageMonths <= 13) deaths.push({ id: calf.id, number: calf.nutrav, sex, ageMonths, cause: calf.sortie.causeMortalite });
+    }
     const observations = calf.pesees.map((p) => ({ date: p.date, kg: p.poids, source: "Pesée" }));
     if (sold && calf.sortie) {
       const kg = calf.sortie.poidsVifVente ?? calf.sortie.poidsVif ??
@@ -38,9 +44,9 @@ async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; referenc
     for (const obs of observations) {
       const ageMonths = (obs.date.getTime() - calf.danais.getTime()) / (86400000 * 30.4375);
       if (!Number.isFinite(obs.kg) || obs.kg <= 0 || ageMonths < 0 || ageMonths > 13) continue;
-      points.push({ id: calf.id, number: calf.nutrav, sex, ageMonths, kg: obs.kg, retained, source: obs.source });
+      points.push({ id: calf.id, number: calf.nutrav, sex, ageMonths, kg: obs.kg, retained, deceased, source: obs.source });
       const month = Math.min(13, Math.round(ageMonths));
-      const key = `${retained ? "retained" : "sold"}:${sex}:${month}`;
+      const key = `${deceased ? "deceased" : retained ? "retained" : "sold"}:${sex}:${month}`;
       const animals = buckets.get(key) ?? new Map<string, { sum: number; count: number }>();
       const prev = animals.get(calf.id) ?? { sum: 0, count: 0 };
       animals.set(calf.id, { sum: prev.sum + obs.kg, count: prev.count + 1 });
@@ -53,7 +59,7 @@ async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; referenc
     return { group, sex, month: Number(month), count: weights.length,
       kg: weights.reduce((total, kg) => total + kg, 0) / weights.length };
   }).sort((a, b) => a.month - b.month);
-  return { points, reference };
+  return { points, reference, deaths };
 }
 
 // Calcul du GMQ en g/j
@@ -304,7 +310,7 @@ export default async function GmqPage() {
         </div>
       </div>
 
-      <DescendantGrowthChart points={croissance.points} reference={croissance.reference} title="Croissance du troupeau · 0 à 13 mois" />
+      <DescendantGrowthChart points={croissance.points} reference={croissance.reference} deaths={croissance.deaths} title="Croissance du troupeau · 0 à 13 mois" />
 
       {totalVeaux === 0 && (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">
