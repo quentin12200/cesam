@@ -6,8 +6,10 @@ import BackButton from "@/app/components/BackButton";
 import DescendantGrowthChart, { type GrowthPoint, type GrowthReference } from "../[nutrav]/DescendantGrowthChart";
 
 async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; reference: GrowthReference[] }> {
-  // Lecture seule. Les animaux sont sélectionnés par leur vêlage, pas par une
-  // catégorie courante susceptible de mélanger vaches et veaux.
+  // Historique permanent en lecture seule : ne JAMAIS filtrer par statut ACTIF.
+  // Les veaux SORTIS restent dans les points et la moyenne de référence,
+  // avec leurs pesées antérieures et leur poids vif de vente lorsqu'il existe.
+  // La sélection par vêlage évite de confondre les veaux avec les vaches.
   const velages = await prisma.velage.findMany({
     where: { veauId: { not: null } },
     select: { veau: { select: {
