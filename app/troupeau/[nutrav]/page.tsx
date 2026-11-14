@@ -699,7 +699,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               )}
             </div>
 
-              {animal.veaux.length > 0 && <DescendantGrowthChart points={growthPoints} reference={growthReference} deaths={deathMarkers} />}
+              {(growthPoints.length > 0 || deathMarkers.length > 0) && <DescendantGrowthChart points={growthPoints} reference={growthReference} deaths={deathMarkers} />}
 
               {/* Veaux */}
               {animal.veaux.length > 0 && (
