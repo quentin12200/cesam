@@ -14,7 +14,12 @@ export default function DescendantGrowthChart({ points, reference, deaths = [], 
   const visible = points.filter((p) => (group === "deceased" ? p.deceased === true : p.deceased !== true && p.retained === (group === "retained")) && (sex === "ALL" || p.sex === sex) && p.ageMonths >= 0 && p.ageMonths <= 13);
   const visibleDeaths = deaths.filter((d) => (sex === "ALL" || d.sex === sex) && d.ageMonths >= 0 && d.ageMonths <= 13);
   const [selectedDeath, setSelectedDeath] = useState<DeathMarker | null>(null);
-  const baseline = reference.filter((r) => r.group === group && (sex === "ALL" || r.sex === sex) && r.count >= 2 && r.month >= 0 && r.month <= 13);
+  const sourceBaseline = reference.filter((r) => r.group === group && (sex === "ALL" || r.sex === sex) && r.month >= 0 && r.month <= 13);
+  const baseline = [...new Set(sourceBaseline.map((r) => r.month))].map((month) => {
+    const rows = sourceBaseline.filter((r) => r.month === month);
+    const count = rows.reduce((sum, r) => sum + r.count, 0);
+    return { month, count, kg: rows.reduce((sum, r) => sum + r.kg * r.count, 0) / count };
+  }).filter((r) => r.count >= 2).sort((a, b) => a.month - b.month);
   const maxKg = Math.max(100, ...visible.map((p) => p.kg), ...baseline.map((r) => r.kg));
   const x = (months: number) => 40 + (months / 13) * 295;
   const y = (kg: number) => 195 - (kg / (maxKg * 1.1)) * 175;
