@@ -9,12 +9,12 @@ export type GrowthReference = { group: string; sex: string; month: number; kg: n
 
 export default function DescendantGrowthChart({ points, reference, deaths = [], title = "Croissance des descendants · 0 à 13 mois" }: { points: GrowthPoint[]; reference: GrowthReference[]; deaths?: DeathMarker[]; title?: string }) {
   const [group, setGroup] = useState<"sold" | "retained" | "deceased">("sold");
-  const [sex, setSex] = useState<"M" | "F">("M");
+  const [sex, setSex] = useState<"M" | "F" | "ALL">("ALL");
   const [selected, setSelected] = useState<GrowthPoint | null>(null);
-  const visible = points.filter((p) => (group === "deceased" ? p.deceased === true : p.deceased !== true && p.retained === (group === "retained")) && p.sex === sex && p.ageMonths >= 0 && p.ageMonths <= 13);
-  const visibleDeaths = deaths.filter((d) => d.sex === sex && d.ageMonths >= 0 && d.ageMonths <= 13);
+  const visible = points.filter((p) => (group === "deceased" ? p.deceased === true : p.deceased !== true && p.retained === (group === "retained")) && (sex === "ALL" || p.sex === sex) && p.ageMonths >= 0 && p.ageMonths <= 13);
+  const visibleDeaths = deaths.filter((d) => (sex === "ALL" || d.sex === sex) && d.ageMonths >= 0 && d.ageMonths <= 13);
   const [selectedDeath, setSelectedDeath] = useState<DeathMarker | null>(null);
-  const baseline = reference.filter((r) => r.group === group && r.sex === sex && r.count >= 2 && r.month >= 0 && r.month <= 13);
+  const baseline = reference.filter((r) => r.group === group && (sex === "ALL" || r.sex === sex) && r.count >= 2 && r.month >= 0 && r.month <= 13);
   const maxKg = Math.max(100, ...visible.map((p) => p.kg), ...baseline.map((r) => r.kg));
   const x = (months: number) => 40 + (months / 13) * 295;
   const y = (kg: number) => 195 - (kg / (maxKg * 1.1)) * 175;
@@ -22,10 +22,10 @@ export default function DescendantGrowthChart({ points, reference, deaths = [], 
     <section className="rounded-xl bg-white p-3 shadow space-y-3">
       <h3 className="font-semibold text-gray-800">{title}</h3>
       <div className="flex flex-wrap gap-2">
-        <button type="button" aria-pressed={group === "sold"} onClick={() => { setGroup("sold"); setSelected(null); }} className={`rounded-lg px-3 py-2 text-sm ${group === "sold" ? "bg-green-700 text-white" : "bg-gray-100"}`}>Veaux vendus</button>
-        <button type="button" aria-pressed={group === "retained"} onClick={() => { setGroup("retained"); setSex("F"); setSelected(null); }} className={`rounded-lg px-3 py-2 text-sm ${group === "retained" ? "bg-green-700 text-white" : "bg-gray-100"}`}>Velles gardées</button>
+        <button type="button" aria-pressed={group === "sold"} onClick={() => { setGroup("sold"); setSelected(null); }} className={`rounded-lg px-3 py-2 text-sm ${group === "sold" ? "bg-green-700 text-white" : "bg-gray-100"}`}>Autres veaux</button>
+        <button type="button" aria-pressed={group === "retained"} onClick={() => { setGroup("retained"); setSex("F"); setSelected(null); }} className={`rounded-lg px-3 py-2 text-sm ${group === "retained" ? "bg-green-700 text-white" : "bg-gray-100"}`}>Renouvellement</button>
         <button type="button" aria-pressed={group === "deceased"} onClick={() => { setGroup("deceased"); setSelected(null); }} className={`rounded-lg px-3 py-2 text-sm ${group === "deceased" ? "bg-red-700 text-white" : "bg-gray-100"}`}>Veaux morts</button>
-        {group !== "retained" && <select aria-label="Sexe des veaux" value={sex} onChange={(e) => { setSex(e.target.value as "M" | "F"); setSelected(null); }} className="rounded-lg border px-2 text-sm"><option value="M">Mâles</option><option value="F">Femelles</option></select>}
+        {<select aria-label="Sexe des veaux" value={sex} onChange={(e) => { setSex(e.target.value as "M" | "F" | "ALL"); setSelected(null); }} className="rounded-lg border px-2 text-sm"><option value="ALL">Mâles et femelles</option><option value="M">Mâles</option><option value="F">Femelles</option></select>}
       </div>
       <svg viewBox="0 0 350 225" role="img" aria-label="Poids vif en kg selon âge en mois, points des descendants et moyenne du troupeau" className="w-full">
         {[0, 0.25, 0.5, 0.75, 1].map((fraction) => <g key={fraction}><line x1="40" x2="335" y1={y(maxKg * fraction)} y2={y(maxKg * fraction)} stroke="#e5e7eb"/><text x="34" y={y(maxKg * fraction) + 3} textAnchor="end" fontSize="10" fill="#64748b">{Math.round(maxKg * fraction)}</text></g>)}
