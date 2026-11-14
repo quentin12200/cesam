@@ -104,17 +104,25 @@ export async function POST(request: NextRequest) {
         : {};
       const prixKiloCommun = prixKilo != null ? Number(prixKilo) : null;
       const sorties = await prisma.$transaction(async (tx) => {
-        const created = await Promise.all(animals.map(async (animal) => {
+        const created = [];
+        for (const animal of animals) {
+          // Verrou logique dans la transaction : une vente concurrente ne peut pas
+          // sortir deux fois le même animal, même après la vérification initiale.
+          const claimed = await tx.animal.updateMany({
+            where: { id: animal.id, statut: "ACTIF" },
+            data: { statut: "SORTI", updatedAt: new Date() },
+          });
+          if (claimed.count !== 1) throw new Error("ANIMAL_DEJA_SORTI");
         const poidsAnimalValue = weightByAnimal[animal.id];
         const poidsAnimal = poidsAnimalValue !== null && poidsAnimalValue !== undefined && poidsAnimalValue !== ""
           ? Number(poidsAnimalValue)
           : null;
-        if (poidsAnimal !== null && !Number.isFinite(poidsAnimal)) throw new Error("Poids invalide");
+        if (poidsAnimal !== null && (!Number.isFinite(poidsAnimal) || poidsAnimal <= 0)) throw new Error("Poids invalide");
         const prixAnimalValue = priceByAnimal[animal.id];
         const prixAnimal = prixAnimalValue !== null && prixAnimalValue !== undefined && prixAnimalValue !== ""
           ? Number(prixAnimalValue)
           : prixKiloCommun;
-        if (prixAnimal !== null && !Number.isFinite(prixAnimal)) throw new Error("Prix invalide");
+        if (prixAnimal !== null && (!Number.isFinite(prixAnimal) || prixAnimal < 0)) throw new Error("Prix invalide");
         const prixPrevuAnimal = prixAnimal !== null && poidsAnimal !== null
           ? Math.round(prixAnimal * poidsAnimal * 100) / 100
           : null;
@@ -148,9 +156,8 @@ export async function POST(request: NextRequest) {
             updatedAt: new Date(),
           },
         });
-        await tx.animal.update({ where: { id: animal.id }, data: { statut: "SORTI", updatedAt: new Date() } });
-        return sortie;
-        }));
+        created.push(sortie);
+        }
         if (typeof simulationId === "string" && simulationId) {
           await tx.saleSimulation.update({ where: { id: simulationId }, data: { statut: "CONFIRMED" } });
         }
@@ -240,6 +247,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ...sortie, _undoId: undoId, _undoDesc: desc }, { status: 201 });
   } catch (err) {
+    if (err instanceof Error && err.message === "ANIMAL_DEJA_SORTI") {
+      return NextResponse.json({ error: "Un animal vient déjà d’être sorti. Actualise la sélection." }, { status: 409 });
+    }
     console.error("POST /api/sorties error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
