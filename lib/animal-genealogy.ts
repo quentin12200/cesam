@@ -170,3 +170,41 @@ export function buildAncestryUpdate(input: {
     [`${prefix}NomManuel`]: input.name?.trim() || null,
   };
 }
+
+/**
+ * Resolve a calf's father without allowing a weak name match to override
+ * a linked bull or a conflicting full national number.
+ * Pure function: safe to exercise with fictitious genealogy records.
+ */
+export function matchesRecordedFather(input: {
+  bullId: string;
+  bullNational: string | null;
+  bullName: string | null;
+  bullNameIsUnique: boolean;
+  linkedBullId: string | null;
+  breedingBullId: string | null;
+  manualNational: string | null;
+  birthNational: string | null;
+  manualName: string | null;
+  birthName: string | null;
+}): boolean {
+  const normalizeNational = (value: string | null) =>
+    (value ?? "").replace(/\\s+/g, "").replace(/^FR/i, "").toUpperCase();
+  const normalizedBull = normalizeNational(input.bullNational);
+  const recorded = [input.manualNational, input.birthNational]
+    .map(normalizeNational).filter(Boolean);
+  // Explicit linked IDs are authoritative; contradictory links must not be
+  // re-attributed through a matching historical name.
+  if (input.linkedBullId || input.breedingBullId) {
+    return input.linkedBullId === input.bullId || input.breedingBullId === input.bullId;
+  }
+  const fullRecorded = recorded.filter(n => n.length >= 8);
+  if (fullRecorded.length > 0) {
+    return normalizedBull.length >= 8 && fullRecorded.every(n => n === normalizedBull);
+  }
+  const canonicalName = input.bullName?.trim().toLocaleUpperCase("fr") ?? "";
+  return input.bullNameIsUnique && canonicalName.length >= 3 &&
+    [input.manualName, input.birthName].some(
+      n => n?.trim().toLocaleUpperCase("fr") === canonicalName,
+    );
+}
