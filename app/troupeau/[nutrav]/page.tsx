@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import DescendantGrowthChart, { type GrowthPoint, type GrowthReference } from "./DescendantGrowthChart";
+import DescendantGrowthChart, { type GrowthPoint, type GrowthReference, type DeathMarker } from "./DescendantGrowthChart";
 import {
   formatAge,
   formatDate,
@@ -210,17 +210,22 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
         select: {
           id: true, mereId: true, nutrav: true, danais: true, sexbov: true, estGenisse: true, categorie: true,
           pesees: { select: { date: true, poids: true } },
-          sortie: { select: { type: true, date: true, poids: true, poidsVifVente: true, poidsVif: true, modeVente: true, categorieSortie: true } },
+          sortie: { select: { type: true, date: true, poids: true, poidsVifVente: true, poidsVif: true, modeVente: true, categorieSortie: true, causeMortalite: true } },
         },
       })
     : [];
   const monthAge = (birth: Date, date: Date) => (date.getTime() - birth.getTime()) / (86400000 * 30.4375);
   const growthPoints: GrowthPoint[] = [];
+  const deathMarkers: DeathMarker[] = [];
   const growthBuckets = new Map<string, Map<string, { sum: number; count: number }>>();
   for (const calf of growthAnimals) {
     const retained = calf.sexbov === "F" && (calf.estGenisse || ["PRESELECTION_GENISSE", "GENISSE_VALIDEE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(calf.categorie ?? ""));
     const sold = calf.sortie && ["ELEVAGE", "BOUCHERIE", "ENGRAISSEMENT"].includes(calf.sortie.type);
     const deceased = calf.sortie?.type === "MORT";
+    if (deceased && calf.sortie && calf.mereId === animal.id) {
+      const ageMonths = monthAge(calf.danais, calf.sortie.date);
+      if (ageMonths >= 0 && ageMonths <= 13) deathMarkers.push({ id: calf.id, number: calf.nutrav, sex: calf.sexbov === "M" ? "M" : "F", ageMonths, cause: calf.sortie.causeMortalite });
+    }
     if (!retained && !sold && !deceased) continue;
     // A retained heifer sold later stays in the retained group; never count her as a sold calf.
     const sex = calf.sexbov === "M" ? "M" : "F";
@@ -694,7 +699,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               )}
             </div>
 
-              {animal.veaux.length > 0 && <DescendantGrowthChart points={growthPoints} reference={growthReference} />}
+              {animal.veaux.length > 0 && <DescendantGrowthChart points={growthPoints} reference={growthReference} deaths={deathMarkers} />}
 
               {/* Veaux */}
               {animal.veaux.length > 0 && (
