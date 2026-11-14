@@ -24,15 +24,15 @@ export default function DescendantGrowthChart({ points, reference, deaths = [], 
   const x = (months: number) => 40 + (months / 13) * 295;
   const y = (kg: number) => 195 - (kg / (maxKg * 1.1)) * 175;
   return (
-    <section className="rounded-xl bg-white p-3 shadow space-y-3">
+    <section className="rounded-xl bg-white p-3 sm:p-5 shadow space-y-3">
       <h3 className="font-semibold text-gray-800">{title}</h3>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button type="button" aria-pressed={group === "sold"} onClick={() => { setGroup("sold"); setSelected(null); }} className={`rounded-lg px-3 py-2 text-sm ${group === "sold" ? "bg-green-700 text-white" : "bg-gray-100"}`}>Autres veaux</button>
         <button type="button" aria-pressed={group === "retained"} onClick={() => { setGroup("retained"); setSex("F"); setSelected(null); }} className={`rounded-lg px-3 py-2 text-sm ${group === "retained" ? "bg-green-700 text-white" : "bg-gray-100"}`}>Renouvellement</button>
         <button type="button" aria-pressed={group === "deceased"} onClick={() => { setGroup("deceased"); setSelected(null); }} className={`rounded-lg px-3 py-2 text-sm ${group === "deceased" ? "bg-red-700 text-white" : "bg-gray-100"}`}>Veaux morts</button>
-        {<select aria-label="Sexe des veaux" value={sex} onChange={(e) => { setSex(e.target.value as "M" | "F" | "ALL"); setSelected(null); }} className="rounded-lg border px-2 text-sm"><option value="ALL">Mâles et femelles</option><option value="M">Mâles</option><option value="F">Femelles</option></select>}
+        {<select aria-label="Sexe des veaux" value={sex} onChange={(e) => { setSex(e.target.value as "M" | "F" | "ALL"); setSelected(null); }} className="rounded-lg border px-2 py-2 text-xs sm:text-sm"><option value="ALL">Mâles et femelles</option><option value="M">Mâles</option><option value="F">Femelles</option></select>}
       </div>
-      <svg viewBox="0 0 350 225" role="img" aria-label="Poids vif en kg selon âge en mois, points des descendants et moyenne du troupeau" className="w-full">
+      <svg viewBox="0 0 350 225" role="img" aria-label="Poids vif en kg selon âge en mois, points des descendants et moyenne du troupeau" className="w-full max-h-[420px]">
         {[0, 0.25, 0.5, 0.75, 1].map((fraction) => <g key={fraction}><line x1="40" x2="335" y1={y(maxKg * fraction)} y2={y(maxKg * fraction)} stroke="#e5e7eb"/><text x="34" y={y(maxKg * fraction) + 3} textAnchor="end" fontSize="10" fill="#64748b">{Math.round(maxKg * fraction)}</text></g>)}
         {[0, 3, 6, 9, 13].map((month) => <text key={month} x={x(month)} y="213" fontSize="10" textAnchor="middle" fill="#64748b">{month}</text>)}
         <text x="8" y="12" fontSize="10" fill="#64748b">kg vif</text>
