@@ -15,6 +15,7 @@ import { addDays, addMonths } from "date-fns";
 import type { ActeVaccination } from "./vaccine-acts.ts";
 import { medicamentCompatibleAvecEtape } from "./vaccine-attachment.ts";
 import { protocoleInitialAcquisDepuisHistorique } from "./vaccine-statut.ts";
+import { rotavecUneDoseParGestation } from "./rotavec-cycle.ts";
 
 export interface EtapeGrille extends EtapeVaccinaleConfig {
   medicamentId: string | null;
@@ -357,8 +358,11 @@ function celluleProtocole(
   }, { protocoleLieAuVelage, medicamentPartage: medicamentPartageEntreProtocoles(protocole, protocoles), gestationId: animal.gestationId });
   const actesHistoriquesDuProtocole = interpretation.historique;
   const actesUtiles = interpretation.vaccinations;
-  const statutProtocole = protocoleInitialAcquisDepuisHistorique(etapes, actesHistoriquesDuProtocole)
-    ? "PROTOCOLE_ACQUIS" : statutEnregistre?.statut ?? null;
+  // Les statuts « acquis » sont globaux à la vache, pas à sa nouvelle gestation.
+  const doseParGestation = protocoleLieAuVelage && configurationQuestionnaire?.demarrage.type === "DOSE_UNIQUE";
+  const statutProtocole = doseParGestation ? null
+    : protocoleInitialAcquisDepuisHistorique(etapes, actesHistoriquesDuProtocole)
+      ? "PROTOCOLE_ACQUIS" : statutEnregistre?.statut ?? null;
   // Un statut acquis enregistré, mais dépourvu d'injection probante, ne doit pas faire croire
   // que la vaccination est faite ou que l'absence d'échéance est normale.
   const acquisSansPreuve = statutProtocole === "PROTOCOLE_ACQUIS" && actesHistoriquesDuProtocole.length === 0;
@@ -429,7 +433,7 @@ function celluleProtocole(
         dateVelagePrevue: animal.dateVelagePrevueIso ? new Date(animal.dateVelagePrevueIso) : null,
         etapes,
         vaccinations: actesUtiles,
-        historiqueVaccinations: actesHistoriquesDuProtocole,
+        historiqueVaccinations: doseParGestation ? actesUtiles : actesHistoriquesDuProtocole,
         statutProtocole,
         configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
         brancheInitialeId: statutEnregistre?.brancheInitialeId ?? null,
@@ -514,8 +518,11 @@ export function construireGrilleVaccinale(
   vaccinsPharmacie: readonly VaccinPharmacieGrille[],
   date = new Date()
 ): { blocs: BlocVaccinGrille[]; lignes: LigneGrille[] } {
-  const blocs = construireBlocsVaccinaux(protocoles, vaccinsPharmacie);
-  const protocolesAvecEtapes = protocoles.filter((p) => p.etapes.length > 0);
+  const protocolesNormalises = protocoles.map((protocole) => rotavecUneDoseParGestation({
+    ...protocole, etapes: [...protocole.etapes], configurationQuestionnaireJson: protocole.configurationQuestionnaireJson ?? null,
+  }));
+  const blocs = construireBlocsVaccinaux(protocolesNormalises, vaccinsPharmacie);
+  const protocolesAvecEtapes = protocolesNormalises.filter((p) => p.etapes.length > 0);
 
   const lignes: LigneGrille[] = animaux.map((animal) => {
     const cellules: Record<string, CelluleGrille> = {};

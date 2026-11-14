@@ -1,3 +1,4 @@
+import { rotavecUneDoseParGestation } from "./rotavec-cycle.ts";
 import "server-only";
 
 import { differenceInCalendarDays } from "date-fns";
@@ -144,7 +145,11 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
     }),
   ]);
 
-  return protocoles.map((protocole) => {
+  return protocoles.map((protocoleDb) => {
+    const protocole = rotavecUneDoseParGestation(protocoleDb);
+    const configurationCycle = lireConfigurationQuestionnaire(protocole.configurationQuestionnaireJson);
+    const doseParGestation = configurationCycle?.demarrage.type === "DOSE_UNIQUE"
+      && configurationCycle.demarrage.calendrier.type === "AVANT_VELAGE";
     const etapesInitiales = protocole.etapes.filter((etape) => etape.cycle !== "ENTRETIEN");
     const totalInitial = etapesInitiales.length;
     let termines = 0;
@@ -186,9 +191,9 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
       const statutCalcule = aUneEtapeFaite && !protocoleLieAuVelage && etapesInitiales.length === 2
         ? null
         : statutEnregistre?.statut ?? null;
-      const statutProtocole = protocoleInitialAcquisDepuisHistorique(protocole.etapes, historiqueRattache)
-        ? "PROTOCOLE_ACQUIS"
-        : statutCalcule;
+      const statutProtocole = doseParGestation ? null
+        : protocoleInitialAcquisDepuisHistorique(protocole.etapes, historiqueRattache)
+          ? "PROTOCOLE_ACQUIS" : statutCalcule;
       const action = calculerActionVaccinale({
         date,
         dateNaissance: animal.danais,
@@ -198,7 +203,7 @@ export async function getPreparationsVaccinales(date = new Date()): Promise<Grou
         bientotJours: 7,
         etapes: protocole.etapes,
         vaccinations,
-        historiqueVaccinations: historiqueRattache,
+        historiqueVaccinations: doseParGestation ? vaccinations : historiqueRattache,
         statutProtocole: (acteInfere ? null : statutProtocole) as StatutProtocoleVaccinal | null,
         configurationQuestionnaireJson: protocole.configurationQuestionnaireJson,
         brancheInitialeId: statutEnregistre?.brancheInitialeId ?? null,
