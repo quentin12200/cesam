@@ -3,6 +3,58 @@ import Link from "next/link";
 import { TrendingUp } from "lucide-react";
 
 import BackButton from "@/app/components/BackButton";
+import DescendantGrowthChart, { type GrowthPoint, type GrowthReference } from "../[nutrav]/DescendantGrowthChart";
+
+async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; reference: GrowthReference[] }> {
+  // Lecture seule. Les animaux sont sélectionnés par leur vêlage, pas par une
+  // catégorie courante susceptible de mélanger vaches et veaux.
+  const velages = await prisma.velage.findMany({
+    where: { veauId: { not: null } },
+    select: { veau: { select: {
+      id: true, nutrav: true, danais: true, sexbov: true, estGenisse: true, categorie: true,
+      pesees: { select: { date: true, poids: true } },
+      sortie: { select: { type: true, date: true, poids: true, poidsVifVente: true, poidsVif: true, modeVente: true } },
+    } } },
+  });
+  const points: GrowthPoint[] = [];
+  const buckets = new Map<string, Map<string, { sum: number; count: number }>>();
+  const seen = new Set<string>();
+  for (const velage of velages) {
+    const calf = velage.veau;
+    if (!calf || seen.has(calf.id)) continue;
+    seen.add(calf.id);
+    const retained = calf.sexbov === "F" && (calf.estGenisse ||
+      ["PRESELECTION_GENISSE", "GENISSE_VALIDEE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(calf.categorie ?? ""));
+    const sold = calf.sortie && ["ELEVAGE", "BOUCHERIE", "ENGRAISSEMENT"].includes(calf.sortie.type);
+    if (!retained && !sold) continue;
+    const sex = calf.sexbov === "M" ? "M" : "F";
+    const observations = calf.pesees.map((p) => ({ date: p.date, kg: p.poids, source: "Pesée" }));
+    if (sold && calf.sortie) {
+      const kg = calf.sortie.poidsVifVente ?? calf.sortie.poidsVif ??
+        (calf.sortie.modeVente !== "CARCASSE" && calf.sortie.type === "ELEVAGE" ? calf.sortie.poids : null);
+      if (kg != null) observations.push({ date: calf.sortie.date, kg, source: "Poids vif de vente" });
+    }
+    for (const obs of observations) {
+      const ageMonths = (obs.date.getTime() - calf.danais.getTime()) / (86400000 * 30.4375);
+      if (!Number.isFinite(obs.kg) || obs.kg <= 0 || ageMonths < 0 || ageMonths > 13) continue;
+      points.push({ id: calf.id, number: calf.nutrav, sex, ageMonths, kg: obs.kg, retained, source: obs.source });
+      const month = Math.min(13, Math.round(ageMonths));
+      const key = `${retained ? "retained" : "sold"}:${sex}:${month}`;
+      const animals = buckets.get(key) ?? new Map<string, { sum: number; count: number }>();
+      const prev = animals.get(calf.id) ?? { sum: 0, count: 0 };
+      animals.set(calf.id, { sum: prev.sum + obs.kg, count: prev.count + 1 });
+      buckets.set(key, animals);
+    }
+  }
+  const reference: GrowthReference[] = [...buckets.entries()].map(([key, animals]) => {
+    const [group, sex, month] = key.split(":");
+    const weights = [...animals.values()].map((v) => v.sum / v.count);
+    return { group, sex, month: Number(month), count: weights.length,
+      kg: weights.reduce((total, kg) => total + kg, 0) / weights.length };
+  }).sort((a, b) => a.month - b.month);
+  return { points, reference };
+}
+
 // Calcul du GMQ en g/j
 // GMQ = (poids dernière pesée - poids naissance) / age en jours à dernière pesée
 // Poids naissance = première pesée (la plus ancienne)
@@ -219,7 +271,7 @@ function GmqBadge({ gmq }: { gmq: number | null }) {
 }
 
 export default async function GmqPage() {
-  const { parMere, parPere } = await getGmqData();
+  const [{ parMere, parPere }, croissance] = await Promise.all([getGmqData(), getCroissanceGlobale()]);
 
   const totalVeaux = parMere.reduce((s, r) => s + r.nbVeaux, 0);
   const allGmq = parMere.flatMap((r) => r.gmqMoyen !== null ? [r.gmqMoyen] : []);
@@ -238,6 +290,8 @@ export default async function GmqPage() {
           <p className="text-xs text-gray-500 mt-0.5">Gain Moyen Quotidien des veaux</p>
         </div>
       </div>
+
+      <DescendantGrowthChart points={croissance.points} reference={croissance.reference} title="Croissance du troupeau · 0 à 13 mois" />
 
       {/* Résumé global */}
       <div className="grid grid-cols-2 gap-3">
