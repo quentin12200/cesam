@@ -4,13 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 
 export type GrowthPoint = { id: string; number: string; sex: string; ageMonths: number; kg: number; retained: boolean; deceased?: boolean; source: string };
+export type DeathMarker = { id: string; number: string; sex: string; ageMonths: number; cause: string | null };
 export type GrowthReference = { group: string; sex: string; month: number; kg: number; count: number };
 
-export default function DescendantGrowthChart({ points, reference, title = "Croissance des descendants · 0 à 13 mois" }: { points: GrowthPoint[]; reference: GrowthReference[]; title?: string }) {
+export default function DescendantGrowthChart({ points, reference, deaths = [], title = "Croissance des descendants · 0 à 13 mois" }: { points: GrowthPoint[]; reference: GrowthReference[]; deaths?: DeathMarker[]; title?: string }) {
   const [group, setGroup] = useState<"sold" | "retained" | "deceased">("sold");
   const [sex, setSex] = useState<"M" | "F">("M");
   const [selected, setSelected] = useState<GrowthPoint | null>(null);
   const visible = points.filter((p) => (group === "deceased" ? p.deceased === true : p.deceased !== true && p.retained === (group === "retained")) && p.sex === sex && p.ageMonths >= 0 && p.ageMonths <= 13);
+  const visibleDeaths = deaths.filter((d) => group === "deceased" && d.sex === sex && d.ageMonths >= 0 && d.ageMonths <= 13);
+  const [selectedDeath, setSelectedDeath] = useState<DeathMarker | null>(null);
   const baseline = reference.filter((r) => r.group === group && r.sex === sex && r.count >= 2 && r.month >= 0 && r.month <= 13);
   const maxKg = Math.max(100, ...visible.map((p) => p.kg), ...baseline.map((r) => r.kg));
   const x = (months: number) => 40 + (months / 13) * 295;
@@ -30,10 +33,12 @@ export default function DescendantGrowthChart({ points, reference, title = "Croi
         <text x="8" y="12" fontSize="10" fill="#64748b">kg vif</text>
         <text x="280" y="224" fontSize="10" fill="#64748b">mois</text>
         {baseline.length > 1 && <polyline points={baseline.map((r) => `${x(r.month)},${y(r.kg)}`).join(" ")} fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeDasharray="5 4"/>}
+        {visibleDeaths.map((d) => <g key={`death-${d.id}`} role="button" tabIndex={0} aria-label={`${d.number} mort à ${d.ageMonths.toFixed(1)} mois`} onClick={() => { setSelectedDeath(d); setSelected(null); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setSelectedDeath(d); setSelected(null); } }}><line x1={x(d.ageMonths)-6} y1="189" x2={x(d.ageMonths)+6} y2="201" stroke="#dc2626" strokeWidth="3"/><line x1={x(d.ageMonths)-6} y1="201" x2={x(d.ageMonths)+6} y2="189" stroke="#dc2626" strokeWidth="3"/></g>)}
         {visible.map((p, index) => <circle key={`${p.id}-${p.ageMonths}-${index}`} cx={x(p.ageMonths)} cy={y(p.kg)} r="5.5" fill={p.deceased ? "#b91c1c" : p.retained ? "#db2777" : "#15803d"} stroke="white" strokeWidth="1.5" tabIndex={0} role="button" aria-label={`${p.number}, ${p.kg} kg à ${p.ageMonths.toFixed(1)} mois`} onClick={() => setSelected(p)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSelected(p); }}/>)}
       </svg>
-      <p className="text-xs text-gray-500">Points rouges : pesées des veaux morts, conservées dans l’historique · Autres points : pesées et poids de vente vifs connus · Pointillés : moyenne du troupeau par âge et sexe (au moins 2 mesures). Les données absentes ne sont pas estimées.</p>
-      {visible.length === 0 && <p className="text-sm text-gray-500">Aucune pesée disponible pour cette sélection.</p>}
+      <p className="text-xs text-gray-500">Croix rouges sur l’axe : âge au décès (même sans pesée) · Points rouges : pesées des veaux morts, conservées dans l’historique · Autres points : pesées et poids de vente vifs connus · Pointillés : moyenne du troupeau par âge et sexe (au moins 2 mesures). Les données absentes ne sont pas estimées.</p>
+      {visible.length === 0 && visibleDeaths.length === 0 && <p className="text-sm text-gray-500">Aucune pesée disponible pour cette sélection.</p>}
+      {selectedDeath && <p className="text-sm rounded-lg bg-red-50 p-2"><Link className="font-semibold text-red-700 underline" href={`/troupeau/${selectedDeath.number}`}>{selectedDeath.number}</Link> · Mort à {selectedDeath.ageMonths.toFixed(1)} mois · Cause : {selectedDeath.cause || "Non renseignée"}</p>}
       {selected && <p className="text-sm rounded-lg bg-gray-50 p-2"><Link className="font-semibold text-green-700 underline" href={`/troupeau/${selected.number}`}>{selected.number}</Link> · {selected.kg} kg à {selected.ageMonths.toFixed(1)} mois · {selected.source}</p>}
     </section>
   );
