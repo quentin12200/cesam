@@ -3,6 +3,7 @@ import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { undoExitInTransaction, buildExitPatch } from "@/lib/grouped-sale";
 
 export async function PATCH(
   req: NextRequest,
@@ -32,40 +33,18 @@ export async function PATCH(
       }
     }
 
-    const poidsFinal = poids !== undefined ? (poids !== null ? parseFloat(poids) : null) : sortie.poids;
-    const prixKiloFinal = prixKilo !== undefined ? (prixKilo !== null ? parseFloat(prixKilo) : null) : sortie.prixKilo;
-    const prixPrevuHT = poidsFinal && prixKiloFinal
-      ? Math.round(poidsFinal * prixKiloFinal * 100) / 100
-      : null;
-
     const updated = await prisma.sortie.update({
       where: { id },
-      data: {
-        ...(date !== undefined && { date: new Date(date) }),
-        ...(type !== undefined && { type }),
-        ...(categorieSortie !== undefined && { categorieSortie: categorieSortie || null }),
-        ...(sexeSortie !== undefined && { sexeSortie: sexeSortie || null }),
-        ...(modeVente !== undefined && { modeVente: modeVente || null }),
-        ...(acheteur !== undefined && { acheteur: acheteur || null }),
-        ...(poids !== undefined && { poids: poids !== null ? parseFloat(poids) : null }),
-        ...(poidsVif !== undefined && { poidsVif: poidsVif !== null ? parseFloat(poidsVif) : null }),
-        ...(rendementCarcasse !== undefined && { rendementCarcasse: rendementCarcasse !== null ? parseFloat(rendementCarcasse) : null }),
-        ...(poidsVifVente !== undefined && { poidsVifVente: poidsVifVente !== null ? parseFloat(poidsVifVente) : null }),
-        ...(prixKgVif !== undefined && { prixKgVif: prixKgVif !== null ? parseFloat(prixKgVif) : null }),
-        ...(poidsCarcasse !== undefined && { poidsCarcasse: poidsCarcasse !== null ? parseFloat(poidsCarcasse) : null }),
-        ...(prixKgCarcasse !== undefined && { prixKgCarcasse: prixKgCarcasse !== null ? parseFloat(prixKgCarcasse) : null }),
-        ...(prixKilo !== undefined && { prixKilo: prixKilo !== null ? parseFloat(prixKilo) : null }),
-        ...((poids !== undefined || prixKilo !== undefined) && { prixPrevuHT }),
-        ...(prixDefinitifHT !== undefined && { prixDefinitifHT: prixDefinitifHT !== null ? parseFloat(prixDefinitifHT) : null }),
-        ...(notes !== undefined && { notes: notes || null }),
-        ...(causeMortalite !== undefined && { causeMortalite: causeMortalite || null }),
-        updatedAt: new Date(),
-      },
+      data: buildExitPatch(body, sortie),
     });
 
     await logAction("UPDATE_SORTIE", `Sortie ${id} modifiée`, []);
     return NextResponse.json(updated);
   } catch (err) {
+    if (err instanceof Error && ["CHAMP_NUMERIQUE_INVALIDE", "DATE_SORTIE_INVALIDE"].includes(err.message)) {
+      return NextResponse.json({ error: "Poids, prix ou date invalide" }, { status: 400 });
+    }
+    if (err instanceof Error && err.message.includes("P2025")) return NextResponse.json({ error: "Sortie déjà annulée" }, { status: 409 });
     console.error("PATCH /api/sorties/[id] error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
@@ -86,18 +65,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Sortie introuvable" }, { status: 404 });
     }
 
-    await prisma.sortie.delete({ where: { id } });
-
-    // Remettre l'animal en ACTIF seulement s'il n'a plus d'autres sorties
-    const autresSorties = await prisma.sortie.count({
-      where: { animalId: sortie.animalId },
-    });
-    if (autresSorties === 0) {
-      await prisma.animal.update({
-        where: { id: sortie.animalId },
-        data: { statut: "ACTIF", updatedAt: new Date() },
-      });
-    }
+    // Suppression et réactivation atomiques : une erreur ne laisse jamais
+    // l'animal actif avec une sortie encore enregistrée.
+    const reactivated = await prisma.$transaction((tx) => undoExitInTransaction(id, sortie.animalId, tx));
 
     const desc = `Sortie de ${sortie.animal.nobovi ?? sortie.animal.nutrav} annulée`;
     let undoId = "";
@@ -113,6 +83,15 @@ export async function DELETE(
             type: sortie.type,
             acheteur: sortie.acheteur,
             prixKilo: sortie.prixKilo,
+            categorieSortie: sortie.categorieSortie,
+            sexeSortie: sortie.sexeSortie,
+            modeVente: sortie.modeVente,
+            poidsVif: sortie.poidsVif,
+            rendementCarcasse: sortie.rendementCarcasse,
+            poidsVifVente: sortie.poidsVifVente,
+            prixKgVif: sortie.prixKgVif,
+            poidsCarcasse: sortie.poidsCarcasse,
+            prixKgCarcasse: sortie.prixKgCarcasse,
             poids: sortie.poids,
             prixPrevuHT: sortie.prixPrevuHT,
             prixDefinitifHT: sortie.prixDefinitifHT,
@@ -122,12 +101,13 @@ export async function DELETE(
             updatedAt: new Date(),
           },
         },
-        { op: "update", model: "animal", where: { id: sortie.animalId }, data: { statut: "SORTI" } },
+        ...(reactivated ? [{ op: "update" as const, model: "animal", where: { id: sortie.animalId }, data: { statut: "SORTI" } }] : []),
       ]);
     } catch {}
 
     return NextResponse.json({ ok: true, _undoId: undoId, _undoDesc: desc });
   } catch (err) {
+    if (err instanceof Error && err.message.includes("P2025")) return NextResponse.json({ error: "Sortie déjà annulée" }, { status: 409 });
     console.error("DELETE /api/sorties/[id] error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }

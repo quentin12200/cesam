@@ -99,6 +99,9 @@ export function categorieSortieAnimal(categorie?: string | null, sexe?: string):
 export default function SortieEditorModal({ title, initial, animalLabel, animals, initialAnimalIds, submitLabel = "Enregistrer", onClose, onSubmit, onDelete }: Props) {
   const multiSelect = initialAnimalIds !== undefined;
   const [animalId, setAnimalId] = useState(initial.animalId ?? "");
+  const [animalSearch, setAnimalSearch] = useState("");
+  const [causeOptions, setCauseOptions] = useState<string[]>([]);
+  const [newCause, setNewCause] = useState("");
   const [animalIds, setAnimalIds] = useState(() => uniqueAnimalIds(initialAnimalIds));
   const [animalWeights, setAnimalWeights] = useState<Record<string, string>>(() => Object.fromEntries(
     (animals ?? []).map((animal) => [animal.id, nombreInitial(animal.poidsVif)]),
@@ -121,6 +124,9 @@ export default function SortieEditorModal({ title, initial, animalLabel, animals
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const filteredAnimals = useMemo(() => (animals ?? []).filter((animal) => `${animal.nutrav} ${animal.nobovi ?? ""}`.toLocaleLowerCase("fr").includes(animalSearch.trim().toLocaleLowerCase("fr"))), [animals, animalSearch]);
+  const availableCauses = useMemo(() => [...new Set(["Inconnue", ...CAUSES_MORTALITE, ...causeOptions, ...(causeMortalite ? [causeMortalite] : [])])].sort((a, b) => (CAUSES_MORTALITE_LABELS[a] ?? a).localeCompare(CAUSES_MORTALITE_LABELS[b] ?? b, "fr")), [causeOptions, causeMortalite]);
+  useEffect(() => { if (nature !== "MORT") return; let active = true; fetch("/api/sorties/causes").then((r) => { if (!r.ok) throw new Error("Causes indisponibles"); return r.json(); }).then((causes) => { if (active && Array.isArray(causes)) setCauseOptions(causes.filter((cause): cause is string => typeof cause === "string")); }).catch(() => {}); return () => { active = false; }; }, [nature]);
   const poidsActif = modeVente === "VIF" ? poidsVifVente : poidsCarcasse;
   const prixActif = modeVente === "VIF" ? prixKgVif : prixKgCarcasse;
   const montantCalcule = useMemo(() => {
@@ -220,8 +226,9 @@ export default function SortieEditorModal({ title, initial, animalLabel, animals
                   {animalIds.length} sélectionné{animalIds.length > 1 ? "s" : ""}
                 </span>
               </div>
+              <input type="search" aria-label="Rechercher un animal à vendre" placeholder="Rechercher un numéro ou un nom…" value={animalSearch} onChange={(e) => setAnimalSearch(e.target.value)} className={`${champ} mb-2`} />
               <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-2">
-                {animals.map((animal) => {
+                {filteredAnimals.map((animal) => {
                   const selected = animalIds.includes(animal.id);
                   return (
                     <div key={animal.id} className={`rounded-lg border p-2 ${selected ? "border-green-400 bg-green-50" : "border-gray-200"}`}>
@@ -254,16 +261,16 @@ export default function SortieEditorModal({ title, initial, animalLabel, animals
                 })}
               </div>
             </div>
-          ) : <div><label className="block text-sm font-medium text-gray-700 mb-1">Animal *</label><select value={animalId} onChange={(e) => setAnimalId(e.target.value)} required className={champ}><option value="">Sélectionner un animal…</option>{animals.map((animal) => <option key={animal.id} value={animal.id}>{animal.nutrav} — {animal.nobovi ?? "Sans nom"}</option>)}</select></div>)}
+          ) : <div><label className="block text-sm font-medium text-gray-700 mb-1">Animal *</label><input type="search" aria-label="Rechercher un animal" placeholder="Numéro ou nom…" value={animalSearch} onChange={(e) => setAnimalSearch(e.target.value)} className={`${champ} mb-2`} /><select value={animalId} onChange={(e) => setAnimalId(e.target.value)} required className={champ}><option value="">Sélectionner un animal…</option>{filteredAnimals.concat(animals.filter((animal) => animal.id === animalId && !filteredAnimals.some((item) => item.id === animal.id))).map((animal) => <option key={animal.id} value={animal.id}>{animal.nutrav} — {animal.nobovi ?? "Sans nom"}</option>)}</select></div>)}
 
           {!multiSelect && <div><label className="block text-sm font-medium text-gray-700 mb-1">Nature de la sortie</label><div className="grid grid-cols-2 gap-2">{([['VENTE','Vente'],['MORT','Mort']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setNature(value)} className={`min-h-12 rounded-lg border text-sm font-medium ${nature === value ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 text-gray-600"}`}>{label}</button>)}</div></div>}
 
-          {!multiSelect && <div className="grid grid-cols-2 gap-3">
+          {!multiSelect && nature === "VENTE" && <div className="grid grid-cols-2 gap-3">
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label><select value={categorieSortie} onChange={(e) => setCategorieSortie(e.target.value as SortieCategorie)} className={champ}>{CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Sexe</label><select value={sexeSortie} onChange={(e) => setSexeSortie(e.target.value)} className={champ}><option value="F">Femelle</option><option value="M">Mâle</option></select></div>
           </div>}
 
-          {!multiSelect && attenteInfo?.enAttente && <div className="bg-orange-50 border border-orange-300 rounded-lg p-3 text-sm"><div className="flex items-start gap-2 text-orange-800 font-medium"><AlertTriangle size={16} className="shrink-0 mt-0.5" /><span>Délai d&apos;attente en cours{attenteInfo.dateFinAttenteViande && ` pour la viande jusqu'au ${new Date(attenteInfo.dateFinAttenteViande).toLocaleDateString("fr-FR")}`}{attenteInfo.medicamentNom && ` (${attenteInfo.medicamentNom})`}.</span></div>{nature === "VENTE" && modeVente === "CARCASSE" && attenteInfo.enAttenteViande && <label className="flex items-start gap-2 mt-2 text-orange-900"><input type="checkbox" checked={confirmeAttente} onChange={(e) => setConfirmeAttente(e.target.checked)} className="mt-0.5" /><span className="text-xs">Je confirme être informé du délai et je valide cette sortie.</span></label>}</div>}
+          {!multiSelect && nature === "VENTE" && attenteInfo?.enAttente && <div className="bg-orange-50 border border-orange-300 rounded-lg p-3 text-sm"><div className="flex items-start gap-2 text-orange-800 font-medium"><AlertTriangle size={16} className="shrink-0 mt-0.5" /><span>Délai d&apos;attente en cours{attenteInfo.dateFinAttenteViande && ` pour la viande jusqu'au ${new Date(attenteInfo.dateFinAttenteViande).toLocaleDateString("fr-FR")}`}{attenteInfo.medicamentNom && ` (${attenteInfo.medicamentNom})`}.</span></div>{nature === "VENTE" && modeVente === "CARCASSE" && attenteInfo.enAttenteViande && <label className="flex items-start gap-2 mt-2 text-orange-900"><input type="checkbox" checked={confirmeAttente} onChange={(e) => setConfirmeAttente(e.target.checked)} className="mt-0.5" /><span className="text-xs">Je confirme être informé du délai et je valide cette sortie.</span></label>}</div>}
 
           {nature === "VENTE" && <><div><label className="block text-sm font-medium text-gray-700 mb-1">Mode de vente</label><div className="grid grid-cols-2 gap-2">{([['VIF','Vif'],['CARCASSE','Carcasse']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setModeVente(value)} className={`min-h-12 rounded-lg border text-sm font-medium ${modeVente === value ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 text-gray-600"}`}>{label}</button>)}</div></div>
             <div className={multiSelect ? "grid grid-cols-1" : "grid grid-cols-2 gap-3"}>{multiSelect
@@ -273,8 +280,9 @@ export default function SortieEditorModal({ title, initial, animalLabel, animals
 
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Date de sortie</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className={champ} /></div>
           {nature === "VENTE" && <><div><label className="block text-sm font-medium text-gray-700 mb-1">Marchand</label><MarchandSelect value={acheteur} onChange={setAcheteur} /></div>{montantCalcule != null && <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm"><span className="text-gray-600">Total calculé : </span><span className="font-bold text-green-700 text-base">{montantCalcule.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT</span></div>}{!multiSelect && <div><label className="block text-sm font-medium text-gray-700 mb-1">Prix définitif HT (€)</label><input type="number" min="0" step="0.01" value={prixDefinitifHT} onChange={(e) => setPrixDefinitifHT(e.target.value)} placeholder={montantCalcule?.toFixed(2) ?? ""} className={champ} /></div>}</>}
-          {nature === "MORT" && <div><label className="block text-sm font-medium text-red-700 mb-1">Cause de mortalité *</label><select value={causeMortalite} onChange={(e) => setCauseMortalite(e.target.value)} className={champ}><option value="">Sélectionner…</option>{CAUSES_MORTALITE.map((cause) => <option key={cause} value={cause}>{CAUSES_MORTALITE_LABELS[cause] ?? cause}</option>)}</select></div>}
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Notes</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500" /></div>
+          {nature === "MORT" && <div><label className="block text-sm font-medium text-red-700 mb-1">Cause de mortalité *</label><select value={causeMortalite} onChange={(e) => setCauseMortalite(e.target.value)} className={champ}><option value="">Sélectionner…</option>{availableCauses.map((cause) => <option key={cause} value={cause}>{CAUSES_MORTALITE_LABELS[cause] ?? cause}</option>)}</select></div>}
+          {nature === "MORT" && <div className="flex gap-2"><input type="text" aria-label="Nouvelle cause de mortalité" placeholder="Nouvelle cause précise…" value={newCause} onChange={(e) => setNewCause(e.target.value)} className={champ} /><button type="button" disabled={!newCause.trim()} onClick={() => { const typed = newCause.trim(); const existing = availableCauses.find((cause) => (CAUSES_MORTALITE_LABELS[cause] ?? cause).toLocaleLowerCase("fr") === typed.toLocaleLowerCase("fr")); setCauseMortalite(existing ?? typed); setCauseOptions((current) => existing ? current : [...current, typed]); setNewCause(""); }} className="shrink-0 rounded-lg bg-green-700 px-3 text-sm font-semibold text-white disabled:opacity-40">Ajouter</button></div>}
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">{nature === "MORT" ? "Observations sur cet animal" : "Notes"}</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500" /></div>
           <div className="flex gap-3 pt-2"><button type="button" onClick={onClose} className="min-h-11 flex-1 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium">Annuler</button><button type="submit" disabled={loading} className="min-h-11 flex-1 bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">{loading ? "Enregistrement…" : submitLabel}</button></div>
         </form>
       </div>

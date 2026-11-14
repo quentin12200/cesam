@@ -279,6 +279,13 @@ function ListeMortsNes({ velages }: { velages: VelageDetail[] }) {
   );
 }
 
+function ageAuDeces(dateNaissance: Date, dateMort: Date): string {
+  const jours = Math.max(0, Math.floor((dateMort.getTime() - dateNaissance.getTime()) / 86_400_000));
+  if (jours < 31) return `${jours} jour${jours > 1 ? "s" : ""}`;
+  const mois = Math.floor(jours / 30.4375);
+  return `${mois} mois (${jours} jours)`;
+}
+
 function ListeMortsAvantSevrage({ animaux }: { animaux: MortDetail[] }) {
   return (
     <div>
@@ -295,7 +302,7 @@ function ListeMortsAvantSevrage({ animaux }: { animaux: MortDetail[] }) {
                 <span className="text-xs text-gray-400">{formatDate(animal.dateMort)}</span>
               </div>
               <p className="text-xs text-gray-400 mt-0.5">
-                Né le {formatDate(animal.dateNaissance)}{animal.cause ? ` · ${animal.cause}` : ""}
+                Né le {formatDate(animal.dateNaissance)} · Décédé à {ageAuDeces(animal.dateNaissance, animal.dateMort)} · Cause : {animal.cause || "Non renseignée"}
               </p>
             </div>
           ))}

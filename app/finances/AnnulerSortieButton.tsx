@@ -12,7 +12,8 @@ export default function AnnulerSortieButton({
 }) {
   const router = useRouter();
   async function handleDelete() {
-    await fetch(`/api/sorties/${sortieId}`, { method: "DELETE" });
+    const res = await fetch(`/api/sorties/${sortieId}`, { method: "DELETE" });
+    if (!res.ok) throw new Error((await res.json()).error ?? "Annulation impossible");
     router.refresh();
   }
 

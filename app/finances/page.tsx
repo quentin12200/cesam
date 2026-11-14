@@ -79,9 +79,15 @@ async function getFinancesData(annee: number) {
 
   const veauxVendus = ventesElevage.filter((s) => s.animal.velageVeau !== null);
   const veauxVendusCount = veauxVendus.length + veauxHistoriques.length;
-  const poidsVeauxTotal = veauxVendus.reduce((sum, s) => sum + (s.poids ?? 0), 0)
-    + veauxHistoriques.reduce((sum, v) => sum + (v.poidsVif ?? v.poidsCarc ?? 0), 0);
-  const poidsMoyenVeau = veauxVendusCount > 0 ? poidsVeauxTotal / veauxVendusCount : null;
+  // Moyenne en poids VIF uniquement : jamais de poids carcasse et jamais de zéro
+  // implicite pour les animaux dont le poids de vente est inconnu.
+  const poidsVeauxConnus = [
+    ...veauxVendus.map((s) => s.poidsVifVente ?? s.poidsVif ?? (s.modeVente !== "CARCASSE" ? s.poids : null)),
+    ...veauxHistoriques.map((v) => v.poidsVif),
+  ].filter((poids): poids is number => typeof poids === "number" && Number.isFinite(poids) && poids > 0);
+  const poidsMoyenVeau = poidsVeauxConnus.length > 0
+    ? poidsVeauxConnus.reduce((total, poids) => total + poids, 0) / poidsVeauxConnus.length
+    : null;
   const prixMoyenVeau = veauxVendusCount > 0 ? caVeaux / veauxVendusCount : null;
 
   const vachesBoucherie = ventesBoucherie;
@@ -177,6 +183,7 @@ async function getFinancesData(annee: number) {
     mortsCount: morts.length,
     engraissementsCount: engraissements.length,
     poidsMoyenVeau,
+    veauxAvecPoidsCount: poidsVeauxConnus.length,
     prixMoyenVeau,
     poidsMoyenCarcasse,
     prixMoyenVache,
@@ -307,7 +314,7 @@ export default async function FinancesPage({ searchParams }: PageProps) {
           <div className="text-xs text-gray-500 mt-0.5">animaux</div>
           {data.poidsMoyenVeau && (
             <div className="text-xs text-gray-400 mt-1">
-              Poids moy. {formatPoids(data.poidsMoyenVeau)}
+              Poids vif moy. {formatPoids(data.poidsMoyenVeau)} · {data.veauxAvecPoidsCount} veaux pesés
             </div>
           )}
           {data.prixMoyenVeau && (

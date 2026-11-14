@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import DescendantGrowthChart, { type GrowthPoint, type GrowthReference, type DeathMarker } from "./DescendantGrowthChart";
 import {
   formatAge,
   formatDate,
@@ -202,6 +203,55 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   ]);
 
   if (!animal) notFound();
+  // Read-only, using existing animal, weighing and exit records.
+  const growthAnimals = animal.veaux.length > 0
+    ? await prisma.animal.findMany({
+        where: { mereId: { not: null }, OR: [{ sortie: { is: { type: { in: ["ELEVAGE", "BOUCHERIE", "ENGRAISSEMENT", "MORT"] } } } }, { estGenisse: true }, { categorie: { in: ["PRESELECTION_GENISSE", "GENISSE_VALIDEE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"] } }] },
+        select: {
+          id: true, mereId: true, nutrav: true, danais: true, sexbov: true, estGenisse: true, categorie: true,
+          pesees: { select: { date: true, poids: true } },
+          sortie: { select: { type: true, date: true, poids: true, poidsVifVente: true, poidsVif: true, modeVente: true, categorieSortie: true, causeMortalite: true } },
+        },
+      })
+    : [];
+  const monthAge = (birth: Date, date: Date) => (date.getTime() - birth.getTime()) / (86400000 * 30.4375);
+  const growthPoints: GrowthPoint[] = [];
+  const deathMarkers: DeathMarker[] = [];
+  const growthBuckets = new Map<string, Map<string, { sum: number; count: number }>>();
+  for (const calf of growthAnimals) {
+    const retained = calf.sexbov === "F" && (calf.estGenisse || ["PRESELECTION_GENISSE", "GENISSE_VALIDEE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(calf.categorie ?? ""));
+    const sold = calf.sortie && ["ELEVAGE", "BOUCHERIE", "ENGRAISSEMENT"].includes(calf.sortie.type);
+    const deceased = calf.sortie?.type === "MORT";
+    if (deceased && calf.sortie && calf.mereId === animal.id) {
+      const ageMonths = monthAge(calf.danais, calf.sortie.date);
+      if (ageMonths >= 0 && ageMonths <= 13) deathMarkers.push({ id: calf.id, number: calf.nutrav, sex: calf.sexbov === "M" ? "M" : "F", ageMonths, cause: calf.sortie.causeMortalite });
+    }
+    if (!retained && !sold && !deceased) continue;
+    // A retained heifer sold later stays in the retained group; never count her as a sold calf.
+    const sex = calf.sexbov === "M" ? "M" : "F";
+    const observations = calf.pesees.map((p) => ({ date: p.date, kg: p.poids, source: "Pesée" }));
+    if (sold && calf.sortie) {
+      const kg = calf.sortie.poidsVifVente ?? calf.sortie.poidsVif ?? (calf.sortie.modeVente !== "CARCASSE" && calf.sortie.type === "ELEVAGE" ? calf.sortie.poids : null);
+      if (kg != null) observations.push({ date: calf.sortie.date, kg, source: "Poids vif de vente" });
+    }
+    for (const obs of observations) {
+      const ageMonths = monthAge(calf.danais, obs.date);
+      if (!Number.isFinite(obs.kg) || obs.kg <= 0 || ageMonths < 0 || ageMonths > 13) continue;
+      if (calf.mereId === animal.id) growthPoints.push({ id: calf.id, number: calf.nutrav, sex, ageMonths, kg: obs.kg, retained, deceased, source: obs.source });
+      const month = Math.min(13, Math.round(ageMonths));
+      const key = `${deceased ? "deceased" : retained ? "retained" : "sold"}:${sex}:${month}`;
+      const animalsInBucket = growthBuckets.get(key) ?? new Map<string, { sum: number; count: number }>();
+      const current = animalsInBucket.get(calf.id) ?? { sum: 0, count: 0 };
+      animalsInBucket.set(calf.id, { sum: current.sum + obs.kg, count: current.count + 1 });
+      growthBuckets.set(key, animalsInBucket);
+    }
+  }
+  const growthReference: GrowthReference[] = [...growthBuckets.entries()].map(([key, animalsInBucket]) => {
+    const [group, sex, month] = key.split(":");
+    const weights = [...animalsInBucket.values()].map((measure) => measure.sum / measure.count);
+    return { group, sex, month: Number(month), kg: weights.reduce((total, kg) => total + kg, 0) / weights.length, count: weights.length };
+  }).sort((a, b) => a.month - b.month);
+
   // Même vérité historique que /sanitaire/vaccins : un vaccin saisi comme simple Traitement
   // (médicament catégorie VACCIN) compte comme fait ici aussi. Voir lib/vaccine-acts.ts.
   const traitementsVaccinAnimal = await prisma.traitement.findMany({
@@ -648,6 +698,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 </div>
               )}
             </div>
+
+              {(growthPoints.length > 0 || deathMarkers.length > 0) && <DescendantGrowthChart points={growthPoints} reference={growthReference} deaths={deathMarkers} />}
 
               {/* Veaux */}
               {animal.veaux.length > 0 && (
