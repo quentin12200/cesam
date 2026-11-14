@@ -4,14 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 
 export type GrowthPoint = { id: string; number: string; sex: string; ageMonths: number; kg: number; retained: boolean; source: string };
-export type GrowthReference = { sex: string; month: number; kg: number; count: number };
+export type GrowthReference = { group: string; sex: string; month: number; kg: number; count: number };
 
 export default function DescendantGrowthChart({ points, reference }: { points: GrowthPoint[]; reference: GrowthReference[] }) {
   const [group, setGroup] = useState<"sold" | "retained">("sold");
   const [sex, setSex] = useState<"M" | "F">("M");
   const [selected, setSelected] = useState<GrowthPoint | null>(null);
   const visible = points.filter((p) => p.retained === (group === "retained") && p.sex === sex && p.ageMonths >= 0 && p.ageMonths <= 13);
-  const baseline = reference.filter((r) => r.sex === sex && r.count >= 2 && r.month >= 0 && r.month <= 13);
+  const baseline = reference.filter((r) => r.group === (group === "retained" ? "retained" : "sold") && r.sex === sex && r.count >= 2 && r.month >= 0 && r.month <= 13);
   const maxKg = Math.max(100, ...visible.map((p) => p.kg), ...baseline.map((r) => r.kg));
   const x = (months: number) => 40 + (months / 13) * 295;
   const y = (kg: number) => 195 - (kg / (maxKg * 1.1)) * 175;
