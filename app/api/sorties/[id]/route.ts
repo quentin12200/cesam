@@ -86,18 +86,18 @@ export async function DELETE(
       return NextResponse.json({ error: "Sortie introuvable" }, { status: 404 });
     }
 
-    await prisma.sortie.delete({ where: { id } });
-
-    // Remettre l'animal en ACTIF seulement s'il n'a plus d'autres sorties
-    const autresSorties = await prisma.sortie.count({
-      where: { animalId: sortie.animalId },
-    });
-    if (autresSorties === 0) {
-      await prisma.animal.update({
+    // Suppression et réactivation atomiques : une erreur ne laisse jamais
+    // l'animal actif avec une sortie encore enregistrée.
+    const reactivated = await prisma.$transaction(async (tx) => {
+      await tx.sortie.delete({ where: { id } });
+      const remaining = await tx.sortie.count({ where: { animalId: sortie.animalId } });
+      if (remaining !== 0) return false;
+      await tx.animal.update({
         where: { id: sortie.animalId },
         data: { statut: "ACTIF", updatedAt: new Date() },
       });
-    }
+      return true;
+    });
 
     const desc = `Sortie de ${sortie.animal.nobovi ?? sortie.animal.nutrav} annulée`;
     let undoId = "";
@@ -113,6 +113,15 @@ export async function DELETE(
             type: sortie.type,
             acheteur: sortie.acheteur,
             prixKilo: sortie.prixKilo,
+            categorieSortie: sortie.categorieSortie,
+            sexeSortie: sortie.sexeSortie,
+            modeVente: sortie.modeVente,
+            poidsVif: sortie.poidsVif,
+            rendementCarcasse: sortie.rendementCarcasse,
+            poidsVifVente: sortie.poidsVifVente,
+            prixKgVif: sortie.prixKgVif,
+            poidsCarcasse: sortie.poidsCarcasse,
+            prixKgCarcasse: sortie.prixKgCarcasse,
             poids: sortie.poids,
             prixPrevuHT: sortie.prixPrevuHT,
             prixDefinitifHT: sortie.prixDefinitifHT,
@@ -122,7 +131,7 @@ export async function DELETE(
             updatedAt: new Date(),
           },
         },
-        { op: "update", model: "animal", where: { id: sortie.animalId }, data: { statut: "SORTI" } },
+        ...(reactivated ? [{ op: "update" as const, model: "animal", where: { id: sortie.animalId }, data: { statut: "SORTI" } }] : []),
       ]);
     } catch {}
 
