@@ -6,7 +6,7 @@ import { nationalWithCountry, canonicalName, fullNational } from "@/lib/bull-ide
 import { useRouter } from "next/navigation";
 
 export type BullControlRow = {
-  id: string; number: string; country: string; name: string | null; present: boolean;
+  id: string; number: string; work: string | null; country: string; name: string | null; present: boolean;
   historical: number; duplicateCandidates: Array<{ id: string; number: string; name: string | null }>;
   direct: number; manual: number; calving: number; offspring: number;
   breeding: number; inseminations: number; childNumbers: string[];
@@ -34,6 +34,8 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
   const [filter, setFilter] = useState("tous");
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editWork, setEditWork] = useState("");
+  const [editNational, setEditNational] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [showConflicts, setShowConflicts] = useState(false);
@@ -60,20 +62,21 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
     else { setSort(key); setDescending(false); }
   }
 
-  async function saveName(row: BullControlRow) {
+  async function saveIdentity(row: BullControlRow) {
+    const changingNational = editNational.replace(/\s+/g, "").toUpperCase() !== row.number.replace(/\s+/g, "").toUpperCase();
+    if (changingNational && !window.confirm("Modifier le numéro national ? Les anciennes filiations ne seront pas réécrites. CESAM bloquera les doublons et les références historiques.")) return;
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/taureaux", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: row.id, nopere: editName }),
+        body: JSON.stringify({ id: row.id, nopere: editName, traper: editWork, nupere: editNational, confirmation: changingNational ? "CORRIGER" : undefined }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Modification refusée");
-      setRows((current) => current.map((item) => item.id === row.id ? { ...item, name: result.taureau.nopere } : item));
-      setEditing(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
-    } finally { setBusy(false); }
+      setRows((current) => current.map((item) => item.id === row.id ? { ...item, name: result.taureau.nopere, number: result.taureau.nupere, work: result.taureau.traper } : item));
+      setEditing(null); router.refresh();
+    } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setBusy(false); }
   }
 
   async function deleteBull(row: BullControlRow) {
@@ -165,6 +168,21 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
         </section>
       )}
 
+      {editing && (() => {
+        const row = rows.find((r) => r.id === editing);
+        return row ? <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/50 p-3">
+          <section role="dialog" aria-modal="true" aria-label="Modifier le père" className="w-full max-w-md space-y-3 rounded-2xl bg-white p-5 shadow-2xl">
+            <h2 className="text-lg font-bold">Modifier {row.name ?? row.number}</h2>
+            <label className="block text-sm">Nom<input value={editName} onChange={e => setEditName(e.target.value)} className="mt-1 w-full rounded-lg border p-3" /></label>
+            <label className="block text-sm">Numéro de travail<input value={editWork} onChange={e => setEditWork(e.target.value)} className="mt-1 w-full rounded-lg border p-3" placeholder="Ex. 5482" /></label>
+            <label className="block text-sm">Numéro national ou référence actuelle<input value={editNational} onChange={e => setEditNational(e.target.value)} className="mt-1 w-full rounded-lg border p-3 font-mono" /></label>
+            <p className="text-xs text-amber-900">Ne remplace pas un numéro court par un numéro supposé. {row.direct} lien(s) animal, {row.manual} mention(s) manuelle(s), {row.calving} vêlage(s), {row.breeding} saillie(s). Les filiations ne seront pas modifiées.</p>
+            {row.duplicateCandidates.length > 0 && <p className="text-sm text-amber-900">Doublons possibles : {row.duplicateCandidates.map(x => `${x.name ?? "Sans nom"} (${x.number})`).join(", ")}. Vérifie avant d&apos;enregistrer.</p>}
+            {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+            <div className="flex gap-2"><button type="button" disabled={busy} onClick={() => saveIdentity(row)} className="flex-1 rounded-lg bg-green-700 p-3 font-semibold text-white disabled:opacity-50">Enregistrer</button><button type="button" disabled={busy} onClick={() => setEditing(null)} className="rounded-lg border p-3">Annuler</button></div>
+          </section>
+        </div> : null;
+      })()}
       {mergeFrom && (() => {
         const from = rows.find((item) => item.id === mergeFrom);
         const choices = rows.filter((candidate) => from
@@ -245,16 +263,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
           <tbody>{visible.map((row) => (
             <tr key={row.id} className="border-t border-gray-100 hover:bg-green-50/40">
               <td className="px-3 py-2"><strong className="block font-mono text-green-900">{displayNumber(row)}</strong>{!fullNational(row.number) && <span className="text-xs font-semibold text-amber-800">Référence courte · national à vérifier</span>}{row.duplicateCandidates.length > 0 && <span className="block text-xs text-amber-800">Doublon possible : {row.duplicateCandidates.map(x => x.name ?? x.number).join(", ")}</span>}</td>
-              <td className="px-3 py-2">
-                {editing === row.id ? (
-                  <div className="flex gap-1">
-                    <input aria-label="Nouveau nom du taureau" value={editName} onChange={(e) => setEditName(e.target.value)}
-                      className="w-32 rounded border px-2 py-1 text-sm" />
-                    <button type="button" disabled={busy} onClick={() => saveName(row)} className="text-green-700 underline">OK</button>
-                    <button type="button" onClick={() => setEditing(null)} className="text-gray-500 underline">Annuler</button>
-                  </div>
-                ) : <span>{row.name || "Sans nom"}</span>}
-              </td>
+              <td className="px-3 py-2">{row.name || "Sans nom"}{row.work && <span className="block text-xs text-gray-500">Travail : {row.work}</span>}</td>
               <td className="px-3 py-2 text-center">{row.direct}</td>
               <td className="px-3 py-2 text-center">{row.manual}{row.historical > 0 && <span className="block text-xs text-amber-800">+{row.historical} par nom</span>}</td>
               <td className="px-3 py-2 text-center">{row.calving}</td>
@@ -265,20 +274,9 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
               <td className="px-3 py-2 text-center">{row.breeding}</td>
               <td className="px-3 py-2 text-center">{row.inseminations}</td>
               <td className="px-3 py-2">
-                <div className="flex items-center gap-3 whitespace-nowrap">
-                  <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); }}
-                    className="text-green-800 underline">Corriger le nom</button>
-                  {!fullNational(row.number) && (
-                    <button type="button" onClick={() => {
-                      const choices = rows.filter((candidate) => candidate.id !== row.id && fullNational(candidate.number) && canonicalName(candidate.name) === canonicalName(row.name));
-                      setMergeFrom(row.id); setMergeInto(choices.length === 1 ? choices[0].id : ""); setError("");
-                    }}
-                      className="text-amber-900 underline">Fusionner</button>
-                  )}
-                  <Link href={`/taureaux/${row.id}`} className="text-blue-700 underline">Fiche</Link>
-                  <button type="button" disabled={busy} onClick={() => deleteBull(row)}
-                    className="text-red-700 underline disabled:opacity-40">Supprimer</button>
-                </div>
+                <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); setEditWork(row.work ?? ""); setEditNational(row.number); setError(""); }}
+                  className="font-bold text-green-800 underline" aria-label={`Modifier ${row.name ?? row.number}`}>⋯ Modifier</button>
+                <Link href={`/taureaux/${row.id}`} className="ml-3 text-blue-700 underline">Fiche</Link>
               </td>
             </tr>
           ))}</tbody>
