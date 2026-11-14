@@ -206,7 +206,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   // Read-only, using existing animal, weighing and exit records.
   const growthAnimals = animal.veaux.length > 0
     ? await prisma.animal.findMany({
-        where: { mereId: { not: null }, OR: [{ sortie: { is: { type: { in: ["ELEVAGE", "BOUCHERIE", "ENGRAISSEMENT"] } } } }, { estGenisse: true }, { categorie: { in: ["PRESELECTION_GENISSE", "GENISSE_VALIDEE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"] } }] },
+        where: { mereId: { not: null }, OR: [{ sortie: { is: { type: { in: ["ELEVAGE", "BOUCHERIE", "ENGRAISSEMENT", "MORT"] } } } }, { estGenisse: true }, { categorie: { in: ["PRESELECTION_GENISSE", "GENISSE_VALIDEE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"] } }] },
         select: {
           id: true, mereId: true, nutrav: true, danais: true, sexbov: true, estGenisse: true, categorie: true,
           pesees: { select: { date: true, poids: true } },
@@ -220,7 +220,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   for (const calf of growthAnimals) {
     const retained = calf.sexbov === "F" && (calf.estGenisse || ["PRESELECTION_GENISSE", "GENISSE_VALIDEE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(calf.categorie ?? ""));
     const sold = calf.sortie && ["ELEVAGE", "BOUCHERIE", "ENGRAISSEMENT"].includes(calf.sortie.type);
-    if (!retained && !sold) continue;
+    const deceased = calf.sortie?.type === "MORT";
+    if (!retained && !sold && !deceased) continue;
     // A retained heifer sold later stays in the retained group; never count her as a sold calf.
     const sex = calf.sexbov === "M" ? "M" : "F";
     const observations = calf.pesees.map((p) => ({ date: p.date, kg: p.poids, source: "Pesée" }));
@@ -231,9 +232,9 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
     for (const obs of observations) {
       const ageMonths = monthAge(calf.danais, obs.date);
       if (!Number.isFinite(obs.kg) || obs.kg <= 0 || ageMonths < 0 || ageMonths > 13) continue;
-      if (calf.mereId === animal.id) growthPoints.push({ id: calf.id, number: calf.nutrav, sex, ageMonths, kg: obs.kg, retained, source: obs.source });
+      if (calf.mereId === animal.id) growthPoints.push({ id: calf.id, number: calf.nutrav, sex, ageMonths, kg: obs.kg, retained, deceased, source: obs.source });
       const month = Math.min(13, Math.round(ageMonths));
-      const key = `${retained ? "retained" : "sold"}:${sex}:${month}`;
+      const key = `${deceased ? "deceased" : retained ? "retained" : "sold"}:${sex}:${month}`;
       const animalsInBucket = growthBuckets.get(key) ?? new Map<string, { sum: number; count: number }>();
       const current = animalsInBucket.get(calf.id) ?? { sum: 0, count: 0 };
       animalsInBucket.set(calf.id, { sum: current.sum + obs.kg, count: current.count + 1 });
