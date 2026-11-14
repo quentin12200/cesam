@@ -25,10 +25,9 @@ async function getCroissanceGlobale(): Promise<{ points: GrowthPoint[]; referenc
     const calf = velage.veau;
     if (!calf || seen.has(calf.id)) continue;
     seen.add(calf.id);
-    const retained = calf.sexbov === "F" && (calf.estGenisse ||
-      ["PRESELECTION_GENISSE", "GENISSE_VALIDEE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"].includes(calf.categorie ?? ""));
+    const retained = calf.sexbov === "F" &&
+      ["PRESELECTION_GENISSE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "GENISSE_VALIDEE"].includes(calf.categorie ?? "");
     const sold = calf.sortie && ["ELEVAGE", "BOUCHERIE", "ENGRAISSEMENT"].includes(calf.sortie.type);
-    if (!retained && !sold) continue;
     const sex = calf.sexbov === "M" ? "M" : "F";
     const observations = calf.pesees.map((p) => ({ date: p.date, kg: p.poids, source: "Pesée" }));
     if (sold && calf.sortie) {
