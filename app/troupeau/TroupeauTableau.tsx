@@ -288,8 +288,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Dernier vêlage" buildFilterUrl={buildFilterUrl} triAsc="velage_asc" triDesc="velage_desc" currentTri={currentTri} /></th>
-              <th className="px-3 py-2.5 text-left font-semibold">Mère</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Père</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Parenté</th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Veau / Sevrage" buildFilterUrl={buildFilterUrl} triAsc="veau_asc" triDesc="veau_desc" currentTri={currentTri} /></th>
               <th className="w-12 px-2 py-2.5 text-center">⋯</th>
             </tr>
@@ -417,7 +416,12 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                     )}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{animal.velageDate ? format(new Date(animal.velageDate), "dd/MM/yyyy") : "—"}</td>
-                   <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
+                   <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
+                     <details className="relative">
+                       <summary className="cursor-pointer whitespace-nowrap font-semibold text-green-700">Parenté ▾</summary>
+                       <div className="absolute z-20 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+                         <div className="text-gray-500 mb-1">Mère</div>
+                          event.stopPropagation()}>
                     {animal.mereLieeNutrav ? (
                       <button
                         type="button"
@@ -435,16 +439,18 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                         {animal.mereNutrav}{animal.mereNom ? ` · ${animal.mereNom}` : ""}
                       </button>
                     ) : <AncestryEditor animalNutrav={animal.nutrav} parent="MERE" />}
-                  </td>
-                  <td className="max-w-[9rem] px-3 py-2.5 text-xs font-semibold text-gray-700" onClick={(event) => event.stopPropagation()}>
+                  <div className="mt-2 border-t pt-2"> event.stopPropagation()}>
                     {animal.pereNumero || animal.pereNom ? (
                       <button type="button" onClick={() => router.push(`/troupeau/${animal.nutrav}/arbre`)}
                         className="line-clamp-2 text-left underline decoration-dotted underline-offset-2"
                         title="Voir le père dans l'arbre généalogique"
                       >{father}</button>
                     ) : <AncestryEditor animalNutrav={animal.nutrav} parent="PERE" />}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
+                  </div>
+                       </div>
+                     </details>
+                   </td>
+                   <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
                     {animal.activeCalves.length > 0 ? (
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         {animal.activeCalves.map((calf) => (
