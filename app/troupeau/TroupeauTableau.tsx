@@ -35,6 +35,7 @@ export interface AnimalRow {
   saillieDate: string | null;
   gestationEtat: string | null;
   gestationVelagePrevue: string | null;
+  gestationDateEstimee: boolean;
   velageDate: string | null;
   dernierVeauMortNe: boolean;
   dernierVeauMort: boolean;
@@ -406,7 +407,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                             <span className={`font-semibold tabular-nums ${etat === "VERT" || etat === "ROSE" ? "text-green-800" : "text-gray-700"}`}>
                               {format(new Date(animal.gestationVelagePrevue), "dd/MM")}
                             </span>
-                            {etat !== "VERT" && etat !== "ROSE" && <span className="text-[10px] text-gray-500">estimé</span>}
+                            {animal.gestationDateEstimee && <span className="text-[10px] text-gray-500">estimé</span>}
                           </div>
                         )}
                         <details className="group text-[11px] print:hidden" onClick={(event) => event.stopPropagation()}>
