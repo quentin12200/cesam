@@ -56,10 +56,10 @@ interface Props {
 }
 
 const ETAT_LABEL: Record<string, string> = {
-  VERT: "Gestante",
-  ROSE: "Imminente",
-  JAUNE: "À écho",
-  GRIS: "En attente",
+  VERT: "Pleine",
+  ROSE: "Terme",
+  JAUNE: "Écho",
+  GRIS: "Attente",
   ROUGE: "Vide",
   REPOS: "Repos",
 };
@@ -393,7 +393,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                           <ReproductionListBadge
                             etat={etat}
                             fallbackLabel={ETAT_LABEL[etat] ?? etat}
-                            gestationDays={gestationDays}
+                            gestationDays={null}
                           />
                           {animal.aEchographier && etat !== "JAUNE" && (
                             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">À écho</span>
@@ -402,7 +402,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                         {animal.gestationVelagePrevue && ["VERT", "ROSE", "GRIS", "JAUNE"].includes(etat) && (
                           <div className="flex items-baseline gap-1.5 whitespace-nowrap">
                             <span className={`font-semibold tabular-nums ${etat === "VERT" || etat === "ROSE" ? "text-green-800" : "text-gray-700"}`}>
-                              {format(new Date(animal.gestationVelagePrevue), "dd/MM/yyyy")}
+                              {format(new Date(animal.gestationVelagePrevue), "dd/MM")}
                             </span>
                             {etat !== "VERT" && etat !== "ROSE" && <span className="text-[10px] text-gray-500">estimé</span>}
                           </div>
