@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { differenceInDays, addDays } from "date-fns";
 import { getEtatGestation, getBadgeClass, getEtatLabel, formatDate, VELAGE_IMMINENT_COLORS } from "@/lib/utils";
 import Link from "next/link";
+import { BarChart3 } from "lucide-react";
 import {
   RefreshCw, CheckCircle,
   Settings, Printer, Users, Baby, MoreHorizontal, Eye,
@@ -749,6 +750,7 @@ function ReproductionContent() {
   return (
     <div className="p-4 space-y-4 max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
       <TroupeauTabs />
+      <Link href="/reproduction/durees-gestation" className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800"><BarChart3 size={16} /> Durées réelles de gestation</Link>
 
       {/* Header */}
       <div className="flex items-center justify-between mt-2">
