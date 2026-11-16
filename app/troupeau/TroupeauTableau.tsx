@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { differenceInDays, intervalToDuration, format } from "date-fns";
+import { CalendarDays, Hourglass, Clock3, BedDouble, X, Stethoscope } from "lucide-react";
 import {
   getCategorie,
   getCategorieLabel,
@@ -54,6 +55,8 @@ interface Props {
   animaux: AnimalRow[];
   postCalvingRestDays: number;
 }
+
+const REPRO_ICONS = { VERT: CalendarDays, ROSE: Hourglass, JAUNE: Stethoscope, GRIS: Clock3, ROUGE: X, REPOS: BedDouble } as const;
 
 const ETAT_LABEL: Record<string, string> = {
   VERT: "Gestante",
@@ -314,6 +317,8 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                     )
                   : null;
 
+              const ReproIcon = etat ? REPRO_ICONS[etat] : null;
+
               const gestationDays =
                 etat === "VERT" && animal.gestationEtat === "VERT" && animal.saillieDate
                   ? differenceInDays(new Date(), new Date(animal.saillieDate))
@@ -390,7 +395,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                     {etat ? (
                       <div className="flex min-w-[160px] flex-col gap-1">
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${etat === "VERT" ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : getBadgeClass(etat)}`}>{ETAT_LABEL[etat] ?? etat}</span>
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${etat === "VERT" ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : getBadgeClass(etat)}`}>{ReproIcon && <ReproIcon size={12} strokeWidth={2.25} aria-hidden="true" />}{ETAT_LABEL[etat] ?? etat}</span>
                           {animal.aEchographier && etat !== "JAUNE" && (
                             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">À écho</span>
                           )}
