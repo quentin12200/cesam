@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { differenceInDays } from "date-fns";
+import { differenceInDays, intervalToDuration, format } from "date-fns";
 import {
   getCategorie,
   getCategorieLabel,
@@ -42,7 +42,7 @@ export interface AnimalRow {
   pereNom: string | null;
   pereNumero: string | null;
   sevreFait: boolean;
-  activeCalves: { nutrav: string; href: string | null; toWean: boolean }[];
+  activeCalves: { nutrav: string; href: string | null; toWean: boolean; birthDate: string | null }[];
   dernierPoids: number | null;
   dernierePeseeDate: string | null;
   enAttente: boolean;
@@ -220,7 +220,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
 
   return (
     <div className="bg-white rounded-xl shadow overflow-hidden">
-      <div className="flex items-center justify-end gap-2 border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
+      <div className="hidden items-center justify-end gap-2 border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
         <span>Trier :</span>
         <span className="rounded-md bg-green-700 px-2 py-1 text-white">
           <SortHeader
@@ -274,7 +274,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   currentTri={currentTri}
                 />
               </th>
-              <th className="px-3 py-2.5 text-left font-semibold">Nom</th>
+              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Nom" buildFilterUrl={buildFilterUrl} triAsc="nom_asc" triDesc="nom_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold">
                 <SortHeader
                   label="Âge"
@@ -285,11 +285,12 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                 />
               </th>
               <th className="px-3 py-2.5 text-left font-semibold">Dernier poids</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Catégorie</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Repro</th>
+              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} /></th>
+              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} /></th>
+              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Dernier vêlage" buildFilterUrl={buildFilterUrl} triAsc="velage_asc" triDesc="velage_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold">Mère</th>
               <th className="px-3 py-2.5 text-left font-semibold">Père</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Sevrage</th>
+              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Veau / Sevrage" buildFilterUrl={buildFilterUrl} triAsc="veau_asc" triDesc="veau_desc" currentTri={currentTri} /></th>
               <th className="w-12 px-2 py-2.5 text-center">⋯</th>
             </tr>
           </thead>
@@ -405,6 +406,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                             </span>
                           )}
                         </div>
+                        {animal.gestationVelagePrevue && etat !== "ROUGE" && etat !== "REPOS" && <div className="mt-1 font-semibold text-green-700">{format(new Date(animal.gestationVelagePrevue), "dd/MM/yyyy")}</div>}
                         <details className="mt-1 text-xs" onClick={(event) => event.stopPropagation()}>
                           <summary className="cursor-pointer select-none text-green-700 hover:underline">Détails repro</summary>
                           <div className="mt-1"><ReproductionCycleSummary summary={animal.reproductionSummary} /></div>
@@ -414,7 +416,8 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                       <span className="text-gray-200 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
+                  <td className="px-3 py-2.5 whitespace-nowrap">{animal.velageDate ? format(new Date(animal.velageDate), "dd/MM/yyyy") : "—"}</td>
+                   <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
                     {animal.mereLieeNutrav ? (
                       <button
                         type="button"
@@ -453,6 +456,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                                 title="Ouvrir la fiche du veau"
                               >{calf.nutrav}</button>
                             ) : <span className={`font-mono font-bold ${calf.toWean ? "text-red-700" : "text-gray-700"}`}>{calf.nutrav}</span>}
+                            {calf.birthDate && <span className="whitespace-nowrap text-gray-600">{(() => { const d = intervalToDuration({ start: new Date(calf.birthDate), end: new Date() }); return `${(d.years ?? 0) * 12 + (d.months ?? 0)} mois ${d.days ?? 0} j`; })()}</span>}
                             {calf.toWean && <span className="whitespace-nowrap rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-800">À sevrer</span>}
                           </span>
                         ))}
