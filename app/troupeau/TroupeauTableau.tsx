@@ -219,21 +219,14 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
   }
 
   return (
-    <div className="bg-white rounded-xl shadow overflow-hidden">
-      <div className="hidden items-center justify-end gap-2 border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
-        <span>Trier :</span>
-        <span className="rounded-md bg-green-700 px-2 py-1 text-white">
-          <SortHeader
-            label="Dernier vêlage"
-            buildFilterUrl={buildFilterUrl}
-            triAsc="velage_asc"
-            triDesc="velage_desc"
-            currentTri={currentTri}
-          />
-        </span>
+    <div className="troupeau-print-view bg-white rounded-xl shadow overflow-hidden print:overflow-visible print:shadow-none">
+      <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2 print:hidden">
+        <span className="text-xs text-gray-500">{animaux.length} animaux dans la vue</span>
+        <button type="button" onClick={() => window.print()} className="rounded-lg border border-green-700 px-3 py-1.5 text-xs font-semibold text-green-800 hover:bg-green-50">Imprimer la vue</button>
       </div>
+      <div className="hidden print:block print:mb-3"><h1 className="text-lg font-bold">CESAM — Troupeau</h1><p className="text-xs">{animaux.length} animaux · {format(new Date(), "dd/MM/yyyy")}</p></div>
       {(selectedIds.size > 0 || feedback) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-green-100 bg-green-50 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-green-100 bg-green-50 px-4 py-3 print:hidden">
           <div>
             {selectedIds.size > 0 && (
               <p className="text-sm font-bold text-green-900">
@@ -254,11 +247,12 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
           )}
         </div>
       )}
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1080px] text-sm">
+      <style>{`@media print { @page { size: A4 landscape; margin: 9mm; } body * { visibility: hidden !important; } .troupeau-print-view, .troupeau-print-view * { visibility: visible !important; } .troupeau-print-view { position: absolute; left: 0; top: 0; width: 100%; } .troupeau-print-view .print\\:hidden { display: none !important; } .troupeau-print-view tr { break-inside: avoid; } .troupeau-print-view th, .troupeau-print-view td { padding: 4px !important; } }`}</style>
+      <div className="overflow-x-auto print:overflow-visible">
+        <table className="w-full min-w-[1080px] text-sm print:min-w-0 print:text-[9px]">
           <thead>
             <tr className="bg-green-700 text-white text-xs select-none">
-              <th className="w-10 px-2 py-2.5 text-center">
+              <th className="w-10 px-2 py-2.5 text-center print:hidden">
                 <input
                   type="checkbox"
                   checked={allEligibleSelected}
@@ -288,9 +282,9 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Dernier vêlage" buildFilterUrl={buildFilterUrl} triAsc="velage_asc" triDesc="velage_desc" currentTri={currentTri} /></th>
-              <th className="px-3 py-2.5 text-left font-semibold">Parenté</th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Veau / Sevrage" buildFilterUrl={buildFilterUrl} triAsc="veau_asc" triDesc="veau_desc" currentTri={currentTri} /></th>
-              <th className="w-12 px-2 py-2.5 text-center">⋯</th>
+              <th className="w-16 px-2 py-2.5 text-center print:hidden">Actions</th>
+              <th className="px-2 py-2.5 text-left font-semibold print:hidden">Parenté</th>
             </tr>
           </thead>
           <tbody>
@@ -341,7 +335,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                     i % 2 === 1 ? "bg-gray-50/50" : ""
                   }`}
                 >
-                  <td className="px-2 py-2.5 text-center" onClick={(event) => event.stopPropagation()}>
+                  <td className="px-2 py-2.5 text-center print:hidden" onClick={(event) => event.stopPropagation()}>
                     {selectable && (
                       <input
                         type="checkbox"
@@ -417,6 +411,30 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{animal.velageDate ? format(new Date(animal.velageDate), "dd/MM/yyyy") : "—"}</td>
                    <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
+                    {animal.activeCalves.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {animal.activeCalves.map((calf) => (
+                          <span key={calf.nutrav} className="inline-flex items-center gap-1">
+                            {calf.href ? (
+                              <button type="button"
+                                onClick={() => router.push(calf.href!)}
+                                className={`font-mono font-bold underline underline-offset-2 ${calf.toWean ? "text-red-700" : "text-blue-700"}`}
+                                title="Ouvrir la fiche du veau"
+                              >{calf.nutrav}</button>
+                            ) : <span className={`font-mono font-bold ${calf.toWean ? "text-red-700" : "text-gray-700"}`}>{calf.nutrav}</span>}
+                            {calf.birthDate && <span className="whitespace-nowrap text-gray-600">{(() => { const d = intervalToDuration({ start: new Date(calf.birthDate), end: new Date() }); return `${(d.years ?? 0) * 12 + (d.months ?? 0)} mois ${d.days ?? 0} j`; })()}</span>}
+                            {calf.toWean && <span className="whitespace-nowrap rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-800">À sevrer</span>}
+                          </span>
+                        ))}
+                      </div>
+                    ) : displayNonWeaned && motherWeaning.statusLabel ? (
+                      <span className="whitespace-nowrap font-semibold text-blue-700">🍼 {motherWeaning.statusLabel}</span>
+                    ) : null}
+                  </td>
+                  <td className="px-2 py-2.5 print:hidden" onClick={(event) => event.stopPropagation()}>
+                    <AnimalRowActions nutrav={animal.nutrav} />
+                  </td>
+                   <td className="px-2 py-2 text-xs print:hidden" onClick={(event) => event.stopPropagation()}>
                      <details className="relative">
                        <summary className="cursor-pointer whitespace-nowrap font-semibold text-green-700">Parenté ▾</summary>
                        <div className="mt-2 min-w-[200px] rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
@@ -449,30 +467,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                        </div>
                      </details>
                    </td>
-                   <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
-                    {animal.activeCalves.length > 0 ? (
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        {animal.activeCalves.map((calf) => (
-                          <span key={calf.nutrav} className="inline-flex items-center gap-1">
-                            {calf.href ? (
-                              <button type="button"
-                                onClick={() => router.push(calf.href!)}
-                                className={`font-mono font-bold underline underline-offset-2 ${calf.toWean ? "text-red-700" : "text-blue-700"}`}
-                                title="Ouvrir la fiche du veau"
-                              >{calf.nutrav}</button>
-                            ) : <span className={`font-mono font-bold ${calf.toWean ? "text-red-700" : "text-gray-700"}`}>{calf.nutrav}</span>}
-                            {calf.birthDate && <span className="whitespace-nowrap text-gray-600">{(() => { const d = intervalToDuration({ start: new Date(calf.birthDate), end: new Date() }); return `${(d.years ?? 0) * 12 + (d.months ?? 0)} mois ${d.days ?? 0} j`; })()}</span>}
-                            {calf.toWean && <span className="whitespace-nowrap rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-800">À sevrer</span>}
-                          </span>
-                        ))}
-                      </div>
-                    ) : displayNonWeaned && motherWeaning.statusLabel ? (
-                      <span className="whitespace-nowrap font-semibold text-blue-700">🍼 {motherWeaning.statusLabel}</span>
-                    ) : null}
-                  </td>
-                  <td className="px-2 py-2.5" onClick={(event) => event.stopPropagation()}>
-                    <AnimalRowActions nutrav={animal.nutrav} />
-                  </td>
+
                 </tr>
               );
             })}
