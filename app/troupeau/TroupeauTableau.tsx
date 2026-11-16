@@ -419,7 +419,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                    <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
                      <details className="relative">
                        <summary className="cursor-pointer whitespace-nowrap font-semibold text-green-700">Parenté ▾</summary>
-                       <div className="absolute z-20 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+                       <div className="absolute right-0 z-20 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
                          <div className="text-gray-500 mb-1">Mère</div>
                     {animal.mereLieeNutrav ? (
                       <button
