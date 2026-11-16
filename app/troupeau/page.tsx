@@ -316,6 +316,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       saillieDate: currentBreeding?.date.toISOString() ?? null,
       gestationEtat: currentBreeding?.gestation?.etat ?? null,
       gestationVelagePrevue: currentBreeding && currentBreeding.gestation?.etat !== "ROUGE" && animal.reproductionEtatManuel !== "ROUGE" ? (currentBreeding.gestation?.dateVelagePrevue ?? addDays(currentBreeding.date, 283)).toISOString() : null,
+      gestationDateEstimee: Boolean(currentBreeding && !currentBreeding.gestation?.dateVelagePrevue),
       velageDate: dernierVelage?.date.toISOString() ?? null,
       dernierVeauMortNe: Boolean(dernierVelage?.veauxDetails?.some((detail) => detail.statut === "MORT_NE")),
       dernierVeauMort: Boolean(dernierVelage && (dernierVelage.veau?.sortie?.type === "MORT" || dernierVelage.veau?.statut === "MORT" || dernierVelage.veauxDetails.some((detail) => detail.statut === "MORT" || detail.animal?.sortie?.type === "MORT" || detail.animal?.statut === "MORT"))),
