@@ -193,7 +193,7 @@ async function getAnimaux(params: TroupeauFilterParams) {
       const calving = a.velagesVache[0];
       const numbers = [
         ...(calving?.veau?.statut === "ACTIF" && !calving.veau.sevreFait ? [calving.veau.nutrav] : []),
-        ...(calving?.veauxDetails ?? []).filter(d => d.statut !== "MORT_NE" && (!d.animal || (d.animal.statut === "ACTIF" && !d.animal.sevreFait))).map(d => d.animal?.nutrav ?? d.nutrav).filter((n): n is string => Boolean(n)),
+        ...(calving?.veauxDetails ?? []).filter(d => !["MORT_NE", "MORT"].includes(d.statut) && (!d.animal || (d.animal.statut === "ACTIF" && d.animal.sortie?.type !== "MORT" && !d.animal.sevreFait))).map(d => d.animal?.nutrav ?? d.nutrav).filter((n): n is string => Boolean(n)),
       ];
       return numbers.sort((a, b) => a.localeCompare(b, "fr", { numeric: true }))[0] ?? null;
     };
@@ -271,7 +271,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     const isDueForWeaning = (birthDate: Date | null | undefined) =>
       birthDate ? classifyWeaningWindow(birthDate, weaningThresholdMonths, today).window === "NOW" : false;
 
-    if (!animal.tarieFaite && dernierVelage?.veau?.statut === "ACTIF" && !dernierVelage.veau.sevreFait) {
+    if (!animal.tarieFaite && dernierVelage?.veau?.statut === "ACTIF" && dernierVelage.veau.sortie?.type !== "MORT" && !dernierVelage.veau.sevreFait) {
       activeCalves.set(dernierVelage.veau.nutrav, {
         nutrav: dernierVelage.veau.nutrav,
         href: `/troupeau/${dernierVelage.veau.nutrav}`,
@@ -282,8 +282,8 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
     if (!animal.tarieFaite) {
       for (const detail of dernierVelage?.veauxDetails ?? []) {
         const nutrav = detail.animal?.nutrav ?? detail.nutrav;
-        const actif = detail.statut !== "MORT_NE"
-          && (!detail.animal || (detail.animal.statut === "ACTIF" && !detail.animal.sevreFait));
+        const actif = !["MORT_NE", "MORT"].includes(detail.statut)
+          && (!detail.animal || (detail.animal.statut === "ACTIF" && detail.animal.sortie?.type !== "MORT" && !detail.animal.sevreFait));
         if (nutrav && actif) {
           activeCalves.set(nutrav, {
             nutrav,
