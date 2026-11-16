@@ -11,7 +11,7 @@ import {
   formatAgeCompact,
   type EtatGestation,
 } from "@/lib/utils";
-import ReproductionListBadge from "@/app/components/ReproductionListBadge";
+import { getBadgeClass } from "@/lib/utils";
 import AncestryEditor from "./[nutrav]/arbre/AncestryEditor";
 import AnimalRowActions from "./AnimalRowActions";
 import { getMotherWeaningDisplay } from "@/lib/troupeau-mother-weaning";
@@ -390,11 +390,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                     {etat ? (
                       <div className="flex min-w-[160px] flex-col gap-1">
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
-                          <ReproductionListBadge
-                            etat={etat}
-                            fallbackLabel={ETAT_LABEL[etat] ?? etat}
-                            gestationDays={null}
-                          />
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${etat === "VERT" ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : getBadgeClass(etat)}`}>{ETAT_LABEL[etat] ?? etat}</span>
                           {animal.aEchographier && etat !== "JAUNE" && (
                             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">À écho</span>
                           )}
