@@ -405,7 +405,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                             </span>
                           )}
                         </div>
-                        {animal.gestationVelagePrevue && etat !== "ROUGE" && etat !== "REPOS" && <div className="mt-1 font-semibold text-green-700">{format(new Date(animal.gestationVelagePrevue), "dd/MM/yyyy")}</div>}
+                        {animal.gestationVelagePrevue && etat !== "ROUGE" && etat !== "REPOS" && <div className={`mt-1 font-semibold ${etat === "VERT" || etat === "ROSE" ? "text-green-700" : etat === "JAUNE" || animal.aEchographier ? "text-amber-700" : "text-gray-500"}`}>{format(new Date(animal.gestationVelagePrevue), "dd/MM/yyyy")}</div>}
                         <details className="mt-1 text-xs" onClick={(event) => event.stopPropagation()}>
                           <summary className="cursor-pointer select-none text-green-700 hover:underline">Détails repro</summary>
                           <div className="mt-1"><ReproductionCycleSummary summary={animal.reproductionSummary} /></div>
