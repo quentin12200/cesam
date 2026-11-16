@@ -128,12 +128,12 @@ async function getAnimaux(params: TroupeauFilterParams) {
           take: 1,
           select: {
             date: true,
-            veau: { select: { nutrav: true, danais: true, statut: true, sevreFait: true } },
+            veau: { select: { nutrav: true, danais: true, statut: true, sevreFait: true, sortie: { select: { type: true } } } },
             veauxDetails: {
               select: {
                 statut: true,
                 nutrav: true,
-                animal: { select: { nutrav: true, danais: true, statut: true, sevreFait: true } },
+                animal: { select: { nutrav: true, danais: true, statut: true, sevreFait: true, sortie: { select: { type: true } } } },
               },
             },
           },
@@ -317,6 +317,9 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       gestationEtat: currentBreeding?.gestation?.etat ?? null,
       gestationVelagePrevue: currentBreeding && currentBreeding.gestation?.etat !== "ROUGE" && animal.reproductionEtatManuel !== "ROUGE" ? (currentBreeding.gestation?.dateVelagePrevue ?? addDays(currentBreeding.date, 283)).toISOString() : null,
       velageDate: dernierVelage?.date.toISOString() ?? null,
+      dernierVeauMortNe: Boolean(dernierVelage?.veauxDetails?.some((detail) => detail.statut === "MORT_NE")),
+      dernierVeauMort: Boolean(dernierVelage && (dernierVelage.veau?.sortie?.type === "MORT" || dernierVelage.veau?.statut === "MORT" || dernierVelage.veauxDetails.some((detail) => detail.statut === "MORT" || detail.animal?.sortie?.type === "MORT" || detail.animal?.statut === "MORT"))),
+      gestationTermineeParVelage: Boolean(dernierVelage && !currentBreeding),
       reproductionSummary: {
         lastCalvingDate: reproductionSummary.lastCalving?.toISOString() ?? null,
         daysSinceLastCalving: reproductionSummary.daysSinceLastCalving,
