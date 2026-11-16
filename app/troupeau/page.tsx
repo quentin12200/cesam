@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { subDays } from "date-fns";
+import { subDays, addDays } from "date-fns";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
@@ -224,7 +224,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       animal.saillies,
       dernierVelage?.date ?? null,
     );
-    const activeCalves = new Map<string, { nutrav: string; href: string | null; toWean: boolean }>();
+    const activeCalves = new Map<string, { nutrav: string; href: string | null; toWean: boolean; birthDate: string | null }>();
     const isDueForWeaning = (birthDate: Date | null | undefined) =>
       birthDate ? classifyWeaningWindow(birthDate, weaningThresholdMonths, today).window === "NOW" : false;
 
@@ -233,6 +233,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         nutrav: dernierVelage.veau.nutrav,
         href: `/troupeau/${dernierVelage.veau.nutrav}`,
         toWean: isDueForWeaning(dernierVelage.veau.danais),
+        birthDate: dernierVelage.veau.danais?.toISOString() ?? null,
       });
     }
     if (!animal.tarieFaite) {
@@ -245,6 +246,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             nutrav,
             href: detail.animal ? `/troupeau/${detail.animal.nutrav}` : null,
             toWean: isDueForWeaning(detail.animal?.danais),
+            birthDate: detail.animal?.danais?.toISOString() ?? null,
           });
         }
       }
@@ -270,7 +272,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       groupeNom: animal.groupe?.nom ?? null,
       saillieDate: currentBreeding?.date.toISOString() ?? null,
       gestationEtat: currentBreeding?.gestation?.etat ?? null,
-      gestationVelagePrevue: currentBreeding?.gestation?.dateVelagePrevue?.toISOString() ?? null,
+      gestationVelagePrevue: (currentBreeding?.gestation?.dateVelagePrevue ?? (currentBreeding?.date && currentBreeding.gestation?.etat !== "ROUGE" ? addDays(currentBreeding.date, 283) : null))?.toISOString() ?? null,
       velageDate: dernierVelage?.date.toISOString() ?? null,
       reproductionSummary: {
         lastCalvingDate: reproductionSummary.lastCalving?.toISOString() ?? null,
