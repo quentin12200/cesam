@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { differenceInDays, intervalToDuration, format } from "date-fns";
-import { CalendarDays, Hourglass, Clock3, BedDouble, X, Stethoscope } from "lucide-react";
+import { CalendarDays, Hourglass, Clock3, Pause, X, Stethoscope } from "lucide-react";
 import {
   getCategorie,
   getCategorieLabel,
@@ -56,7 +56,7 @@ interface Props {
   postCalvingRestDays: number;
 }
 
-const REPRO_ICONS = { VERT: CalendarDays, ROSE: Hourglass, JAUNE: Stethoscope, GRIS: Clock3, ROUGE: X, REPOS: BedDouble } as const;
+const REPRO_ICONS = { VERT: CalendarDays, ROSE: Hourglass, JAUNE: Stethoscope, GRIS: Clock3, ROUGE: X, REPOS: Pause } as const;
 
 const ETAT_LABEL: Record<string, string> = {
   VERT: "Gestante",
