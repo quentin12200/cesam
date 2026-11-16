@@ -421,7 +421,6 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                        <summary className="cursor-pointer whitespace-nowrap font-semibold text-green-700">Parenté ▾</summary>
                        <div className="absolute z-20 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
                          <div className="text-gray-500 mb-1">Mère</div>
-                          event.stopPropagation()}>
                     {animal.mereLieeNutrav ? (
                       <button
                         type="button"
@@ -439,7 +438,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                         {animal.mereNutrav}{animal.mereNom ? ` · ${animal.mereNom}` : ""}
                       </button>
                     ) : <AncestryEditor animalNutrav={animal.nutrav} parent="MERE" />}
-                  <div className="mt-2 border-t pt-2"> event.stopPropagation()}>
+                  <div className="mt-2 border-t pt-2"><div className="text-gray-500 mb-1">Père</div>
                     {animal.pereNumero || animal.pereNom ? (
                       <button type="button" onClick={() => router.push(`/troupeau/${animal.nutrav}/arbre`)}
                         className="line-clamp-2 text-left underline decoration-dotted underline-offset-2"
