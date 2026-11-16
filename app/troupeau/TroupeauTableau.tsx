@@ -61,7 +61,7 @@ const REPRO_ICONS = { VERT: CalendarDays, ROSE: Hourglass, JAUNE: Stethoscope, G
 
 const ETAT_LABEL: Record<string, string> = {
   VERT: "Gestante",
-  ROSE: "Terme",
+  ROSE: "Vêlage proche",
   JAUNE: "Écho",
   GRIS: "Attente",
   ROUGE: "Vide",
