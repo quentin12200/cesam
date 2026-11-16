@@ -56,7 +56,7 @@ interface Props {
 }
 
 const ETAT_LABEL: Record<string, string> = {
-  VERT: "Pleine",
+  VERT: "Gestante",
   ROSE: "Terme",
   JAUNE: "Écho",
   GRIS: "Attente",
