@@ -405,7 +405,10 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                             </span>
                           )}
                         </div>
-                        <ReproductionCycleSummary summary={animal.reproductionSummary} />
+                        <details className="mt-1 text-xs" onClick={(event) => event.stopPropagation()}>
+                          <summary className="cursor-pointer select-none text-green-700 hover:underline">Détails repro</summary>
+                          <div className="mt-1"><ReproductionCycleSummary summary={animal.reproductionSummary} /></div>
+                        </details>
                       </div>
                     ) : (
                       <span className="text-gray-200 text-xs">—</span>
