@@ -35,6 +35,8 @@ export interface AnimalRow {
   gestationEtat: string | null;
   gestationVelagePrevue: string | null;
   velageDate: string | null;
+  dernierVeauMortNe: boolean;
+  gestationTermineeParVelage: boolean;
   reproductionSummary: ReproductionSummaryRow;
   mereNutrav: string | null;
   mereNom: string | null;
@@ -300,7 +302,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
 
               const etat: EtatGestation | null =
                 ["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "A_ENGRAISSER"].includes(cat)
-                  ? animal.reproductionEtatManuel ?? getEtatGestation(
+                  ? (animal.gestationTermineeParVelage ? null : animal.reproductionEtatManuel) ?? getEtatGestation(
                       animal.saillieDate ? new Date(animal.saillieDate) : null,
                       animal.gestationEtat ?? null,
                       animal.gestationVelagePrevue
@@ -414,7 +416,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                       <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{animal.velageDate ? format(new Date(animal.velageDate), "dd/MM/yyyy") : "—"}</td>
+                  <td className="px-2 py-2 whitespace-nowrap">{animal.velageDate ? <span>{format(new Date(animal.velageDate), "dd/MM/yyyy")}{animal.dernierVeauMortNe && <span className="ml-1 rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-800">Mort-né</span>}</span> : "—"}</td>
                    <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
                     {animal.activeCalves.length > 0 ? (
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
