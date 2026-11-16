@@ -384,29 +384,34 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-2 py-2 align-middle">
                     {etat ? (
-                      <div>
-                        <div className="flex flex-wrap gap-1">
+                      <div className="flex min-w-[160px] flex-col gap-1">
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
                           <ReproductionListBadge
                             etat={etat}
                             fallbackLabel={ETAT_LABEL[etat] ?? etat}
                             gestationDays={gestationDays}
                           />
                           {animal.aEchographier && etat !== "JAUNE" && (
-                            <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full">
-                              À écho
-                            </span>
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">À écho</span>
                           )}
                         </div>
-                        {animal.gestationVelagePrevue && ["VERT", "ROSE", "GRIS", "JAUNE"].includes(etat ?? "") && <div className={`mt-1 font-semibold ${etat === "VERT" || etat === "ROSE" ? "text-green-700" : etat === "JAUNE" || animal.aEchographier ? "text-amber-700" : "text-gray-500"}`}>{format(new Date(animal.gestationVelagePrevue), "dd/MM/yyyy")} {etat === "VERT" || etat === "ROSE" ? "" : "· estimation"}</div>}
-                        <details className="mt-1 text-xs" onClick={(event) => event.stopPropagation()}>
-                          <summary className="cursor-pointer select-none text-green-700 hover:underline">Détails repro</summary>
+                        {animal.gestationVelagePrevue && ["VERT", "ROSE", "GRIS", "JAUNE"].includes(etat) && (
+                          <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+                            <span className={`font-semibold tabular-nums ${etat === "VERT" || etat === "ROSE" ? "text-green-800" : "text-gray-700"}`}>
+                              {format(new Date(animal.gestationVelagePrevue), "dd/MM/yyyy")}
+                            </span>
+                            {etat !== "VERT" && etat !== "ROSE" && <span className="text-[10px] text-gray-500">estimé</span>}
+                          </div>
+                        )}
+                        <details className="group text-[11px] print:hidden" onClick={(event) => event.stopPropagation()}>
+                          <summary className="w-fit cursor-pointer select-none text-gray-500 hover:text-green-800">▸ Détails</summary>
                           <div className="mt-1"><ReproductionCycleSummary summary={animal.reproductionSummary} /></div>
                         </details>
                       </div>
                     ) : (
-                      <span className="text-gray-200 text-xs">—</span>
+                      <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{animal.velageDate ? format(new Date(animal.velageDate), "dd/MM/yyyy") : "—"}</td>
