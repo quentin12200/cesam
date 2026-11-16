@@ -13,6 +13,7 @@ import TroupeauTabs from "@/components/TroupeauTabs";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import TroupeauFilters from "./TroupeauFilters";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
+import { getCategorie } from "@/lib/utils";
 import { getCurrentReproductionSummary } from "@/lib/current-reproduction-summary";
 import { classifyWeaningWindow } from "@/lib/weaning-dry-off";
 import { workNumberFromHistoricalNational } from "@/lib/animal-genealogy";
@@ -177,14 +178,14 @@ async function getAnimaux(params: TroupeauFilterParams) {
   if (["nom_asc", "nom_desc", "categorie_asc", "categorie_desc", "repro_asc", "repro_desc", "veau_asc", "veau_desc"].includes(filters.tri ?? "")) {
     const reverse = filters.tri?.endsWith("_desc") ? -1 : 1;
     const categoryRank = (a: typeof animaux[number]) => {
-      const category = a.categorie ?? (a.estGenisse ? "GRANDE_GENISSE" : a.sexbov === "F" ? "VACHE" : "AUTRE");
+      const category = getCategorie(a.sexbov, a.danais, a.estGenisse, a.categorie);
       const index = categoryOrder.indexOf(category);
       return index < 0 ? categoryOrder.length : index;
     };
     const dueDate = (a: typeof animaux[number]) => {
       const lastCalving = a.velagesVache[0]?.date ?? null;
       const breeding = getCurrentCycleBreeding(a.saillies, lastCalving);
-      if (!breeding || breeding.gestation?.etat === "ROUGE") return null;
+      if (!breeding || breeding.gestation?.etat === "ROUGE" || a.reproductionEtatManuel === "ROUGE") return null;
       return breeding.gestation?.dateVelagePrevue ?? addDays(breeding.date, 283);
     };
     const calfNumber = (a: typeof animaux[number]) => {
@@ -314,7 +315,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       groupeNom: animal.groupe?.nom ?? null,
       saillieDate: currentBreeding?.date.toISOString() ?? null,
       gestationEtat: currentBreeding?.gestation?.etat ?? null,
-      gestationVelagePrevue: (currentBreeding?.gestation?.dateVelagePrevue ?? (currentBreeding?.date && currentBreeding.gestation?.etat !== "ROUGE" ? addDays(currentBreeding.date, 283) : null))?.toISOString() ?? null,
+      gestationVelagePrevue: currentBreeding && currentBreeding.gestation?.etat !== "ROUGE" && animal.reproductionEtatManuel !== "ROUGE" ? (currentBreeding.gestation?.dateVelagePrevue ?? addDays(currentBreeding.date, 283)).toISOString() : null,
       velageDate: dernierVelage?.date.toISOString() ?? null,
       reproductionSummary: {
         lastCalvingDate: reproductionSummary.lastCalving?.toISOString() ?? null,
