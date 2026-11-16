@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { subDays } from "date-fns";
+import { subDays, addDays } from "date-fns";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
@@ -13,6 +13,7 @@ import TroupeauTabs from "@/components/TroupeauTabs";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import TroupeauFilters from "./TroupeauFilters";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
+import { getCategorie } from "@/lib/utils";
 import { getCurrentReproductionSummary } from "@/lib/current-reproduction-summary";
 import { classifyWeaningWindow } from "@/lib/weaning-dry-off";
 import { workNumberFromHistoricalNational } from "@/lib/animal-genealogy";
@@ -173,6 +174,48 @@ async function getAnimaux(params: TroupeauFilterParams) {
     });
   }
 
+  const categoryOrder = ["VACHE", "GRANDE_GENISSE", "MOYENNE_GENISSE", "PETITE_GENISSE"];
+  if (["nom_asc", "nom_desc", "categorie_asc", "categorie_desc", "repro_asc", "repro_desc", "veau_asc", "veau_desc"].includes(filters.tri ?? "")) {
+    const reverse = filters.tri?.endsWith("_desc") ? -1 : 1;
+    const categoryRank = (a: typeof animaux[number]) => {
+      const category = getCategorie(a.sexbov, a.danais, a.estGenisse, a.categorie);
+      const index = categoryOrder.indexOf(category);
+      return index < 0 ? categoryOrder.length : index;
+    };
+    const dueDate = (a: typeof animaux[number]) => {
+      const lastCalving = a.velagesVache[0]?.date ?? null;
+      const breeding = getCurrentCycleBreeding(a.saillies, lastCalving);
+      if (!breeding || breeding.gestation?.etat === "ROUGE" || a.reproductionEtatManuel === "ROUGE") return null;
+      return breeding.gestation?.dateVelagePrevue ?? addDays(breeding.date, 283);
+    };
+    const calfNumber = (a: typeof animaux[number]) => {
+      if (a.tarieFaite) return null;
+      const calving = a.velagesVache[0];
+      const numbers = [
+        ...(calving?.veau?.statut === "ACTIF" && !calving.veau.sevreFait ? [calving.veau.nutrav] : []),
+        ...(calving?.veauxDetails ?? []).filter(d => d.statut !== "MORT_NE" && (!d.animal || (d.animal.statut === "ACTIF" && !d.animal.sevreFait))).map(d => d.animal?.nutrav ?? d.nutrav).filter((n): n is string => Boolean(n)),
+      ];
+      return numbers.sort((a, b) => a.localeCompare(b, "fr", { numeric: true }))[0] ?? null;
+    };
+    animaux.sort((a, b) => {
+      if (filters.tri?.startsWith("nom_")) return ((a.nobovi ?? "").localeCompare(b.nobovi ?? "", "fr") || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })) * reverse;
+      if (filters.tri?.startsWith("categorie_")) return ((categoryRank(a) - categoryRank(b)) || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })) * reverse;
+      if (filters.tri?.startsWith("repro_")) {
+        const ad = dueDate(a)?.getTime() ?? null, bd = dueDate(b)?.getTime() ?? null;
+        if (ad === null || bd === null) {
+          if (ad !== null) return -1;
+          if (bd !== null) return 1;
+          return (a.velagesVache[0]?.date?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.velagesVache[0]?.date?.getTime() ?? Number.MAX_SAFE_INTEGER);
+        }
+        return (ad - bd) * reverse || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
+      }
+      const ac = calfNumber(a), bc = calfNumber(b);
+      if (ac === null) return bc === null ? 0 : 1;
+      if (bc === null) return -1;
+      return ac.localeCompare(bc, "fr", { numeric: true }) * reverse;
+    });
+  }
+
   return {
     animaux,
     total: animaux.length,
@@ -224,7 +267,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       animal.saillies,
       dernierVelage?.date ?? null,
     );
-    const activeCalves = new Map<string, { nutrav: string; href: string | null; toWean: boolean }>();
+    const activeCalves = new Map<string, { nutrav: string; href: string | null; toWean: boolean; birthDate: string | null }>();
     const isDueForWeaning = (birthDate: Date | null | undefined) =>
       birthDate ? classifyWeaningWindow(birthDate, weaningThresholdMonths, today).window === "NOW" : false;
 
@@ -233,6 +276,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         nutrav: dernierVelage.veau.nutrav,
         href: `/troupeau/${dernierVelage.veau.nutrav}`,
         toWean: isDueForWeaning(dernierVelage.veau.danais),
+        birthDate: dernierVelage.veau.danais?.toISOString() ?? null,
       });
     }
     if (!animal.tarieFaite) {
@@ -245,6 +289,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
             nutrav,
             href: detail.animal ? `/troupeau/${detail.animal.nutrav}` : null,
             toWean: isDueForWeaning(detail.animal?.danais),
+            birthDate: detail.animal?.danais?.toISOString() ?? null,
           });
         }
       }
@@ -270,7 +315,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       groupeNom: animal.groupe?.nom ?? null,
       saillieDate: currentBreeding?.date.toISOString() ?? null,
       gestationEtat: currentBreeding?.gestation?.etat ?? null,
-      gestationVelagePrevue: currentBreeding?.gestation?.dateVelagePrevue?.toISOString() ?? null,
+      gestationVelagePrevue: currentBreeding && currentBreeding.gestation?.etat !== "ROUGE" && animal.reproductionEtatManuel !== "ROUGE" ? (currentBreeding.gestation?.dateVelagePrevue ?? addDays(currentBreeding.date, 283)).toISOString() : null,
       velageDate: dernierVelage?.date.toISOString() ?? null,
       reproductionSummary: {
         lastCalvingDate: reproductionSummary.lastCalving?.toISOString() ?? null,

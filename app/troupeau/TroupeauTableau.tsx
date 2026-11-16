@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { differenceInDays } from "date-fns";
+import { differenceInDays, intervalToDuration, format } from "date-fns";
 import {
   getCategorie,
   getCategorieLabel,
@@ -42,7 +42,7 @@ export interface AnimalRow {
   pereNom: string | null;
   pereNumero: string | null;
   sevreFait: boolean;
-  activeCalves: { nutrav: string; href: string | null; toWean: boolean }[];
+  activeCalves: { nutrav: string; href: string | null; toWean: boolean; birthDate: string | null }[];
   dernierPoids: number | null;
   dernierePeseeDate: string | null;
   enAttente: boolean;
@@ -220,7 +220,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
 
   return (
     <div className="bg-white rounded-xl shadow overflow-hidden">
-      <div className="flex items-center justify-end gap-2 border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
+      <div className="hidden items-center justify-end gap-2 border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
         <span>Trier :</span>
         <span className="rounded-md bg-green-700 px-2 py-1 text-white">
           <SortHeader
@@ -274,7 +274,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   currentTri={currentTri}
                 />
               </th>
-              <th className="px-3 py-2.5 text-left font-semibold">Nom</th>
+              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Nom" buildFilterUrl={buildFilterUrl} triAsc="nom_asc" triDesc="nom_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold">
                 <SortHeader
                   label="Âge"
@@ -285,11 +285,11 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                 />
               </th>
               <th className="px-3 py-2.5 text-left font-semibold">Dernier poids</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Catégorie</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Repro</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Mère</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Père</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Sevrage</th>
+              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} /></th>
+              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} /></th>
+              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Dernier vêlage" buildFilterUrl={buildFilterUrl} triAsc="velage_asc" triDesc="velage_desc" currentTri={currentTri} /></th>
+              <th className="px-3 py-2.5 text-left font-semibold">Parenté</th>
+              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Veau / Sevrage" buildFilterUrl={buildFilterUrl} triAsc="veau_asc" triDesc="veau_desc" currentTri={currentTri} /></th>
               <th className="w-12 px-2 py-2.5 text-center">⋯</th>
             </tr>
           </thead>
@@ -405,13 +405,22 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                             </span>
                           )}
                         </div>
-                        <ReproductionCycleSummary summary={animal.reproductionSummary} />
+                        {animal.gestationVelagePrevue && ["VERT", "ROSE", "GRIS", "JAUNE"].includes(etat ?? "") && <div className={`mt-1 font-semibold ${etat === "VERT" || etat === "ROSE" ? "text-green-700" : etat === "JAUNE" || animal.aEchographier ? "text-amber-700" : "text-gray-500"}`}>{format(new Date(animal.gestationVelagePrevue), "dd/MM/yyyy")} {etat === "VERT" || etat === "ROSE" ? "" : "· estimation"}</div>}
+                        <details className="mt-1 text-xs" onClick={(event) => event.stopPropagation()}>
+                          <summary className="cursor-pointer select-none text-green-700 hover:underline">Détails repro</summary>
+                          <div className="mt-1"><ReproductionCycleSummary summary={animal.reproductionSummary} /></div>
+                        </details>
                       </div>
                     ) : (
                       <span className="text-gray-200 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
+                  <td className="px-3 py-2.5 whitespace-nowrap">{animal.velageDate ? format(new Date(animal.velageDate), "dd/MM/yyyy") : "—"}</td>
+                   <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
+                     <details className="relative">
+                       <summary className="cursor-pointer whitespace-nowrap font-semibold text-green-700">Parenté ▾</summary>
+                       <div className="mt-2 min-w-[200px] rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
+                         <div className="text-gray-500 mb-1">Mère</div>
                     {animal.mereLieeNutrav ? (
                       <button
                         type="button"
@@ -429,16 +438,18 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                         {animal.mereNutrav}{animal.mereNom ? ` · ${animal.mereNom}` : ""}
                       </button>
                     ) : <AncestryEditor animalNutrav={animal.nutrav} parent="MERE" />}
-                  </td>
-                  <td className="max-w-[9rem] px-3 py-2.5 text-xs font-semibold text-gray-700" onClick={(event) => event.stopPropagation()}>
+                  <div className="mt-2 border-t pt-2"><div className="text-gray-500 mb-1">Père</div>
                     {animal.pereNumero || animal.pereNom ? (
                       <button type="button" onClick={() => router.push(`/troupeau/${animal.nutrav}/arbre`)}
                         className="line-clamp-2 text-left underline decoration-dotted underline-offset-2"
                         title="Voir le père dans l'arbre généalogique"
                       >{father}</button>
                     ) : <AncestryEditor animalNutrav={animal.nutrav} parent="PERE" />}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
+                  </div>
+                       </div>
+                     </details>
+                   </td>
+                   <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
                     {animal.activeCalves.length > 0 ? (
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         {animal.activeCalves.map((calf) => (
@@ -450,6 +461,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                                 title="Ouvrir la fiche du veau"
                               >{calf.nutrav}</button>
                             ) : <span className={`font-mono font-bold ${calf.toWean ? "text-red-700" : "text-gray-700"}`}>{calf.nutrav}</span>}
+                            {calf.birthDate && <span className="whitespace-nowrap text-gray-600">{(() => { const d = intervalToDuration({ start: new Date(calf.birthDate), end: new Date() }); return `${(d.years ?? 0) * 12 + (d.months ?? 0)} mois ${d.days ?? 0} j`; })()}</span>}
                             {calf.toWean && <span className="whitespace-nowrap rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-800">À sevrer</span>}
                           </span>
                         ))}
