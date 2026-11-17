@@ -129,7 +129,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [printColumns, setPrintColumns] = useState({ nom: true, age: false, poids: false, categorie: false });
+  const [printColumns, setPrintColumns] = useState({ nom: true, age: true, poids: true, categorie: true });
   const [printOptionsOpen, setPrintOptionsOpen] = useState(false);
 
   // Read current filter state
@@ -256,7 +256,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
           )}
         </div>
       )}
-      <style>{`@media print { @page { size: A4 portrait; margin: 10mm; } .troupeau-print-view { position: static !important; width: 100% !important; overflow: visible !important; } .troupeau-print-view table { width: 100% !important; min-width: 0 !important; table-layout: fixed; font-size: 9px !important; } .troupeau-print-view th, .troupeau-print-view td { padding: 3px !important; overflow-wrap: anywhere; white-space: normal !important; } .troupeau-print-view tr { break-inside: avoid; } .troupeau-print-view thead { display: table-header-group; } .troupeau-print-view .print\\:hidden { display: none !important; } }`}</style>
+      <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } body * { visibility: hidden !important; } .troupeau-print-view, .troupeau-print-view * { visibility: visible !important; } .troupeau-print-view { position: absolute !important; top: 0; left: 0; } .troupeau-print-view { position: static !important; width: 100% !important; overflow: visible !important; } .troupeau-print-view table { width: 100% !important; min-width: 0 !important; table-layout: fixed; font-size: 9px !important; } .troupeau-print-view th, .troupeau-print-view td { padding: 3px !important; overflow-wrap: anywhere; white-space: normal !important; } .troupeau-print-view tr { break-inside: avoid; } .troupeau-print-view thead { display: table-header-group; } .troupeau-print-view .print\\:hidden { display: none !important; } }`}</style>
       <div className="overflow-x-auto print:overflow-visible">
         <table className="w-full min-w-[1080px] text-sm print:min-w-0 print:text-[9px]">
           <thead>
