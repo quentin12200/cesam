@@ -268,7 +268,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
         .troupeau-print-view tr { display: table-row !important; break-inside: avoid-page; page-break-inside: avoid; }
         .troupeau-print-view th, .troupeau-print-view td { display: table-cell !important; padding: 2px 3px !important; line-height: 1.15 !important; overflow-wrap: anywhere; white-space: normal !important; vertical-align: middle !important; }
         .troupeau-print-view td div { min-width: 0 !important; gap: 1px !important; }
-        .troupeau-print-view .print\\\\:hidden { display: none !important; }
+        .troupeau-print-view [class~="print:hidden"] { display: none !important; }
         .troupeau-print-view details { display: none !important; }
         .troupeau-print-view h1 { margin: 0 !important; }
       }`}</style>
