@@ -18,5 +18,6 @@ jobs:
       - run: npx prisma generate
       - run: npx tsc --noEmit
       - run: node --test --experimental-strip-types lib/validate-breeding.test.ts lib/grouped-sale.test.ts
+      - run: node --test tests/troupeau-print-filtered-table.test.mjs
       # Full production build is verified by Vercel, which has the configured database.
       # This isolated runner intentionally has no access to production data.
