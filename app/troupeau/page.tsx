@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
 import TroupeauScrollRestorer from "./TroupeauScrollRestorer";
 import TroupeauTableau, { type AnimalRow } from "./TroupeauTableau";
+import TroupeauAutoPrint from "./TroupeauAutoPrint";
 import TroupeauMobileList from "./TroupeauMobileList";
 import MoreMenu from "./MoreMenu";
 import TroupeauTabs from "@/components/TroupeauTabs";
@@ -39,6 +40,7 @@ interface PageProps {
     nouveau?: string;
     filtres?: string;
     vue?: string;
+    print?: string;
   }>;
 }
 
@@ -237,6 +239,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const groupe = params.groupe;
   const tri = params.tri;
   const showForm = params.nouveau === "1";
+  const autoPrint = params.print === "1";
 
   const { animaux, total, groupes, postCalvingRestDays, weaningThresholdMonths } = await getAnimaux({
     sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri,
@@ -352,9 +355,9 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
           <p className="truncate text-xs text-gray-500">Consulter et rechercher tout le troupeau</p>
         </div>
         <MoreMenu
-          printHref={`/troupeau/impression?${new URLSearchParams(
+          printHref={`/troupeau?${new URLSearchParams(
             Object.fromEntries(
-              Object.entries({ sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri })
+              Object.entries({ sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri, print: "1" })
                 .filter(([, v]) => v !== undefined && v !== null) as [string, string][]
             )
           ).toString()}`}
@@ -417,8 +420,10 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         params={{ sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri }}
       />
 
+      {autoPrint && <TroupeauAutoPrint />}
+
       {/* Tableau sur ordinateur */}
-      <div className="hidden md:block">
+      <div className="hidden md:block print:block">
         <Suspense fallback={<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Chargement…</div>}>
           <TroupeauTableau
             postCalvingRestDays={postCalvingRestDays}
