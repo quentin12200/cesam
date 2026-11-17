@@ -7,7 +7,7 @@ const table = readFileSync(new URL("../app/troupeau/TroupeauTableau.tsx", import
 
 test("le menu impression réutilise le même tableau et ses paramètres de filtre et de tri", () => {
   assert.match(page, /printHref=\{\`\/troupeau\?/);
-  assert.match(page, /sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri, print: "1"/);
+  assert.match(page, /sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri, tri2, print: "1"/);
   assert.match(page, /<TroupeauTableau/);
   assert.match(page, /<TroupeauAutoPrint/);
 });

@@ -37,6 +37,7 @@ interface PageProps {
     sevrage?: string;
     groupe?: string;
     tri?: string;
+    tri2?: string;
     nouveau?: string;
     filtres?: string;
     vue?: string;
@@ -44,7 +45,7 @@ interface PageProps {
   }>;
 }
 
-async function getAnimaux(params: TroupeauFilterParams) {
+async function getAnimaux(params: TroupeauFilterParams & { tri2?: string }) {
   await syncAutomaticEchoRequests();
   const now = new Date();
   const filters = normalizeTroupeauFilters(params);
@@ -165,6 +166,7 @@ async function getAnimaux(params: TroupeauFilterParams) {
   ]);
 
   const animaux = filtrerAnimauxParCriteresLocaux(animauxNonFiltres, filters, now);
+  const tri2 = /^(age|sexe|categorie)_(asc|desc)$/.test(params.tri2 ?? "") ? params.tri2 : undefined;
   if (filters.tri === "velage_asc" || filters.tri === "velage_desc") {
     const direction = filters.tri === "velage_asc" ? 1 : -1;
     animaux.sort((left, right) => {
@@ -199,6 +201,15 @@ async function getAnimaux(params: TroupeauFilterParams) {
       ];
       return numbers.sort((a, b) => a.localeCompare(b, "fr", { numeric: true }))[0] ?? null;
     };
+    const secondaryCompare = (a: typeof animaux[number], b: typeof animaux[number]) => {
+      if (!tri2 || !filters.tri?.startsWith("repro_")) return a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
+      const direction = tri2.endsWith("_desc") ? -1 : 1;
+      let difference = 0;
+      if (tri2.startsWith("age_")) difference = b.danais.getTime() - a.danais.getTime();
+      if (tri2.startsWith("sexe_")) difference = a.sexbov.localeCompare(b.sexbov, "fr");
+      if (tri2.startsWith("categorie_")) difference = categoryRank(a) - categoryRank(b);
+      return difference * direction || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
+    };
     animaux.sort((a, b) => {
       if (filters.tri?.startsWith("nom_")) return ((a.nobovi ?? "").localeCompare(b.nobovi ?? "", "fr") || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })) * reverse;
       if (filters.tri?.startsWith("categorie_")) return ((categoryRank(a) - categoryRank(b)) || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })) * reverse;
@@ -207,9 +218,9 @@ async function getAnimaux(params: TroupeauFilterParams) {
         if (ad === null || bd === null) {
           if (ad !== null) return -1;
           if (bd !== null) return 1;
-          return (a.velagesVache[0]?.date?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.velagesVache[0]?.date?.getTime() ?? Number.MAX_SAFE_INTEGER);
+          return secondaryCompare(a, b);
         }
-        return (ad - bd) * reverse || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
+        return (ad - bd) * reverse || secondaryCompare(a, b);
       }
       const ac = calfNumber(a), bc = calfNumber(b);
       if (ac === null) return bc === null ? 0 : 1;
@@ -238,11 +249,12 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const sevrage = params.sevrage;
   const groupe = params.groupe;
   const tri = params.tri;
+  const tri2 = /^(age|sexe|categorie)_(asc|desc)$/.test(params.tri2 ?? "") ? params.tri2 : undefined;
   const showForm = params.nouveau === "1";
   const autoPrint = params.print === "1";
 
   const { animaux, total, groupes, postCalvingRestDays, weaningThresholdMonths } = await getAnimaux({
-    sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri,
+    sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri, tri2,
   });
 
   // Velles à vendre rapidement : categorie = "VELLE", statut ACTIF, âge entre 351 et 365 jours
@@ -357,7 +369,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
         <MoreMenu
           printHref={`/troupeau?${new URLSearchParams(
             Object.fromEntries(
-              Object.entries({ sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri, print: "1" })
+              Object.entries({ sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri, tri2, print: "1" })
                 .filter(([, v]) => v !== undefined && v !== null) as [string, string][]
             )
           ).toString()}`}
