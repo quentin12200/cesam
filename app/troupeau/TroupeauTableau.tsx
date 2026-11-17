@@ -134,6 +134,19 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
 
   // Read current filter state
   const currentTri = searchParams.get("tri") ?? undefined;
+  const currentTri2 = searchParams.get("tri2") ?? undefined;
+  const reproPrimary = currentTri === "repro_asc" || currentTri === "repro_desc";
+  function toggleSecondary(field: "age" | "sexe" | "categorie") {
+    const asc = `${field}_asc`, desc = `${field}_desc`;
+    const next = currentTri2 === asc ? desc : currentTri2 === desc ? undefined : asc;
+    router.push(buildFilterUrl("tri2", next));
+  }
+  function secondaryHeader(field: "age" | "sexe" | "categorie", label: string) {
+    const active = reproPrimary && currentTri2?.startsWith(`${field}_`);
+    return <button type="button" onClick={() => toggleSecondary(field)} className={`inline-flex items-center gap-1 whitespace-nowrap hover:text-green-200 ${active ? "text-yellow-300" : ""}`} title={`Tri secondaire ${label} : croissant, décroissant, puis ordre initial`}>
+      {label}<span className="text-[9px] opacity-80">{active ? (currentTri2?.endsWith("_asc") ? "▲" : "▼") : "↕"}</span>{active && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">2</span>}
+    </button>;
+  }
   const eligibleAnimals = animaux.filter((animal) => {
     const category = getCategorie(
       animal.sexbov,
@@ -294,17 +307,12 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
               </th>
               <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.nom ? "" : "print:hidden"}`}><SortHeader label="Nom" buildFilterUrl={buildFilterUrl} triAsc="nom_asc" triDesc="nom_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold">
-                <SortHeader
-                  label="Âge"
-                  buildFilterUrl={buildFilterUrl}
-                  triAsc="age_asc"
-                  triDesc="age_desc"
-                  currentTri={currentTri}
-                />
+                {reproPrimary ? secondaryHeader("age", "Âge") : <SortHeader label="Âge" buildFilterUrl={buildFilterUrl} triAsc="age_asc" triDesc="age_desc" currentTri={currentTri} />}
               </th>
+               <th className="px-2 py-2.5 text-left font-semibold print:hidden">{secondaryHeader("sexe", "Sexe")}</th>
               <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.poids ? "" : "print:hidden"}`}>Dernier poids</th>
-              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.categorie ? "" : "print:hidden"}`}><SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} /></th>
-              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} /></th>
+              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.categorie ? "" : "print:hidden"}`}>{reproPrimary ? secondaryHeader("categorie", "Catégorie") : <SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} />}</th>
+              <th className="px-3 py-2.5 text-left font-semibold"><span className="inline-flex items-center gap-1"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} />{reproPrimary && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">1</span>}</span></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Dernier vêlage" buildFilterUrl={buildFilterUrl} triAsc="velage_asc" triDesc="velage_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Veau / Sevrage" buildFilterUrl={buildFilterUrl} triAsc="veau_asc" triDesc="veau_desc" currentTri={currentTri} /></th>
               <th className="w-16 px-2 py-2.5 text-center print:hidden">Actions</th>
@@ -383,6 +391,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   <td className={`px-3 py-2.5 text-gray-600 whitespace-nowrap ${printColumns.age ? "" : "print:hidden"}`}>
                     {formatAgeCompact(danais)}
                   </td>
+                  <td className="px-2 py-2.5 text-gray-600 print:hidden">{animal.sexbov === "F" ? "F" : "M"}</td>
                   <td className={`px-3 py-2.5 text-gray-700 whitespace-nowrap ${printColumns.poids ? "" : "print:hidden"}`}>
                     {animal.dernierPoids !== null ? (
                       <div>
