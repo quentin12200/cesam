@@ -14,7 +14,7 @@ import TroupeauTabs from "@/components/TroupeauTabs";
 import { syncAutomaticEchoRequests } from "@/lib/echo-requests";
 import TroupeauFilters from "./TroupeauFilters";
 import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
-import { getCategorie } from "@/lib/utils";
+import { getCategorie, getEtatGestation } from "@/lib/utils";
 import { getCurrentReproductionSummary } from "@/lib/current-reproduction-summary";
 import { classifyWeaningWindow } from "@/lib/weaning-dry-off";
 import { workNumberFromHistoricalNational } from "@/lib/animal-genealogy";
@@ -201,6 +201,27 @@ async function getAnimaux(params: TroupeauFilterParams & { tri2?: string }) {
       ];
       return numbers.sort((a, b) => a.localeCompare(b, "fr", { numeric: true }))[0] ?? null;
     };
+    // Match the reproduction badge shown in the table so resting and empty animals
+    // stay in separate groups before the secondary age/sex/category sort.
+    const reproductionGroup = (a: typeof animaux[number]) => {
+      const category = getCategorie(a.sexbov, a.danais, a.estGenisse, a.categorie);
+      if (!["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "A_ENGRAISSER"].includes(category)) return 3;
+      const lastCalving = a.velagesVache[0]?.date ?? null;
+      const breeding = getCurrentCycleBreeding(a.saillies, lastCalving);
+      const due = dueDate(a);
+      const state = (lastCalving && !breeding ? null : a.reproductionEtatManuel)
+        ?? getEtatGestation(
+          breeding?.date ?? null,
+          breeding?.gestation?.etat ?? null,
+          due,
+          lastCalving,
+          false,
+          reproductionConfig?.reproReposObjectifJours ?? 60,
+        );
+      if (state === "REPOS") return 1;
+      if (state === "ROUGE") return 2;
+      return 3;
+    };
     const secondaryCompare = (a: typeof animaux[number], b: typeof animaux[number]) => {
       if (!tri2 || !filters.tri?.startsWith("repro_")) return a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
       const direction = tri2.endsWith("_desc") ? -1 : 1;
@@ -218,7 +239,8 @@ async function getAnimaux(params: TroupeauFilterParams & { tri2?: string }) {
         if (ad === null || bd === null) {
           if (ad !== null) return -1;
           if (bd !== null) return 1;
-          return secondaryCompare(a, b);
+          const groupDifference = reproductionGroup(a) - reproductionGroup(b);
+          return groupDifference || secondaryCompare(a, b);
         }
         return (ad - bd) * reverse || secondaryCompare(a, b);
       }
