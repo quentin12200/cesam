@@ -241,6 +241,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
     } else {
       params.delete(key);
     }
+    if (key === "tri" && value !== "repro_asc" && value !== "repro_desc") params.delete("tri2");
     params.delete("page");
     params.set("vue", "tableau");
     return `/troupeau?${params.toString()}`;
