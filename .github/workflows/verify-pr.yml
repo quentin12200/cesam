@@ -21,5 +21,6 @@ jobs:
       - run: node --test tests/troupeau-print-filtered-table.test.mjs
       - run: node --test tests/troupeau-print-pagination.test.mjs
       - run: node --test tests/troupeau-double-sort.test.mjs
+      - run: node --test tests/troupeau-print-calf-wrap.test.mjs
       # Full production build is verified by Vercel, which has the configured database.
       # This isolated runner intentionally has no access to production data.
