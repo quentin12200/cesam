@@ -281,6 +281,12 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
         .troupeau-print-view tr { display: table-row !important; break-inside: avoid-page; page-break-inside: avoid; }
         .troupeau-print-view th, .troupeau-print-view td { display: table-cell !important; padding: 2px 3px !important; line-height: 1.15 !important; overflow-wrap: anywhere; white-space: normal !important; vertical-align: middle !important; }
         .troupeau-print-view td div { min-width: 0 !important; gap: 1px !important; }
+        /* Reserve enough space for calf numbers in A4 landscape; allow details to wrap between words, never within a number. */
+        .troupeau-print-view th:nth-child(10), .troupeau-print-view td:nth-child(10) { width: 23% !important; }
+        .troupeau-print-view .calf-list { display: flex !important; flex-wrap: wrap !important; gap: 2px 5px !important; }
+        .troupeau-print-view .calf-item { display: flex !important; flex-wrap: wrap !important; align-items: baseline !important; gap: 1px 4px !important; min-width: 0 !important; }
+        .troupeau-print-view .calf-number { display: inline-block !important; white-space: nowrap !important; overflow-wrap: normal !important; word-break: keep-all !important; }
+        .troupeau-print-view .calf-detail { white-space: nowrap !important; overflow-wrap: normal !important; word-break: keep-all !important; }
         .troupeau-print-view [class~="print:hidden"] { display: none !important; }
         .troupeau-print-view details { display: none !important; }
         .troupeau-print-view h1 { margin: 0 !important; }
@@ -448,18 +454,18 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   <td className="px-2 py-2 whitespace-nowrap">{animal.velageDate ? <span>{format(new Date(animal.velageDate), "dd/MM/yyyy")}{animal.dernierVeauMortNe && <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">Mort-né</span>}{animal.dernierVeauMort && <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">Mort</span>}</span> : "—"}</td>
                    <td className="px-3 py-2.5 text-xs" onClick={(event) => event.stopPropagation()}>
                     {animal.activeCalves.length > 0 ? (
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <div className="calf-list flex flex-wrap items-center gap-x-2 gap-y-1">
                         {animal.activeCalves.map((calf) => (
-                          <span key={calf.nutrav} className="inline-flex items-center gap-1">
+                          <span key={calf.nutrav} className="calf-item inline-flex flex-wrap items-center gap-1">
                             {calf.href ? (
                               <button type="button"
                                 onClick={() => router.push(calf.href!)}
-                                className={`font-mono font-bold underline underline-offset-2 ${calf.toWean ? "text-red-700" : "text-blue-700"}`}
+                                className={`calf-number whitespace-nowrap font-mono font-bold underline underline-offset-2 ${calf.toWean ? "text-red-700" : "text-blue-700"}`}
                                 title="Ouvrir la fiche du veau"
                               >{calf.nutrav}</button>
-                            ) : <span className={`font-mono font-bold ${calf.toWean ? "text-red-700" : "text-gray-700"}`}>{calf.nutrav}</span>}
-                            {calf.birthDate && <span className="whitespace-nowrap text-gray-600">{(() => { const d = intervalToDuration({ start: new Date(calf.birthDate), end: new Date() }); return `${(d.years ?? 0) * 12 + (d.months ?? 0)} mois ${d.days ?? 0} j`; })()}</span>}
-                            {calf.toWean && <span className="whitespace-nowrap rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-800">À sevrer</span>}
+                            ) : <span className={`calf-number whitespace-nowrap font-mono font-bold ${calf.toWean ? "text-red-700" : "text-gray-700"}`}>{calf.nutrav}</span>}
+                            {calf.birthDate && <span className="calf-detail whitespace-nowrap text-gray-600">{(() => { const d = intervalToDuration({ start: new Date(calf.birthDate), end: new Date() }); return `${(d.years ?? 0) * 12 + (d.months ?? 0)} mois ${d.days ?? 0} j`; })()}</span>}
+                            {calf.toWean && <span className="calf-detail whitespace-nowrap rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-800">À sevrer</span>}
                           </span>
                         ))}
                       </div>
