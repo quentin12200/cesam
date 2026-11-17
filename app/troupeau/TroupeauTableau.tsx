@@ -76,12 +76,16 @@ function SortHeader({
   triAsc,
   triDesc,
   currentTri,
+  onReset,
+  primaryRank,
 }: {
   label: string;
   buildFilterUrl: (key: string, value: string | undefined) => string;
   triAsc?: string;
   triDesc?: string;
   currentTri: string | undefined;
+  onReset?: () => void;
+  primaryRank?: boolean;
 }) {
   const router = useRouter();
   const isAsc = currentTri === triAsc;
@@ -94,21 +98,24 @@ function SortHeader({
       router.push(buildFilterUrl("tri", undefined));
       return;
     }
-    if (!currentTri || currentTri === triDesc) {
-      router.push(buildFilterUrl("tri", triAsc));
+    if (isDesc) {
+      if (onReset) onReset();
+      else router.push(buildFilterUrl("tri", undefined));
     } else {
-      router.push(buildFilterUrl("tri", triDesc));
+      router.push(buildFilterUrl("tri", isAsc ? triDesc : triAsc));
     }
   }
 
   return (
     <button
       onClick={handleClick}
+      title={triAsc ? `${label} : croissant → décroissant → annuler le tri` : "Revenir au classement par numéro"}
       className={`flex items-center gap-1 hover:text-green-200 transition-colors whitespace-nowrap ${
         isActive ? "text-yellow-300" : ""
       }`}
     >
       {label}
+      {primaryRank && (isAsc || isDesc) && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">{isAsc ? "1 ↑" : "1 ↓"}</span>}
       {triAsc ? (
         <span className="flex flex-col leading-none text-[8px]">
           <span className={isAsc ? "text-yellow-300" : "opacity-60"}>▲</span>
@@ -136,6 +143,14 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
   const currentTri = searchParams.get("tri") ?? undefined;
   const currentTri2 = searchParams.get("tri2") ?? undefined;
   const reproPrimary = currentTri === "repro_asc" || currentTri === "repro_desc";
+  function resetPrimarySort() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("tri");
+    params.delete("tri2");
+    params.delete("page");
+    params.set("vue", "tableau");
+    router.push(`/troupeau?${params.toString()}`);
+  }
   function toggleSecondary(field: "age" | "sexe" | "categorie") {
     const asc = `${field}_asc`, desc = `${field}_desc`;
     const next = currentTri2 === asc ? desc : currentTri2 === desc ? undefined : asc;
@@ -144,7 +159,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
   function secondaryHeader(field: "age" | "sexe" | "categorie", label: string) {
     const active = reproPrimary && currentTri2?.startsWith(`${field}_`);
     return <button type="button" disabled={!reproPrimary} onClick={() => toggleSecondary(field)} className={`inline-flex items-center gap-1 whitespace-nowrap hover:text-green-200 disabled:opacity-50 ${active ? "text-yellow-300" : ""}`} title={`Tri secondaire ${label} : croissant, décroissant, puis ordre initial`}>
-      {label}<span className="text-[9px] opacity-80">{active ? (currentTri2?.endsWith("_asc") ? "▲" : "▼") : "↕"}</span>{active && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">2</span>}
+      {label}<span className="text-[9px] opacity-80">{active ? (currentTri2?.endsWith("_asc") ? "▲" : "▼") : "↕"}</span>{active && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">2 {currentTri2?.endsWith("_asc") ? "↑" : "↓"}</span>}
     </button>;
   }
   const eligibleAnimals = animaux.filter((animal) => {
@@ -318,7 +333,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                <th className="px-2 py-2.5 text-left font-semibold print:hidden">{secondaryHeader("sexe", "Sexe")}</th>
               <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.poids ? "" : "print:hidden"}`}>Dernier poids</th>
               <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.categorie ? "" : "print:hidden"}`}>{reproPrimary ? secondaryHeader("categorie", "Catégorie") : <SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} />}</th>
-              <th className="px-3 py-2.5 text-left font-semibold"><span className="inline-flex items-center gap-1"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} />{reproPrimary && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">1</span>}</span></th>
+              <th className="px-3 py-2.5 text-left font-semibold"><span className="inline-flex items-center gap-1"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} primaryRank onReset={resetPrimarySort} /></span></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Dernier vêlage" buildFilterUrl={buildFilterUrl} triAsc="velage_asc" triDesc="velage_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Veau / Sevrage" buildFilterUrl={buildFilterUrl} triAsc="veau_asc" triDesc="veau_desc" currentTri={currentTri} /></th>
               <th className="w-16 px-2 py-2.5 text-center print:hidden">Actions</th>
