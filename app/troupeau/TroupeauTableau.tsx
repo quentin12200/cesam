@@ -256,7 +256,22 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
           )}
         </div>
       )}
-      <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } body * { visibility: hidden !important; } .troupeau-print-view, .troupeau-print-view * { visibility: visible !important; } .troupeau-print-view { position: absolute !important; top: 0; left: 0; } .troupeau-print-view { width: 100% !important; overflow: visible !important; } .troupeau-print-view table { width: 100% !important; min-width: 0 !important; table-layout: fixed; font-size: 9px !important; } .troupeau-print-view th, .troupeau-print-view td { padding: 3px !important; overflow-wrap: anywhere; white-space: normal !important; } .troupeau-print-view tr { break-inside: avoid; } .troupeau-print-view thead { display: table-header-group; } .troupeau-print-view .print\\:hidden { display: none !important; } }`}</style>
+      <style>{`@media print {
+        @page { size: A4 landscape; margin: 7mm; }
+        body *:not(:has(.troupeau-print-view)):not(.troupeau-print-view):not(.troupeau-print-view *) { display: none !important; }
+        body *:has(.troupeau-print-view) { display: block !important; position: static !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
+        .troupeau-print-view { position: static !important; display: block !important; width: 100% !important; overflow: visible !important; box-shadow: none !important; }
+        .troupeau-print-view .overflow-x-auto { overflow: visible !important; }
+        .troupeau-print-view table { display: table !important; width: 100% !important; min-width: 0 !important; table-layout: fixed; border-collapse: collapse !important; font-size: 8px !important; }
+        .troupeau-print-view thead { display: table-header-group !important; }
+        .troupeau-print-view tbody { display: table-row-group !important; }
+        .troupeau-print-view tr { display: table-row !important; break-inside: avoid-page; page-break-inside: avoid; }
+        .troupeau-print-view th, .troupeau-print-view td { display: table-cell !important; padding: 2px 3px !important; line-height: 1.15 !important; overflow-wrap: anywhere; white-space: normal !important; vertical-align: middle !important; }
+        .troupeau-print-view td div { min-width: 0 !important; gap: 1px !important; }
+        .troupeau-print-view [class~="print:hidden"] { display: none !important; }
+        .troupeau-print-view details { display: none !important; }
+        .troupeau-print-view h1 { margin: 0 !important; }
+      }`}</style>
       <div className="overflow-x-auto print:overflow-visible">
         <table className="w-full min-w-[1080px] text-sm print:min-w-0 print:text-[9px]">
           <thead>
