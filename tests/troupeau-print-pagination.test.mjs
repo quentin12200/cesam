@@ -14,7 +14,7 @@ test("l'impression reste dans le flux paginé et répète les en-têtes", () => 
 });
 
 test("le tableau trié et filtré est conservé et la parenté masquée", () => {
-  assert.match(page, /sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri, print: "1"/);
+  assert.match(page, /sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri, tri2, print: "1"/);
   assert.match(table, /\[class~="print:hidden"\]/);
   assert.match(table, /print:hidden">Parenté/);
   assert.match(table, /print:hidden">Actions/);
