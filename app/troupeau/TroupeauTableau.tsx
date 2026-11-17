@@ -129,6 +129,8 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [printColumns, setPrintColumns] = useState({ nom: true, age: false, poids: false, categorie: false });
+  const [printOptionsOpen, setPrintOptionsOpen] = useState(false);
 
   // Read current filter state
   const currentTri = searchParams.get("tri") ?? undefined;
@@ -228,8 +230,9 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
     <div className="troupeau-print-view bg-white rounded-xl shadow overflow-hidden print:overflow-visible print:shadow-none">
       <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2 print:hidden">
         <span className="text-xs text-gray-500">{animaux.length} animaux dans la vue</span>
-        <button type="button" onClick={() => window.print()} className="rounded-lg border border-green-700 px-3 py-1.5 text-xs font-semibold text-green-800 hover:bg-green-50">Imprimer la vue</button>
+        <div className="flex items-center gap-2"><button type="button" onClick={() => setPrintOptionsOpen((open) => !open)} className="rounded-lg border px-3 py-1.5 text-xs">Colonnes à imprimer</button><button type="button" onClick={() => window.print()} className="rounded-lg border border-green-700 px-3 py-1.5 text-xs font-semibold text-green-800 hover:bg-green-50">Imprimer la vue</button></div>
       </div>
+      {printOptionsOpen && <div className="flex flex-wrap gap-3 border-b p-3 text-xs print:hidden">{([{ key: "nom", label: "Nom" }, { key: "age", label: "Âge de la vache" }, { key: "poids", label: "Dernier poids" }, { key: "categorie", label: "Catégorie" }] as const).map(({ key, label }) => <label key={key} className="flex items-center gap-1"><input type="checkbox" checked={printColumns[key]} onChange={(event) => setPrintColumns((current) => ({ ...current, [key]: event.target.checked }))} />{label}</label>)}</div>}
       <div className="hidden print:block print:mb-3"><h1 className="text-lg font-bold">CESAM — Troupeau</h1><p className="text-xs">{animaux.length} animaux · {format(new Date(), "dd/MM/yyyy")}</p></div>
       {(selectedIds.size > 0 || feedback) && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-green-100 bg-green-50 px-4 py-3 print:hidden">
@@ -253,7 +256,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
           )}
         </div>
       )}
-      <style>{`@media print { @page { size: A4 landscape; margin: 9mm; } body * { visibility: hidden !important; } .troupeau-print-view, .troupeau-print-view * { visibility: visible !important; } .troupeau-print-view { position: absolute; left: 0; top: 0; width: 100%; } .troupeau-print-view .print\\:hidden { display: none !important; } .troupeau-print-view tr { break-inside: avoid; } .troupeau-print-view th, .troupeau-print-view td { padding: 4px !important; } }`}</style>
+      <style>{`@media print { @page { size: A4 portrait; margin: 10mm; } .troupeau-print-view { position: static !important; width: 100% !important; overflow: visible !important; } .troupeau-print-view table { width: 100% !important; min-width: 0 !important; table-layout: fixed; font-size: 9px !important; } .troupeau-print-view th, .troupeau-print-view td { padding: 3px !important; overflow-wrap: anywhere; white-space: normal !important; } .troupeau-print-view tr { break-inside: avoid; } .troupeau-print-view thead { display: table-header-group; } .troupeau-print-view .print\\:hidden { display: none !important; } }`}</style>
       <div className="overflow-x-auto print:overflow-visible">
         <table className="w-full min-w-[1080px] text-sm print:min-w-0 print:text-[9px]">
           <thead>
@@ -274,7 +277,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   currentTri={currentTri}
                 />
               </th>
-              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Nom" buildFilterUrl={buildFilterUrl} triAsc="nom_asc" triDesc="nom_desc" currentTri={currentTri} /></th>
+              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.nom ? "" : "print:hidden"}`}><SortHeader label="Nom" buildFilterUrl={buildFilterUrl} triAsc="nom_asc" triDesc="nom_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold">
                 <SortHeader
                   label="Âge"
@@ -284,8 +287,8 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   currentTri={currentTri}
                 />
               </th>
-              <th className="px-3 py-2.5 text-left font-semibold">Dernier poids</th>
-              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} /></th>
+              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.poids ? "" : "print:hidden"}`}>Dernier poids</th>
+              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.categorie ? "" : "print:hidden"}`}><SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Dernier vêlage" buildFilterUrl={buildFilterUrl} triAsc="velage_asc" triDesc="velage_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Veau / Sevrage" buildFilterUrl={buildFilterUrl} triAsc="veau_asc" triDesc="veau_desc" currentTri={currentTri} /></th>
@@ -357,15 +360,15 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   <td className="px-3 py-2.5 font-mono font-bold text-green-800 whitespace-nowrap">
                     {animal.nutrav}
                   </td>
-                  <td className="px-3 py-2.5 text-gray-800 max-w-[140px] truncate">
+                  <td className={`px-3 py-2.5 text-gray-800 max-w-[140px] truncate ${printColumns.nom ? "" : "print:hidden"}`}>
                     {animal.nobovi ?? (
                       <span className="text-gray-400 italic">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
+                  <td className={`px-3 py-2.5 text-gray-600 whitespace-nowrap ${printColumns.age ? "" : "print:hidden"}`}>
                     {formatAgeCompact(danais)}
                   </td>
-                  <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">
+                  <td className={`px-3 py-2.5 text-gray-700 whitespace-nowrap ${printColumns.poids ? "" : "print:hidden"}`}>
                     {animal.dernierPoids !== null ? (
                       <div>
                         <span className="font-semibold">{animal.dernierPoids} kg</span>
@@ -380,7 +383,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                       </div>
                     ) : <span className="text-gray-200">—</span>}
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
+                  <td className={`px-3 py-2.5 whitespace-nowrap ${printColumns.categorie ? "" : "print:hidden"}`}>
                     <span
                       className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${catColor}`}
                     >
