@@ -270,23 +270,41 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
         </div>
       )}
       <style>{`@media print {
-        @page { size: A4 landscape; margin: 7mm; }
+        @page { size: A4 portrait; margin: 8mm 6mm; }
         body *:not(:has(.troupeau-print-view)):not(.troupeau-print-view):not(.troupeau-print-view *) { display: none !important; }
         body *:has(.troupeau-print-view) { display: block !important; position: static !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
         .troupeau-print-view { position: static !important; display: block !important; width: 100% !important; overflow: visible !important; box-shadow: none !important; }
         .troupeau-print-view .overflow-x-auto { overflow: visible !important; }
-        .troupeau-print-view table { display: table !important; width: 100% !important; min-width: 0 !important; table-layout: fixed; border-collapse: collapse !important; font-size: 8px !important; }
-        .troupeau-print-view thead { display: table-header-group !important; }
+        .troupeau-print-view table { display: table !important; width: 100% !important; min-width: 0 !important; table-layout: fixed; border-collapse: collapse !important; font-size: 9px !important; }
+        .troupeau-print-view thead { display: table-header-group !important; break-inside: avoid !important; }
+        .troupeau-print-view thead tr { display: table-row !important; }
+        .troupeau-print-view thead th { display: table-cell !important; color: #111827 !important; background: #e5e7eb !important; font-weight: 700 !important; font-size: 8.5px !important; border-bottom: 1px solid #6b7280 !important; }
+        .troupeau-print-view thead button { display: none !important; }
+        .troupeau-print-view .print-heading { display: inline !important; }
+        .troupeau-print-view .print-category { display: inline !important; }
+        .troupeau-print-view .screen-category { display: none !important; }
         .troupeau-print-view tbody { display: table-row-group !important; }
         .troupeau-print-view tr { display: table-row !important; break-inside: avoid-page; page-break-inside: avoid; }
-        .troupeau-print-view th, .troupeau-print-view td { display: table-cell !important; padding: 2px 3px !important; line-height: 1.15 !important; overflow-wrap: anywhere; white-space: normal !important; vertical-align: middle !important; }
+        .troupeau-print-view th, .troupeau-print-view td { display: table-cell !important; padding: 3px 2px !important; line-height: 1.2 !important; overflow-wrap: normal !important; white-space: normal !important; vertical-align: middle !important; }
+        .troupeau-print-view th:nth-child(6), .troupeau-print-view td:nth-child(6) { display: none !important; }
+        .troupeau-print-view th:nth-child(2), .troupeau-print-view td:nth-child(2) { width: 11% !important; }
+        .troupeau-print-view th:nth-child(3), .troupeau-print-view td:nth-child(3) { width: 16% !important; }
+        .troupeau-print-view th:nth-child(4), .troupeau-print-view td:nth-child(4) { width: 9% !important; }
+        .troupeau-print-view th:nth-child(7), .troupeau-print-view td:nth-child(7) { width: 14% !important; }
+        .troupeau-print-view th:nth-child(8), .troupeau-print-view td:nth-child(8) { width: 16% !important; }
+        .troupeau-print-view th:nth-child(9), .troupeau-print-view td:nth-child(9) { width: 14% !important; }
+        .troupeau-print-view th:nth-child(10), .troupeau-print-view td:nth-child(10) { width: 20% !important; }
+        .troupeau-print-view td:nth-child(2) { font-size: 11px !important; font-weight: 800 !important; color: #111827 !important; white-space: nowrap !important; }
+        .troupeau-print-view td:nth-child(8), .troupeau-print-view td:nth-child(9) { font-size: 9.5px !important; font-weight: 600 !important; font-variant-numeric: tabular-nums; }
+        .troupeau-print-view td:nth-child(9) { white-space: nowrap !important; }
+        .troupeau-print-view td:nth-child(7) { font-size: 8.5px !important; }
+        .troupeau-print-view .calf-number { font-size: 10px !important; font-weight: 800 !important; }
         .troupeau-print-view td div { min-width: 0 !important; gap: 1px !important; }
-        /* Reserve enough space for calf numbers in A4 landscape; allow details to wrap between words, never within a number. */
-        .troupeau-print-view th:nth-child(10), .troupeau-print-view td:nth-child(10) { width: 23% !important; }
+        /* Portrait: calf number stays intact; optional age and sevrage notes wrap between tokens. */
         .troupeau-print-view .calf-list { display: flex !important; flex-wrap: wrap !important; gap: 2px 5px !important; }
         .troupeau-print-view .calf-item { display: flex !important; flex-wrap: wrap !important; align-items: baseline !important; gap: 1px 4px !important; min-width: 0 !important; }
         .troupeau-print-view .calf-number { display: inline-block !important; white-space: nowrap !important; overflow-wrap: normal !important; word-break: keep-all !important; }
-        .troupeau-print-view .calf-detail { white-space: nowrap !important; overflow-wrap: normal !important; word-break: keep-all !important; }
+        .troupeau-print-view .calf-detail { white-space: nowrap !important; overflow-wrap: normal !important; word-break: keep-all !important; font-size: 8px !important; }
         .troupeau-print-view [class~="print:hidden"] { display: none !important; }
         .troupeau-print-view details { display: none !important; }
         .troupeau-print-view h1 { margin: 0 !important; }
@@ -305,22 +323,22 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                 />
               </th>
               <th className="px-3 py-2.5 text-left font-semibold">
-                <SortHeader
+                <span className="print-heading hidden">N°</span><SortHeader
                   label="N° Travail"
                   buildFilterUrl={buildFilterUrl}
                   currentTri={currentTri}
                 />
               </th>
-              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.nom ? "" : "print:hidden"}`}><SortHeader label="Nom" buildFilterUrl={buildFilterUrl} triAsc="nom_asc" triDesc="nom_desc" currentTri={currentTri} /></th>
+              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.nom ? "" : "print:hidden"}`}><span className="print-heading hidden">Nom</span><SortHeader label="Nom" buildFilterUrl={buildFilterUrl} triAsc="nom_asc" triDesc="nom_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold">
-                {reproPrimary ? secondaryHeader("age", "Âge") : <SortHeader label="Âge" buildFilterUrl={buildFilterUrl} triAsc="age_asc" triDesc="age_desc" currentTri={currentTri} />}
+                <span className="print-heading hidden">Âge</span>{reproPrimary ? secondaryHeader("age", "Âge") : <span className="print-heading hidden">Âge</span><SortHeader label="Âge" buildFilterUrl={buildFilterUrl} triAsc="age_asc" triDesc="age_desc" currentTri={currentTri} />}
               </th>
                <th className="px-2 py-2.5 text-left font-semibold print:hidden">{secondaryHeader("sexe", "Sexe")}</th>
               <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.poids ? "" : "print:hidden"}`}>Dernier poids</th>
-              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.categorie ? "" : "print:hidden"}`}>{reproPrimary ? secondaryHeader("categorie", "Catégorie") : <SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} />}</th>
-              <th className="px-3 py-2.5 text-left font-semibold"><span className="inline-flex items-center gap-1"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} />{reproPrimary && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">1</span>}</span></th>
-              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Dernier vêlage" buildFilterUrl={buildFilterUrl} triAsc="velage_asc" triDesc="velage_desc" currentTri={currentTri} /></th>
-              <th className="px-3 py-2.5 text-left font-semibold"><SortHeader label="Veau / Sevrage" buildFilterUrl={buildFilterUrl} triAsc="veau_asc" triDesc="veau_desc" currentTri={currentTri} /></th>
+              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.categorie ? "" : "print:hidden"}`}><span className="print-heading hidden">Catégorie</span>{reproPrimary ? secondaryHeader("categorie", "Catégorie") : <span className="print-heading hidden">Catégorie</span><SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} />}</th>
+              <th className="px-3 py-2.5 text-left font-semibold"><span className="print-heading hidden">Vêlage prévu</span><span className="inline-flex items-center gap-1"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} />{reproPrimary && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">1</span>}</span></th>
+              <th className="px-3 py-2.5 text-left font-semibold"><span className="print-heading hidden">Dernier vêlage</span><SortHeader label="Dernier vêlage" buildFilterUrl={buildFilterUrl} triAsc="velage_asc" triDesc="velage_desc" currentTri={currentTri} /></th>
+              <th className="px-3 py-2.5 text-left font-semibold"><span className="print-heading hidden">Veau / Sevrage</span><SortHeader label="Veau / Sevrage" buildFilterUrl={buildFilterUrl} triAsc="veau_asc" triDesc="veau_desc" currentTri={currentTri} /></th>
               <th className="w-16 px-2 py-2.5 text-center print:hidden">Actions</th>
               <th className="px-2 py-2.5 text-left font-semibold print:hidden">Parenté</th>
             </tr>
@@ -415,10 +433,11 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   </td>
                   <td className={`px-3 py-2.5 whitespace-nowrap ${printColumns.categorie ? "" : "print:hidden"}`}>
                     <span
-                      className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${catColor}`}
+                      className={`screen-category text-xs font-medium px-1.5 py-0.5 rounded-full ${catColor}`}
                     >
                       {animal.sexbov === "F" ? "♀" : "♂"} {catLabel}
                     </span>
+                    <span className="print-category hidden">{catLabel.replace("Grande génisse", "G. génisse").replace("Moyenne génisse", "M. génisse").replace("Petite génisse", "P. génisse").replace("Présélection génisse", "Présél. génisse").replace("Engraissement", "Engrais.").replace("À engraisser", "À engrais.")}</span>
                     {animal.enAttente && (
                       <span className="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700" title="Délai d'attente en cours">
                         ⏱

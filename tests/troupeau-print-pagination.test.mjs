@@ -9,7 +9,7 @@ test("l'impression reste dans le flux paginé et répète les en-têtes", () => 
   assert.match(table, /\.troupeau-print-view \{ position: static !important/);
   assert.match(table, /thead \{ display: table-header-group !important/);
   assert.match(table, /tbody \{ display: table-row-group !important/);
-  assert.match(table, /padding: 2px 3px !important/);
+  assert.match(table, /padding: 3px 2px !important/);
   assert.match(table, /break-inside: avoid-page/);
 });
 
