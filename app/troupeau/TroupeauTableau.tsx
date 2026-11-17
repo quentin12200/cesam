@@ -143,7 +143,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
   }
   function secondaryHeader(field: "age" | "sexe" | "categorie", label: string) {
     const active = reproPrimary && currentTri2?.startsWith(`${field}_`);
-    return <button type="button" onClick={() => toggleSecondary(field)} className={`inline-flex items-center gap-1 whitespace-nowrap hover:text-green-200 ${active ? "text-yellow-300" : ""}`} title={`Tri secondaire ${label} : croissant, décroissant, puis ordre initial`}>
+    return <button type="button" disabled={!reproPrimary} onClick={() => toggleSecondary(field)} className={`inline-flex items-center gap-1 whitespace-nowrap hover:text-green-200 disabled:opacity-50 ${active ? "text-yellow-300" : ""}`} title={`Tri secondaire ${label} : croissant, décroissant, puis ordre initial`}>
       {label}<span className="text-[9px] opacity-80">{active ? (currentTri2?.endsWith("_asc") ? "▲" : "▼") : "↕"}</span>{active && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">2</span>}
     </button>;
   }
