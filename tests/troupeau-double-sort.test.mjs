@@ -23,7 +23,7 @@ test("secondary sort is three-state and marked directly in headers", () => {
   assert.match(table, /secondaryHeader\("age", "Âge"\)/);
   assert.match(table, /secondaryHeader\("sexe", "Sexe"\)/);
   assert.match(table, /secondaryHeader\("categorie", "Catégorie"\)/);
-  assert.match(table, /"2 ↑" : "↓"/.source ? /"2 ↑" : "2 ↓"/ : /2/);
+  assert.match(table, /"2 ↑" : "2 ↓"/);
   assert.match(table, /"1 ↑" : "1 ↓"/);
   assert.match(table, /params.delete\("tri2"\)/);
   assert.match(table, /if \(isDesc\)/);
