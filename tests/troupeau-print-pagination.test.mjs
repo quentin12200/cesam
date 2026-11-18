@@ -22,10 +22,10 @@ test("le tableau trié et filtré est conservé et la parenté masquée", () => 
 });
 
 test("A4 portrait: sept colonnes utiles et en-têtes imprimés sans boutons de tri", () => {
-  assert.match(table, /@page \\{ size: A4 portrait; margin: 8mm 6mm/);
-  assert.match(table, /thead button \\{ display: none !important/);
-  assert.match(table, /\\.print-heading \\{ display: inline !important/);
-  assert.match(table, /th:nth-child\\(6\\), \\.troupeau-print-view td:nth-child\\(6\\) \\{ display: none !important/);
+  assert.match(table, /@page \{ size: A4 portrait; margin: 8mm 6mm/);
+  assert.match(table, /thead button \{ display: none !important/);
+  assert.match(table, /\.print-heading \{ display: inline !important/);
+  assert.match(table, /th:nth-child\(6\), \.troupeau-print-view td:nth-child\(6\) \{ display: none !important/);
   assert.match(table, /print-category hidden/);
   assert.match(table, /À sevrer/);
 });
