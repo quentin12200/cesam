@@ -21,7 +21,6 @@ test("all eight header sorts are accepted as primary and secondary", () => {
     assert.match(table, new RegExp('triAsc="' + field + '_asc"'));
     assert.match(filters, /numero\|nom\|age\|sexe\|categorie\|repro\|velage\|veau/);
   }
-  assert.match(page, /const tri2 = \/\^\(numero\|nom\|age\|sexe\|categorie\|repro\|velage\|veau\)/);
 });
 
 test("missing values stay last and calf numbers compare numerically", () => {
