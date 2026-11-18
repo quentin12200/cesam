@@ -79,7 +79,7 @@ const ETAT_LABEL: Record<string, string> = {
 // ─── SortHeader ──────────────────────────────────────────────────────────────
 
 function SortHeader({
-  label, buildFilterUrl, triAsc, triDesc, currentTri, onReset, primaryRank,
+  label, buildFilterUrl, triAsc, triDesc, currentTri,
 }: {
   label: string;
   buildFilterUrl: (key: string, value: string | undefined) => string;
