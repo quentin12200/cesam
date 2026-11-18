@@ -11,7 +11,7 @@ test("one comparator applies primary then secondary only on ties", () => {
   assert.match(page, /secondarySort \? compare\(a, b, secondarySort\) : 0/);
   assert.match(page, /animaux\.sort\(\(a, b\) =>/);
   assert.equal((page.match(/animaux\.sort\(/g) ?? []).length, 1);
-  assert.match(page, /secondarySort = params\.tri2/);
+  assert.match(page, /secondarySort = params\.multi === "1" && params\.tri2/);
   assert.match(page, /params\.tri2\.split\("_"\)\[0\] !== primarySort\.split\("_"\)\[0\]/);
 });
 
@@ -37,4 +37,12 @@ test("independent header controls retain print view and reproduction colors", ()
   assert.match(table, /secondary\?\.split\("_"\)\[0\] === value\.split\("_"\)\[0\]/);
   assert.match(page, /groupe, tri, tri2, print: "1"/);
   assert.match(table, /REPRO_COLORS\[etat\]/);
+});
+
+test("multi-sort is opt-in and disabling it clears the second criterion", () => {
+  assert.match(table, /type="checkbox" checked=\{multiSort\}/);
+  assert.match(table, /next\.delete\("multi"\); next\.delete\("tri2"\)/);
+  assert.match(table, /multiSort && triAsc && !sameField/);
+  assert.match(table, /if \(key === "tri" && \(!multiSort/);
+  assert.match(page, /secondarySort = params\.multi === "1" && params\.tri2/);
 });
