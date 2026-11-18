@@ -166,132 +166,53 @@ async function getAnimaux(params: TroupeauFilterParams & { tri2?: string }) {
   ]);
 
   const animaux = filtrerAnimauxParCriteresLocaux(animauxNonFiltres, filters, now);
-  const tri2 = /^(age|sexe|categorie|nom|repro|velage|veau|numero)_(asc|desc)$/.test(params.tri2 ?? "") ? params.tri2 : undefined;
-  if (filters.tri === "velage_asc" || filters.tri === "velage_desc") {
-    const direction = filters.tri === "velage_asc" ? 1 : -1;
-    animaux.sort((left, right) => {
-      const leftDate = left.velagesVache[0]?.date?.getTime() ?? null;
-      const rightDate = right.velagesVache[0]?.date?.getTime() ?? null;
-      if (leftDate === null) return rightDate === null ? 0 : 1;
-      if (rightDate === null) return -1;
-      return (leftDate - rightDate) * direction;
-    });
-  }
-
+  // Un moteur unique : le second critère départage uniquement les ex æquo du premier.
+  const validSort = /^(numero|nom|age|sexe|categorie|repro|velage|veau)_(asc|desc)$/;
+  const primarySort = filters.tri && validSort.test(filters.tri) ? filters.tri : "numero_asc";
+  const secondarySort = params.tri2 && validSort.test(params.tri2) && params.tri2.split("_")[0] !== primarySort.split("_")[0]
+    ? params.tri2 : undefined;
   const categoryOrder = ["VACHE", "GRANDE_GENISSE", "MOYENNE_GENISSE", "PETITE_GENISSE"];
-  if (["nom_asc", "nom_desc", "categorie_asc", "categorie_desc", "repro_asc", "repro_desc", "veau_asc", "veau_desc"].includes(filters.tri ?? "")) {
-    const reverse = filters.tri?.endsWith("_desc") ? -1 : 1;
-    const categoryRank = (a: typeof animaux[number]) => {
-      const category = getCategorie(a.sexbov, a.danais, a.estGenisse, a.categorie);
-      const index = categoryOrder.indexOf(category);
-      return index < 0 ? categoryOrder.length : index;
-    };
-    const dueDate = (a: typeof animaux[number]) => {
-      const lastCalving = a.velagesVache[0]?.date ?? null;
-      const breeding = getCurrentCycleBreeding(a.saillies, lastCalving);
-      if (!breeding || breeding.gestation?.etat === "ROUGE" || a.reproductionEtatManuel === "ROUGE") return null;
-      return breeding.gestation?.dateVelagePrevue ?? addDays(breeding.date, 283);
-    };
-    const calfNumber = (a: typeof animaux[number]) => {
-      if (a.tarieFaite) return null;
-      const calving = a.velagesVache[0];
-      const numbers = [
-        ...(calving?.veau?.statut === "ACTIF" && !calving.veau.sevreFait ? [calving.veau.nutrav] : []),
-        ...(calving?.veauxDetails ?? []).filter(d => !["MORT_NE", "MORT"].includes(d.statut) && (!d.animal || (d.animal.statut === "ACTIF" && d.animal.sortie?.type !== "MORT" && !d.animal.sevreFait))).map(d => d.animal?.nutrav ?? d.nutrav).filter((n): n is string => Boolean(n)),
-      ];
-      return numbers.sort((a, b) => a.localeCompare(b, "fr", { numeric: true }))[0] ?? null;
-    };
-    // Match the reproduction badge shown in the table so resting and empty animals
-    // stay in separate groups before the secondary age/sex/category sort.
-    const reproductionGroup = (a: typeof animaux[number]) => {
-      const category = getCategorie(a.sexbov, a.danais, a.estGenisse, a.categorie);
-      if (!["VACHE", "MOYENNE_GENISSE", "GRANDE_GENISSE", "A_ENGRAISSER"].includes(category)) return 3;
-      const lastCalving = a.velagesVache[0]?.date ?? null;
-      const breeding = getCurrentCycleBreeding(a.saillies, lastCalving);
-      const due = dueDate(a);
-      const state = (lastCalving && !breeding ? null : a.reproductionEtatManuel)
-        ?? getEtatGestation(
-          breeding?.date ?? null,
-          breeding?.gestation?.etat ?? null,
-          due,
-          lastCalving,
-          false,
-          reproductionConfig?.reproReposObjectifJours ?? 60,
-        );
-      if (state === "REPOS") return 1;
-      if (state === "ROUGE") return 2;
-      return 3;
-    };
-    const secondaryCompare = (a: typeof animaux[number], b: typeof animaux[number]) => {
-      if (!tri2 || !filters.tri?.startsWith("repro_")) return a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
-      const direction = tri2.endsWith("_desc") ? -1 : 1;
-      let difference = 0;
-      if (tri2.startsWith("age_")) difference = b.danais.getTime() - a.danais.getTime();
-      if (tri2.startsWith("sexe_")) difference = a.sexbov.localeCompare(b.sexbov, "fr");
-      if (tri2.startsWith("categorie_")) difference = categoryRank(a) - categoryRank(b);
-      return difference * direction || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
-    };
-    animaux.sort((a, b) => {
-      if (filters.tri?.startsWith("nom_")) return ((a.nobovi ?? "").localeCompare(b.nobovi ?? "", "fr") || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })) * reverse;
-      if (filters.tri?.startsWith("categorie_")) return ((categoryRank(a) - categoryRank(b)) || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })) * reverse;
-      if (filters.tri?.startsWith("repro_")) {
-        const ad = dueDate(a)?.getTime() ?? null, bd = dueDate(b)?.getTime() ?? null;
-        if (ad === null || bd === null) {
-          if (ad !== null) return -1;
-          if (bd !== null) return 1;
-          const groupDifference = reproductionGroup(a) - reproductionGroup(b);
-          return groupDifference || secondaryCompare(a, b);
-        }
-        return (ad - bd) * reverse || secondaryCompare(a, b);
-      }
-      const ac = calfNumber(a), bc = calfNumber(b);
-      if (ac === null) return bc === null ? 0 : 1;
-      if (bc === null) return -1;
-      return ac.localeCompare(bc, "fr", { numeric: true }) * reverse;
-    });
-  }
-
-  // Tri libre à deux niveaux : chaque colonne peut être prioritaire ou secondaire.
-  // La date manquante reste en fin de groupe, quel que soit le sens du tri.
-  const selectedSort = filters.tri;
-  const selectedSecond = tri2;
-  if (selectedSort || selectedSecond) {
-    const categoryRank = (a: typeof animaux[number]) => {
-      const order = ["VACHE", "GRANDE_GENISSE", "MOYENNE_GENISSE", "PETITE_GENISSE"];
-      const index = order.indexOf(getCategorie(a.sexbov, a.danais, a.estGenisse, a.categorie));
-      return index < 0 ? order.length : index;
-    };
-    const dueDate = (a: typeof animaux[number]) => {
-      const last = a.velagesVache[0]?.date ?? null;
-      const breeding = getCurrentCycleBreeding(a.saillies, last);
-      if (!breeding || breeding.gestation?.etat === "ROUGE" || a.reproductionEtatManuel === "ROUGE") return null;
-      return (breeding.gestation?.dateVelagePrevue ?? addDays(breeding.date, 283)).getTime();
-    };
-    const compare = (a: typeof animaux[number], b: typeof animaux[number], sort: string) => {
-      const reverse = sort.endsWith("_desc") ? -1 : 1;
-      const field = sort.replace(/_(asc|desc)$/, "");
-      if (field === "numero") return a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true }) * reverse;
-      if (field === "nom") return (a.nobovi ?? "").localeCompare(b.nobovi ?? "", "fr") * reverse;
-      if (field === "sexe") return a.sexbov.localeCompare(b.sexbov, "fr") * reverse;
-      if (field === "categorie") return (categoryRank(a) - categoryRank(b)) * reverse;
-      if (field === "age") return (b.danais.getTime() - a.danais.getTime()) * reverse;
-      if (field === "velage" || field === "repro") {
-        const av = field === "velage" ? a.velagesVache[0]?.date?.getTime() : dueDate(a);
-        const bv = field === "velage" ? b.velagesVache[0]?.date?.getTime() : dueDate(b);
-        if (av == null || bv == null) return av == null ? (bv == null ? 0 : 1) : -1;
-        return (av - bv) * reverse;
-      }
-      return 0;
-    };
-    const supported = /^(numero|nom|age|sexe|categorie|velage|repro)_(asc|desc)$/;
-    if ((selectedSort && supported.test(selectedSort)) || (selectedSecond && supported.test(selectedSecond))) {
-      animaux.sort((a, b) =>
-        (selectedSort && supported.test(selectedSort) ? compare(a, b, selectedSort) : 0)
-        || (selectedSecond && supported.test(selectedSecond) ? compare(a, b, selectedSecond) : 0)
-        || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })
-      );
-    }
-  }
+  const categoryRank = (a: typeof animaux[number]) => {
+    const index = categoryOrder.indexOf(getCategorie(a.sexbov, a.danais, a.estGenisse, a.categorie));
+    return index < 0 ? categoryOrder.length : index;
+  };
+  const dueDate = (a: typeof animaux[number]) => {
+    const last = a.velagesVache[0]?.date ?? null;
+    const breeding = getCurrentCycleBreeding(a.saillies, last);
+    if (!breeding || breeding.gestation?.etat === "ROUGE" || a.reproductionEtatManuel === "ROUGE") return null;
+    return (breeding.gestation?.dateVelagePrevue ?? addDays(breeding.date, 283)).getTime();
+  };
+  const calfNumber = (a: typeof animaux[number]) => {
+    if (a.tarieFaite) return null;
+    const calving = a.velagesVache[0];
+    const numbers = [
+      ...(calving?.veau?.statut === "ACTIF" && !calving.veau.sevreFait && calving.veau.sortie?.type !== "MORT" ? [calving.veau.nutrav] : []),
+      ...(calving?.veauxDetails ?? []).filter(d => !["MORT_NE", "MORT"].includes(d.statut) && (!d.animal || (d.animal.statut === "ACTIF" && d.animal.sortie?.type !== "MORT" && !d.animal.sevreFait))).map(d => d.animal?.nutrav ?? d.nutrav).filter((n): n is string => Boolean(n)),
+    ];
+    return numbers.sort((a, b) => a.localeCompare(b, "fr", { numeric: true }))[0] ?? null;
+  };
+  const compareNullable = <T,>(a: T | null | undefined, b: T | null | undefined, direction: number, comparator: (left: T, right: T) => number) => {
+    if (a == null || b == null) return a == null ? (b == null ? 0 : 1) : -1;
+    return comparator(a, b) * direction;
+  };
+  const compare = (a: typeof animaux[number], b: typeof animaux[number], sort: string) => {
+    const direction = sort.endsWith("_desc") ? -1 : 1;
+    const field = sort.replace(/_(asc|desc)$/, "");
+    if (field === "numero") return a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true }) * direction;
+    if (field === "nom") return compareNullable(a.nobovi, b.nobovi, direction, (x, y) => x.localeCompare(y, "fr"));
+    if (field === "sexe") return a.sexbov.localeCompare(b.sexbov, "fr") * direction;
+    if (field === "categorie") return (categoryRank(a) - categoryRank(b)) * direction;
+    if (field === "age") return (b.danais.getTime() - a.danais.getTime()) * direction;
+    if (field === "velage") return compareNullable(a.velagesVache[0]?.date?.getTime(), b.velagesVache[0]?.date?.getTime(), direction, (x, y) => x - y);
+    if (field === "repro") return compareNullable(dueDate(a), dueDate(b), direction, (x, y) => x - y);
+    if (field === "veau") return compareNullable(calfNumber(a), calfNumber(b), direction, (x, y) => x.localeCompare(y, "fr", { numeric: true }));
+    return 0;
+  };
+  animaux.sort((a, b) =>
+    compare(a, b, primarySort)
+    || (secondarySort ? compare(a, b, secondarySort) : 0)
+    || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })
+  );
 
   return {
     animaux,
@@ -313,7 +234,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const sevrage = params.sevrage;
   const groupe = params.groupe;
   const tri = params.tri;
-  const tri2 = /^(age|sexe|categorie)_(asc|desc)$/.test(params.tri2 ?? "") ? params.tri2 : undefined;
+  const tri2 = /^(numero|nom|age|sexe|categorie|repro|velage|veau)_(asc|desc)$/.test(params.tri2 ?? "") ? params.tri2 : undefined;
   const showForm = params.nouveau === "1";
   const autoPrint = params.print === "1";
 
