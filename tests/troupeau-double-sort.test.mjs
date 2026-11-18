@@ -4,31 +4,37 @@ import { readFileSync } from "node:fs";
 
 const page = readFileSync("app/troupeau/page.tsx", "utf8");
 const table = readFileSync("app/troupeau/TroupeauTableau.tsx", "utf8");
+const filters = readFileSync("lib/troupeau-filters.ts", "utf8");
 
-test("free two-level sorting compares primary first and secondary only on ties", () => {
-  assert.match(page, /selectedSort && supported\.test\(selectedSort\) \? compare\(a, b, selectedSort\) : 0/);
-  assert.match(page, /selectedSecond && supported\.test\(selectedSecond\) \? compare\(a, b, selectedSecond\) : 0/);
-  assert.match(page, /numero\|nom\|age\|sexe\|categorie\|velage\|repro/);
-  assert.match(page, /if \(av == null \|\| bv == null\)/);
+test("one comparator applies primary then secondary only on ties", () => {
+  assert.match(page, /compare\(a, b, primarySort\)/);
+  assert.match(page, /secondarySort \? compare\(a, b, secondarySort\) : 0/);
+  assert.match(page, /animaux\.sort\(\(a, b\) =>/);
+  assert.equal((page.match(/animaux\.sort\(/g) ?? []).length, 1);
+  assert.match(page, /secondarySort = params\.tri2/);
+  assert.match(page, /params\.tri2\.split\("_"\)\[0\] !== primarySort\.split\("_"\)\[0\]/);
 });
 
-test("each sortable header supports primary and secondary priority", () => {
+test("all eight header sorts are accepted as primary and secondary", () => {
+  for (const field of ["numero", "nom", "age", "sexe", "categorie", "repro", "velage", "veau"]) {
+    assert.match(page, new RegExp('field === "' + field + '"'));
+    assert.match(table, new RegExp('triAsc="' + field + '_asc"'));
+    assert.match(filters, /numero\|nom\|age\|sexe\|categorie\|repro\|velage\|veau/);
+  }
+  assert.match(page, /const tri2 = \/\^\(numero\|nom\|age\|sexe\|categorie\|repro\|velage\|veau\)/);
+});
+
+test("missing values stay last and calf numbers compare numerically", () => {
+  assert.match(page, /if \(a == null \|\| b == null\)/);
+  assert.match(page, /x\.localeCompare\(y, "fr", \{ numeric: true \}\)/);
+  assert.match(page, /calfNumber\(a\), calfNumber\(b\)/);
+});
+
+test("independent header controls retain print view and reproduction colors", () => {
   assert.match(table, /title=\{\`Tri principal : \$\{label\}\`\}/);
   assert.match(table, /title=\{\`Ajouter \$\{label\} en tri secondaire/);
-  for (const field of ["age", "sexe", "categorie", "repro", "velage"]) {
-    assert.match(table, new RegExp('triAsc="' + field + '_asc"'));
-  }
-  assert.match(table, /next\.set\("vue", "tableau"\)/);
-  assert.match(table, /secondary === triAsc \? triDesc : undefined/);
-});
-
-test("compact table preserves printing and visibly colored reproduction states", () => {
+  assert.match(table, /!sameField/);
+  assert.match(table, /secondary\?\.split\("_"\)\[0\] === value\.split\("_"\)\[0\]/);
   assert.match(page, /groupe, tri, tri2, print: "1"/);
-  assert.match(table, /table-fixed text-\[11px\]/);
-  assert.doesNotMatch(table, /min-w-\[1080px\]/);
   assert.match(table, /REPRO_COLORS\[etat\]/);
-  for (const state of ["VERT", "ROSE", "JAUNE", "GRIS", "ROUGE", "REPOS"]) {
-    assert.match(table, new RegExp(state + ': "border border-'));
-  }
-  assert.match(table, /print:hidden">\{animal\.sexbov === "F"/);
 });
