@@ -45,7 +45,7 @@ interface PageProps {
   }>;
 }
 
-async function getAnimaux(params: TroupeauFilterParams & { tri2?: string }) {
+async function getAnimaux(params: TroupeauFilterParams & { tri2?: string; multi?: string }) {
   await syncAutomaticEchoRequests();
   const now = new Date();
   const filters = normalizeTroupeauFilters(params);
@@ -169,7 +169,7 @@ async function getAnimaux(params: TroupeauFilterParams & { tri2?: string }) {
   // Un moteur unique : le second critère départage uniquement les ex æquo du premier.
   const validSort = /^(numero|nom|age|sexe|categorie|repro|velage|veau)_(asc|desc)$/;
   const primarySort = filters.tri && validSort.test(filters.tri) ? filters.tri : "numero_asc";
-  const secondarySort = params.tri2 && validSort.test(params.tri2) && params.tri2.split("_")[0] !== primarySort.split("_")[0]
+  const secondarySort = params.multi === "1" && params.tri2 && validSort.test(params.tri2) && params.tri2.split("_")[0] !== primarySort.split("_")[0]
     ? params.tri2 : undefined;
   const categoryOrder = ["VACHE", "GRANDE_GENISSE", "MOYENNE_GENISSE", "PETITE_GENISSE"];
   const categoryRank = (a: typeof animaux[number]) => {
@@ -234,12 +234,12 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
   const sevrage = params.sevrage;
   const groupe = params.groupe;
   const tri = params.tri;
-  const tri2 = /^(numero|nom|age|sexe|categorie|repro|velage|veau)_(asc|desc)$/.test(params.tri2 ?? "") ? params.tri2 : undefined;
+  const tri2 = params.multi === "1" && /^(numero|nom|age|sexe|categorie|repro|velage|veau)_(asc|desc)$/.test(params.tri2 ?? "") ? params.tri2 : undefined;
   const showForm = params.nouveau === "1";
   const autoPrint = params.print === "1";
 
   const { animaux, total, groupes, postCalvingRestDays, weaningThresholdMonths } = await getAnimaux({
-    sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri, tri2,
+    sexe, q, categorie, tarie, repro, sanitaire, sevrage, groupe, tri, tri2, multi: params.multi,
   });
 
   // Velles à vendre rapidement : categorie = "VELLE", statut ACTIF, âge entre 351 et 365 jours
