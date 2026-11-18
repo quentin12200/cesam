@@ -38,6 +38,7 @@ interface PageProps {
     groupe?: string;
     tri?: string;
     tri2?: string;
+    multi?: string;
     nouveau?: string;
     filtres?: string;
     vue?: string;
