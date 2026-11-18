@@ -111,13 +111,13 @@ function SortHeader({
         if (!triAsc) { navigate("tri", "numero_asc"); return; }
         if (isDesc) navigate("tri", "numero_asc");
         else navigate("tri", isAsc ? triDesc : triAsc);
-      }} title={`Tri principal : ${label}`} className={`inline-flex items-center gap-0.5 hover:text-yellow-200 ${primary ? "text-yellow-300" : ""}`}>
-        {label}<span className="text-[9px]">{isDesc ? "▼" : isAsc ? "▲" : "↕"}</span>
+      }} title={`Tri principal : ${label}`} className={`inline-flex min-w-0 items-center gap-1 hover:text-yellow-200 ${primary ? "text-yellow-300" : ""}`}>
+        <span>{label}</span><span className="inline-block w-3 shrink-0 text-center text-[10px] leading-none">{isDesc ? "↓" : isAsc ? "↑" : "↕"}</span>
         {primary && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">1</span>}
       </button>
       {multiSort && triAsc && !sameField && <button type="button" title={`Ajouter ${label} en tri secondaire ; recliquer pour inverser`}
         onClick={() => navigate("tri2", isSecondary ? secondary === triAsc ? triDesc : undefined : triAsc)}
-        className={`rounded px-0.5 text-[10px] print:hidden ${isSecondary ? "bg-yellow-300 text-green-900 font-bold" : "text-green-100/70 hover:bg-green-700"}`}>
+        className={`inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded px-1 text-[10px] print:hidden ${isSecondary ? "bg-yellow-300 text-green-900 font-bold" : "text-green-100/70 hover:bg-green-700"}`}>
         {isSecondary ? `2${secondary === triAsc ? "↑" : "↓"}` : "+"}
       </button>}
     </span>
@@ -298,6 +298,21 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
         .troupeau-print-view td:nth-child(8), .troupeau-print-view td:nth-child(9) { font-size: 9.5px !important; font-weight: 600 !important; font-variant-numeric: tabular-nums; }
         .troupeau-print-view td:nth-child(9) { white-space: nowrap !important; }
         .troupeau-print-view td:nth-child(7) { font-size: 8.5px !important; }
+        .troupeau-print-view td:nth-child(8) { width: 22% !important; }
+        .troupeau-print-view th:nth-child(8) { width: 22% !important; }
+        .troupeau-print-view th:nth-child(3), .troupeau-print-view td:nth-child(3) { width: 13% !important; }
+        .troupeau-print-view th:nth-child(7), .troupeau-print-view td:nth-child(7) { width: 12% !important; }
+        .troupeau-print-view th:nth-child(9), .troupeau-print-view td:nth-child(9) { width: 13% !important; }
+        .troupeau-print-view th:nth-child(10), .troupeau-print-view td:nth-child(10) { width: 20% !important; }
+        .troupeau-print-view .print-velage-date { display: block !important; font-size: 13px !important; font-weight: 900 !important; line-height: 1.1 !important; letter-spacing: .1px !important; }
+        .troupeau-print-view .print-velage-date.urgent { color: #b45309 !important; }
+        .troupeau-print-view .print-repro-status { font-size: 8px !important; padding: 0 !important; border: 0 !important; background: transparent !important; }
+        .troupeau-print-view .print-repro-status svg { display: none !important; }
+        .troupeau-print-view .print-repro-layout { gap: 1px !important; }
+        .troupeau-print-view .print-repro-badges { order: 2 !important; }
+        .troupeau-print-view .print-repro-date-row { order: 1 !important; }
+        .troupeau-print-view .print-category { display: inline !important; }
+        .troupeau-print-view .screen-category { display: none !important; }
         .troupeau-print-view .calf-number { font-size: 10px !important; font-weight: 800 !important; }
         .troupeau-print-view td div { min-width: 0 !important; gap: 1px !important; }
         /* Portrait: calf number stays intact; optional age and sevrage notes wrap between tokens. */
@@ -437,7 +452,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                     <span
                       className={`text-[10px] font-medium px-1 py-0.5 rounded ${catColor}`}
                     >
-                      {catLabel.replace("Grande génisse", "G. gén.").replace("Moyenne génisse", "M. gén.").replace("Petite génisse", "P. gén.").replace("Présélection génisse", "Présél.").replace("Engraissement", "Engrais.").replace("À engraisser", "À engrais.")}
+                      <span className="screen-category">{catLabel.replace("Grande génisse", "G. gén.").replace("Moyenne génisse", "M. gén.").replace("Petite génisse", "P. gén.").replace("Présélection génisse", "Présél.").replace("Engraissement", "Engrais.").replace("À engraisser", "À engrais.")}
                     <span className="print-category hidden">{catLabel.replace("Grande génisse", "G. génisse").replace("Moyenne génisse", "M. génisse").replace("Petite génisse", "P. génisse").replace("Présélection génisse", "Présél. génisse").replace("Engraissement", "Engrais.").replace("À engraisser", "À engrais.")}</span>
                     </span>
                     {animal.enAttente && (
@@ -448,16 +463,16 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   </td>
                   <td className="px-2 py-2 align-middle">
                     {etat ? (
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <div className="flex items-center gap-1.5 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold whitespace-nowrap ${REPRO_COLORS[etat] ?? getBadgeClass(etat)}`}>{ReproIcon && <ReproIcon size={12} strokeWidth={2.25} aria-hidden="true" />}{ETAT_LABEL[etat] ?? etat}</span>
+                      <div className="print-repro-layout flex min-w-0 flex-col gap-1">
+                        <div className="print-repro-badges flex items-center gap-1.5 whitespace-nowrap">
+                          <span className={`print-repro-status inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold whitespace-nowrap ${REPRO_COLORS[etat] ?? getBadgeClass(etat)}`}>{ReproIcon && <ReproIcon size={12} strokeWidth={2.25} aria-hidden="true" />}{ETAT_LABEL[etat] ?? etat}</span>
                           {animal.aEchographier && etat !== "JAUNE" && (
                             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">À écho</span>
                           )}
                         </div>
                         {animal.gestationVelagePrevue && ["VERT", "ROSE", "GRIS", "JAUNE"].includes(etat) && (
-                          <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-                            <span className={`font-semibold tabular-nums ${etat === "VERT" || etat === "ROSE" ? "text-green-800" : "text-gray-700"}`}>
+                          <div className="print-repro-date-row flex items-baseline gap-1.5 whitespace-nowrap">
+                            <span className={`print-velage-date ${etat === "ROSE" ? "urgent" : ""} font-semibold tabular-nums ${etat === "VERT" || etat === "ROSE" ? "text-green-800" : "text-gray-700"}`}>
                               {format(new Date(animal.gestationVelagePrevue), "dd/MM")}
                             </span>
                             {etat !== "VERT" && etat !== "ROSE" && <span className="text-[10px] text-gray-500">estimé</span>}
