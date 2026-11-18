@@ -71,13 +71,7 @@ const ETAT_LABEL: Record<string, string> = {
 // ─── SortHeader ──────────────────────────────────────────────────────────────
 
 function SortHeader({
-  label,
-  buildFilterUrl,
-  triAsc,
-  triDesc,
-  currentTri,
-  onReset,
-  primaryRank,
+  label, buildFilterUrl, triAsc, triDesc, currentTri, onReset, primaryRank,
 }: {
   label: string;
   buildFilterUrl: (key: string, value: string | undefined) => string;
@@ -88,43 +82,36 @@ function SortHeader({
   primaryRank?: boolean;
 }) {
   const router = useRouter();
+  const params = useSearchParams();
+  const secondary = params.get("tri2");
   const isAsc = currentTri === triAsc;
   const isDesc = currentTri === triDesc;
-  const isActive = isAsc || isDesc || (!triAsc && !currentTri);
-
-  function handleClick() {
-    if (!triAsc) {
-      // N° travail sort: reset tri
-      router.push(buildFilterUrl("tri", undefined));
-      return;
-    }
-    if (isDesc) {
-      if (onReset) onReset();
-      else router.push(buildFilterUrl("tri", undefined));
-    } else {
-      router.push(buildFilterUrl("tri", isAsc ? triDesc : triAsc));
-    }
+  const isSecondary = secondary === triAsc || secondary === triDesc;
+  const primary = isAsc || isDesc || (!triAsc && !currentTri);
+  function navigate(key: "tri" | "tri2", value?: string) {
+    const next = new URLSearchParams(params.toString());
+    if (value) next.set(key, value); else next.delete(key);
+    if (key === "tri" && value && secondary === value) next.delete("tri2");
+    next.delete("page");
+    next.set("vue", "tableau");
+    router.push(`/troupeau?${next.toString()}`);
   }
-
   return (
-    <button
-      onClick={handleClick}
-      title={triAsc ? `${label} : croissant → décroissant → annuler le tri` : "Revenir au classement par numéro"}
-      className={`flex items-center gap-1 hover:text-green-200 transition-colors whitespace-nowrap ${
-        isActive ? "text-yellow-300" : ""
-      }`}
-    >
-      {label}
-      {primaryRank && (isAsc || isDesc) && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">{isAsc ? "1 ↑" : "1 ↓"}</span>}
-      {triAsc ? (
-        <span className="flex flex-col leading-none text-[8px]">
-          <span className={isAsc ? "text-yellow-300" : "opacity-60"}>▲</span>
-          <span className={isDesc ? "text-yellow-300" : "opacity-60"}>▼</span>
-        </span>
-      ) : (
-        isActive && <span className="text-yellow-300">▲</span>
-      )}
-    </button>
+    <span className="inline-flex items-center gap-0.5 whitespace-nowrap">
+      <button type="button" onClick={() => {
+        if (!triAsc) { navigate("tri", "numero_asc"); return; }
+        if (isDesc) { if (onReset) onReset(); else navigate("tri"); }
+        else navigate("tri", isAsc ? triDesc : triAsc);
+      }} title={`Tri principal : ${label}`} className={`inline-flex items-center gap-0.5 hover:text-yellow-200 ${primary ? "text-yellow-300" : ""}`}>
+        {label}<span className="text-[9px]">{isDesc ? "▼" : isAsc ? "▲" : "↕"}</span>
+        {primary && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">1</span>}
+      </button>
+      {triAsc && <button type="button" title={`Ajouter ${label} en tri secondaire ; recliquer pour inverser`}
+        onClick={() => navigate("tri2", isSecondary ? secondary === triAsc ? triDesc : undefined : triAsc)}
+        className={`rounded px-0.5 text-[10px] print:hidden ${isSecondary ? "bg-yellow-300 text-green-900 font-bold" : "text-green-100/70 hover:bg-green-700"}`}>
+        {isSecondary ? `2${secondary === triAsc ? "↑" : "↓"}` : "+"}
+      </button>}
+    </span>
   );
 }
 
@@ -157,8 +144,8 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
     router.push(buildFilterUrl("tri2", next));
   }
   function secondaryHeader(field: "age" | "sexe" | "categorie", label: string) {
-    const active = reproPrimary && currentTri2?.startsWith(`${field}_`);
-    return <button type="button" disabled={!reproPrimary} onClick={() => toggleSecondary(field)} className={`inline-flex items-center gap-1 whitespace-nowrap hover:text-green-200 disabled:opacity-50 ${active ? "text-yellow-300" : ""}`} title={`Tri secondaire ${label} : croissant, décroissant, puis ordre initial`}>
+    const active = currentTri2?.startsWith(`${field}_`);
+    return <button type="button"  onClick={() => toggleSecondary(field)} className={`inline-flex items-center gap-1 whitespace-nowrap hover:text-green-200 disabled:opacity-50 ${active ? "text-yellow-300" : ""}`} title={`Tri secondaire ${label} : croissant, décroissant, puis ordre initial`}>
       {label}<span className="text-[9px] opacity-80">{active ? (currentTri2?.endsWith("_asc") ? "▲" : "▼") : "↕"}</span>{active && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">2 {currentTri2?.endsWith("_asc") ? "↑" : "↓"}</span>}
     </button>;
   }
@@ -241,7 +228,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
     } else {
       params.delete(key);
     }
-    if (key === "tri" && value !== "repro_asc" && value !== "repro_desc") params.delete("tri2");
+    
     params.delete("page");
     params.set("vue", "tableau");
     return `/troupeau?${params.toString()}`;
@@ -325,11 +312,11 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
         .troupeau-print-view details { display: none !important; }
         .troupeau-print-view h1 { margin: 0 !important; }
       }`}</style>
-      <div className="overflow-x-auto print:overflow-visible">
-        <table className="w-full min-w-[1080px] text-sm print:min-w-0 print:text-[9px]">
+      <div className="w-full overflow-x-auto print:overflow-visible">
+        <table className="w-full table-fixed text-[11px] lg:text-xs print:min-w-0 print:text-[9px]">
           <thead>
             <tr className="bg-green-700 text-white text-xs select-none">
-              <th className="w-10 px-2 py-2.5 text-center print:hidden">
+              <th className="w-10 px-1 py-1.5 text-center print:hidden">
                 <input
                   type="checkbox"
                   checked={allEligibleSelected}
@@ -338,7 +325,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   className="h-4 w-4 rounded border-green-200 accent-amber-400"
                 />
               </th>
-              <th className="px-3 py-2.5 text-left font-semibold">
+              <th className="px-1.5 py-1.5 text-left font-semibold">
                 <span className="print-heading hidden">N°</span><SortHeader
                   label="N° Travail"
                   buildFilterUrl={buildFilterUrl}
@@ -347,11 +334,11 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
               </th>
               <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.nom ? "" : "print:hidden"}`}><span className="print-heading hidden">Nom</span><SortHeader label="Nom" buildFilterUrl={buildFilterUrl} triAsc="nom_asc" triDesc="nom_desc" currentTri={currentTri} /></th>
               <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.age ? "" : "print:hidden"}`}>
-                <span className="print-heading hidden">Âge</span>{reproPrimary ? secondaryHeader("age", "Âge") : <SortHeader label="Âge" buildFilterUrl={buildFilterUrl} triAsc="age_asc" triDesc="age_desc" currentTri={currentTri} />}
+                <span className="print-heading hidden">Âge</span><SortHeader label="Âge" buildFilterUrl={buildFilterUrl} triAsc="age_asc" triDesc="age_desc" currentTri={currentTri} />
               </th>
-               <th className="px-2 py-2.5 text-left font-semibold print:hidden">{secondaryHeader("sexe", "Sexe")}</th>
+               <th className="px-2 py-2.5 text-left font-semibold print:hidden"><SortHeader label="Sexe" buildFilterUrl={buildFilterUrl} triAsc="sexe_asc" triDesc="sexe_desc" currentTri={currentTri} /></th>
               <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.poids ? "" : "print:hidden"}`}>Dernier poids</th>
-              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.categorie ? "" : "print:hidden"}`}><span className="print-heading hidden">Catégorie</span>{reproPrimary ? secondaryHeader("categorie", "Catégorie") : <SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} />}</th>
+              <th className={`px-3 py-2.5 text-left font-semibold ${printColumns.categorie ? "" : "print:hidden"}`}><span className="print-heading hidden">Catégorie</span><SortHeader label="Catégorie" buildFilterUrl={buildFilterUrl} triAsc="categorie_asc" triDesc="categorie_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><span className="print-heading hidden">Vêlage prévu</span><span className="inline-flex items-center gap-1"><SortHeader label="Vêlage prévu" buildFilterUrl={buildFilterUrl} triAsc="repro_asc" triDesc="repro_desc" currentTri={currentTri} primaryRank onReset={resetPrimarySort} /></span></th>
               <th className="px-3 py-2.5 text-left font-semibold"><span className="print-heading hidden">Dernier vêlage</span><SortHeader label="Dernier vêlage" buildFilterUrl={buildFilterUrl} triAsc="velage_asc" triDesc="velage_desc" currentTri={currentTri} /></th>
               <th className="px-3 py-2.5 text-left font-semibold"><span className="print-heading hidden">Veau / Sevrage</span><SortHeader label="Veau / Sevrage" buildFilterUrl={buildFilterUrl} triAsc="veau_asc" triDesc="veau_desc" currentTri={currentTri} /></th>
@@ -420,10 +407,10 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                       />
                     )}
                   </td>
-                  <td className="px-3 py-2.5 font-mono font-bold text-green-800 whitespace-nowrap">
+                  <td className="px-3 py-2.5 font-mono text-sm font-extrabold text-green-800 whitespace-nowrap">
                     {animal.nutrav}
                   </td>
-                  <td className={`px-3 py-2.5 text-gray-800 max-w-[140px] truncate ${printColumns.nom ? "" : "print:hidden"}`}>
+                  <td className={`px-3 py-2.5 text-gray-800 max-w-[75px] truncate ${printColumns.nom ? "" : "print:hidden"}`}>
                     {animal.nobovi ?? (
                       <span className="text-gray-400 italic">—</span>
                     )}
@@ -449,9 +436,9 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   </td>
                   <td className={`px-3 py-2.5 whitespace-nowrap ${printColumns.categorie ? "" : "print:hidden"}`}>
                     <span
-                      className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${catColor}`}
+                      className={`text-[10px] font-medium px-1 py-0.5 rounded ${catColor}`}
                     >
-                      {animal.sexbov === "F" ? "♀" : "♂"} {catLabel}
+                      {catLabel.replace("Grande génisse", "G. gén.").replace("Moyenne génisse", "M. gén.").replace("Petite génisse", "P. gén.").replace("Présélection génisse", "Présél.").replace("Engraissement", "Engrais.").replace("À engraisser", "À engrais.")}
                     <span className="print-category hidden">{catLabel.replace("Grande génisse", "G. génisse").replace("Moyenne génisse", "M. génisse").replace("Petite génisse", "P. génisse").replace("Présélection génisse", "Présél. génisse").replace("Engraissement", "Engrais.").replace("À engraisser", "À engrais.")}</span>
                     </span>
                     {animal.enAttente && (
@@ -462,7 +449,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                   </td>
                   <td className="px-2 py-2 align-middle">
                     {etat ? (
-                      <div className="flex min-w-[160px] flex-col gap-1">
+                      <div className="flex min-w-0 flex-col gap-1">
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${etat === "VERT" ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : getBadgeClass(etat)}`}>{ReproIcon && <ReproIcon size={12} strokeWidth={2.25} aria-hidden="true" />}{ETAT_LABEL[etat] ?? etat}</span>
                           {animal.aEchographier && etat !== "JAUNE" && (
