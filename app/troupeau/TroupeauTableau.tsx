@@ -315,6 +315,8 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
               <th className="px-1.5 py-1.5 text-left font-semibold">
                 <span className="print-heading hidden">N°</span><SortHeader
                   label="N° Travail"
+                  triAsc="numero_asc"
+                  triDesc="numero_desc"
                   buildFilterUrl={buildFilterUrl}
                   currentTri={currentTri}
                 />
