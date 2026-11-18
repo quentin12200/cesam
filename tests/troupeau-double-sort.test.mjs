@@ -5,31 +5,30 @@ import { readFileSync } from "node:fs";
 const page = readFileSync("app/troupeau/page.tsx", "utf8");
 const table = readFileSync("app/troupeau/TroupeauTableau.tsx", "utf8");
 
-test("secondary sort only breaks ties within primary calving-date order", () => {
-  assert.match(page, /if \(!tri2 \|\| !filters\.tri\?\.startsWith\("repro_"\)\)/);
-  assert.match(page, /return \(ad - bd\) \* reverse \|\| secondaryCompare\(a, b\)/);
-  assert.match(page, /return groupDifference \|\| secondaryCompare\(a, b\)/);
-  assert.match(page, /const groupDifference = reproductionGroup\(a\) - reproductionGroup\(b\)/);
-  assert.match(page, /if \(state === "REPOS"\) return 1/);
-  assert.match(page, /if \(state === "ROUGE"\) return 2/);
-  assert.match(page, /tri2\.startsWith\("age_"\)/);
-  assert.match(page, /tri2\.startsWith\("sexe_"\)/);
-  assert.match(page, /tri2\.startsWith\("categorie_"\)/);
+test("free two-level sorting compares primary first and secondary only on ties", () => {
+  assert.match(page, /selectedSort && supported\.test\(selectedSort\) \? compare\(a, b, selectedSort\) : 0/);
+  assert.match(page, /selectedSecond && supported\.test\(selectedSecond\) \? compare\(a, b, selectedSecond\) : 0/);
+  assert.match(page, /numero\|nom\|age\|sexe\|categorie\|velage\|repro/);
+  assert.match(page, /if \(av == null \|\| bv == null\)/);
 });
 
-test("secondary sort is three-state and marked directly in headers", () => {
-  assert.match(table, /currentTri2 === asc \? desc : currentTri2 === desc \? undefined : asc/);
-  assert.match(table, /disabled=\{!reproPrimary\}/);
-  assert.match(table, /secondaryHeader\("age", "Âge"\)/);
-  assert.match(table, /secondaryHeader\("sexe", "Sexe"\)/);
-  assert.match(table, /secondaryHeader\("categorie", "Catégorie"\)/);
-  assert.match(table, /2 \{currentTri2\?\.endsWith\("_asc"\) \? "↑" : "↓"\}/);
-  assert.match(table, /"1 ↑" : "1 ↓"/);
-  assert.match(table, /params.delete\("tri2"\)/);
-  assert.match(table, /if \(isDesc\)/);
+test("each sortable header supports primary and secondary priority", () => {
+  assert.match(table, /title=\{\`Tri principal : \$\{label\}\`\}/);
+  assert.match(table, /title=\{\`Ajouter \$\{label\} en tri secondaire/);
+  for (const field of ["age", "sexe", "categorie", "repro", "velage"]) {
+    assert.match(table, new RegExp('triAsc="' + field + '_asc"'));
+  }
+  assert.match(table, /next\.set\("vue", "tableau"\)/);
+  assert.match(table, /secondary === triAsc \? triDesc : undefined/);
 });
 
-test("print URL preserves secondary sort and sex column remains screen-only", () => {
+test("compact table preserves printing and visibly colored reproduction states", () => {
   assert.match(page, /groupe, tri, tri2, print: "1"/);
+  assert.match(table, /table-fixed text-\[11px\]/);
+  assert.doesNotMatch(table, /min-w-\[1080px\]/);
+  assert.match(table, /REPRO_COLORS\[etat\]/);
+  for (const state of ["VERT", "ROSE", "JAUNE", "GRIS", "ROUGE", "REPOS"]) {
+    assert.match(table, new RegExp(state + ': "border border-'));
+  }
   assert.match(table, /print:hidden">\{animal\.sexbov === "F"/);
 });

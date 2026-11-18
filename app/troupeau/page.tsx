@@ -166,7 +166,7 @@ async function getAnimaux(params: TroupeauFilterParams & { tri2?: string }) {
   ]);
 
   const animaux = filtrerAnimauxParCriteresLocaux(animauxNonFiltres, filters, now);
-  const tri2 = /^(age|sexe|categorie)_(asc|desc)$/.test(params.tri2 ?? "") ? params.tri2 : undefined;
+  const tri2 = /^(age|sexe|categorie|nom|repro|velage|veau|numero)_(asc|desc)$/.test(params.tri2 ?? "") ? params.tri2 : undefined;
   if (filters.tri === "velage_asc" || filters.tri === "velage_desc") {
     const direction = filters.tri === "velage_asc" ? 1 : -1;
     animaux.sort((left, right) => {
@@ -249,6 +249,48 @@ async function getAnimaux(params: TroupeauFilterParams & { tri2?: string }) {
       if (bc === null) return -1;
       return ac.localeCompare(bc, "fr", { numeric: true }) * reverse;
     });
+  }
+
+  // Tri libre à deux niveaux : chaque colonne peut être prioritaire ou secondaire.
+  // La date manquante reste en fin de groupe, quel que soit le sens du tri.
+  const selectedSort = filters.tri;
+  const selectedSecond = tri2;
+  if (selectedSort || selectedSecond) {
+    const categoryRank = (a: typeof animaux[number]) => {
+      const order = ["VACHE", "GRANDE_GENISSE", "MOYENNE_GENISSE", "PETITE_GENISSE"];
+      const index = order.indexOf(getCategorie(a.sexbov, a.danais, a.estGenisse, a.categorie));
+      return index < 0 ? order.length : index;
+    };
+    const dueDate = (a: typeof animaux[number]) => {
+      const last = a.velagesVache[0]?.date ?? null;
+      const breeding = getCurrentCycleBreeding(a.saillies, last);
+      if (!breeding || breeding.gestation?.etat === "ROUGE" || a.reproductionEtatManuel === "ROUGE") return null;
+      return (breeding.gestation?.dateVelagePrevue ?? addDays(breeding.date, 283)).getTime();
+    };
+    const compare = (a: typeof animaux[number], b: typeof animaux[number], sort: string) => {
+      const reverse = sort.endsWith("_desc") ? -1 : 1;
+      const field = sort.replace(/_(asc|desc)$/, "");
+      if (field === "numero") return a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true }) * reverse;
+      if (field === "nom") return (a.nobovi ?? "").localeCompare(b.nobovi ?? "", "fr") * reverse;
+      if (field === "sexe") return a.sexbov.localeCompare(b.sexbov, "fr") * reverse;
+      if (field === "categorie") return (categoryRank(a) - categoryRank(b)) * reverse;
+      if (field === "age") return (b.danais.getTime() - a.danais.getTime()) * reverse;
+      if (field === "velage" || field === "repro") {
+        const av = field === "velage" ? a.velagesVache[0]?.date?.getTime() : dueDate(a);
+        const bv = field === "velage" ? b.velagesVache[0]?.date?.getTime() : dueDate(b);
+        if (av == null || bv == null) return av == null ? (bv == null ? 0 : 1) : -1;
+        return (av - bv) * reverse;
+      }
+      return 0;
+    };
+    const supported = /^(numero|nom|age|sexe|categorie|velage|repro)_(asc|desc)$/;
+    if ((selectedSort && supported.test(selectedSort)) || (selectedSecond && supported.test(selectedSecond))) {
+      animaux.sort((a, b) =>
+        (selectedSort && supported.test(selectedSort) ? compare(a, b, selectedSort) : 0)
+        || (selectedSecond && supported.test(selectedSecond) ? compare(a, b, selectedSecond) : 0)
+        || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })
+      );
+    }
   }
 
   return {
