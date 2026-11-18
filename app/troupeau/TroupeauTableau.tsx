@@ -89,7 +89,8 @@ function SortHeader({
 }) {
   const router = useRouter();
   const params = useSearchParams();
-  const secondary = params.get("tri2");
+  const multiSort = params.get("multi") === "1";
+  const secondary = multiSort ? params.get("tri2") : null;
   const isAsc = currentTri === triAsc;
   const isDesc = currentTri === triDesc;
   const isSecondary = secondary === triAsc || secondary === triDesc;
@@ -98,7 +99,7 @@ function SortHeader({
   function navigate(key: "tri" | "tri2", value?: string) {
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value); else next.delete(key);
-    if (key === "tri" && value && secondary?.split("_")[0] === value.split("_")[0]) next.delete("tri2");
+    if (key === "tri" && (!multiSort || (value && secondary?.split("_")[0] === value.split("_")[0]))) next.delete("tri2");
     if (key === "tri2" && value && value.split("_")[0] === (next.get("tri") ?? "numero_asc").split("_")[0]) return;
     next.delete("page");
     next.set("vue", "tableau");
@@ -114,7 +115,7 @@ function SortHeader({
         {label}<span className="text-[9px]">{isDesc ? "▼" : isAsc ? "▲" : "↕"}</span>
         {primary && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">1</span>}
       </button>
-      {triAsc && !sameField && <button type="button" title={`Ajouter ${label} en tri secondaire ; recliquer pour inverser`}
+      {multiSort && triAsc && !sameField && <button type="button" title={`Ajouter ${label} en tri secondaire ; recliquer pour inverser`}
         onClick={() => navigate("tri2", isSecondary ? secondary === triAsc ? triDesc : undefined : triAsc)}
         className={`rounded px-0.5 text-[10px] print:hidden ${isSecondary ? "bg-yellow-300 text-green-900 font-bold" : "text-green-100/70 hover:bg-green-700"}`}>
         {isSecondary ? `2${secondary === triAsc ? "↑" : "↓"}` : "+"}
@@ -136,6 +137,15 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
 
   // Read current filter state
   const currentTri = searchParams.get("tri") ?? undefined;
+  const multiSort = searchParams.get("multi") === "1";
+  function toggleMultiSort(enabled: boolean) {
+    const next = new URLSearchParams(searchParams.toString());
+    if (enabled) next.set("multi", "1");
+    else { next.delete("multi"); next.delete("tri2"); }
+    next.delete("page");
+    next.set("vue", "tableau");
+    router.push(`/troupeau?${next.toString()}`);
+  }
   const eligibleAnimals = animaux.filter((animal) => {
     const category = getCategorie(
       animal.sexbov,
@@ -232,7 +242,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
   return (
     <div className="troupeau-print-view bg-white rounded-xl shadow overflow-hidden print:overflow-visible print:shadow-none">
       <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2 print:hidden">
-        <span className="text-xs text-gray-500">{animaux.length} animaux dans la vue</span>
+        <div className="flex flex-wrap items-center gap-3"><span className="text-xs text-gray-500">{animaux.length} animaux dans la vue</span><label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-green-800"><input type="checkbox" checked={multiSort} onChange={(event) => toggleMultiSort(event.target.checked)} className="accent-green-700" />Multi-tri</label>{multiSort && <span className="text-[11px] text-gray-500">① Cliquer sur un titre · ② Cliquer sur +</span>}</div>
         <div className="flex items-center gap-2"><button type="button" onClick={() => setPrintOptionsOpen((open) => !open)} className="rounded-lg border px-3 py-1.5 text-xs">Colonnes à imprimer</button><button type="button" onClick={() => window.print()} className="rounded-lg border border-green-700 px-3 py-1.5 text-xs font-semibold text-green-800 hover:bg-green-50">Imprimer la vue</button></div>
       </div>
       {printOptionsOpen && <div className="flex flex-wrap gap-3 border-b p-3 text-xs print:hidden">{([{ key: "nom", label: "Nom" }, { key: "age", label: "Âge de la vache" }, { key: "categorie", label: "Catégorie" }] as const).map(({ key, label }) => <label key={key} className="flex items-center gap-1"><input type="checkbox" checked={printColumns[key]} onChange={(event) => setPrintColumns((current) => ({ ...current, [key]: event.target.checked }))} />{label}</label>)}</div>}
