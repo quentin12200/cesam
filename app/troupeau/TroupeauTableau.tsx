@@ -284,6 +284,9 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
         .troupeau-print-view .print-category { display: inline !important; }
         .troupeau-print-view .screen-category { display: none !important; }
         .troupeau-print-view tbody { display: table-row-group !important; }
+        .troupeau-print-view tbody tr { border-bottom: 1px solid #9ca3af !important; }
+        .troupeau-print-view tbody tr:nth-child(even) { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .troupeau-print-view tbody tr:nth-child(5n) { border-bottom: 2px solid #475569 !important; }
         .troupeau-print-view tr { display: table-row !important; break-inside: avoid-page; page-break-inside: avoid; }
         .troupeau-print-view th, .troupeau-print-view td { display: table-cell !important; padding: 3px 2px !important; line-height: 1.2 !important; overflow-wrap: normal !important; white-space: normal !important; vertical-align: middle !important; }
         .troupeau-print-view th:nth-child(6), .troupeau-print-view td:nth-child(6) { display: none !important; }
@@ -406,8 +409,10 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                     sessionStorage.setItem("troupeau:scrollY", String(window.scrollY));
                     router.push(`/troupeau/${animal.nutrav}`);
                   }}
-                  className={`border-t border-gray-100 cursor-pointer hover:bg-green-50 transition-colors ${
-                    i % 2 === 1 ? "bg-gray-50/50" : ""
+                  className={`border-b border-gray-300 cursor-pointer hover:bg-green-50 transition-colors ${
+                    (i + 1) % 5 === 0 ? "border-b-2 border-b-slate-500" : ""
+                  } ${
+                    i % 2 === 1 ? "bg-slate-100/70" : ""
                   }`}
                 >
                   <td className="px-2 py-2.5 text-center print:hidden" onClick={(event) => event.stopPropagation()}>
