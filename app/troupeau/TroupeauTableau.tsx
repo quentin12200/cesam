@@ -452,7 +452,7 @@ export default function TroupeauTableau({ animaux, postCalvingRestDays }: Props)
                     <span
                       className={`text-[10px] font-medium px-1 py-0.5 rounded ${catColor}`}
                     >
-                      <span className="screen-category">{catLabel.replace("Grande génisse", "G. gén.").replace("Moyenne génisse", "M. gén.").replace("Petite génisse", "P. gén.").replace("Présélection génisse", "Présél.").replace("Engraissement", "Engrais.").replace("À engraisser", "À engrais.")}
+                      <span className="screen-category">{catLabel.replace("Grande génisse", "G. gén.").replace("Moyenne génisse", "M. gén.").replace("Petite génisse", "P. gén.").replace("Présélection génisse", "Présél.").replace("Engraissement", "Engrais.").replace("À engraisser", "À engrais.")}</span>
                     <span className="print-category hidden">{catLabel.replace("Grande génisse", "G. génisse").replace("Moyenne génisse", "M. génisse").replace("Petite génisse", "P. génisse").replace("Présélection génisse", "Présél. génisse").replace("Engraissement", "Engrais.").replace("À engraisser", "À engrais.")}</span>
                     </span>
                     {animal.enAttente && (
