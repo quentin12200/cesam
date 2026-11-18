@@ -93,11 +93,13 @@ function SortHeader({
   const isAsc = currentTri === triAsc;
   const isDesc = currentTri === triDesc;
   const isSecondary = secondary === triAsc || secondary === triDesc;
-  const primary = isAsc || isDesc || (!triAsc && !currentTri);
+  const sameField = (currentTri ?? "numero_asc").split("_")[0] === triAsc?.split("_")[0];
+  const primary = isAsc || isDesc || (!currentTri && triAsc === "numero_asc");
   function navigate(key: "tri" | "tri2", value?: string) {
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value); else next.delete(key);
-    if (key === "tri" && value && secondary === value) next.delete("tri2");
+    if (key === "tri" && value && secondary?.split("_")[0] === value.split("_")[0]) next.delete("tri2");
+    if (key === "tri2" && value && value.split("_")[0] === (next.get("tri") ?? "numero_asc").split("_")[0]) return;
     next.delete("page");
     next.set("vue", "tableau");
     router.push(`/troupeau?${next.toString()}`);
@@ -106,13 +108,13 @@ function SortHeader({
     <span className="inline-flex items-center gap-0.5 whitespace-nowrap">
       <button type="button" onClick={() => {
         if (!triAsc) { navigate("tri", "numero_asc"); return; }
-        if (isDesc) navigate("tri");
+        if (isDesc) navigate("tri", "numero_asc");
         else navigate("tri", isAsc ? triDesc : triAsc);
       }} title={`Tri principal : ${label}`} className={`inline-flex items-center gap-0.5 hover:text-yellow-200 ${primary ? "text-yellow-300" : ""}`}>
         {label}<span className="text-[9px]">{isDesc ? "▼" : isAsc ? "▲" : "↕"}</span>
         {primary && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">1</span>}
       </button>
-      {triAsc && <button type="button" title={`Ajouter ${label} en tri secondaire ; recliquer pour inverser`}
+      {triAsc && !sameField && <button type="button" title={`Ajouter ${label} en tri secondaire ; recliquer pour inverser`}
         onClick={() => navigate("tri2", isSecondary ? secondary === triAsc ? triDesc : undefined : triAsc)}
         className={`rounded px-0.5 text-[10px] print:hidden ${isSecondary ? "bg-yellow-300 text-green-900 font-bold" : "text-green-100/70 hover:bg-green-700"}`}>
         {isSecondary ? `2${secondary === triAsc ? "↑" : "↓"}` : "+"}
