@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classeStatutVaccinal, comparerUrgenceVaccinale, formatTempsAvantVelage, type CelluleVaccinaleTri } from "./vaccine-table-presentation.ts";
+import { classeStatutVaccinal, comparerUrgenceVaccinale, comparerEcheanceVaccinale, formatTempsAvantVelage, type CelluleVaccinaleTri } from "./vaccine-table-presentation.ts";
 
 test("les cinq statuts ont des couleurs distinctes et le vert est réservé au fait", () => {
   const classes = ["PREVU", "BIENTOT", "A_FAIRE", "EN_RETARD", "FAIT"].map((statut) => classeStatutVaccinal[statut as keyof typeof classeStatutVaccinal]);
@@ -34,4 +34,37 @@ test("le temps avant vêlage est lisible en jours puis en mois", () => {
   assert.equal(formatTempsAvantVelage("2026-10-19T12:00:00Z", reference), "J-18");
   assert.equal(formatTempsAvantVelage("2026-12-13T12:00:00Z", reference), "2 m 12 j");
   assert.equal(formatTempsAvantVelage("2027-01-01T12:00:00Z", reference), "3 m");
+});
+
+test("tri Primo : date croissante même si le statut est différent", () => {
+  const cellules: CelluleVaccinaleTri[] = [
+    { statut: "A_FAIRE", date: "2026-11-20" },
+    { statut: "EN_RETARD", date: "2026-11-01" },
+    { statut: "BIENTOT", date: "2026-10-01" },
+    { statut: "PREVU", date: "2026-12-01" },
+  ];
+  assert.deepEqual(cellules.sort(comparerEcheanceVaccinale).map(c => c.date),
+    ["2026-10-01", "2026-11-01", "2026-11-20", "2026-12-01"]);
+});
+
+test("tri Primo : dates absentes ou invalides en dernier, sans NaN", () => {
+  const cellules: CelluleVaccinaleTri[] = [
+    { statut: "A_FAIRE", date: "inconnue" },
+    { statut: "VIDE", date: null },
+    { statut: "EN_RETARD", date: "2026-09-01" },
+    { statut: "A_FAIRE", date: "2026-11-01" },
+  ];
+  cellules.sort(comparerEcheanceVaccinale);
+  assert.deepEqual(cellules.slice(0, 2).map(c => c.date), ["2026-09-01", "2026-11-01"]);
+  assert.equal(comparerEcheanceVaccinale(cellules[2], cellules[3]), 0);
+});
+
+test("tri Primo décroissant : dates manquantes toujours à la fin", () => {
+  const dates: CelluleVaccinaleTri[] = [
+    { statut: "VIDE", date: null },
+    { statut: "PREVU", date: "2026-10-01" },
+    { statut: "A_FAIRE", date: "2026-11-01" },
+  ];
+  dates.sort((a, b) => comparerEcheanceVaccinale(a, b, -1));
+  assert.deepEqual(dates.map(c => c.date), ["2026-11-01", "2026-10-01", null]);
 });
