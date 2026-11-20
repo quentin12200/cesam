@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { ordonnanceCompatibleDate } from "@/lib/vaccine-prescription-date";
 import { verifierRattachementOrdonnanceActe } from "@/lib/vaccine-prescription-attachment";
 
 /** Rattache uniquement une ordonnance à un acte existant : aucune injection créée. */
@@ -14,14 +15,16 @@ export async function PATCH(request: NextRequest) {
     }
     const ordonnance = await prisma.ordonnance.findUnique({
       where: { id: ordonnanceId },
-      select: { id: true, numero: true, medicamentId: true, medicamentNom: true,
+      select: { id: true, numero: true, date: true, medicamentId: true, medicamentNom: true,
         medicaments: { select: { medicamentId: true, nomExtrait: true, medicament: { select: { nom: true } } } } },
     });
     if (!ordonnance) return NextResponse.json({ error: "Ordonnance introuvable" }, { status: 404 });
     const acte = sourceType === "VACCINATION"
-      ? await prisma.vaccination.findUnique({ where: { id: sourceId }, select: { medicamentId: true, ordonnanceId: true, vaccin: true } })
-      : await prisma.traitement.findUnique({ where: { id: sourceId }, select: { medicamentId: true, ordonnanceId: true, medicamentNom: true, medicament: { select: { categorie: true } } } });
+      ? await prisma.vaccination.findUnique({ where: { id: sourceId }, select: { medicamentId: true, ordonnanceId: true, vaccin: true, date: true } })
+      : await prisma.traitement.findUnique({ where: { id: sourceId }, select: { medicamentId: true, ordonnanceId: true, dateDebut: true, medicamentNom: true, medicament: { select: { categorie: true } } } });
     if (!acte) return NextResponse.json({ error: "Acte introuvable" }, { status: 404 });
+    const dateActe = "date" in acte ? acte.date : acte.dateDebut;
+    if (!ordonnanceCompatibleDate(ordonnance.date, dateActe)) return NextResponse.json({ error: "Ordonnance postérieure à l’injection : rattachement impossible" }, { status: 400 });
     const ids = [ordonnance.medicamentId, ...ordonnance.medicaments.map((item) => item.medicamentId)];
     const erreur = verifierRattachementOrdonnanceActe({
       sourceType, sourceId, ordonnanceId, acteExiste: true,
