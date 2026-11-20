@@ -1,3 +1,4 @@
+import { ordonnanceCompatibleDate } from "@/lib/vaccine-prescription-date";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
@@ -115,8 +116,11 @@ export async function POST(request: NextRequest) {
       : [];
     const ordonnanceIds = [...new Set(traitementsList.map((t) => t.ordonnanceId).filter((id): id is string => Boolean(id)))];
     if (ordonnanceIds.length) {
-      const existantes = await prisma.ordonnance.count({ where: { id: { in: ordonnanceIds } } });
-      if (existantes !== ordonnanceIds.length) return NextResponse.json({ error: "Ordonnance introuvable" }, { status: 400 });
+      const existantes = await prisma.ordonnance.findMany({ where: { id: { in: ordonnanceIds } }, select: { id: true, date: true } });
+      if (existantes.length !== ordonnanceIds.length) return NextResponse.json({ error: "Ordonnance introuvable" }, { status: 400 });
+      if (existantes.some((ordonnance) => !ordonnanceCompatibleDate(ordonnance.date, date))) {
+        return NextResponse.json({ error: "Ordonnance postérieure à la date d’injection : association impossible" }, { status: 400 });
+      }
     }
     const resolvedDate = new Date(date);
     const now = new Date();
