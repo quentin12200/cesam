@@ -15,7 +15,7 @@ export async function PATCH(request: NextRequest) {
     const ordonnance = await prisma.ordonnance.findUnique({
       where: { id: ordonnanceId },
       select: { id: true, numero: true, medicamentId: true, medicamentNom: true,
-        medicaments: { select: { medicamentId: true } } },
+        medicaments: { select: { medicamentId: true, nomExtrait: true, medicament: { select: { nom: true } } } } },
     });
     if (!ordonnance) return NextResponse.json({ error: "Ordonnance introuvable" }, { status: 404 });
     const acte = sourceType === "VACCINATION"
@@ -28,6 +28,9 @@ export async function PATCH(request: NextRequest) {
       estVaccin: sourceType === "VACCINATION" || ("medicament" in acte && acte.medicament?.categorie === "VACCIN"),
       medicamentId: acte.medicamentId, medicamentsOrdonnanceIds: ids,
       ordonnanceActuelleId: acte.ordonnanceId,
+      nomVaccinActe: "vaccin" in acte ? acte.vaccin : acte.medicamentNom,
+      nomsVaccinsOrdonnance: [ordonnance.medicamentNom, ...ordonnance.medicaments.flatMap((item) => [item.nomExtrait, item.medicament.nom])],
+      nombreMedicamentsOrdonnance: ordonnance.medicaments.length || (ordonnance.medicamentId || ordonnance.medicamentNom.trim() ? 1 : 0),
     });
     if (erreur) return NextResponse.json({ error: erreur }, { status: erreur.includes("déjà") ? 409 : 400 });
     if (sourceType === "VACCINATION") {
