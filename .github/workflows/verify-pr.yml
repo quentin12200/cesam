@@ -22,5 +22,21 @@ jobs:
       - run: node --test tests/troupeau-print-pagination.test.mjs
       - run: node --test tests/troupeau-double-sort.test.mjs
       - run: node --test tests/troupeau-print-calf-wrap.test.mjs
-      # Full production build is verified by Vercel, which has the configured database.
-      # This isolated runner intentionally has no access to production data.
+  isolated-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: "file:/tmp/cesam-build-diagnostic-empty.db"
+      TURSO_AUTH_TOKEN: ""
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Reproduce Next.js production compilation without production database
+        run: npm run build
+
