@@ -48,4 +48,5 @@ jobs:
             lib/vaccine-protocol-extraction.test.ts \
             lib/vaccine-acts.test.ts \
             lib/vaccine-prescription-attachment.test.ts \
+            lib/vaccine-prescription-date.test.ts \
             lib/vaccine-protocol-save.test.ts
