@@ -55,6 +55,7 @@ function OrdonnanceForm({
   const [numero, setNumero] = useState(initial?.ordonnanceNumero ?? "");
   const [veterinaireNom, setVeterinaireNom] = useState(initial?.veterinaire ?? "");
   const [medicamentNom, setMedicamentNom] = useState(initial?.medicamentNom ?? "");
+  const [autresMedicaments, setAutresMedicaments] = useState<string[]>([]);
   const [dose, setDose] = useState(initial?.dose != null ? String(initial.dose) : "");
   const [uniteDosage, setUniteDosage] = useState(initial?.uniteDosage ?? "ml");
   const [voie, setVoie] = useState(initial?.voie ?? "");
@@ -74,6 +75,7 @@ function OrdonnanceForm({
       numero: numero || null,
       veterinaireNom: veterinaireNom || null,
       medicamentNom,
+      medicaments: [medicamentNom, ...autresMedicaments].map((nom) => nom.trim()).filter(Boolean),
       dose: dose !== "" ? Number(dose) : null,
       uniteDosage: uniteDosage || null,
       voie: voie || null,
@@ -140,6 +142,11 @@ function OrdonnanceForm({
           className="w-full border rounded-lg px-3 py-2 text-sm uppercase" placeholder="ex: METACAM" required />
       </div>
 
+      {autresMedicaments.map((nom, index) => <div key={index} className="flex items-center gap-2">
+        <input aria-label={`Médicament supplémentaire ${index + 1}`} value={nom} onChange={(event) => setAutresMedicaments((actuels) => actuels.map((valeur, position) => position === index ? event.target.value : valeur))} className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="Autre médicament de l'ordonnance" />
+        <button type="button" onClick={() => setAutresMedicaments((actuels) => actuels.filter((_, position) => position !== index))} className="rounded border px-2 py-2 text-xs">Retirer</button>
+      </div>)}
+      <button type="button" onClick={() => setAutresMedicaments((actuels) => [...actuels, ""])} className="text-sm font-semibold text-blue-700">+ Ajouter un médicament</button>
       <button type="button" onClick={() => setDetailsOuverts((valeur) => !valeur)} className="text-left text-xs font-semibold text-blue-800 underline">{detailsOuverts ? "Masquer les informations complémentaires" : "Informations complémentaires (facultatif)"}</button>
       {detailsOuverts && <div className="space-y-3">      <div className="grid grid-cols-3 gap-3">
         <div>
