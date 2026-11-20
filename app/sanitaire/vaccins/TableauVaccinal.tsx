@@ -546,6 +546,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
           protocoleId: cible.protocoleId,
           etapeProtocoleId,
           gestationId: cible.protocoleLieAuVelage ? cible.gestationId : null,
+          ...(ordonnanceIdSession ? { ordonnanceId: ordonnanceIdSession } : {}),
         }),
       });
       const detail = await reponse.json().catch(() => ({}));
