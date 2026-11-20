@@ -96,9 +96,14 @@ function OrdonnanceForm({
         body: JSON.stringify(payload),
       });
     }
-    setSaving(false);
+    if (!response.ok) throw new Error("Enregistrement impossible.");
     onClose();
     router.refresh();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Enregistrement impossible");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
