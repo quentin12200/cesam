@@ -177,6 +177,14 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [colonnesMenuOuvert, setColonnesMenuOuvert] = useState(false);
   const [dateSession, setDateSession] = useState(dateLocaleIso);
   const [executant, setExecutant] = useState("");
+  const [ordonnanceNumeroSession, setOrdonnanceNumeroSession] = useState("");
+  const [ordonnanceIdSession, setOrdonnanceIdSession] = useState("");
+  const [ordonnanceEnAttente, setOrdonnanceEnAttente] = useState(false);
+  const [ordonnancesDisponibles, setOrdonnancesDisponibles] = useState<Array<{ id: string; numero: string | null; date: string; veterinaireNom: string | null }>>([]);
+  const [ordonnancesSelectionnees, setOrdonnancesSelectionnees] = useState<string[]>([]);
+  const [ajoutOrdonnanceOuvert, setAjoutOrdonnanceOuvert] = useState(false);
+  const [nouvelleOrdo, setNouvelleOrdo] = useState({ numero: "", date: dateLocaleIso(), veterinaireNom: "", medicamentNom: "HEPIZOVAC" });
+  const [ajoutOrdoEnCours, setAjoutOrdoEnCours] = useState(false);
   const [intervenants, setIntervenants] = useState<Intervenant[]>([]);
   const [animauxSelectionnes, setAnimauxSelectionnes] = useState<Set<string>>(new Set());
   const [uniquementSelection, setUniquementSelection] = useState(false);
@@ -200,6 +208,10 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [panneauHistorique, setPanneauHistorique] = useState<{ animalId: string; blocCle: string; etapeId: string } | null>(null);
   const [historiqueNonClasseAnimalId, setHistoriqueNonClasseAnimalId] = useState<string | null>(null);
   const [acteEnEdition, setActeEnEdition] = useState<string | null>(null);
+  const [acteOrdonnanceEnEdition, setActeOrdonnanceEnEdition] = useState<string | null>(null);
+  const [ordonnanceHistoriqueId, setOrdonnanceHistoriqueId] = useState("");
+  const [ordonnancesHistorique, setOrdonnancesHistorique] = useState<Array<{ id: string; numero: string | null; date: string; veterinaireNom: string | null }>>([]);
+  const [chargementOrdonnancesHistorique, setChargementOrdonnancesHistorique] = useState(false);
   const [soinOuvert, setSoinOuvert] = useState(false);
   const [medicamentsSoins, setMedicamentsSoins] = useState<MedicamentOption[]>([]);
   const [soinMedicament, setSoinMedicament] = useState<MedicamentOption | null>(null);
@@ -401,7 +413,40 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     }]; }));
   }
 
+  const ordonnancesSessionEligibles = ordonnancesDisponibles.filter((ordonnance) => ordonnance.date.slice(0, 10) <= dateSession);
+  const ordonnanceSessionDateValide = !ordonnanceIdSession || ordonnancesSessionEligibles.some((ordonnance) => ordonnance.id === ordonnanceIdSession);
+  const medicamentsSession = [...new Set(groupesSession.map((groupe) => groupe.etape.medicamentNom || groupe.bloc.nom).filter(Boolean))];
+  useEffect(() => {
+    if (medicamentsSession.length !== 1) { setOrdonnancesDisponibles([]); setOrdonnancesSelectionnees([]); return; }
+    let actif = true;
+    fetch("/api/ordonnances/for-medicament?nom=" + encodeURIComponent(medicamentsSession[0]) + "&date=" + encodeURIComponent(dateSession))
+      .then((reponse) => reponse.json())
+      .then((donnees) => { if (actif) setOrdonnancesDisponibles(Array.isArray(donnees) ? donnees.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : []); })
+      .catch(() => { if (actif) setOrdonnancesDisponibles([]); });
+    return () => { actif = false; };
+  }, [medicamentsSession.join("|"), dateSession]);
+
+  async function ajouterOrdonnanceSession() {
+    if (nouvelleOrdo.date > dateSession) { setErreur("Une ordonnance postérieure à la séance ne peut pas être associée."); return; }
+    if (!nouvelleOrdo.numero.trim() || !nouvelleOrdo.date || !nouvelleOrdo.medicamentNom.trim()) { setErreur("Numéro, date et médicament sont nécessaires."); return; }
+    setAjoutOrdoEnCours(true);
+    setErreur("");
+    try {
+      const response = await fetch("/api/ordonnances", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...nouvelleOrdo, medicaments: [nouvelleOrdo.medicamentNom] }) });
+      if (!response.ok) throw new Error("L'ordonnance n'a pas pu être enregistrée.");
+      const ordonnance = await response.json();
+      setOrdonnanceIdSession(ordonnance.id);
+      setOrdonnanceNumeroSession("");
+      setOrdonnancesSelectionnees([ordonnance.id]);
+      setOrdonnanceEnAttente(false);
+      setOrdonnancesDisponibles((actuelles) => [...actuelles.filter((o) => o.id !== ordonnance.id), ordonnance].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+      setAjoutOrdonnanceOuvert(false);
+    } catch (error) { setErreur(error instanceof Error ? error.message : "Erreur d'enregistrement"); }
+    finally { setAjoutOrdoEnCours(false); }
+  }
+
   function enregistrerSelection() {
+    if (!ordonnanceSessionDateValide) { setErreur("L’ordonnance sélectionnée est postérieure à la séance ou n’est plus disponible."); return; }
     if (!dateSession || !executant.trim() || groupesSession.length === 0) {
       setErreur("Indique la date, l’exécutant et sélectionne au moins un acte.");
       return;
@@ -450,6 +495,9 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
               dose,
               uniteDosage: administration.uniteDosage || null,
               doseUnique: true,
+              ordonnanceNumero: ordonnanceNumeroSession.trim() || null,
+              ordonnanceId: ordonnanceIdSession || null,
+              ordonnanceAAssocier: ordonnanceEnAttente && !ordonnanceNumeroSession.trim() && !ordonnanceIdSession,
             }],
             ...(groupe.actes.every((acte) => acte.ligne.cellules[groupe.etape.id]?.rattachementProtocoleAutorise)
               && groupe.etape.protocoleId
@@ -486,6 +534,45 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     }
   }
 
+  async function ouvrirOrdonnancesHistorique(cle: string, nomVaccin: string, dateInjection: string) {
+    setActeOrdonnanceEnEdition(cle);
+    setOrdonnanceHistoriqueId("");
+    setOrdonnancesHistorique([]);
+    setErreur("");
+    setChargementOrdonnancesHistorique(true);
+    try {
+      const response = await fetch("/api/ordonnances/for-medicament?nom=" + encodeURIComponent(nomVaccin) + "&date=" + encodeURIComponent(dateInjection.slice(0, 10)));
+      if (!response.ok) throw new Error("Impossible de charger les ordonnances");
+      const items = await response.json();
+      setOrdonnancesHistorique(Array.isArray(items) ? items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : []);
+    } catch (error) {
+      setErreur(error instanceof Error ? error.message : "Chargement impossible");
+    } finally {
+      setChargementOrdonnancesHistorique(false);
+    }
+  }
+
+  async function rattacherOrdonnanceHistorique(sourceType: "VACCINATION" | "TRAITEMENT", sourceId: string | null) {
+    if (!sourceId || !ordonnanceHistoriqueId) return;
+    setRattachementEnCours(true);
+    setErreur("");
+    try {
+      const response = await fetch("/api/ordonnances/rattacher-acte", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceType, sourceId, ordonnanceId: ordonnanceHistoriqueId }),
+      });
+      const detail = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(detail.error || "Association impossible");
+      setActeOrdonnanceEnEdition(null);
+      setOrdonnanceHistoriqueId("");
+      router.refresh();
+    } catch (error) {
+      setErreur(error instanceof Error ? error.message : "Association impossible");
+    } finally {
+      setRattachementEnCours(false);
+    }
+  }
+
   async function enregistrerRattachement(cible: {
     sourceType: "VACCINATION" | "TRAITEMENT";
     sourceId: string | null;
@@ -506,6 +593,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
           protocoleId: cible.protocoleId,
           etapeProtocoleId,
           gestationId: cible.protocoleLieAuVelage ? cible.gestationId : null,
+          ...(ordonnanceIdSession ? { ordonnanceId: ordonnanceIdSession } : {}),
         }),
       });
       const detail = await reponse.json().catch(() => ({}));
@@ -672,7 +760,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     };
     const nonRattaches = actesVaccin.filter((acte) => !etapeDe(acte)).length;
     const cleEdition = (acte: ActeHistorique) => `${acte.sourceType}:${acte.sourceId}`;
-    const fermer = () => { setPanneauHistorique(null); setActeEnEdition(null); setEtapeChoisie(""); setErreur(""); };
+    const fermer = () => { setPanneauHistorique(null); setActeOrdonnanceEnEdition(null); setActeEnEdition(null); setEtapeChoisie(""); setErreur(""); };
     // Une étape déjà faite n'est jamais verrouillée : on peut ajouter une nouvelle administration.
     const etapesNouvelleAdministration = bloc.protocoleId && medicamentId
       ? bloc.sousColonnes.filter((candidate) => medicamentCompatibleAvecEtape(configEtapes, candidate.id, medicamentId))
@@ -704,7 +792,16 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
               {details && <span className="text-xs text-gray-600">{details}</span>}
               <span className="text-[10px] text-gray-400">{acte.sourceType === "TRAITEMENT" ? "Traitement" : "Vaccination"}</span>
               {bloc.protocoleId && acte.sourceId && !enEdition && <button type="button" disabled={rattachementEnCours} onClick={() => { setActeEnEdition(cle); setEtapeChoisie(""); setErreur(""); }} className="ml-auto min-h-8 rounded-lg border px-2 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">{sousColonne ? "Modifier l’étape" : "Choisir l’étape"}</button>}
+              {acte.sourceId && <button type="button" disabled={rattachementEnCours} onClick={() => void ouvrirOrdonnancesHistorique(cle, nomVaccin, acte.date)} className="min-h-8 rounded-lg border border-green-700 px-2 text-xs font-semibold text-green-800">Associer ordonnance</button>}
             </div>
+            {acteOrdonnanceEnEdition === cle && <div className="mt-2 space-y-2 rounded-lg border border-green-200 bg-green-50 p-2">
+              <p className="text-xs font-semibold text-green-950">Associer à cet acte existant — aucune nouvelle injection</p>
+              {chargementOrdonnancesHistorique ? <p className="text-xs">Chargement…</p> : <select aria-label="Ordonnance à associer" value={ordonnanceHistoriqueId} onChange={(event) => setOrdonnanceHistoriqueId(event.target.value)} className="w-full rounded border bg-white p-2 text-sm">
+                <option value="">Choisir une ordonnance</option>
+                {ordonnancesHistorique.map((ordonnance) => <option key={ordonnance.id} value={ordonnance.id}>{ordonnance.numero || "Sans numéro"} · {new Date(ordonnance.date).toLocaleDateString("fr-FR")} · {ordonnance.veterinaireNom || "Vétérinaire non renseigné"}</option>)}
+              </select>}
+              <div className="flex gap-2"><button type="button" disabled={!ordonnanceHistoriqueId || rattachementEnCours} onClick={() => void rattacherOrdonnanceHistorique(acte.sourceType, acte.sourceId)} className="rounded bg-green-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Confirmer le rattachement</button><button type="button" onClick={() => setActeOrdonnanceEnEdition(null)} className="rounded border bg-white px-3 py-2 text-xs">Annuler</button></div>
+            </div>}
             {enEdition && <div className="mt-2 rounded-lg bg-gray-50 p-2">
               {compatibles.length === 0
                 ? <p className="text-sm text-amber-950">Aucune étape compatible avec ce médicament dans ce protocole</p>
@@ -896,6 +993,26 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         <div className="grid gap-2 sm:grid-cols-[10rem_minmax(12rem,1fr)_auto] sm:items-end">
           <label className="text-xs font-semibold text-green-950">Date<input type="date" value={dateSession} onChange={(event) => setDateSession(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border bg-white px-2 text-sm font-normal text-gray-900" /></label>
           <label className="text-xs font-semibold text-green-950">Exécutant<div className="mt-1 font-normal text-gray-900"><ExecutantSelect intervenants={intervenants} value={executant} onChange={setExecutant} onAdded={(intervenant) => setIntervenants((actuels) => [...actuels, intervenant])} /></div></label>
+          <div className="sm:col-span-3 flex flex-wrap items-end gap-2 rounded-lg border border-green-200 bg-white p-2">
+            <fieldset className="min-w-40 flex-1 text-xs font-semibold text-green-950"><legend>Ordonnances du vaccin (plus ancienne d&apos;abord)</legend>
+              {medicamentsSession.length !== 1 ? <p className="font-normal text-amber-800">Sélectionne un seul vaccin pour proposer les ordonnances correspondantes.</p> : ordonnancesSessionEligibles.length === 0 ? <p className="font-normal text-gray-600">Aucune ordonnance enregistrée pour ce vaccin.</p> : ordonnancesSessionEligibles.map((ordonnance) => <label key={ordonnance.id} className="mt-1 flex items-center gap-2 font-normal"><input type="radio" name="ordonnance-session" checked={ordonnanceIdSession === ordonnance.id} onChange={(event) => { setOrdonnancesSelectionnees(event.target.checked ? [ordonnance.id] : []); setOrdonnanceIdSession(event.target.checked ? ordonnance.id : ""); setOrdonnanceNumeroSession(""); setOrdonnanceEnAttente(false); }} />{ordonnance.numero || "Sans numéro"} · {new Date(ordonnance.date).toLocaleDateString("fr-FR")} · {ordonnance.veterinaireNom || "Vétérinaire non renseigné"}</label>)}
+
+            </fieldset>
+            <div className="w-full">
+              <button type="button" onClick={() => { setNouvelleOrdo((actuelle) => ({ ...actuelle, medicamentNom: medicamentsSession[0] || actuelle.medicamentNom })); setAjoutOrdonnanceOuvert((valeur) => !valeur); }} className="rounded-lg border border-green-700 px-3 py-2 text-xs font-bold text-green-900">+ Ajouter une ordonnance</button>
+              {ajoutOrdonnanceOuvert && <div className="mt-2 grid gap-2 rounded-lg border bg-green-50 p-3 sm:grid-cols-2">
+                <label className="text-xs">Numéro<input className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.numero} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, numero: e.target.value }))} placeholder="0282171" /></label>
+                <label className="text-xs">Date<input type="date" className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.date} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, date: e.target.value }))} /></label>
+                <label className="text-xs">Vétérinaire<input className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.veterinaireNom} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, veterinaireNom: e.target.value }))} placeholder="Dr Pourcel" /></label>
+                <label className="text-xs">Médicament<input className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.medicamentNom} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, medicamentNom: e.target.value }))} /></label>
+                <button type="button" disabled={ajoutOrdoEnCours} onClick={() => void ajouterOrdonnanceSession()} className="rounded-lg bg-green-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Enregistrer et associer</button>
+              </div>}
+            </div>
+            <label className="min-w-36 flex-1 text-xs font-semibold text-green-950">Ou numéro d&apos;ordonnance
+              <input value={ordonnanceNumeroSession} onChange={(event) => { setOrdonnanceNumeroSession(event.target.value); if (event.target.value.trim()) { setOrdonnancesSelectionnees([]); setOrdonnanceIdSession(""); setOrdonnanceEnAttente(false); } }} placeholder="N° à saisir" className="mt-1 min-h-10 w-full rounded border px-2 font-normal" />
+            </label>
+            <label className="flex min-h-10 items-center gap-2 text-xs font-semibold text-green-950"><input type="checkbox" checked={ordonnanceEnAttente} onChange={(event) => { setOrdonnanceEnAttente(event.target.checked); if (event.target.checked) { setOrdonnanceNumeroSession(""); setOrdonnanceIdSession(""); } }} />À rattacher plus tard</label>
+          </div>
           <button type="button" disabled={actes.length === 0 || enregistrement} onClick={enregistrerSelection} className="min-h-10 rounded-lg bg-green-800 px-3 text-sm font-bold text-white disabled:opacity-40">{enregistrement ? "Enregistrement…" : `Enregistrer ${actes.length} vaccination(s)`}</button>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2"><p className="mr-auto text-xs font-semibold text-green-950">{nombreAnimaux} animal(aux) · {actes.length} vaccination(s) sélectionnée(s)</p><button type="button" onClick={() => void ouvrirSoin()} className="min-h-8 rounded-lg border border-green-700 bg-white px-2 text-xs font-semibold text-green-900">+ Ajouter un soin / traitement</button>{soinMessage && <span className="text-xs font-semibold text-green-900">{soinMessage}</span>}{actes.length > 0 && <button type="button" onClick={() => setActesSelectionnes(new Set())} className="min-h-8 rounded-lg border bg-white px-2 text-xs font-semibold">Vider la sélection</button>}</div>
