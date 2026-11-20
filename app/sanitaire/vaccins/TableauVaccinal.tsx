@@ -208,6 +208,10 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [panneauHistorique, setPanneauHistorique] = useState<{ animalId: string; blocCle: string; etapeId: string } | null>(null);
   const [historiqueNonClasseAnimalId, setHistoriqueNonClasseAnimalId] = useState<string | null>(null);
   const [acteEnEdition, setActeEnEdition] = useState<string | null>(null);
+  const [acteOrdonnanceEnEdition, setActeOrdonnanceEnEdition] = useState<string | null>(null);
+  const [ordonnanceHistoriqueId, setOrdonnanceHistoriqueId] = useState("");
+  const [ordonnancesHistorique, setOrdonnancesHistorique] = useState<Array<{ id: string; numero: string | null; date: string; veterinaireNom: string | null }>>([]);
+  const [chargementOrdonnancesHistorique, setChargementOrdonnancesHistorique] = useState(false);
   const [soinOuvert, setSoinOuvert] = useState(false);
   const [medicamentsSoins, setMedicamentsSoins] = useState<MedicamentOption[]>([]);
   const [soinMedicament, setSoinMedicament] = useState<MedicamentOption | null>(null);
@@ -526,6 +530,45 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     }
   }
 
+  async function ouvrirOrdonnancesHistorique(cle: string, nomVaccin: string) {
+    setActeOrdonnanceEnEdition(cle);
+    setOrdonnanceHistoriqueId("");
+    setOrdonnancesHistorique([]);
+    setErreur("");
+    setChargementOrdonnancesHistorique(true);
+    try {
+      const response = await fetch("/api/ordonnances/for-medicament?nom=" + encodeURIComponent(nomVaccin));
+      if (!response.ok) throw new Error("Impossible de charger les ordonnances");
+      const items = await response.json();
+      setOrdonnancesHistorique(Array.isArray(items) ? items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : []);
+    } catch (error) {
+      setErreur(error instanceof Error ? error.message : "Chargement impossible");
+    } finally {
+      setChargementOrdonnancesHistorique(false);
+    }
+  }
+
+  async function rattacherOrdonnanceHistorique(sourceType: "VACCINATION" | "TRAITEMENT", sourceId: string | null) {
+    if (!sourceId || !ordonnanceHistoriqueId) return;
+    setRattachementEnCours(true);
+    setErreur("");
+    try {
+      const response = await fetch("/api/ordonnances/rattacher-acte", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceType, sourceId, ordonnanceId: ordonnanceHistoriqueId }),
+      });
+      const detail = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(detail.error || "Association impossible");
+      setActeOrdonnanceEnEdition(null);
+      setOrdonnanceHistoriqueId("");
+      router.refresh();
+    } catch (error) {
+      setErreur(error instanceof Error ? error.message : "Association impossible");
+    } finally {
+      setRattachementEnCours(false);
+    }
+  }
+
   async function enregistrerRattachement(cible: {
     sourceType: "VACCINATION" | "TRAITEMENT";
     sourceId: string | null;
@@ -713,7 +756,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     };
     const nonRattaches = actesVaccin.filter((acte) => !etapeDe(acte)).length;
     const cleEdition = (acte: ActeHistorique) => `${acte.sourceType}:${acte.sourceId}`;
-    const fermer = () => { setPanneauHistorique(null); setActeEnEdition(null); setEtapeChoisie(""); setErreur(""); };
+    const fermer = () => { setPanneauHistorique(null); setActeOrdonnanceEnEdition(null); setActeEnEdition(null); setEtapeChoisie(""); setErreur(""); };
     // Une étape déjà faite n'est jamais verrouillée : on peut ajouter une nouvelle administration.
     const etapesNouvelleAdministration = bloc.protocoleId && medicamentId
       ? bloc.sousColonnes.filter((candidate) => medicamentCompatibleAvecEtape(configEtapes, candidate.id, medicamentId))
@@ -745,7 +788,16 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
               {details && <span className="text-xs text-gray-600">{details}</span>}
               <span className="text-[10px] text-gray-400">{acte.sourceType === "TRAITEMENT" ? "Traitement" : "Vaccination"}</span>
               {bloc.protocoleId && acte.sourceId && !enEdition && <button type="button" disabled={rattachementEnCours} onClick={() => { setActeEnEdition(cle); setEtapeChoisie(""); setErreur(""); }} className="ml-auto min-h-8 rounded-lg border px-2 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">{sousColonne ? "Modifier l’étape" : "Choisir l’étape"}</button>}
+              {acte.sourceId && <button type="button" disabled={rattachementEnCours} onClick={() => void ouvrirOrdonnancesHistorique(cle, nomVaccin)} className="min-h-8 rounded-lg border border-green-700 px-2 text-xs font-semibold text-green-800">Associer ordonnance</button>}
             </div>
+            {acteOrdonnanceEnEdition === cle && <div className="mt-2 space-y-2 rounded-lg border border-green-200 bg-green-50 p-2">
+              <p className="text-xs font-semibold text-green-950">Associer à cet acte existant — aucune nouvelle injection</p>
+              {chargementOrdonnancesHistorique ? <p className="text-xs">Chargement…</p> : <select aria-label="Ordonnance à associer" value={ordonnanceHistoriqueId} onChange={(event) => setOrdonnanceHistoriqueId(event.target.value)} className="w-full rounded border bg-white p-2 text-sm">
+                <option value="">Choisir une ordonnance</option>
+                {ordonnancesHistorique.map((ordonnance) => <option key={ordonnance.id} value={ordonnance.id}>{ordonnance.numero || "Sans numéro"} · {new Date(ordonnance.date).toLocaleDateString("fr-FR")} · {ordonnance.veterinaireNom || "Vétérinaire non renseigné"}</option>)}
+              </select>}
+              <div className="flex gap-2"><button type="button" disabled={!ordonnanceHistoriqueId || rattachementEnCours} onClick={() => void rattacherOrdonnanceHistorique(acte.sourceType, acte.sourceId)} className="rounded bg-green-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Confirmer le rattachement</button><button type="button" onClick={() => setActeOrdonnanceEnEdition(null)} className="rounded border bg-white px-3 py-2 text-xs">Annuler</button></div>
+            </div>}
             {enEdition && <div className="mt-2 rounded-lg bg-gray-50 p-2">
               {compatibles.length === 0
                 ? <p className="text-sm text-amber-950">Aucune étape compatible avec ce médicament dans ce protocole</p>
