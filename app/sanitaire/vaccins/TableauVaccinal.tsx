@@ -12,7 +12,7 @@ import { medicamentCompatibleAvecEtape } from "@/lib/vaccine-attachment";
 import { actionsSelectionAnimaux, basculerSelectionVisibles, celluleVaccinaleSelectionnable, etatSelectionMaitre, libelleAnimauxSelectionnes } from "@/lib/vaccine-selection";
 import { construireChargeSoin } from "@/lib/vaccine-soin-seance";
 import { actesDuVaccin, actesVaccinauxNonClasses, anneesDisponibles, datesCompactes, memeActeVaccinal, type ActeHistorique } from "@/lib/vaccine-history-view";
-import { classeStatutVaccinal, comparerDateVelage, comparerUrgenceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
+import { classeStatutVaccinal, comparerDateVelage, comparerEcheanceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
 import { libelleFenetreVaccinale, selectionDepuisGroupeAgenda, type ActionAgenda, type GroupeAgenda } from "@/lib/vaccine-agenda";
 import { useVaccinWorkspace, type VaccinMode } from "./useVaccinWorkspace";
 import { compterVaccinationsVisibles } from "@/lib/vaccine-header-counts";
@@ -253,7 +253,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       }
       if (tri.startsWith("vaccin:")) {
         const etapeId = tri.slice("vaccin:".length);
-        return signe * comparerUrgenceVaccinale(echeanceDeTri(a.cellules[etapeId]), echeanceDeTri(b.cellules[etapeId]));
+        return signe * comparerEcheanceVaccinale(echeanceDeTri(a.cellules[etapeId]), echeanceDeTri(b.cellules[etapeId]))\n          || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
       }
       return signe * a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
     });
