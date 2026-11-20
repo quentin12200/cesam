@@ -7,6 +7,8 @@ on:
       - "app/sanitaire/vaccins/**"
       - "lib/vaccine-*.ts"
       - "app/api/ordonnances/rattacher-acte/**"
+      - "app/api/ordonnances/for-medicament/**"
+      - "app/api/evenements/batch/**"
       - "lib/vaccination-session*.ts"
       - "prisma/**"
       - "package.json"
