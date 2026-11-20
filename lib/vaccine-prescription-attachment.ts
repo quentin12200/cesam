@@ -20,7 +20,7 @@ export function verifierRattachementOrdonnanceActe(input: {
   } else {
     // Actes historiques : aucune association approximative ou basée sur une sous-chaîne.
     // Une ordonnance multi-médicaments est volontairement exclue de ce repli.
-    const normaliser = (nom: string | null | undefined) => (nom ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLocaleUpperCase("fr-FR").replace(/\\s+/g, " ");
+    const normaliser = (nom: string | null | undefined) => (nom ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLocaleUpperCase("fr-FR").replace(/\s+/g, " ");
     const nomActe = normaliser(input.nomVaccinActe);
     const noms = (input.nomsVaccinsOrdonnance ?? []).map(normaliser).filter(Boolean);
     if (!nomActe || input.nombreMedicamentsOrdonnance !== 1 || noms.length === 0 || !noms.every((nom) => nom === nomActe)) {
