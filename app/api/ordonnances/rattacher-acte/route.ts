@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { verifierRattachementOrdonnanceActe } from "@/lib/vaccine-prescription-attachment";
 
 /** Rattache uniquement une ordonnance à un acte existant : aucune injection créée. */
 export async function PATCH(request: NextRequest) {
@@ -21,16 +22,14 @@ export async function PATCH(request: NextRequest) {
       ? await prisma.vaccination.findUnique({ where: { id: sourceId }, select: { medicamentId: true, ordonnanceId: true, vaccin: true } })
       : await prisma.traitement.findUnique({ where: { id: sourceId }, select: { medicamentId: true, ordonnanceId: true, medicamentNom: true, medicament: { select: { categorie: true } } } });
     if (!acte) return NextResponse.json({ error: "Acte introuvable" }, { status: 404 });
-    if (sourceType === "TRAITEMENT" && "medicament" in acte && acte.medicament?.categorie !== "VACCIN") {
-      return NextResponse.json({ error: "Ce traitement n'est pas une vaccination" }, { status: 400 });
-    }
-    const ids = [ordonnance.medicamentId, ...ordonnance.medicaments.map((item) => item.medicamentId)].filter(Boolean);
-    if (!acte.medicamentId || !ids.includes(acte.medicamentId)) {
-      return NextResponse.json({ error: "L'ordonnance ne contient pas le vaccin de cet acte" }, { status: 400 });
-    }
-    if (acte.ordonnanceId && acte.ordonnanceId !== ordonnance.id) {
-      return NextResponse.json({ error: "Une autre ordonnance est déjà associée : correction manuelle nécessaire" }, { status: 409 });
-    }
+    const ids = [ordonnance.medicamentId, ...ordonnance.medicaments.map((item) => item.medicamentId)];
+    const erreur = verifierRattachementOrdonnanceActe({
+      sourceType, sourceId, ordonnanceId, acteExiste: true,
+      estVaccin: sourceType === "VACCINATION" || ("medicament" in acte && acte.medicament?.categorie === "VACCIN"),
+      medicamentId: acte.medicamentId, medicamentsOrdonnanceIds: ids,
+      ordonnanceActuelleId: acte.ordonnanceId,
+    });
+    if (erreur) return NextResponse.json({ error: erreur }, { status: erreur.includes("déjà") ? 409 : 400 });
     if (sourceType === "VACCINATION") {
       await prisma.vaccination.update({ where: { id: sourceId }, data: { ordonnanceId: ordonnance.id, ordonnanceNumero: ordonnance.numero } });
     } else {
