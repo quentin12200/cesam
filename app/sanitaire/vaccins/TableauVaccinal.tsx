@@ -182,6 +182,9 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [ordonnanceEnAttente, setOrdonnanceEnAttente] = useState(false);
   const [ordonnancesDisponibles, setOrdonnancesDisponibles] = useState<Array<{ id: string; numero: string | null; date: string; veterinaireNom: string | null }>>([]);
   const [ordonnancesSelectionnees, setOrdonnancesSelectionnees] = useState<string[]>([]);
+  const [ajoutOrdonnanceOuvert, setAjoutOrdonnanceOuvert] = useState(false);
+  const [nouvelleOrdo, setNouvelleOrdo] = useState({ numero: "", date: dateLocaleIso, veterinaireNom: "", medicamentNom: "HEPIZOVAC" });
+  const [ajoutOrdoEnCours, setAjoutOrdoEnCours] = useState(false);
   const [intervenants, setIntervenants] = useState<Intervenant[]>([]);
   const [animauxSelectionnes, setAnimauxSelectionnes] = useState<Set<string>>(new Set());
   const [uniquementSelection, setUniquementSelection] = useState(false);
@@ -416,6 +419,24 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       .catch(() => { if (actif) setOrdonnancesDisponibles([]); });
     return () => { actif = false; };
   }, [medicamentsSession.join("|")]);
+
+  async function ajouterOrdonnanceSession() {
+    if (!nouvelleOrdo.numero.trim() || !nouvelleOrdo.date || !nouvelleOrdo.medicamentNom.trim()) { setErreur("Numéro, date et médicament sont nécessaires."); return; }
+    setAjoutOrdoEnCours(true);
+    setErreur("");
+    try {
+      const response = await fetch("/api/ordonnances", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nouvelleOrdo) });
+      if (!response.ok) throw new Error("L'ordonnance n'a pas pu être enregistrée.");
+      const ordonnance = await response.json();
+      setOrdonnanceIdSession(ordonnance.id);
+      setOrdonnanceNumeroSession("");
+      setOrdonnancesSelectionnees([ordonnance.id]);
+      setOrdonnanceEnAttente(false);
+      setOrdonnancesDisponibles((actuelles) => [...actuelles.filter((o) => o.id !== ordonnance.id), ordonnance].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+      setAjoutOrdonnanceOuvert(false);
+    } catch (error) { setErreur(error instanceof Error ? error.message : "Erreur d'enregistrement"); }
+    finally { setAjoutOrdoEnCours(false); }
+  }
 
   function enregistrerSelection() {
     if (!dateSession || !executant.trim() || groupesSession.length === 0) {
@@ -921,6 +942,16 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
               {medicamentsSession.length !== 1 ? <p className="font-normal text-amber-800">Sélectionne un seul vaccin pour proposer les ordonnances correspondantes.</p> : ordonnancesDisponibles.length === 0 ? <p className="font-normal text-gray-600">Aucune ordonnance enregistrée pour ce vaccin.</p> : ordonnancesDisponibles.map((ordonnance) => <label key={ordonnance.id} className="mt-1 flex items-center gap-2 font-normal"><input type="checkbox" checked={ordonnancesSelectionnees.includes(ordonnance.id)} onChange={(event) => { setOrdonnancesSelectionnees((actuelles) => event.target.checked ? [...actuelles, ordonnance.id] : actuelles.filter((id) => id !== ordonnance.id)); setOrdonnanceIdSession(event.target.checked ? ordonnance.id : ""); setOrdonnanceNumeroSession(""); setOrdonnanceEnAttente(false); }} />{ordonnance.numero || "Sans numéro"} · {new Date(ordonnance.date).toLocaleDateString("fr-FR")} · {ordonnance.veterinaireNom || "Vétérinaire non renseigné"}</label>)}
               {ordonnancesSelectionnees.length > 1 && <p className="mt-1 font-normal text-amber-800">Plusieurs ordonnances sélectionnées : rattachement multiple à la séance à finaliser avant enregistrement.</p>}
             </fieldset>
+            <div className="w-full">
+              <button type="button" onClick={() => { setNouvelleOrdo((actuelle) => ({ ...actuelle, medicamentNom: medicamentsSession[0] || actuelle.medicamentNom })); setAjoutOrdonnanceOuvert((valeur) => !valeur); }} className="rounded-lg border border-green-700 px-3 py-2 text-xs font-bold text-green-900">+ Ajouter une ordonnance</button>
+              {ajoutOrdonnanceOuvert && <div className="mt-2 grid gap-2 rounded-lg border bg-green-50 p-3 sm:grid-cols-2">
+                <label className="text-xs">Numéro<input className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.numero} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, numero: e.target.value }))} placeholder="0282171" /></label>
+                <label className="text-xs">Date<input type="date" className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.date} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, date: e.target.value }))} /></label>
+                <label className="text-xs">Vétérinaire<input className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.veterinaireNom} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, veterinaireNom: e.target.value }))} placeholder="Dr Pourcel" /></label>
+                <label className="text-xs">Médicament<input className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.medicamentNom} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, medicamentNom: e.target.value }))} /></label>
+                <button type="button" disabled={ajoutOrdoEnCours} onClick={() => void ajouterOrdonnanceSession()} className="rounded-lg bg-green-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Enregistrer et associer</button>
+              </div>}
+            </div>
             <label className="min-w-36 flex-1 text-xs font-semibold text-green-950">Ou numéro d'ordonnance
               <input value={ordonnanceNumeroSession} onChange={(event) => { setOrdonnanceNumeroSession(event.target.value); if (event.target.value.trim()) { setOrdonnanceIdSession(""); setOrdonnanceEnAttente(false); } }} placeholder="N° à saisir" className="mt-1 min-h-10 w-full rounded border px-2 font-normal" />
             </label>
