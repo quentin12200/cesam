@@ -165,6 +165,7 @@ export default async function VaccinsPage() {
       <header><h1 className="text-xl font-black text-gray-900">Tableau vaccinal</h1></header>
       <TableauVaccinal actionsPrevues={actionsPrevues} blocs={grille.blocs} lignes={grille.lignes.map((ligne) => ({
         ...ligne,
+        categorie: animauxGrille.find((animal) => animal.id === ligne.animalId)?.categorie ?? "",
         actes: ligne.actes.map((acte) => ({ ...acte, date: acte.date.toISOString() })),
         cellules: Object.fromEntries(Object.entries(ligne.cellules).map(([cle, cellule]) => [cle, {
           ...cellule,

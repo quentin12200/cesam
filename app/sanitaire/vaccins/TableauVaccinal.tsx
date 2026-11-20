@@ -57,6 +57,7 @@ interface Ligne {
   mereNom: string | null;
   mereLiee: boolean;
   sexe: string;
+  categorie: string;
   danaisIso: string;
   gestationId: string | null;
   dateVelagePrevueIso: string | null;
@@ -128,6 +129,11 @@ const colonnesAnimal: { id: ColonneAnimal; label: string }[] = [
 ];
 const colonnesMasquables = colonnesAnimal.filter((colonne): colonne is { id: ColonneMasquable; label: string } => colonne.id !== "numero");
 const largeurColonne: Record<ColonneAnimal, number> = { numero: 64, nom: 92, mere: 72, age: 66, sexe: 42, velage: 76 };
+const repereGenisse: Record<string, { titre: string; couleur: string }> = {
+  PETITE_GENISSE: { titre: "Petite génisse", couleur: "bg-lime-500" },
+  MOYENNE_GENISSE: { titre: "Moyenne génisse", couleur: "bg-emerald-600" },
+  GRANDE_GENISSE: { titre: "Grande génisse", couleur: "bg-teal-600" },
+};
 const largeurSelection = 38;
 const dateLocaleIso = () => {
   const date = new Date();
@@ -914,7 +920,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
             {!colonnesMasquees.has("nom") && <td className="animal-fixed z-20 max-w-24 border-r bg-white p-1 text-xs text-gray-600" style={{ left: decalageColonne("nom"), width: largeurColonne.nom, minWidth: largeurColonne.nom }}><span className="block truncate">{ligne.nom || "—"}</span></td>}
             {!colonnesMasquees.has("mere") && <td className="animal-fixed z-20 border-r bg-white p-1 text-xs text-gray-700" style={{ left: decalageColonne("mere"), width: largeurColonne.mere, minWidth: largeurColonne.mere }} title={ligne.mereNom ? `${ligne.mereNutrav ?? ""} — ${ligne.mereNom}` : ligne.mereNutrav ?? undefined}>{ligne.mereNutrav ? (ligne.mereLiee ? <Link href={`/troupeau/${ligne.mereNutrav}`} className="font-mono font-bold text-green-800 underline">{ligne.mereNutrav}</Link> : <span className="font-mono font-semibold">{ligne.mereNutrav}</span>) : "—"}</td>}
             {!colonnesMasquees.has("age") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("age"), width: largeurColonne.age, minWidth: largeurColonne.age }}>{formatAgeTerrain(ligne.danaisIso)}</td>}
-            {!colonnesMasquees.has("sexe") && <td className="animal-fixed z-20 border-r bg-white p-1 text-center font-medium text-gray-700" style={{ left: decalageColonne("sexe"), width: largeurColonne.sexe, minWidth: largeurColonne.sexe }}>{ligne.sexe}</td>}
+            {!colonnesMasquees.has("sexe") && <td className="animal-fixed z-20 border-r bg-white p-1 text-center font-medium text-gray-700" style={{ left: decalageColonne("sexe"), width: largeurColonne.sexe, minWidth: largeurColonne.sexe }}><span className="inline-flex items-center justify-center gap-1">{ligne.sexe}{repereGenisse[ligne.categorie] && <span role="img" aria-label={repereGenisse[ligne.categorie].titre} title={repereGenisse[ligne.categorie].titre} className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${repereGenisse[ligne.categorie].couleur}`} />}</span></td>}
             {!colonnesMasquees.has("velage") && <td className="animal-fixed z-20 border-r bg-white p-1 font-medium whitespace-nowrap text-gray-700" style={{ left: decalageColonne("velage"), width: largeurColonne.velage, minWidth: largeurColonne.velage }}>{ligne.dateVelagePrevueIso ? formatTempsAvantVelage(ligne.dateVelagePrevueIso) : "—"}</td>}
             {blocsAffiches.flatMap((bloc) => modeVaccin(bloc.cle) === "COMPACT"
               ? [<td key={`${bloc.cle}-compact`} className="w-24 min-w-24 border-r bg-white p-1 text-center"><button type="button" onClick={() => changerModeVaccin(bloc.cle, "OUVERT")} aria-label={`Ouvrir ${bloc.nom} pour ${ligne.nutrav}`} title={bloc.nom} className="min-h-11 w-full rounded-md bg-gray-50 px-1 text-xs font-semibold text-gray-700">{(() => { const cellules = bloc.sousColonnes.map((etape) => ligne.cellules[etape.id]).filter(Boolean); return cellules.some((cellule) => cellule.statut === "EN_RETARD") ? "En retard" : cellules.some((cellule) => cellule.statut === "A_FAIRE") ? "À faire" : cellules.some((cellule) => cellule.statut === "FAIT") ? "✓ Fait" : cellules.some((cellule) => cellule.statut === "BIENTOT" || cellule.statut === "PREVU") ? "À prévoir" : "—"; })()}</button></td>]
