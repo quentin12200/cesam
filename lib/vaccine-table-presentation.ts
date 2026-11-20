@@ -41,7 +41,7 @@ export function comparerUrgenceVaccinale(a?: CelluleVaccinaleTri, b?: CelluleVac
  * dates absentes ou invalides à la fin, indépendamment du statut sanitaire. */
 export function comparerEcheanceVaccinale(a?: CelluleVaccinaleTri, b?: CelluleVaccinaleTri): number {
   const temps = (cellule?: CelluleVaccinaleTri): number => {
-    if (!cellule?.date || !/^\\d{4}-\\d{2}-\\d{2}(?:T|$)/.test(cellule.date)) return Number.POSITIVE_INFINITY;
+    if (!cellule?.date || !/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(cellule.date)) return Number.POSITIVE_INFINITY;
     const valeur = Date.parse(cellule.date);
     return Number.isFinite(valeur) ? valeur : Number.POSITIVE_INFINITY;
   };
