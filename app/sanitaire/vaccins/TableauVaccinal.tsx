@@ -130,9 +130,9 @@ const colonnesAnimal: { id: ColonneAnimal; label: string }[] = [
 const colonnesMasquables = colonnesAnimal.filter((colonne): colonne is { id: ColonneMasquable; label: string } => colonne.id !== "numero");
 const largeurColonne: Record<ColonneAnimal, number> = { numero: 64, nom: 92, mere: 72, age: 66, sexe: 42, velage: 76 };
 const repereGenisse: Record<string, { titre: string; couleur: string }> = {
-  PETITE_GENISSE: { titre: "Petite génisse", couleur: "bg-green-600" },
-  MOYENNE_GENISSE: { titre: "Moyenne génisse", couleur: "bg-amber-500" },
-  GRANDE_GENISSE: { titre: "Grande génisse", couleur: "bg-blue-600" },
+  PETITE_GENISSE: { titre: "Petite génisse", couleur: "bg-lime-500" },
+  MOYENNE_GENISSE: { titre: "Moyenne génisse", couleur: "bg-emerald-600" },
+  GRANDE_GENISSE: { titre: "Grande génisse", couleur: "bg-teal-600" },
 };
 const largeurSelection = 38;
 const dateLocaleIso = () => {
