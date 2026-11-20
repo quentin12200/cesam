@@ -994,7 +994,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
           <label className="text-xs font-semibold text-green-950">Date<input type="date" value={dateSession} onChange={(event) => setDateSession(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border bg-white px-2 text-sm font-normal text-gray-900" /></label>
           <label className="text-xs font-semibold text-green-950">Exécutant<div className="mt-1 font-normal text-gray-900"><ExecutantSelect intervenants={intervenants} value={executant} onChange={setExecutant} onAdded={(intervenant) => setIntervenants((actuels) => [...actuels, intervenant])} /></div></label>
           <div className="sm:col-span-3 flex flex-wrap items-end gap-2 rounded-lg border border-green-200 bg-white p-2">
-            <fieldset className="min-w-40 flex-1 text-xs font-semibold text-green-950"><legend>Ordonnances du vaccin (plus ancienne d'abord)</legend>
+            <fieldset className="min-w-40 flex-1 text-xs font-semibold text-green-950"><legend>Ordonnances du vaccin (plus ancienne d&apos;abord)</legend>
               {medicamentsSession.length !== 1 ? <p className="font-normal text-amber-800">Sélectionne un seul vaccin pour proposer les ordonnances correspondantes.</p> : ordonnancesSessionEligibles.length === 0 ? <p className="font-normal text-gray-600">Aucune ordonnance enregistrée pour ce vaccin.</p> : ordonnancesSessionEligibles.map((ordonnance) => <label key={ordonnance.id} className="mt-1 flex items-center gap-2 font-normal"><input type="radio" name="ordonnance-session" checked={ordonnanceIdSession === ordonnance.id} onChange={(event) => { setOrdonnancesSelectionnees(event.target.checked ? [ordonnance.id] : []); setOrdonnanceIdSession(event.target.checked ? ordonnance.id : ""); setOrdonnanceNumeroSession(""); setOrdonnanceEnAttente(false); }} />{ordonnance.numero || "Sans numéro"} · {new Date(ordonnance.date).toLocaleDateString("fr-FR")} · {ordonnance.veterinaireNom || "Vétérinaire non renseigné"}</label>)}
 
             </fieldset>
@@ -1008,7 +1008,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
                 <button type="button" disabled={ajoutOrdoEnCours} onClick={() => void ajouterOrdonnanceSession()} className="rounded-lg bg-green-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Enregistrer et associer</button>
               </div>}
             </div>
-            <label className="min-w-36 flex-1 text-xs font-semibold text-green-950">Ou numéro d'ordonnance
+            <label className="min-w-36 flex-1 text-xs font-semibold text-green-950">Ou numéro d&apos;ordonnance
               <input value={ordonnanceNumeroSession} onChange={(event) => { setOrdonnanceNumeroSession(event.target.value); if (event.target.value.trim()) { setOrdonnancesSelectionnees([]); setOrdonnanceIdSession(""); setOrdonnanceEnAttente(false); } }} placeholder="N° à saisir" className="mt-1 min-h-10 w-full rounded border px-2 font-normal" />
             </label>
             <label className="flex min-h-10 items-center gap-2 text-xs font-semibold text-green-950"><input type="checkbox" checked={ordonnanceEnAttente} onChange={(event) => { setOrdonnanceEnAttente(event.target.checked); if (event.target.checked) { setOrdonnanceNumeroSession(""); setOrdonnanceIdSession(""); } }} />À rattacher plus tard</label>
