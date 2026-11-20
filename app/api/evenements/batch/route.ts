@@ -17,6 +17,9 @@ interface TraitementDraft {
   dureeJours?: number | null;
   doseUnique?: boolean;
   motif?: string | null;
+  ordonnanceNumero?: string | null;
+  ordonnanceId?: string | null;
+  ordonnanceAAssocier?: boolean;
   delaiAttenteViandeJ?: number | null;
   delaiAttenteLaitJ?: number | null;
 }
@@ -110,6 +113,11 @@ export async function POST(request: NextRequest) {
     const traitementsList: TraitementDraft[] = Array.isArray(traitements)
       ? traitements.filter((traitement: TraitementDraft) => traitement?.medicamentNom?.trim())
       : [];
+    const ordonnanceIds = [...new Set(traitementsList.map((t) => t.ordonnanceId).filter((id): id is string => Boolean(id)))];
+    if (ordonnanceIds.length) {
+      const existantes = await prisma.ordonnance.count({ where: { id: { in: ordonnanceIds } } });
+      if (existantes !== ordonnanceIds.length) return NextResponse.json({ error: "Ordonnance introuvable" }, { status: 400 });
+    }
     const resolvedDate = new Date(date);
     const now = new Date();
     const statutsVaccinauxAvant = vaccinationConfig
@@ -154,6 +162,9 @@ export async function POST(request: NextRequest) {
           dose: traitement.doseParAnimal?.[animalId] ?? traitement.dose ?? null,
           uniteDosage: traitement.uniteDosage || null,
           motif: traitement.motif || null,
+          ordonnanceNumero: traitement.ordonnanceNumero?.trim() || null,
+          ordonnanceId: traitement.ordonnanceId || null,
+          ordonnanceAAssocier: !traitement.ordonnanceNumero?.trim() && !traitement.ordonnanceId && traitement.ordonnanceAAssocier === true,
           executant: traitement.executant || null,
           moment: moment ?? null,
           delaiAttenteViandeJ: traitement.delaiAttenteViandeJ ?? null,
