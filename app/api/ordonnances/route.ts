@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
         },
       });
       if (nomsUniques.length) {
-        const catalogue = await prisma.medicament.findMany({ where: { nom: { in: noms } }, select: { id: true, nom: true } });
+        const catalogue = await prisma.medicament.findMany({ select: { id: true, nom: true } });
         for (const nom of nomsUniques) {
           const item = catalogue.find((m) => m.nom.toLocaleUpperCase("fr-FR") === nom);
           if (item) {
