@@ -243,7 +243,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       }));
     });
     const lignesFiltrees = uniquementSelection ? filtres.filter((ligne) => animauxSelectionnes.has(ligne.animalId)) : filtres;
-    if (!tri || !directionTri) return lignesFiltrees;
+    if (!tri || !directionTri) return [...lignesFiltrees].sort((a, b) => a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true }));
     const signe = directionTri === "desc" ? -1 : 1;
     return [...lignesFiltrees].sort((a, b) => {
       if (tri === "age") return signe * (ageJours(a.danaisIso) - ageJours(b.danaisIso));
@@ -253,7 +253,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       }
       if (tri.startsWith("vaccin:")) {
         const etapeId = tri.slice("vaccin:".length);
-        return signe * comparerEcheanceVaccinale(echeanceDeTri(a.cellules[etapeId]), echeanceDeTri(b.cellules[etapeId]))
+        return comparerEcheanceVaccinale(echeanceDeTri(a.cellules[etapeId]), echeanceDeTri(b.cellules[etapeId]), signe)
           || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
       }
       return signe * a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
