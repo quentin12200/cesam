@@ -183,7 +183,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [ordonnancesDisponibles, setOrdonnancesDisponibles] = useState<Array<{ id: string; numero: string | null; date: string; veterinaireNom: string | null }>>([]);
   const [ordonnancesSelectionnees, setOrdonnancesSelectionnees] = useState<string[]>([]);
   const [ajoutOrdonnanceOuvert, setAjoutOrdonnanceOuvert] = useState(false);
-  const [nouvelleOrdo, setNouvelleOrdo] = useState({ numero: "", date: dateLocaleIso, veterinaireNom: "", medicamentNom: "HEPIZOVAC" });
+  const [nouvelleOrdo, setNouvelleOrdo] = useState({ numero: "", date: dateLocaleIso(), veterinaireNom: "", medicamentNom: "HEPIZOVAC" });
   const [ajoutOrdoEnCours, setAjoutOrdoEnCours] = useState(false);
   const [intervenants, setIntervenants] = useState<Intervenant[]>([]);
   const [animauxSelectionnes, setAnimauxSelectionnes] = useState<Set<string>>(new Set());
@@ -425,7 +425,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     setAjoutOrdoEnCours(true);
     setErreur("");
     try {
-      const response = await fetch("/api/ordonnances", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nouvelleOrdo) });
+      const response = await fetch("/api/ordonnances", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...nouvelleOrdo, medicaments: [nouvelleOrdo.medicamentNom] }) });
       if (!response.ok) throw new Error("L'ordonnance n'a pas pu être enregistrée.");
       const ordonnance = await response.json();
       setOrdonnanceIdSession(ordonnance.id);
