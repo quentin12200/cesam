@@ -14,6 +14,9 @@ export async function PATCH(
     const protocoleId = typeof body.protocoleId === "string" ? body.protocoleId : "";
     const etapeProtocoleId = typeof body.etapeProtocoleId === "string" ? body.etapeProtocoleId : "";
     const gestationId = typeof body.gestationId === "string" && body.gestationId ? body.gestationId : null;
+    const ordonnanceId = typeof body.ordonnanceId === "string" && body.ordonnanceId ? body.ordonnanceId : null;
+    const ordonnance = ordonnanceId ? await prisma.ordonnance.findUnique({ where: { id: ordonnanceId }, select: { id: true, numero: true } }) : null;
+    if (ordonnanceId && !ordonnance) return NextResponse.json({ error: "Ordonnance introuvable" }, { status: 400 });
     if (!protocoleId || !etapeProtocoleId) {
       return NextResponse.json({ error: "Protocole et étape requis" }, { status: 400 });
     }
@@ -67,6 +70,7 @@ export async function PATCH(
       data: {
         protocoleId,
         etapeProtocoleId,
+        ...(ordonnance ? { ordonnanceId: ordonnance.id, ordonnanceNumero: ordonnance.numero } : {}),
         gestationId: vaccination.gestationId
           ?? gestationIdAEnregistrer(protocole.etapes, gestationId, protocole.configurationQuestionnaireJson),
         typeInjection: typeInjectionPourEtape(protocole.etapes, etapeProtocoleId),
