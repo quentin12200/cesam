@@ -58,3 +58,13 @@ test("tri Primo : dates absentes ou invalides en dernier, sans NaN", () => {
   assert.deepEqual(cellules.slice(0, 2).map(c => c.date), ["2026-09-01", "2026-11-01"]);
   assert.equal(comparerEcheanceVaccinale(cellules[2], cellules[3]), 0);
 });
+
+test("tri Primo décroissant : dates manquantes toujours à la fin", () => {
+  const dates: CelluleVaccinaleTri[] = [
+    { statut: "VIDE", date: null },
+    { statut: "PREVU", date: "2026-10-01" },
+    { statut: "A_FAIRE", date: "2026-11-01" },
+  ];
+  dates.sort((a, b) => comparerEcheanceVaccinale(a, b, -1));
+  assert.deepEqual(dates.map(c => c.date), ["2026-11-01", "2026-10-01", null]);
+});
