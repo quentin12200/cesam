@@ -144,8 +144,16 @@ const cleActe = (animalId: string, etapeId: string) => `${animalId}|${etapeId}`;
 const estAFaire = (statut: CelluleGrille["statut"]) => statut === "A_FAIRE" || statut === "BIENTOT";
 // Une case FAIT n'est jamais verrouillée : une nouvelle administration reste possible (via l'historique).
 const statutEffectif = (cellule: CelluleGrille): CelluleGrille["statut"] => cellule.statut === "FAIT" && cellule.prochaine ? cellule.prochaine.statut : cellule.statut;
-const echeanceDeTri = (cellule: CelluleGrille | undefined) =>
-  cellule?.prochaine ? { statut: cellule.prochaine.statut, date: cellule.prochaine.date } : cellule;
+// Trier selon le début de la fenêtre affichée dans la case, pas la date
+// théorique d'échéance (qui peut être postérieure à la fenêtre visible).
+const echeanceDeTri = (cellule: CelluleGrille | undefined) => {
+  if (!cellule) return undefined;
+  if (cellule.aValider) return { statut: cellule.statut, date: null };
+  if (cellule.statut === "FAIT") {
+    return { statut: cellule.prochaine?.statut ?? cellule.statut, date: cellule.prochaine?.fenetre.debut ?? null };
+  }
+  return { statut: cellule.statut, date: cellule.fenetre?.debut ?? null };
+};
 
 function correspondStatut(cellule: CelluleGrille, filtres: ReadonlySet<Statut>): boolean {
   if (filtres.size === 0) return true;
