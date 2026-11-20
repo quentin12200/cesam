@@ -13,11 +13,18 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const {
-    date, numero, veterinaireNom, medicamentNom,
+    date, numero, veterinaireNom, medicamentNom, medicaments,
     dose, uniteDosage, voie, frequence, dureeJours, motif, animaux, notes, photoUrl,
     delaiAttenteViandeJ, delaiAttenteLaitJ, precautions, rappels,
   } = body;
 
+  const noms = Array.isArray(medicaments) ? medicaments.map((item: unknown) => typeof item === "string" ? item.trim() : "").filter(Boolean) : [];
+  const nomsUniques = [...new Set(noms.map((nom: string) => nom.toLocaleUpperCase("fr-FR")))];
+  if (nomsUniques.length > 0) {
+    const catalogue = await prisma.medicament.findMany({ select: { id: true, nom: true } });
+    const introuvables = nomsUniques.filter((nom) => !catalogue.some((item) => item.nom.toLocaleUpperCase("fr-FR") === nom));
+    if (introuvables.length) return NextResponse.json({ error: "Médicament(s) absent(s) du catalogue : " + introuvables.join(", ") }, { status: 400 });
+  }
   const trimmedNumero = numero?.trim() || null;
 
   if (trimmedNumero) {
@@ -34,6 +41,16 @@ export async function POST(request: NextRequest) {
           rappels: existante.rappels ?? rappels?.trim() ?? null,
         },
       });
+      if (nomsUniques.length) {
+        const catalogue = await prisma.medicament.findMany({ where: { nom: { in: noms } }, select: { id: true, nom: true } });
+        for (const nom of nomsUniques) {
+          const item = catalogue.find((m) => m.nom.toLocaleUpperCase("fr-FR") === nom);
+          if (item) {
+            const deja = await prisma.ordonnanceMedicament.findFirst({ where: { ordonnanceId: existante.id, medicamentId: item.id } });
+            if (!deja) await prisma.ordonnanceMedicament.create({ data: { ordonnanceId: existante.id, medicamentId: item.id, nomExtrait: item.nom, statutCorrespondance: "matched" } });
+          }
+        }
+      }
       return NextResponse.json({ ...updated, _reused: true }, { status: 200 });
     }
   }
@@ -59,6 +76,14 @@ export async function POST(request: NextRequest) {
       rappels: rappels?.trim() || null,
     },
   });
+
+  if (nomsUniques.length) {
+    const catalogue = await prisma.medicament.findMany({ select: { id: true, nom: true } });
+    await prisma.ordonnanceMedicament.createMany({ data: nomsUniques.map((nom) => {
+      const item = catalogue.find((m) => m.nom.toLocaleUpperCase("fr-FR") === nom)!;
+      return { ordonnanceId: ordonnance.id, medicamentId: item.id, nomExtrait: item.nom, statutCorrespondance: "matched" };
+    }) });
+  }
 
   const desc = `Ordonnance ${ordonnance.medicamentNom || ''} créée`;
   let undoId = "";
