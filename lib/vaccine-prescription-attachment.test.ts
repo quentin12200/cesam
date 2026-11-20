@@ -11,3 +11,9 @@ test("missing catalog id rejected", () => assert.match(verifierRattachementOrdon
 test("different existing ordonnance cannot be silently replaced", () => assert.match(verifierRattachementOrdonnanceActe({ ...base, ordonnanceActuelleId: "o2" })!, /déjà associée/));
 test("same ordonnance can be confirmed again", () => assert.equal(verifierRattachementOrdonnanceActe({ ...base, ordonnanceActuelleId: "o1" }), null));
 test("missing source rejected", () => assert.match(verifierRattachementOrdonnanceActe({ ...base, sourceId: "" })!, /requis/));
+
+test("historical MHE vaccine: exact single-medicine match accepted", () => assert.equal(verifierRattachementOrdonnanceActe({ ...base, medicamentId: null, nomVaccinActe: " Hepizovac ", nomsVaccinsOrdonnance: ["HEPIZOVAC"], nombreMedicamentsOrdonnance: 1 }), null));
+test("historical vaccine: substring similarity rejected", () => assert.match(verifierRattachementOrdonnanceActe({ ...base, medicamentId: null, nomVaccinActe: "HEPIZOVAC", nomsVaccinsOrdonnance: ["HEPIZOVAC PLUS"], nombreMedicamentsOrdonnance: 1 })!, /correspondance exacte/));
+test("historical vaccine: multi-medicine ordonnance rejected", () => assert.match(verifierRattachementOrdonnanceActe({ ...base, medicamentId: null, nomVaccinActe: "HEPIZOVAC", nomsVaccinsOrdonnance: ["HEPIZOVAC"], nombreMedicamentsOrdonnance: 2 })!, /médicament unique/));
+test("historical vaccine: missing name rejected", () => assert.match(verifierRattachementOrdonnanceActe({ ...base, medicamentId: null, nomVaccinActe: "", nomsVaccinsOrdonnance: ["HEPIZOVAC"], nombreMedicamentsOrdonnance: 1 })!, /correspondance exacte/));
+test("historical vaccine: conflicting names rejected", () => assert.match(verifierRattachementOrdonnanceActe({ ...base, medicamentId: null, nomVaccinActe: "HEPIZOVAC", nomsVaccinsOrdonnance: ["HEPIZOVAC", "AUTRE VACCIN"], nombreMedicamentsOrdonnance: 1 })!, /correspondance exacte/));
