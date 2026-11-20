@@ -181,6 +181,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [ordonnanceIdSession, setOrdonnanceIdSession] = useState("");
   const [ordonnanceEnAttente, setOrdonnanceEnAttente] = useState(false);
   const [ordonnancesDisponibles, setOrdonnancesDisponibles] = useState<Array<{ id: string; numero: string | null; date: string; veterinaireNom: string | null }>>([]);
+  const [ordonnancesSelectionnees, setOrdonnancesSelectionnees] = useState<string[]>([]);
   const [intervenants, setIntervenants] = useState<Intervenant[]>([]);
   const [animauxSelectionnes, setAnimauxSelectionnes] = useState<Set<string>>(new Set());
   const [uniquementSelection, setUniquementSelection] = useState(false);
@@ -221,10 +222,6 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     vue, recherche, vaccinModes, statuts, tri, directionTri, colonnesMasquees, anneesAffichees, toutHistorique, uniquementSelection,
     animauxSelectionnes, actesSelectionnes, dateSession, executant, ajustements,
   }, { setVue, setRecherche, setVaccinModes, setStatuts, setTri, setDirectionTri, setColonnesMasquees, setAnneesAffichees, setToutHistorique, setUniquementSelection, setAnimauxSelectionnes, setActesSelectionnes, setDateSession, setExecutant, setAjustements }, lignes, blocs);
-
-  useEffect(() => {
-    fetch("/api/ordonnances?limit=100").then((reponse) => reponse.json()).then((donnees) => { if (Array.isArray(donnees)) setOrdonnancesDisponibles(donnees); else if (Array.isArray(donnees?.ordonnances)) setOrdonnancesDisponibles(donnees.ordonnances); }).catch(() => {});
-  }, []);
 
   useEffect(() => {
     fetch("/api/intervenants").then((reponse) => reponse.json()).then(setIntervenants).catch(() => {});
@@ -409,11 +406,23 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     }]; }));
   }
 
+  const medicamentsSession = [...new Set(groupesSession.map((groupe) => groupe.etape.medicamentNom || groupe.bloc.nom).filter(Boolean))];
+  useEffect(() => {
+    if (medicamentsSession.length !== 1) { setOrdonnancesDisponibles([]); setOrdonnancesSelectionnees([]); return; }
+    let actif = true;
+    fetch("/api/ordonnances/for-medicament?nom=" + encodeURIComponent(medicamentsSession[0]))
+      .then((reponse) => reponse.json())
+      .then((donnees) => { if (actif) setOrdonnancesDisponibles(Array.isArray(donnees) ? donnees.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : []); })
+      .catch(() => { if (actif) setOrdonnancesDisponibles([]); });
+    return () => { actif = false; };
+  }, [medicamentsSession.join("|")]);
+
   function enregistrerSelection() {
     if (!dateSession || !executant.trim() || groupesSession.length === 0) {
       setErreur("Indique la date, l’exécutant et sélectionne au moins un acte.");
       return;
     }
+    if (ordonnancesSelectionnees.length > 1) { setErreur("Le rattachement de plusieurs ordonnances n’est pas encore disponible. Ne valide pas cette séance avec une seule ordonnance."); return; }
     const administrations = { ...administrationsParDefaut(), ...ajustements };
     setAjustements(administrations);
     setErreur("");
@@ -908,12 +917,10 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
           <label className="text-xs font-semibold text-green-950">Date<input type="date" value={dateSession} onChange={(event) => setDateSession(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border bg-white px-2 text-sm font-normal text-gray-900" /></label>
           <label className="text-xs font-semibold text-green-950">Exécutant<div className="mt-1 font-normal text-gray-900"><ExecutantSelect intervenants={intervenants} value={executant} onChange={setExecutant} onAdded={(intervenant) => setIntervenants((actuels) => [...actuels, intervenant])} /></div></label>
           <div className="sm:col-span-3 flex flex-wrap items-end gap-2 rounded-lg border border-green-200 bg-white p-2">
-            <label className="min-w-40 flex-1 text-xs font-semibold text-green-950">Ordonnance existante
-              <select value={ordonnanceIdSession} onChange={(event) => { setOrdonnanceIdSession(event.target.value); if (event.target.value) { setOrdonnanceNumeroSession(""); setOrdonnanceEnAttente(false); } }} className="mt-1 min-h-10 w-full rounded border px-2 font-normal">
-                <option value="">Aucune sélectionnée</option>
-                {ordonnancesDisponibles.map((ordonnance) => <option key={ordonnance.id} value={ordonnance.id}>{ordonnance.numero || "Sans numéro"} · {new Date(ordonnance.date).toLocaleDateString("fr-FR")} · {ordonnance.veterinaireNom || "Vétérinaire non renseigné"}</option>)}
-              </select>
-            </label>
+            <fieldset className="min-w-40 flex-1 text-xs font-semibold text-green-950"><legend>Ordonnances du vaccin (plus ancienne d'abord)</legend>
+              {medicamentsSession.length !== 1 ? <p className="font-normal text-amber-800">Sélectionne un seul vaccin pour proposer les ordonnances correspondantes.</p> : ordonnancesDisponibles.length === 0 ? <p className="font-normal text-gray-600">Aucune ordonnance enregistrée pour ce vaccin.</p> : ordonnancesDisponibles.map((ordonnance) => <label key={ordonnance.id} className="mt-1 flex items-center gap-2 font-normal"><input type="checkbox" checked={ordonnancesSelectionnees.includes(ordonnance.id)} onChange={(event) => { setOrdonnancesSelectionnees((actuelles) => event.target.checked ? [...actuelles, ordonnance.id] : actuelles.filter((id) => id !== ordonnance.id)); setOrdonnanceIdSession(event.target.checked ? ordonnance.id : ""); setOrdonnanceNumeroSession(""); setOrdonnanceEnAttente(false); }} />{ordonnance.numero || "Sans numéro"} · {new Date(ordonnance.date).toLocaleDateString("fr-FR")} · {ordonnance.veterinaireNom || "Vétérinaire non renseigné"}</label>)}
+              {ordonnancesSelectionnees.length > 1 && <p className="mt-1 font-normal text-amber-800">Plusieurs ordonnances sélectionnées : rattachement multiple à la séance à finaliser avant enregistrement.</p>}
+            </fieldset>
             <label className="min-w-36 flex-1 text-xs font-semibold text-green-950">Ou numéro d'ordonnance
               <input value={ordonnanceNumeroSession} onChange={(event) => { setOrdonnanceNumeroSession(event.target.value); if (event.target.value.trim()) { setOrdonnanceIdSession(""); setOrdonnanceEnAttente(false); } }} placeholder="N° à saisir" className="mt-1 min-h-10 w-full rounded border px-2 font-normal" />
             </label>
