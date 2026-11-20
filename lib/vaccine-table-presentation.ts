@@ -39,7 +39,7 @@ export function comparerUrgenceVaccinale(a?: CelluleVaccinaleTri, b?: CelluleVac
 
 /** Tri chronologique strict d'une colonne vaccinale : échéances valides d'abord,
  * dates absentes ou invalides à la fin, indépendamment du statut sanitaire. */
-export function comparerEcheanceVaccinale(a?: CelluleVaccinaleTri, b?: CelluleVaccinaleTri): number {
+export function comparerEcheanceVaccinale(a?: CelluleVaccinaleTri, b?: CelluleVaccinaleTri, signe: 1 | -1 = 1): number {
   const temps = (cellule?: CelluleVaccinaleTri): number => {
     if (!cellule?.date || !/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(cellule.date)) return Number.POSITIVE_INFINITY;
     const valeur = Date.parse(cellule.date);
@@ -48,7 +48,9 @@ export function comparerEcheanceVaccinale(a?: CelluleVaccinaleTri, b?: CelluleVa
   const dateA = temps(a);
   const dateB = temps(b);
   if (dateA === dateB) return 0;
-  return dateA < dateB ? -1 : 1;
+  if (dateA === Number.POSITIVE_INFINITY) return 1;
+  if (dateB === Number.POSITIVE_INFINITY) return -1;
+  return (dateA < dateB ? -1 : 1) * signe;
 }
 
 export function formatTempsAvantVelage(dateVelagePrevue: string | Date, dateReference = new Date()): string {
