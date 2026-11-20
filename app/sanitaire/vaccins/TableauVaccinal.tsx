@@ -253,7 +253,8 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       }
       if (tri.startsWith("vaccin:")) {
         const etapeId = tri.slice("vaccin:".length);
-        return signe * comparerEcheanceVaccinale(echeanceDeTri(a.cellules[etapeId]), echeanceDeTri(b.cellules[etapeId]))\n          || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
+        return signe * comparerEcheanceVaccinale(echeanceDeTri(a.cellules[etapeId]), echeanceDeTri(b.cellules[etapeId]))
+          || a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
       }
       return signe * a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true });
     });
