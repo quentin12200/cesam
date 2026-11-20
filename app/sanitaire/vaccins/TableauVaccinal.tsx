@@ -150,9 +150,9 @@ const echeanceDeTri = (cellule: CelluleGrille | undefined) => {
   if (!cellule) return undefined;
   if (cellule.aValider) return { statut: cellule.statut, date: null };
   if (cellule.statut === "FAIT") {
-    return { statut: cellule.prochaine?.statut ?? cellule.statut, date: cellule.prochaine?.fenetre.debut ?? null };
+    return { statut: cellule.prochaine?.statut ?? cellule.statut, date: cellule.prochaine ? (cellule.prochaine.statut === "EN_RETARD" ? cellule.prochaine.fenetre.fin : cellule.prochaine.fenetre.debut) : null };
   }
-  return { statut: cellule.statut, date: cellule.fenetre?.debut ?? null };
+  return { statut: cellule.statut, date: cellule.fenetre ? (cellule.statut === "EN_RETARD" ? cellule.fenetre.fin : cellule.fenetre.debut) : null };
 };
 
 function correspondStatut(cellule: CelluleGrille, filtres: ReadonlySet<Statut>): boolean {
