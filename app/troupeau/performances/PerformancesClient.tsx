@@ -186,6 +186,23 @@ function VacheRow({ row }: { row: VachePerf }) {
                 )}
               </div>
 
+              {/* Comparaison des pères pour cette mère */}
+              <div className="md:col-span-2 rounded-lg border border-indigo-100 bg-white p-3">
+                <p className="mb-2 text-xs font-semibold text-gray-600">GMQ des veaux selon le père</p>
+                {row.peresGmq.length === 0 ? <p className="text-xs text-gray-400">Pas assez de pesées avec père identifié</p> : (
+                  <div className="flex flex-wrap gap-2">
+                    {row.peresGmq.map((pere) => (
+                      <div key={pere.pereNom} className="rounded-lg bg-indigo-50 px-3 py-2 text-xs">
+                        <div className="font-semibold text-gray-800">{pere.pereNom}</div>
+                        <div className="font-bold text-indigo-700">{pere.gmqMoyen.toLocaleString("fr-FR")} g/j</div>
+                        <div className="text-gray-500">sur {pere.nombreVeaux} veau{pere.nombreVeaux > 1 ? "x" : ""} pesé{pere.nombreVeaux > 1 ? "s" : ""}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-2 text-[10px] text-gray-500">Comparaison indicative : les âges, les conditions d’élevage et les effectifs peuvent différer.</p>
+              </div>
+
               {/* Veaux */}
               <div>
                 <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
@@ -372,7 +389,7 @@ export default function PerformancesClient({ data }: { data: VachePerf[] }) {
           veau/an)
         </p>
         <p>
-          • <strong>GMQ</strong> = (poids dernière pesée − poids 1ʳᵉ pesée) ÷ âge en jours —
+          • <strong>GMQ</strong> = (poids dernière pesée − poids 1ʳᵉ pesée) ÷ jours entre les deux pesées × 1 000 —
           minimum 2 pesées
         </p>
         <p>
