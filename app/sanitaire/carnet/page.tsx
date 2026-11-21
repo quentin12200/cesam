@@ -15,10 +15,12 @@ import PrintButton from "@/app/components/PrintButton";
 import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 import ImportHistoriqueButton from "./ImportHistoriqueButton";
 import RechercheActesCarnet from "./RechercheActes";
+import ChoixImpression from "./ChoixImpression";
+import { dansImpression, periodeValide, type PeriodeImpression } from "@/lib/carnet-periode-impression";
 
 interface PageProps {
   searchParams: Promise<{ order?: string; sort?: string; du?: string; au?: string; animal?: string; produit?: string;
-    acteTri?: string; acteDirection?: string; annee?: string; mois?: string; ordonnance?: string; q?: string }>;
+    acteTri?: string; acteDirection?: string; annee?: string; mois?: string; ordonnance?: string; q?: string; impression?: string; printDu?: string; printAu?: string }>;
 }
 
 async function getExploitationConfig() {
@@ -50,11 +52,19 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
     getExploitationConfig(),
     getActesSanitairesReels(),
   ]);
+  const mode: PeriodeImpression | null = params.impression === "mois" || params.impression === "annee" || params.impression === "periode" || params.impression === "selection" ? params.impression : null;
+  const choix = { mode: mode ?? "mois", annee, mois, du: params.printDu, au: params.printAu };
+  const impressionValide = periodeValide(choix);
   const rechercheActive = Boolean(params.q?.trim());
   const actesSelectionnes = rechercheActive ? rechercherActes(actes, recherche) : [];
   const idsSelectionnes = new Set(actesSelectionnes.map((a) => a.id.split(":")[1]));
-  const rows = toutesRows.filter((r) => rechercheActive ? idsSelectionnes.has(r.id) : dansPeriode(r.date));
-  const evenements = rechercheActive ? [] : tousEvenements.filter((e) => dansPeriode(e.date) && e.produits.length > 0);
+  const rows = toutesRows.filter((r) => {
+    if (mode === "selection") return rechercheActive && idsSelectionnes.has(r.id);
+    if (mode) return impressionValide && dansImpression(r.date, choix);
+    return rechercheActive ? idsSelectionnes.has(r.id) : dansPeriode(r.date);
+  });
+  const evenements = rechercheActive || mode === "selection" ? [] : tousEvenements.filter((e) =>
+    e.produits.length > 0 && (mode ? impressionValide && dansImpression(e.date, choix) : dansPeriode(e.date)));
   const printDate = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const groupes = order === "animal" ? groupRowsByAnimal(rows) : [];
   const evenementsTries = [...evenements].sort((a, b) => sort === "animal"
@@ -129,6 +139,11 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
           <span className="text-xs text-gray-600">Archives consultables sans suppression automatique</span>
         </form>
         <RechercheActesCarnet actes={actes} recherche={recherche} />
+        <ChoixImpression annee={annee} mois={mois} q={params.q ?? ""} />
+        {mode && <div id="apercu-impression" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-green-300 bg-green-50 p-3 print:hidden">
+          <span className="text-sm font-semibold">Aperçu de la période — {rows.length} actes</span>
+          {impressionValide ? <PrintButton label="Imprimer cette période" /> : <span role="alert" className="text-red-700">Période invalide</span>}
+        </div>}
         <div className="mb-6 rounded-xl overflow-hidden shadow-sm border border-green-800 print:border-2">
           <div className="bg-green-700 text-white px-6 py-5 text-center">
             <p className="text-xs uppercase tracking-widest text-green-100">{config?.raisonSociale ?? "Exploitation"}</p>
