@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Baby, Heart, HeartPulse, Plus, Scale, Scan, Syringe, X, Pencil, Check, Stethoscope, Tag, ClipboardPlus, Footprints, ListChecks } from "lucide-react";
+import { Baby, Heart, HeartPulse, Plus, Scale, Scan, Syringe, X, Pencil, Check, Stethoscope, Tag, ClipboardPlus, Footprints, ListChecks, Scissors } from "lucide-react";
 
-export type ActionId = "velage" | "chaleur" | "saillie" | "echographie" | "vaccination" | "traitement" | "pesee" | "bouclage" | "sanitaire" | "parage" | "liste_velages";
+export type ActionId = "velage" | "chaleur" | "saillie" | "echographie" | "vaccination" | "traitement" | "pesee" | "bouclage" | "sanitaire" | "parage" | "liste_velages" | "sevrage";
 type Action = { id: ActionId; label: string; color: string; icon: typeof Baby; next?: "repro" | "health" };
 const ROOT: Action[] = [
   { id: "velage", label: "Vêlage", color: "#EAA5BA", icon: Baby },
@@ -10,6 +10,7 @@ const ROOT: Action[] = [
   { id: "sanitaire", label: "Sanitaire", color: "#83B8EE", icon: Stethoscope, next: "health" },
   { id: "pesee", label: "Pesée rapide", color: "#B5A5E8", icon: Scale },
   { id: "bouclage", label: "Bouclage", color: "#E9BA7C", icon: Tag },
+  { id: "sevrage", label: "Sevrage", color: "#9BC9A4", icon: Scissors },
 ];
 const REPRO: Action[] = [
   { id: "chaleur", label: "Chaleurs", color: "#F5C7D5", icon: Heart },
@@ -60,17 +61,17 @@ export default function AccueilRadialMenu({ onAction, onSaveNote, animalNumero }
       {open && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-3">
           <button type="button" aria-label="Revenir au cercle précédent" onClick={back} className="absolute inset-0 bg-slate-800/35 backdrop-blur-sm" />
-          <div role="dialog" aria-label={level === "root" ? "Actions rapides" : level === "repro" ? "Reproduction" : "Sanitaire"} className="relative z-10 w-full max-w-[360px] rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl">
-            {animalNumero && <p className="text-center text-sm font-semibold text-green-800">Animal sélectionné : {animalNumero} · démonstration</p>}
+          <div role="dialog" aria-label={level === "root" ? "Actions rapides" : level === "repro" ? "Reproduction" : "Sanitaire"} className="relative z-10 w-full max-w-[360px] p-3">
+            {animalNumero && <p className="mx-auto mb-2 w-fit rounded-full bg-white/85 px-3 py-1 text-center text-sm font-semibold text-green-800 shadow-sm">Animal sélectionné : {animalNumero} · démonstration</p>}
             <div className="relative mx-auto aspect-square w-full max-w-[330px]">
               {actions.map((action, index) => {
-                const angle = actions.length === 3 ? [-90, 30, 150][index] : actions.length === 4 ? [-90, 0, 90, 180][index] : [-90, -18, 54, 126, 198][index];
+                const angle = actions.length === 6 ? [-90, -30, 30, 90, 150, 210][index] : actions.length === 3 ? [-90, 30, 150][index] : actions.length === 4 ? [-90, 0, 90, 180][index] : [-90, -18, 54, 126, 198][index];
                 const rad = angle * Math.PI / 180;
                 const left = 50 + 36 * Math.cos(rad), top = 50 + 36 * Math.sin(rad);
                 return (
                   <div key={action.id} className="absolute w-[90px] -translate-x-1/2 -translate-y-1/2" style={{ left: `${left}%`, top: `${top}%` }}>
-                    <button type="button" onClick={() => { if (action.next) setLevel(action.next); else { onAction(action.id); setOpen(false); } }} className="flex min-h-[84px] w-full flex-col items-center justify-center gap-1 text-center text-[11px] font-semibold leading-tight text-slate-800">
-                      <span className="flex h-14 w-14 items-center justify-center rounded-full shadow-sm" style={{ backgroundColor: action.color }}><action.icon size={25} /></span>
+                    <button type="button" onClick={() => { if (action.next) setLevel(action.next); else { onAction(action.id); setOpen(false); } }} className="flex min-h-[84px] w-full flex-col items-center justify-center gap-1 text-center text-[11px] font-semibold leading-tight text-white drop-shadow-md">
+                      <span className="flex h-14 w-14 items-center justify-center rounded-full shadow-lg" style={{ backgroundColor: action.color }}><action.icon size={25} /></span>
                       <span>{action.label}</span>
                     </button>
                   </div>
@@ -93,7 +94,7 @@ export default function AccueilRadialMenu({ onAction, onSaveNote, animalNumero }
               </div>
             </div>
             {error && <p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}
-            <button type="button" onClick={back} className="mx-auto mt-2 flex items-center gap-1 rounded-full px-4 py-2 text-sm text-slate-600"><X size={16}/> {level === "root" ? "Fermer" : "Retour"}</button>
+            <button type="button" onClick={back} className="mx-auto mt-2 flex items-center gap-1 rounded-full bg-slate-900/65 px-4 py-2 text-sm font-semibold text-white"><X size={16}/> {level === "root" ? "Fermer" : "Retour"}</button>
           </div>
         </div>
       )}
