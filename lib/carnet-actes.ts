@@ -89,8 +89,8 @@ export function unifierActesDuCarnet(vaccinations: readonly VaccinationCarnet[],
 }
 
 export type RechercheActes = {
-  du?: string; au?: string; animal?: string; produit?: string; ordonnance?: string;
-  tri?: "date" | "animal" | "produit" | "executant";
+  du?: string; au?: string; animal?: string; produit?: string; ordonnance?: string; q?: string;
+  tri?: "date" | "animal" | "produit" | "executant" | "ordonnance";
   direction?: "asc" | "desc";
 };
 
@@ -100,14 +100,19 @@ export function rechercherActes(actes: readonly ActeSanitaireReel[], recherche: 
   const animal = nomComparable(recherche.animal ?? "");
   const produit = nomComparable(recherche.produit ?? "");
   const ordonnance = nomComparable(recherche.ordonnance ?? "");
+  const q = nomComparable(recherche.q ?? "");
+  const dateRecherche = (recherche.q ?? "").trim().match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  const dateIso = dateRecherche ? `${dateRecherche[3]}-${dateRecherche[2].padStart(2, "0")}-${dateRecherche[1].padStart(2, "0")}` : null;
   const tri = recherche.tri ?? "date";
   const direction = recherche.direction === "asc" ? 1 : -1;
   const texte = (a: ActeSanitaireReel) => tri === "animal" ? a.nutrav
-    : tri === "produit" ? a.produit : a.executant ?? "";
+    : tri === "produit" ? a.produit : tri === "ordonnance" ? a.ordonnanceNumero ?? "" : a.executant ?? "";
   return actes.filter((a) => (!du || jour(a.date) >= du) && (!au || jour(a.date) <= au)
     && (!animal || nomComparable(`${a.nutrav} ${a.nom ?? ""}`).includes(animal))
     && (!produit || nomComparable(a.produit).includes(produit))
-    && (!ordonnance || nomComparable(a.ordonnanceNumero ?? "").includes(ordonnance)))
+    && (!ordonnance || nomComparable(a.ordonnanceNumero ?? "").includes(ordonnance))
+    && (!q || nomComparable([a.produit, a.nutrav, a.nom ?? "", a.ordonnanceNumero ?? "", jour(a.date), a.date.toLocaleDateString("fr-FR")].join(" ")).includes(q)
+      || Boolean(dateIso && jour(a.date) === dateIso)))
     .sort((a, b) => {
       const principal = tri === "date" ? a.date.getTime() - b.date.getTime()
         : tri === "animal" ? a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })
