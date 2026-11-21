@@ -41,7 +41,7 @@ export default function RechercheActesCarnet({ actes, recherche }: {
       <a href={`/api/carnet-sanitaire?selection=1&${new URLSearchParams({ q: recherche.q ?? "", tri: recherche.tri ?? "date", direction: recherche.direction ?? "desc" })}`}
         className="rounded-lg border px-3 py-2 text-sm font-semibold text-green-800">Exporter la sélection (CSV)</a>
       <PrintButton />
-      <span className="text-xs text-gray-500">Pour imprimer uniquement les résultats, utiliser « Imprimer la sélection » dans la vue dédiée.</span>
+      <span className="text-xs text-gray-500">Le bouton Imprimer édite les actes correspondant à votre recherche.</span>
     </div>
     <p role="status" className="mt-3 text-sm font-semibold text-gray-700">{lignes.length} acte{lignes.length > 1 ? "s" : ""} trouvé{lignes.length > 1 ? "s" : ""}</p>
     <div className="mt-2 max-h-[65vh] overflow-auto rounded-lg border border-gray-200">
