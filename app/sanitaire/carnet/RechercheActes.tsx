@@ -10,7 +10,7 @@ export default function RechercheActesCarnet({ actes, recherche }: {
 }) {
   const lignes = rechercherActes(actes, recherche);
   const filtres = new URLSearchParams();
-  for (const [cle, valeur] of Object.entries({ du: recherche.du, au: recherche.au, animal: recherche.animal, produit: recherche.produit })) {
+  for (const [cle, valeur] of Object.entries({ du: recherche.du, au: recherche.au, animal: recherche.animal, produit: recherche.produit, ordonnance: recherche.ordonnance })) {
     if (valeur) filtres.set(cle, valeur);
   }
   const lienTri = (tri: Tri) => {
@@ -29,7 +29,7 @@ export default function RechercheActesCarnet({ actes, recherche }: {
     <h2 id="recherche-actes" className="text-lg font-bold text-green-950">Rechercher des actes sanitaires</h2>
     <p className="text-xs text-gray-600">Vaccinations faites et traitements enregistrés, même sans protocole. Une administration présente dans les deux sources n’apparaît qu’une fois.</p>
 
-    <form action="/sanitaire/carnet" method="get" className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.5fr_1.5fr_auto]">
+    <form action="/sanitaire/carnet" method="get" className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]">
       <label className="text-xs font-semibold text-gray-700">Du
         <input type="date" name="du" defaultValue={recherche.du ?? ""} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-2 text-sm" />
       </label>
@@ -44,6 +44,10 @@ export default function RechercheActesCarnet({ actes, recherche }: {
         <input name="animal" type="search" defaultValue={recherche.animal ?? ""} placeholder="Numéro ou nom"
           className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" />
       </label>
+      <label className="text-xs font-semibold text-gray-700">N° ordonnance
+        <input name="ordonnance" type="search" defaultValue={recherche.ordonnance ?? ""} placeholder="Numéro d'ordonnance"
+          className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" />
+      </label>
       <div className="flex items-end gap-2"><button type="submit" className="min-h-11 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white">Rechercher</button>
         <Link href="/sanitaire/carnet" className="flex min-h-11 items-center text-xs text-gray-600 underline">Effacer</Link></div>
     </form>
@@ -53,7 +57,7 @@ export default function RechercheActesCarnet({ actes, recherche }: {
       <table className="min-w-[860px] w-full border-collapse text-left text-xs sm:text-sm">
         <thead className="sticky top-0 z-10 bg-green-50">
           <tr>{enteteTri("date", "Date")}{enteteTri("animal", "Animal")}{enteteTri("produit", "Produit")}
-            {enteteTri("executant", "Exécutant")}<th scope="col" className="px-3 py-2">Source</th><th scope="col" className="px-3 py-2">Protocole / étape</th></tr>
+            {enteteTri("executant", "Exécutant")}<th scope="col" className="px-3 py-2">Ordonnance</th><th scope="col" className="px-3 py-2">Source</th><th scope="col" className="px-3 py-2">Protocole / étape</th></tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
           {lignes.map((acte) => <tr key={acte.id} className="odd:bg-white even:bg-gray-50">
@@ -61,10 +65,11 @@ export default function RechercheActesCarnet({ actes, recherche }: {
             <td className="px-3 py-2"><Link href={`/troupeau/${encodeURIComponent(acte.nutrav)}`} className="font-bold text-green-800 underline">{acte.nutrav}</Link>{acte.nom ? ` · ${acte.nom}` : ""}</td>
             <td className="px-3 py-2 font-semibold text-gray-900">{acte.produit}</td>
             <td className="px-3 py-2">{acte.executant ?? "—"}</td>
+            <td className="px-3 py-2">{acte.ordonnanceNumero ?? "—"}</td>
             <td className="px-3 py-2">{acte.source}</td>
             <td className="px-3 py-2">{acte.protocoleNom ? `${acte.protocoleNom}${acte.etapeNom ? ` · ${acte.etapeNom}` : " · étape non rattachée"}` : "Sans protocole"}</td>
           </tr>)}
-          {lignes.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-gray-600">Aucun acte trouvé pour ces filtres.</td></tr>}
+          {lignes.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-600">Aucun acte trouvé pour ces filtres.</td></tr>}
         </tbody>
       </table>
     </div>
