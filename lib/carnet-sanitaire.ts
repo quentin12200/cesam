@@ -8,7 +8,7 @@ export async function getActesSanitairesReels(): Promise<ActeSanitaireReel[]> {
     prisma.vaccination.findMany({
       where: { statut: "FAIT" },
       select: {
-        id: true, date: true, statut: true, vaccin: true, medicamentId: true,
+        id: true, date: true, statut: true, vaccin: true, medicamentId: true, ordonnanceNumero: true,
         animal: { select: { id: true, nutrav: true, nobovi: true } },
         medicament: { select: { nom: true } },
         protocole: { select: { label: true } },
@@ -17,7 +17,7 @@ export async function getActesSanitairesReels(): Promise<ActeSanitaireReel[]> {
     }),
     prisma.traitement.findMany({
       select: {
-        id: true, dateDebut: true, medicamentNom: true, medicamentId: true, executant: true,
+        id: true, dateDebut: true, medicamentNom: true, medicamentId: true, executant: true, ordonnanceNumero: true,
         animal: { select: { id: true, nutrav: true, nobovi: true } },
         evenement: { select: { constatePar: true } },
         protocoleVaccin: { select: { label: true } },
@@ -27,11 +27,11 @@ export async function getActesSanitairesReels(): Promise<ActeSanitaireReel[]> {
   ]);
   return unifierActesDuCarnet(
     vaccinations.map((v) => ({ id: v.id, animal: { id: v.animal.id, nutrav: v.animal.nutrav, nom: v.animal.nobovi },
-      date: v.date, statut: v.statut, vaccin: v.vaccin, medicamentId: v.medicamentId,
+      date: v.date, statut: v.statut, vaccin: v.vaccin, medicamentId: v.medicamentId, ordonnanceNumero: v.ordonnanceNumero,
       medicamentNom: v.medicament?.nom ?? null, protocoleNom: v.protocole?.label ?? null,
       etapeNom: v.etapeProtocole?.label ?? null })),
     traitements.map((t) => ({ id: t.id, animal: { id: t.animal.id, nutrav: t.animal.nutrav, nom: t.animal.nobovi },
-      date: t.dateDebut, medicamentNom: t.medicamentNom, medicamentId: t.medicamentId,
+      date: t.dateDebut, medicamentNom: t.medicamentNom, medicamentId: t.medicamentId, ordonnanceNumero: t.ordonnanceNumero,
       executant: t.executant ?? t.evenement?.constatePar ?? null,
       protocoleNom: t.protocoleVaccin?.label ?? null, etapeNom: t.etapeProtocoleVaccin?.label ?? null })),
   );
