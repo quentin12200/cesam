@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildAncestryUpdate,
+  matchesRecordedFather,
   canUseAnimalAsParent,
   isSameAncestryIdentity,
   rankAncestryMatches,
@@ -196,4 +197,26 @@ test("une mère Animal doit être femelle et un père Animal mâle", () => {
   assert.equal(canUseAnimalAsParent({ targetId: "c", candidateId: "m", candidateSex: "M", parent: "MERE" }), false);
   assert.equal(canUseAnimalAsParent({ targetId: "c", candidateId: "m", candidateSex: "M", parent: "PERE" }), true);
   assert.equal(canUseAnimalAsParent({ targetId: "c", candidateId: "f", candidateSex: "F", parent: "PERE" }), false);
+});
+
+const zeus = {
+  bullId: "zeus", bullNational: "FR4635275482", bullName: "ZEUS",
+  bullNameIsUnique: true, linkedBullId: null, breedingBullId: null,
+  manualNational: null, birthNational: null, manualName: null, birthName: null,
+};
+
+test("ZEUS : numéro national complet identique avec ou sans FR", () => {
+  assert.equal(matchesRecordedFather({ ...zeus, manualNational: "46 3527 5482" }), true);
+  assert.equal(matchesRecordedFather({ ...zeus, manualNational: "FR4635275483", birthName: "ZEUS" }), false);
+});
+
+test("un père explicitement lié ne peut pas être remplacé par un homonyme", () => {
+  assert.equal(matchesRecordedFather({ ...zeus, linkedBullId: "autre", birthName: "ZEUS" }), false);
+  assert.equal(matchesRecordedFather({ ...zeus, linkedBullId: "zeus" }), true);
+  assert.equal(matchesRecordedFather({ ...zeus, breedingBullId: "autre", manualName: "ZEUS" }), false);
+});
+
+test("un nom unique n'est qu'un repli sans numéro national contradictoire", () => {
+  assert.equal(matchesRecordedFather({ ...zeus, birthName: "zeus" }), true);
+  assert.equal(matchesRecordedFather({ ...zeus, bullNameIsUnique: false, birthName: "ZEUS" }), false);
 });
