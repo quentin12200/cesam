@@ -18,7 +18,7 @@ import RechercheActesCarnet from "./RechercheActes";
 
 interface PageProps {
   searchParams: Promise<{ order?: string; sort?: string; du?: string; au?: string; animal?: string; produit?: string;
-    acteTri?: string; acteDirection?: string; annee?: string; mois?: string }>;
+    acteTri?: string; acteDirection?: string; annee?: string; mois?: string; ordonnance?: string }>;
 }
 
 async function getExploitationConfig() {
@@ -35,7 +35,7 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
   const sort = sortParam === "animal" || sortParam === "produit" ? sortParam : "date";
   const order = orderParam === "animal" ? "animal" : "chrono";
   const recherche: RechercheActes = {
-    du: params.du, au: params.au, animal: params.animal, produit: params.produit,
+    du: params.du, au: params.au, animal: params.animal, produit: params.produit, ordonnance: params.ordonnance,
     tri: params.acteTri === "animal" || params.acteTri === "produit" || params.acteTri === "executant" ? params.acteTri : "date",
     direction: params.acteDirection === "asc" ? "asc" : "desc",
   };
