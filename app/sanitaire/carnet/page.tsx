@@ -9,16 +9,18 @@ import {
   getActesSanitairesReels, getCarnetSanitaireRows, groupRowsByAnimal, type CarnetSanitaireRow,
   getEvenementsCarnetRows, groupEvenementsByAnimal, type EvenementCarnetRow,
 } from "@/lib/carnet-sanitaire";
-import type { RechercheActes } from "@/lib/carnet-actes";
+import { rechercherActes, type RechercheActes } from "@/lib/carnet-actes";
 import { getCategorieLabel } from "@/lib/evenements-sanitaires";
 import PrintButton from "@/app/components/PrintButton";
 import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
 import ImportHistoriqueButton from "./ImportHistoriqueButton";
 import RechercheActesCarnet from "./RechercheActes";
+import ChoixImpression from "./ChoixImpression";
+import { dansImpression, periodeValide, type PeriodeImpression } from "@/lib/carnet-periode-impression";
 
 interface PageProps {
   searchParams: Promise<{ order?: string; sort?: string; du?: string; au?: string; animal?: string; produit?: string;
-    acteTri?: string; acteDirection?: string }>;
+    acteTri?: string; acteDirection?: string; annee?: string; mois?: string; ordonnance?: string; q?: string; impression?: string; printDu?: string; printAu?: string }>;
 }
 
 async function getExploitationConfig() {
@@ -35,18 +37,34 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
   const sort = sortParam === "animal" || sortParam === "produit" ? sortParam : "date";
   const order = orderParam === "animal" ? "animal" : "chrono";
   const recherche: RechercheActes = {
-    du: params.du, au: params.au, animal: params.animal, produit: params.produit,
+    du: params.du, au: params.au, animal: params.animal, produit: params.produit, ordonnance: params.ordonnance, q: params.q,
     tri: params.acteTri === "animal" || params.acteTri === "produit" || params.acteTri === "executant" ? params.acteTri : "date",
     direction: params.acteDirection === "asc" ? "asc" : "desc",
   };
 
-  const [rows, evenements, config, actes] = await Promise.all([
+  const now = new Date();
+  const annee = /^\d{4}$/.test(params.annee ?? "") ? Number(params.annee) : now.getFullYear();
+  const mois = params.mois === "tous" ? null : /^([1-9]|1[0-2])$/.test(params.mois ?? "") ? Number(params.mois) : (params.annee ? null : now.getMonth() + 1);
+  const dansPeriode = (date: Date) => date.getFullYear() === annee && (mois === null || date.getMonth() + 1 === mois);
+  const [toutesRows, tousEvenements, config, actes] = await Promise.all([
     getCarnetSanitaireRows(),
     getEvenementsCarnetRows(),
     getExploitationConfig(),
     getActesSanitairesReels(),
   ]);
-  const now = new Date();
+  const mode: PeriodeImpression | null = params.impression === "mois" || params.impression === "annee" || params.impression === "periode" || params.impression === "selection" ? params.impression : null;
+  const choix = { mode: mode ?? "mois", annee, mois, du: params.printDu, au: params.printAu };
+  const impressionValide = periodeValide(choix);
+  const rechercheActive = Boolean(params.q?.trim());
+  const actesSelectionnes = rechercheActive ? rechercherActes(actes, recherche) : [];
+  const idsSelectionnes = new Set(actesSelectionnes.map((a) => a.id.split(":")[1]));
+  const rows = toutesRows.filter((r) => {
+    if (mode === "selection") return rechercheActive && idsSelectionnes.has(r.id);
+    if (mode) return impressionValide && dansImpression(r.date, choix);
+    return rechercheActive ? idsSelectionnes.has(r.id) : dansPeriode(r.date);
+  });
+  const evenements = rechercheActive || mode === "selection" ? [] : tousEvenements.filter((e) =>
+    e.produits.length > 0 && (mode ? impressionValide && dansImpression(e.date, choix) : dansPeriode(e.date)));
   const printDate = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const groupes = order === "animal" ? groupRowsByAnimal(rows) : [];
   const evenementsTries = [...evenements].sort((a, b) => sort === "animal"
@@ -105,7 +123,27 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
       </div>
 
       <div className="px-4 py-4 max-w-6xl mx-auto">
+        <form action="/sanitaire/carnet" method="get" className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border bg-white p-3 print:hidden">
+          <label className="text-sm font-semibold">Année
+            <select name="annee" defaultValue={String(annee)} className="ml-2 rounded-lg border p-2">
+              {Array.from({ length: 10 }, (_, i) => now.getFullYear() - i).map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-semibold">Mois
+            <select name="mois" defaultValue={mois === null ? "tous" : String(mois)} className="ml-2 rounded-lg border p-2">
+              <option value="tous">Toute l'année</option>
+              {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Date(2020, i, 1).toLocaleDateString("fr-FR", { month: "long" })}</option>)}
+            </select>
+          </label>
+          <button type="submit" className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white">Afficher</button>
+          <span className="text-xs text-gray-600">Archives consultables sans suppression automatique</span>
+        </form>
         <RechercheActesCarnet actes={actes} recherche={recherche} />
+        <ChoixImpression annee={annee} mois={mois} q={params.q ?? ""} />
+        {mode && <div id="apercu-impression" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-green-300 bg-green-50 p-3 print:hidden">
+          <span className="text-sm font-semibold">Aperçu de la période — {rows.length} actes</span>
+          {impressionValide ? <PrintButton label="Imprimer cette période" /> : <span role="alert" className="text-red-700">Période invalide</span>}
+        </div>}
         <div className="mb-6 rounded-xl overflow-hidden shadow-sm border border-green-800 print:border-2">
           <div className="bg-green-700 text-white px-6 py-5 text-center">
             <p className="text-xs uppercase tracking-widest text-green-100">{config?.raisonSociale ?? "Exploitation"}</p>
