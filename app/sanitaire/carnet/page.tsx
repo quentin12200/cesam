@@ -80,6 +80,7 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
       </div>
 
       <div className="px-4 flex flex-wrap items-center gap-2 print:hidden">
+        <Link href="/sanitaire/carnet/registre" className="min-h-9 rounded-lg bg-green-800 px-3 py-2 text-sm font-bold text-white">Registre unifié (aperçu)</Link>
         <Link
           href="/sanitaire/carnet?order=chrono"
           className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${order === "chrono" ? "bg-green-700 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}
