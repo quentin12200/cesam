@@ -64,6 +64,7 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
       orderBy: { dateDebut: "asc" },
     }),
     prisma.vaccination.findMany({
+      where: { statut: "FAIT" },
       include: { animal: { select: { id: true, nutrav: true, nunati: true, nobovi: true, copaip: true } } },
       orderBy: { date: "asc" },
     }),
