@@ -18,7 +18,7 @@ import RechercheActesCarnet from "./RechercheActes";
 
 interface PageProps {
   searchParams: Promise<{ order?: string; sort?: string; du?: string; au?: string; animal?: string; produit?: string;
-    acteTri?: string; acteDirection?: string }>;
+    acteTri?: string; acteDirection?: string; annee?: string; mois?: string }>;
 }
 
 async function getExploitationConfig() {
@@ -40,13 +40,18 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
     direction: params.acteDirection === "asc" ? "asc" : "desc",
   };
 
-  const [rows, evenements, config, actes] = await Promise.all([
+  const now = new Date();
+  const annee = /^\d{4}$/.test(params.annee ?? "") ? Number(params.annee) : now.getFullYear();
+  const mois = params.mois === "tous" ? null : /^([1-9]|1[0-2])$/.test(params.mois ?? "") ? Number(params.mois) : (params.annee ? null : now.getMonth() + 1);
+  const dansPeriode = (date: Date) => date.getFullYear() === annee && (mois === null || date.getMonth() + 1 === mois);
+  const [toutesRows, tousEvenements, config, actes] = await Promise.all([
     getCarnetSanitaireRows(),
     getEvenementsCarnetRows(),
     getExploitationConfig(),
     getActesSanitairesReels(),
   ]);
-  const now = new Date();
+  const rows = toutesRows.filter((r) => dansPeriode(r.date));
+  const evenements = tousEvenements.filter((e) => dansPeriode(e.date) && e.produits.length > 0);
   const printDate = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const groupes = order === "animal" ? groupRowsByAnimal(rows) : [];
   const evenementsTries = [...evenements].sort((a, b) => sort === "animal"
@@ -105,6 +110,21 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
       </div>
 
       <div className="px-4 py-4 max-w-6xl mx-auto">
+        <form action="/sanitaire/carnet" method="get" className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border bg-white p-3 print:hidden">
+          <label className="text-sm font-semibold">Année
+            <select name="annee" defaultValue={String(annee)} className="ml-2 rounded-lg border p-2">
+              {Array.from({ length: 10 }, (_, i) => now.getFullYear() - i).map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-semibold">Mois
+            <select name="mois" defaultValue={mois === null ? "tous" : String(mois)} className="ml-2 rounded-lg border p-2">
+              <option value="tous">Toute l'année</option>
+              {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Date(2020, i, 1).toLocaleDateString("fr-FR", { month: "long" })}</option>)}
+            </select>
+          </label>
+          <button type="submit" className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white">Afficher</button>
+          <span className="text-xs text-gray-600">Archives consultables sans suppression automatique</span>
+        </form>
         <RechercheActesCarnet actes={actes} recherche={recherche} />
         <div className="mb-6 rounded-xl overflow-hidden shadow-sm border border-green-800 print:border-2">
           <div className="bg-green-700 text-white px-6 py-5 text-center">
