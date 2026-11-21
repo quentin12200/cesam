@@ -9,7 +9,7 @@ import {
   getActesSanitairesReels, getCarnetSanitaireRows, groupRowsByAnimal, type CarnetSanitaireRow,
   getEvenementsCarnetRows, groupEvenementsByAnimal, type EvenementCarnetRow,
 } from "@/lib/carnet-sanitaire";
-import type { RechercheActes } from "@/lib/carnet-actes";
+import { rechercherActes, type RechercheActes } from "@/lib/carnet-actes";
 import { getCategorieLabel } from "@/lib/evenements-sanitaires";
 import PrintButton from "@/app/components/PrintButton";
 import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
@@ -18,7 +18,7 @@ import RechercheActesCarnet from "./RechercheActes";
 
 interface PageProps {
   searchParams: Promise<{ order?: string; sort?: string; du?: string; au?: string; animal?: string; produit?: string;
-    acteTri?: string; acteDirection?: string; annee?: string; mois?: string; ordonnance?: string }>;
+    acteTri?: string; acteDirection?: string; annee?: string; mois?: string; ordonnance?: string; q?: string }>;
 }
 
 async function getExploitationConfig() {
@@ -35,7 +35,7 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
   const sort = sortParam === "animal" || sortParam === "produit" ? sortParam : "date";
   const order = orderParam === "animal" ? "animal" : "chrono";
   const recherche: RechercheActes = {
-    du: params.du, au: params.au, animal: params.animal, produit: params.produit, ordonnance: params.ordonnance,
+    du: params.du, au: params.au, animal: params.animal, produit: params.produit, ordonnance: params.ordonnance, q: params.q,
     tri: params.acteTri === "animal" || params.acteTri === "produit" || params.acteTri === "executant" ? params.acteTri : "date",
     direction: params.acteDirection === "asc" ? "asc" : "desc",
   };
@@ -50,8 +50,11 @@ export default async function CarnetSanitairePage({ searchParams }: PageProps) {
     getExploitationConfig(),
     getActesSanitairesReels(),
   ]);
-  const rows = toutesRows.filter((r) => dansPeriode(r.date));
-  const evenements = tousEvenements.filter((e) => dansPeriode(e.date) && e.produits.length > 0);
+  const rechercheActive = Boolean(params.q?.trim());
+  const actesSelectionnes = rechercheActive ? rechercherActes(actes, recherche) : [];
+  const idsSelectionnes = new Set(actesSelectionnes.map((a) => a.id.split(":")[1]));
+  const rows = toutesRows.filter((r) => rechercheActive ? idsSelectionnes.has(r.id) : dansPeriode(r.date));
+  const evenements = rechercheActive ? [] : tousEvenements.filter((e) => dansPeriode(e.date) && e.produits.length > 0);
   const printDate = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const groupes = order === "animal" ? groupRowsByAnimal(rows) : [];
   const evenementsTries = [...evenements].sort((a, b) => sort === "animal"
