@@ -1,325 +1,60 @@
 import BackButton from "@/app/components/BackButton";
-export const dynamic = "force-dynamic";
-
 import Link from "next/link";
-import { Download } from "lucide-react";
-import { prisma } from "@/lib/prisma";
-import { formatDate } from "@/lib/utils";
-import {
-  getActesSanitairesReels, getCarnetSanitaireRows, groupRowsByAnimal, type CarnetSanitaireRow,
-  getEvenementsCarnetRows, groupEvenementsByAnimal, type EvenementCarnetRow,
-} from "@/lib/carnet-sanitaire";
-import { rechercherActes, type RechercheActes } from "@/lib/carnet-actes";
-import { getCategorieLabel } from "@/lib/evenements-sanitaires";
 import PrintButton from "@/app/components/PrintButton";
-import ConfirmDeleteButton from "@/app/components/ConfirmDeleteButton";
-import ImportHistoriqueButton from "./ImportHistoriqueButton";
-import RechercheActesCarnet from "./RechercheActes";
-import ChoixImpression from "./ChoixImpression";
+import { prisma } from "@/lib/prisma";
+import { getActesSanitairesReels, getCarnetSanitaireRows, getEvenementsCarnetRows } from "@/lib/carnet-sanitaire";
+import { construireCarnetUnique, filtrerCarnetUnique } from "@/lib/carnet-unique";
 import { dansImpression, periodeValide, type PeriodeImpression } from "@/lib/carnet-periode-impression";
-
-interface PageProps {
-  searchParams: Promise<{ order?: string; sort?: string; du?: string; au?: string; animal?: string; produit?: string;
-    acteTri?: string; acteDirection?: string; annee?: string; mois?: string; ordonnance?: string; q?: string; impression?: string; printDu?: string; printAu?: string }>;
-}
-
-async function getExploitationConfig() {
-  try {
-    return await prisma.exploitationConfig.findUnique({ where: { id: "singleton" } });
-  } catch {
-    return null;
-  }
-}
-
-export default async function CarnetSanitairePage({ searchParams }: PageProps) {
-  const params = await searchParams;
-  const { order: orderParam, sort: sortParam } = params;
-  const sort = sortParam === "animal" || sortParam === "produit" ? sortParam : "date";
-  const order = orderParam === "animal" ? "animal" : "chrono";
-  const recherche: RechercheActes = {
-    du: params.du, au: params.au, animal: params.animal, produit: params.produit, ordonnance: params.ordonnance, q: params.q,
-    tri: params.acteTri === "animal" || params.acteTri === "produit" || params.acteTri === "executant" ? params.acteTri : "date",
-    direction: params.acteDirection === "asc" ? "asc" : "desc",
-  };
-
-  const now = new Date();
-  const annee = /^\d{4}$/.test(params.annee ?? "") ? Number(params.annee) : now.getFullYear();
-  const mois = params.mois === "tous" ? null : /^([1-9]|1[0-2])$/.test(params.mois ?? "") ? Number(params.mois) : (params.annee ? null : now.getMonth() + 1);
-  const dansPeriode = (date: Date) => date.getFullYear() === annee && (mois === null || date.getMonth() + 1 === mois);
-  const [toutesRows, tousEvenements, config, actes] = await Promise.all([
-    getCarnetSanitaireRows(),
-    getEvenementsCarnetRows(),
-    getExploitationConfig(),
-    getActesSanitairesReels(),
-  ]);
-  const mode: PeriodeImpression | null = params.impression === "mois" || params.impression === "annee" || params.impression === "periode" || params.impression === "selection" ? params.impression : null;
-  const choix = { mode: mode ?? "mois", annee, mois, du: params.printDu, au: params.printAu };
-  const impressionValide = periodeValide(choix);
-  const rechercheActive = Boolean(params.q?.trim());
-  const actesSelectionnes = rechercheActive ? rechercherActes(actes, recherche) : [];
-  const idsSelectionnes = new Set(actesSelectionnes.map((a) => a.id.split(":")[1]));
-  const rows = toutesRows.filter((r) => {
-    if (mode === "selection") return rechercheActive && idsSelectionnes.has(r.id);
-    if (mode) return impressionValide && dansImpression(r.date, choix);
-    return rechercheActive ? idsSelectionnes.has(r.id) : dansPeriode(r.date);
-  });
-  const evenements = rechercheActive || mode === "selection" ? [] : tousEvenements.filter((e) =>
-    e.produits.length > 0 && (mode ? impressionValide && dansImpression(e.date, choix) : dansPeriode(e.date)));
-  const printDate = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-  const groupes = order === "animal" ? groupRowsByAnimal(rows) : [];
-  const evenementsTries = [...evenements].sort((a, b) => sort === "animal"
-    ? a.animalNutrav.localeCompare(b.animalNutrav, "fr", { numeric: true }) || b.date.getTime() - a.date.getTime()
-    : sort === "produit"
-      ? a.produits.join(", ").localeCompare(b.produits.join(", "), "fr") || b.date.getTime() - a.date.getTime()
-      : b.date.getTime() - a.date.getTime());
-  const groupesEvenements = order === "animal" ? groupEvenementsByAnimal(evenementsTries) : [];
-
-  return (
-    <>
-      <div className="p-4 flex items-center justify-between print:hidden">
-        <BackButton label="Retour" className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1" />
-        <div className="flex items-center gap-2">
-          <a
-            href={`/api/carnet-sanitaire?order=${order}`}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
-            title="CSV traitements et vaccinations"
-          >
-            <Download size={14} /> CSV
-          </a>
-          <a
-            href={`/api/carnet-sanitaire/evenements?order=${order}`}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
-            title="CSV événements sanitaires"
-          >
-            <Download size={14} /> CSV événements
-          </a>
-          <PrintButton />
-        </div>
-      </div>
-
-      <div className="px-4 flex flex-wrap items-center gap-2 print:hidden">
-        <Link
-          href="/sanitaire/carnet?order=chrono"
-          className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${order === "chrono" ? "bg-green-700 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}
-        >
-          Chronologique
-        </Link>
-        <Link
-          href="/sanitaire/carnet?order=animal"
-          className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${order === "animal" ? "bg-green-700 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}
-        >
-          Par animal
-        </Link>
-        <span className="text-sm text-gray-600">Trier les événements :</span>
-        {(["date", "animal", "produit"] as const).map((key) => (
-          <Link key={key} href={`/sanitaire/carnet?order=${order}&sort=${key}`}
-            className={`text-sm px-3 py-1.5 rounded-lg border ${sort === key ? "bg-green-700 text-white" : "bg-white text-gray-600 border-gray-200"}`}>
-            {key === "date" ? "Date ↓" : key === "animal" ? "Animal" : "Produit"}
-          </Link>
-        ))}
-        <div className="ml-auto">
-          <ImportHistoriqueButton />
-        </div>
-      </div>
-
-      <div className="px-4 py-4 max-w-6xl mx-auto">
-        <form action="/sanitaire/carnet" method="get" className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border bg-white p-3 print:hidden">
-          <label className="text-sm font-semibold">Année
-            <select name="annee" defaultValue={String(annee)} className="ml-2 rounded-lg border p-2">
-              {Array.from({ length: 10 }, (_, i) => now.getFullYear() - i).map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </label>
-          <label className="text-sm font-semibold">Mois
-            <select name="mois" defaultValue={mois === null ? "tous" : String(mois)} className="ml-2 rounded-lg border p-2">
-              <option value="tous">Toute l'année</option>
-              {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Date(2020, i, 1).toLocaleDateString("fr-FR", { month: "long" })}</option>)}
-            </select>
-          </label>
-          <button type="submit" className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white">Afficher</button>
-          <span className="text-xs text-gray-600">Archives consultables sans suppression automatique</span>
-        </form>
-        <RechercheActesCarnet actes={actes} recherche={recherche} />
-        <ChoixImpression annee={annee} mois={mois} q={params.q ?? ""} />
-        {mode && <div id="apercu-impression" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-green-300 bg-green-50 p-3 print:hidden">
-          <span className="text-sm font-semibold">Aperçu de la période — {rows.length} actes</span>
-          {impressionValide ? <PrintButton label="Imprimer cette période" /> : <span role="alert" className="text-red-700">Période invalide</span>}
-        </div>}
-        <div className="mb-6 rounded-xl overflow-hidden shadow-sm border border-green-800 print:border-2">
-          <div className="bg-green-700 text-white px-6 py-5 text-center">
-            <p className="text-xs uppercase tracking-widest text-green-100">{config?.raisonSociale ?? "Exploitation"}</p>
-            <h1 className="text-2xl font-bold mt-1">Carnet sanitaire</h1>
-            <p className="text-xs text-green-100 mt-1">
-              {order === "chrono" ? "Ordre chronologique" : "Par animal"} — {rows.length} enregistrement{rows.length > 1 ? "s" : ""}
-            </p>
-          </div>
-          <div className="bg-green-50 px-6 py-2 flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-green-900">
-            {config?.ipg && <span>IPG : {config.ipg}</span>}
-            {config?.veterinaireNom && <span>Vétérinaire : {config.veterinaireNom}</span>}
-            <span>Édité le {printDate}</span>
-          </div>
-        </div>
-
-        {rows.length === 0 && evenements.length === 0 ? (
-          <div className="text-center py-10 text-gray-400 text-sm">Aucun enregistrement sanitaire</div>
-        ) : order === "chrono" ? (
-          <>
-            {rows.length > 0 && <CarnetTable rows={rows} showAnimal now={now} />}
-            {evenements.length > 0 && (
-              <>
-                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide mt-6 mb-2">Événements sanitaires</h2>
-                <EvenementsTable rows={evenementsTries} showAnimal />
-              </>
-            )}
-          </>
-        ) : (
-          <div className="space-y-5">
-            {animauxUnion(groupes, groupesEvenements).map(({ animalNutrav, animalNom }) => {
-              const g = groupes.find((x) => x.animalNutrav === animalNutrav);
-              const ge = groupesEvenements.find((x) => x.animalNutrav === animalNutrav);
-              return (
-                <section key={animalNutrav} className="rounded-lg overflow-hidden border border-gray-200">
-                  <h2 className="text-sm font-bold text-white bg-gray-700 uppercase tracking-wide px-3 py-1.5">
-                    {animalNutrav}{animalNom ? ` — ${animalNom}` : ""}
-                  </h2>
-                  {g && <CarnetTable rows={g.rows} showAnimal={false} now={now} />}
-                  {ge && <EvenementsTable rows={ge.rows} showAnimal={false} />}
-                </section>
-              );
-            })}
-          </div>
-        )}
-
-        <p className="text-xs text-gray-300 mt-6 text-center print:block hidden">
-          Document généré le {printDate} · CESAM TroupeauPro
-        </p>
-      </div>
-
-      <style>{`
-        @media print {
-          nav, .print\\:hidden { display: none !important; }
-          body { font-size: 9px; color: #111; }
-          @page { size: A4 landscape; margin: 1.2cm; }
-          table { page-break-inside: auto; }
-          tr { page-break-inside: avoid; }
-          section { page-break-inside: avoid; }
-          .bg-green-700 { background-color: #15803d !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .bg-green-50 { background-color: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .bg-green-100 { background-color: #dcfce7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .bg-gray-700 { background-color: #374151 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .bg-gray-50 { background-color: #f9fafb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .bg-blue-50 { background-color: #eff6ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .bg-orange-100 { background-color: #ffedd5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .text-white { color: #fff !important; }
-          .text-green-100 { color: #dcfce7 !important; }
-        }
-      `}</style>
-    </>
-  );
-}
-
-function animauxUnion(
-  a: { animalNutrav: string; animalNom: string | null }[],
-  b: { animalNutrav: string; animalNom: string | null }[]
-): { animalNutrav: string; animalNom: string | null }[] {
-  const map = new Map<string, string | null>();
-  for (const x of [...a, ...b]) map.set(x.animalNutrav, x.animalNom);
-  return Array.from(map.entries())
-    .map(([animalNutrav, animalNom]) => ({ animalNutrav, animalNom }))
-    .sort((x, y) => x.animalNutrav.localeCompare(y.animalNutrav, undefined, { numeric: true }));
-}
-
-function EvenementsTable({ rows, showAnimal }: { rows: EvenementCarnetRow[]; showAnimal: boolean }) {
-  return (
-    <table className="w-full text-xs border-collapse mb-2">
-      <thead>
-        <tr className="bg-gray-700 text-white">
-          <Th>Date</Th>
-          {showAnimal && <Th>N° Travail</Th>}
-          {showAnimal && <Th>Nom</Th>}
-          <Th>Catégorie</Th>
-          <Th>Événement</Th>
-          <Th>Produit administré</Th>
-          <Th>Commentaire</Th>
-          <Th>Constaté par</Th>
-          <Th>Statut</Th>
-          <Th className="print:hidden"></Th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.id} className="odd:bg-white even:bg-gray-50">
-            <Td>{formatDate(r.date)}{r.moment ? ` (${r.moment})` : ""}</Td>
-            {showAnimal && <Td>{r.animalNutrav}</Td>}
-            {showAnimal && <Td>{r.animalNom ?? "—"}</Td>}
-            <Td>{getCategorieLabel(r.categorie)}</Td>
-            <Td className="font-medium">
-              {r.symptomes.length > 1 ? r.symptomes.join(" • ") : r.type}
-              {r.temperature != null ? ` (${r.temperature}°C)` : ""}
-            </Td>
-            <Td className="font-medium">{r.produits.length ? r.produits.join(" • ") : "—"}</Td>
-            <Td>{r.description ?? "—"}</Td>
-            <Td>{r.constatePar ?? "—"}</Td>
-            <Td className={!r.resolu ? "font-semibold text-red-700" : ""}>{r.resolu ? "Résolu" : "En cours"}</Td>
-            <Td className="print:hidden">
-              <ConfirmDeleteButton url={`/api/evenements/${r.id}`} />
-            </Td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function CarnetTable({ rows, showAnimal, now }: { rows: CarnetSanitaireRow[]; showAnimal: boolean; now: Date }) {
-  return (
-    <table className="w-full text-xs border-collapse mb-2">
-      <thead>
-        <tr className="bg-green-700 text-white">
-          <Th>Date</Th>
-          {showAnimal && <Th>N° National</Th>}
-          {showAnimal && <Th>N° Travail</Th>}
-          {showAnimal && <Th>Nom</Th>}
-          <Th>N° ordonnance</Th>
-          <Th>Prescripteur</Th>
-          <Th>Produit</Th>
-          <Th>Dose</Th>
-          <Th>Voie</Th>
-          <Th>Motif</Th>
-          <Th>Remise lait</Th>
-          <Th>Remise viande</Th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => {
-          const isVaccination = r.motif === "VACCINATION";
-          const laitEnAttente = r.dateRemiseLait ? now < r.dateRemiseLait : false;
-          const viandeEnAttente = r.dateRemiseViande ? now < r.dateRemiseViande : false;
-          return (
-            <tr key={r.id} className={isVaccination ? "odd:bg-white even:bg-blue-50" : "odd:bg-white even:bg-gray-50"}>
-              <Td>{formatDate(r.date)}</Td>
-              {showAnimal && <Td>{r.animalNational}</Td>}
-              {showAnimal && <Td>{r.animalNutrav}</Td>}
-              {showAnimal && <Td>{r.animalNom ?? "—"}</Td>}
-              <Td>{r.ordonnanceNumero ?? "—"}</Td>
-              <Td>{r.prescripteur ?? "—"}</Td>
-              <Td className="font-medium">{r.produit}</Td>
-              <Td>{r.dose || "—"}</Td>
-              <Td>{r.voie ?? "—"}</Td>
-              <Td>{r.motif ?? "—"}</Td>
-              <Td className={laitEnAttente ? "bg-orange-100 font-semibold text-orange-800" : ""}>{formatDate(r.dateRemiseLait)}</Td>
-              <Td className={viandeEnAttente ? "bg-orange-100 font-semibold text-orange-800" : ""}>{formatDate(r.dateRemiseViande)}</Td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return <th className={`border border-green-800 px-2 py-1.5 text-left font-semibold ${className}`}>{children}</th>;
-}
-
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`border border-gray-300 px-2 py-1 ${className}`}>{children}</td>;
+import { formatDate } from "@/lib/utils";
+import ChoixImpression from "./ChoixImpression";
+import ImportHistoriqueButton from "./ImportHistoriqueButton";
+export const dynamic = "force-dynamic";
+type Params={q?:string;annee?:string;mois?:string;type?:string;tri?:string;direction?:string;impression?:string;printDu?:string;printAu?:string};
+export default async function CarnetSanitairePage({searchParams}:{searchParams:Promise<Params>}){
+ const p=await searchParams,now=new Date(),annee=/^\d{4}$/.test(p.annee??"")?Number(p.annee):now.getFullYear();
+ const mois=p.mois==="tous"?null:/^([1-9]|1[0-2])$/.test(p.mois??"")?Number(p.mois):(p.annee?null:now.getMonth()+1);
+ const mode:PeriodeImpression|null=["mois","annee","periode","selection"].includes(p.impression??"")?p.impression as PeriodeImpression:null;
+ const choix={mode:mode??"mois",annee,mois,du:p.printDu,au:p.printAu};
+ const [actes,rows,evenements,config]=await Promise.all([getActesSanitairesReels(),getCarnetSanitaireRows(),getEvenementsCarnetRows(),prisma.exploitationConfig.findUnique({where:{id:"singleton"}}).catch(()=>null)]);
+ const tout=construireCarnetUnique(rows,evenements,actes);
+ const base=mode==="selection"?tout:mode?periodeValide(choix)?tout.filter(l=>dansImpression(l.date,choix)):[]:tout.filter(l=>l.date.getFullYear()===annee&&(mois===null||l.date.getMonth()+1===mois));
+ const affiches=filtrerCarnetUnique(base,p.q??"",undefined,undefined,p.type??"tous");
+ const cle=p.tri??"date",asc=p.direction==="asc";
+ const triables=[...affiches].sort((a,b)=>{const va=cle==="animal"?a.animalNutrav:cle==="produit"?a.produit:cle==="type"?a.type:cle==="executant"?a.executant??"":cle==="ordonnance"?a.ordonnance??"":a.date.getTime();const vb=cle==="animal"?b.animalNutrav:cle==="produit"?b.produit:cle==="type"?b.type:cle==="executant"?b.executant??"":cle==="ordonnance"?b.ordonnance??"":b.date.getTime();const c=typeof va==="number"&&typeof vb==="number"?va-vb:String(va).localeCompare(String(vb),"fr",{numeric:true});return asc?c:-c;});
+ const lienTri=(c:string)=>{const s=new URLSearchParams();for(const [k,v] of Object.entries(p))if(v)s.set(k,v);s.set("tri",c);s.set("direction",cle===c&&asc?"desc":"asc");return "/sanitaire/carnet?"+s.toString();};
+ const entete=(c:string,t:string)=><th className="px-2 py-3 text-left whitespace-nowrap"><Link href={lienTri(c)} className="hover:underline">{t} {cle===c?(asc?"↑":"↓"):"↕"}</Link></th>;
+ const total=triables.length;
+ return <div className="mx-auto max-w-[1800px] p-3 sm:p-5">
+  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden"><BackButton label="Retour"/><div className="flex items-center gap-2"><ImportHistoriqueButton/>{mode&&periodeValide(choix)&&<PrintButton label="🖨️ Imprimer la sélection"/>}</div></div>
+  <div className="mb-5 print:hidden"><h1 className="text-3xl font-extrabold text-green-950">✚ Carnet sanitaire</h1><p className="text-sm text-slate-600">Vaccinations, traitements, événements, symptômes et commentaires — un seul tableau.</p></div>
+  <form action="/sanitaire/carnet" method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-white p-4 print:hidden">
+   <label className="min-w-[240px] flex-1 text-sm font-semibold">Recherche universelle<input name="q" type="search" defaultValue={p.q??""} placeholder="Animal, médicament, symptôme, ordonnance…" className="mt-1 w-full rounded-lg border p-3 font-normal"/></label>
+   <label className="text-sm font-semibold">Année<select name="annee" defaultValue={String(annee)} className="mt-1 block rounded-lg border p-3">{Array.from({length:12},(_,i)=>now.getFullYear()-i).map(y=><option key={y} value={y}>{y}</option>)}</select></label>
+   <label className="text-sm font-semibold">Mois<select name="mois" defaultValue={mois===null?"tous":String(mois)} className="mt-1 block rounded-lg border p-3"><option value="tous">Toute l&apos;année</option>{Array.from({length:12},(_,i)=><option key={i} value={i+1}>{new Date(2020,i,1).toLocaleDateString("fr-FR",{month:"long"})}</option>)}</select></label>
+   <label className="text-sm font-semibold">Type<select name="type" defaultValue={p.type??"tous"} className="mt-1 block rounded-lg border p-3"><option value="tous">Tous</option><option>Vaccination</option><option>Traitement</option><option>Événement</option></select></label>
+   <button type="submit" className="rounded-lg bg-green-700 px-5 py-3 font-semibold text-white">Afficher</button>
+   <Link href="/sanitaire/carnet" className="py-3 text-sm underline">Effacer</Link>
+  </form>
+  <div className="mb-4 print:hidden"><ChoixImpression annee={annee} mois={mois} q={p.q??""} type={p.type??"tous"}/>{mode&&<p className="mt-2 text-sm font-semibold text-green-900" role="status">Sélection prête : {total} lignes. Utilisez « Imprimer la sélection » en haut de page.</p>}</div>
+  <div className="mb-4 flex flex-wrap gap-3 print:hidden">
+   <div className="rounded-xl border bg-white px-5 py-3"><strong className="text-xl">{total}</strong><p className="text-xs text-slate-600">Lignes affichées</p></div>
+   {(["Vaccination","Traitement","Événement"] as const).map(t=><div key={t} className="rounded-xl border bg-white px-5 py-3"><strong className="text-xl">{triables.filter(l=>l.type===t).length}</strong><p className="text-xs text-slate-600">{t}s</p></div>)}
+  </div>
+  <div className="mb-3 hidden print:block"><h1 className="text-xl font-bold">Carnet sanitaire — {config?.raisonSociale??"Exploitation"}</h1><p>IPG : {config?.ipg??"—"} · Édité le {now.toLocaleDateString("fr-FR")} · {total} lignes</p>{mode==="periode"&&<p>Du {p.printDu} au {p.printAu}</p>}</div>
+  <div className="space-y-2 sm:hidden print:hidden">
+   {triables.map(l=><article key={l.id} className="rounded-xl border bg-white p-3 shadow-sm">
+    <div className="flex items-center justify-between gap-2"><span className="font-bold text-green-900">{l.animalNutrav} · {l.animalNom??"Animal"}</span><span className="text-xs text-slate-600">{formatDate(l.date)}</span></div>
+    <div className="mt-1 text-sm font-semibold">{l.type} · {l.produit}</div>
+    <p className="mt-1 text-xs text-slate-700">{[l.dose,l.voie,l.executant].filter(Boolean).join(" · ")}</p>
+    {l.commentaire&&<p className="mt-2 rounded bg-slate-50 p-2 text-sm">{l.commentaire}</p>}
+    <details className="mt-2 text-xs"><summary className="cursor-pointer font-semibold text-green-800">Informations complètes</summary><p className="mt-2">N° national : {l.animalNational||"—"} · Ordonnance : {l.ordonnance||"—"}</p><p>Prescripteur : {l.prescripteur||"—"} · Motif : {l.motif||"—"}</p><p>Remise lait : {l.remiseLait?formatDate(l.remiseLait):"—"} · Viande : {l.remiseViande?formatDate(l.remiseViande):"—"}</p><p>Statut : {l.statut}</p></details>
+   </article>)}
+  </div>
+  <div className="hidden overflow-x-auto rounded-xl border bg-white shadow-sm sm:block print:block print:overflow-visible">
+   <table className="w-full min-w-[1450px] border-collapse text-xs print:min-w-0 print:text-[7px]"><thead className="bg-green-100 text-green-950 print:table-header-group"><tr>{entete("date","Date")}{entete("animal","N° travail")}<th className="px-2 text-left">N° national</th><th className="px-2 text-left">Nom</th>{entete("type","Type")}{entete("produit","Produit / motif")}<th className="px-2 text-left">Dose</th><th className="px-2 text-left">Voie</th>{entete("ordonnance","Ordonnance")}<th className="px-2 text-left">Prescripteur</th>{entete("executant","Exécutant")}<th className="px-2 text-left">Symptômes / commentaires</th><th className="px-2 text-left">Remise lait</th><th className="px-2 text-left">Remise viande</th><th className="px-2 text-left">Statut</th></tr></thead>
+   <tbody>{triables.map(l=><tr key={l.id} className="border-t even:bg-slate-50 print:break-inside-avoid"><td className="whitespace-nowrap px-2 py-2">{formatDate(l.date)}</td><td className="px-2 font-bold text-green-800"><Link href={`/troupeau/${encodeURIComponent(l.animalNutrav)}`}>{l.animalNutrav}</Link></td><td className="px-2">{l.animalNational||"—"}</td><td className="px-2">{l.animalNom||"—"}</td><td className="px-2 font-semibold">{l.type}</td><td className="px-2">{l.produit}</td><td className="px-2">{l.dose||"—"}</td><td className="px-2">{l.voie||"—"}</td><td className="px-2">{l.ordonnance||"—"}</td><td className="px-2">{l.prescripteur||"—"}</td><td className="px-2">{l.executant||"—"}</td><td className="max-w-64 px-2">{[l.motif&&l.type!=="Vaccination"?l.motif:"",l.commentaire].filter(Boolean).join(" · ")||"—"}</td><td className="px-2">{l.remiseLait?formatDate(l.remiseLait):"—"}</td><td className="px-2">{l.remiseViande?formatDate(l.remiseViande):"—"}</td><td className="px-2">{l.statut}</td></tr>)}</tbody></table>
+   {!total&&<p className="p-8 text-center text-slate-600">Aucun enregistrement pour cette sélection.</p>}
+  </div>
+  <style>{`@media print{nav,.print\\:hidden{display:none!important}@page{size:A3 landscape;margin:9mm}thead{display:table-header-group}tr{break-inside:avoid}body{color:#111}}`}</style>
+ </div>;
 }

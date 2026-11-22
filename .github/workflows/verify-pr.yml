@@ -18,10 +18,12 @@ jobs:
       - run: npx prisma generate
       - run: npx tsc --noEmit
       - run: node --test --experimental-strip-types lib/validate-breeding.test.ts lib/grouped-sale.test.ts
-      - run: node --test --experimental-strip-types lib/carnet-actes.test.ts lib/carnet-actes-recherche.test.ts lib/carnet-periode-impression.test.ts
+      - run: node --test --experimental-strip-types lib/carnet-actes.test.ts lib/carnet-actes-recherche.test.ts lib/carnet-periode-impression.test.ts lib/carnet-unique.test.ts
       - run: node --test tests/troupeau-print-filtered-table.test.mjs
       - run: node --test tests/troupeau-print-pagination.test.mjs
       - run: node --test tests/troupeau-double-sort.test.mjs
       - run: node --test tests/troupeau-print-calf-wrap.test.mjs
-      # Full production build is verified by Vercel with its configured environment.
-      # No database is accessed by these isolated GitHub checks.
+      # Évite les erreurs JSX qu'un simple contrôle TypeScript ne détecte pas.
+      - name: Lint carnet sanitaire
+        run: ESLINT_USE_FLAT_CONFIG=false npx eslint app/sanitaire/carnet/page.tsx app/sanitaire/carnet/ChoixImpression.tsx
+
