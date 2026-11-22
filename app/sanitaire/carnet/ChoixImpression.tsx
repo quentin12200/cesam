@@ -3,8 +3,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Mode = "mois" | "annee" | "periode" | "selection";
-export default function ChoixImpression({ annee, mois, q, duInitial = "2026-01-01", auInitial = "2026-12-31" }: {
-  annee: number; mois: number | null; q: string; duInitial?: string; auInitial?: string;
+export default function ChoixImpression({ annee, mois, q, duInitial = "2026-01-01", auInitial = "2026-12-31", type = "tous" }: {
+  annee: number; mois: number | null; q: string; duInitial?: string; auInitial?: string; type?: string;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("periode");
@@ -23,7 +23,8 @@ export default function ChoixImpression({ annee, mois, q, duInitial = "2026-01-0
     setErreur("");
     const params = new URLSearchParams({ impression: mode, annee: String(annee), mois: String(mois ?? "tous") });
     if (mode === "periode") { params.set("printDu", du); params.set("printAu", au); }
-    if (mode === "selection") params.set("q", q);
+    if (q.trim()) params.set("q", q);
+    if (type !== "tous") params.set("type", type);
     router.push(`/sanitaire/carnet?${params.toString()}#apercu-impression`);
   };
   return <section className="mb-4 rounded-xl border border-green-200 bg-white p-4 print:hidden">
