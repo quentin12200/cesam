@@ -11,6 +11,7 @@ import MedicamentPicker, { type MedicamentOption } from "@/app/sanitaire/nouvel-
 import { medicamentCompatibleAvecEtape } from "@/lib/vaccine-attachment";
 import { actionsSelectionAnimaux, basculerSelectionVisibles, celluleVaccinaleSelectionnable, etatSelectionMaitre, libelleAnimauxSelectionnes } from "@/lib/vaccine-selection";
 import { construireChargeSoin } from "@/lib/vaccine-soin-seance";
+import { pendingIndexes, markCompleted, hasUncertainWrite } from "@/lib/vaccine-session-retry";
 import { actesDuVaccin, actesVaccinauxNonClasses, anneesDisponibles, datesCompactes, memeActeVaccinal, type ActeHistorique } from "@/lib/vaccine-history-view";
 import { classeStatutVaccinal, comparerDateVelage, comparerEcheanceVaccinale, formatTempsAvantVelage, libelleVoieDose, voieCourte } from "@/lib/vaccine-table-presentation";
 import { libelleFenetreVaccinale, selectionDepuisGroupeAgenda, type ActionAgenda, type GroupeAgenda } from "@/lib/vaccine-agenda";
@@ -222,8 +223,15 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [soinModifierAnimaux, setSoinModifierAnimaux] = useState(false);
   const [soinEnCours, setSoinEnCours] = useState(false);
   const [soinMessage, setSoinMessage] = useState("");
+  const [soinsEnAttente, setSoinsEnAttente] = useState<ReturnType<typeof construireChargeSoin>[]>([]);
+  const [soinsEnregistres, setSoinsEnregistres] = useState<Set<number>>(new Set());
+  const enregistrementVerrou = useRef(false);
+  const vaccinationsTerminees = useRef(new Set<string>());
+  const soinsTermines = useRef(new Set<number>());
+  const [repriseBloquee, setRepriseBloquee] = useState(false);
   const [vaccinsMenuOuvert, setVaccinsMenuOuvert] = useState(false);
   const [saisieOuverte, setSaisieOuverte] = useState(false);
+  const [ordonnancePanneauOuvert, setOrdonnancePanneauOuvert] = useState(false);
 
   const { message: messageBrouillon, vider: viderBrouillon } = useVaccinWorkspace({
     vue, recherche, vaccinModes, statuts, tri, directionTri, colonnesMasquees, anneesAffichees, toutHistorique, uniquementSelection,
@@ -447,7 +455,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
 
   function enregistrerSelection() {
     if (!ordonnanceSessionDateValide) { setErreur("L’ordonnance sélectionnée est postérieure à la séance ou n’est plus disponible."); return; }
-    if (!dateSession || !executant.trim() || groupesSession.length === 0) {
+    if (!dateSession || !executant.trim() || (groupesSession.length === 0 && soinsEnAttente.length === 0)) {
       setErreur("Indique la date, l’exécutant et sélectionne au moins un acte.");
       return;
     }
@@ -462,6 +470,8 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   }
 
   async function validerSession(administrations = ajustements) {
+    if (enregistrementVerrou.current || repriseBloquee) return;
+    enregistrementVerrou.current = true;
     setErreur("");
     const voieManquante = groupesSession.find((groupe) => !administrations[groupe.cle]?.voie.trim());
     if (voieManquante) {
@@ -472,6 +482,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     const enregistres = new Set<string>();
     try {
       for (const groupe of groupesSession) {
+        if (groupe.actes.every((acte) => vaccinationsTerminees.current.has(acte.cle))) continue;
         const administration = administrations[groupe.cle];
         const animalIds = groupe.actes.map((acte) => acte.ligne.animalId);
         const medicamentId = groupe.etape.medicamentId!;
@@ -521,15 +532,31 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
           const detail = await reponse.json().catch(() => ({}));
           throw new Error(detail.error || `Échec pour ${groupe.bloc.nom} — ${groupe.etape.label}`);
         }
-        groupe.actes.forEach((acte) => enregistres.add(acte.cle));
+        groupe.actes.forEach((acte) => { enregistres.add(acte.cle); vaccinationsTerminees.current.add(acte.cle); });
       }
+      for (const i of pendingIndexes(soinsEnAttente.length, soinsTermines.current)) {
+        const reponse = await fetch("/api/evenements/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(soinsEnAttente[i]) });
+        if (!reponse.ok) { const detail = await reponse.json().catch(() => ({})); throw new Error(detail.error || `Échec du traitement ${i + 1}`); }
+        soinsTermines.current = markCompleted(soinsTermines.current, i);
+        setSoinsEnregistres(new Set(soinsTermines.current));
+      }
+      setSoinsEnAttente([]);
+      setSoinsEnregistres(new Set());
+      soinsTermines.current.clear();
+      vaccinationsTerminees.current.clear();
       viderBrouillon();
       setDonneesManquantes(false);
       router.refresh();
     } catch (cause) {
       if (enregistres.size > 0) setActesSelectionnes((actuels) => new Set([...actuels].filter((cle) => !enregistres.has(cle))));
-      setErreur(cause instanceof Error ? cause.message : "La séance n’a pas pu être enregistrée.");
+      if (hasUncertainWrite(cause)) {
+        setRepriseBloquee(true);
+        setErreur("Connexion interrompue : vérifie les actes dans le carnet sanitaire avant toute nouvelle tentative, pour éviter un doublon.");
+      } else {
+        setErreur(cause instanceof Error ? cause.message : "La séance n’a pas pu être enregistrée.");
+      }
     } finally {
+      enregistrementVerrou.current = false;
       setEnregistrement(false);
     }
   }
@@ -871,13 +898,12 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     }
   }
 
-  async function enregistrerSoin() {
+  function enregistrerSoin() {
     if (!soinMedicament || soinAnimaux.size === 0) return;
     if (!dateSession || !executant.trim()) {
       setErreur("Indique la date et l’exécutant de la séance.");
       return;
     }
-    setSoinEnCours(true);
     setErreur("");
     try {
       const charge = construireChargeSoin({
@@ -892,15 +918,11 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         delaiAttenteViandeJ: soinMedicament.delaiAttenteViandeJ,
         delaiAttenteLaitJ: soinMedicament.delaiAttenteLaitJ,
       });
-      const reponse = await fetch("/api/evenements/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(charge) });
-      const detail = await reponse.json().catch(() => ({}));
-      if (!reponse.ok) throw new Error(detail.error || "Le soin n’a pas pu être enregistré.");
-      setSoinMessage(`${soinMedicament.nom} enregistré pour ${soinAnimaux.size} animal(aux).`);
+      setSoinsEnAttente((actuels) => [...actuels, charge]);
+      setSoinMessage(`${soinMedicament.nom} ajouté à la séance pour ${soinAnimaux.size} animal(aux).`);
       setSoinOuvert(false);
     } catch (cause) {
       setErreur(cause instanceof Error ? cause.message : "Le soin n’a pas pu être enregistré.");
-    } finally {
-      setSoinEnCours(false);
     }
   }
 
@@ -921,7 +943,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         {soinModifierAnimaux && <div className="mt-2 grid max-h-48 gap-1 overflow-y-auto">{animauxDuLot.map((ligne) => <label key={ligne.animalId} className="flex min-h-9 cursor-pointer items-center gap-2"><input type="checkbox" checked={soinAnimaux.has(ligne.animalId)} onChange={() => basculerDansSet(setSoinAnimaux, ligne.animalId)} className="h-5 w-5 accent-green-700" />{ligne.nutrav} {ligne.nom}</label>)}</div>}
       </div>
       {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
-      <button type="button" disabled={!soinMedicament || soinAnimaux.size === 0 || soinEnCours} onClick={() => void enregistrerSoin()} className="mt-3 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-40">{soinEnCours ? "Enregistrement…" : `Appliquer aux ${soinAnimaux.size} animaux`}</button>
+      <button type="button" disabled={!soinMedicament || soinAnimaux.size === 0 || soinEnCours} onClick={() => void enregistrerSoin()} className="mt-3 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-40">{soinEnCours ? "Enregistrement…" : `Ajouter à la séance (${soinAnimaux.size} animaux)`}</button>
       <button type="button" disabled={soinEnCours} onClick={fermer} className="mt-2 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Annuler</button>
     </div></div>;
   }
@@ -949,7 +971,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         {vue === "TABLEAU" && <>
         <input value={recherche} onChange={(event) => setRecherche(event.target.value)} placeholder="Recherche animal" aria-label="Rechercher un animal" className="min-h-10 min-w-48 flex-1 rounded-lg border px-3 text-sm" />
 
-        <button type="button" onClick={() => setVaccinsMenuOuvert(true)} aria-haspopup="dialog" aria-expanded={vaccinsMenuOuvert} className="flex min-h-10 items-center rounded-lg border px-3 text-sm font-semibold text-gray-700">Vaccins · {vaccinsMasques} masqué{vaccinsMasques > 1 ? "s" : ""} ▾</button>
+        <button type="button" onClick={() => setVaccinsMenuOuvert(true)} aria-haspopup="dialog" aria-expanded={vaccinsMenuOuvert} className="flex min-h-10 items-center rounded-lg border px-3 text-sm font-semibold text-gray-700">Vaccins affichés ({blocs.length - vaccinsMasques}/{blocs.length}) ▾</button>
 
         <button type="button" onClick={() => setColonnesMenuOuvert(true)} aria-haspopup="dialog" aria-expanded={colonnesMenuOuvert} className="flex min-h-10 items-center rounded-lg border px-3 text-sm font-semibold text-gray-700">Colonnes</button>
 
@@ -986,14 +1008,15 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       <p className="vaccin-print-hidden mx-3 mb-2 flex flex-wrap items-center gap-x-2 text-xs text-gray-600"><span className="font-semibold">{libelleAnimauxSelectionnes(animauxSelectionnes.size)}</span><span aria-hidden="true">·</span><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => setUniquementSelection((actuel) => !actuel)} className="min-h-9 px-1 font-semibold text-green-800 underline disabled:opacity-40">{actionsSelectionAnimaux(uniquementSelection).basculerVue}</button><span aria-hidden="true">·</span><button type="button" disabled={animauxSelectionnes.size === 0} onClick={() => { setAnimauxSelectionnes(new Set()); setUniquementSelection(false); }} className="min-h-9 px-1 font-semibold text-green-800 underline disabled:opacity-40">{actionsSelectionAnimaux(uniquementSelection).vider}</button></p>
 
 
-      <div className="vaccin-print-hidden mx-3 mb-3 rounded-xl border border-green-200 bg-green-50 p-2 sm:p-3">
+      <div className="vaccin-print-hidden mx-3 mb-2 rounded-xl border border-green-200 bg-green-50 p-2 sm:p-3">
         <button type="button" onClick={() => setSaisieOuverte((actuel) => !actuel)} aria-expanded={saisieOuverte} className="flex min-h-9 w-full items-center justify-between text-left text-sm font-black text-green-950 sm:hidden"><span>💉 Saisie · {actes.length} vaccination(s) sélectionnée(s)</span><span aria-hidden="true">{saisieOuverte ? "▴" : "▾"}</span></button>
         <div className={`${saisieOuverte ? "block" : "hidden"} sm:block`}>
-        <p className="mb-2 hidden text-sm font-black text-green-950 sm:block">Saisie des vaccinations</p>
+        <p className="mb-2 hidden text-sm font-black text-green-950 sm:block">Séance · {actes.length} vaccination(s) sélectionnée(s)</p>
         <div className="grid gap-2 sm:grid-cols-[10rem_minmax(12rem,1fr)_auto] sm:items-end">
           <label className="text-xs font-semibold text-green-950">Date<input type="date" value={dateSession} onChange={(event) => setDateSession(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border bg-white px-2 text-sm font-normal text-gray-900" /></label>
           <label className="text-xs font-semibold text-green-950">Exécutant<div className="mt-1 font-normal text-gray-900"><ExecutantSelect intervenants={intervenants} value={executant} onChange={setExecutant} onAdded={(intervenant) => setIntervenants((actuels) => [...actuels, intervenant])} /></div></label>
-          <div className="sm:col-span-3 flex flex-wrap items-end gap-2 rounded-lg border border-green-200 bg-white p-2">
+          <div className="sm:col-span-3"><button type="button" aria-expanded={ordonnancePanneauOuvert} onClick={() => setOrdonnancePanneauOuvert(true)} className="min-h-10 rounded-lg border border-green-700 bg-white px-3 text-sm font-semibold text-green-900">📄 Ordonnance {ordonnanceIdSession || ordonnanceNumeroSession ? "✓" : ordonnanceEnAttente ? "· à rattacher" : "▸"}</button></div>
+          <div className="hidden">
             <fieldset className="min-w-40 flex-1 text-xs font-semibold text-green-950"><legend>Ordonnances du vaccin (plus ancienne d&apos;abord)</legend>
               {medicamentsSession.length !== 1 ? <p className="font-normal text-amber-800">Sélectionne un seul vaccin pour proposer les ordonnances correspondantes.</p> : ordonnancesSessionEligibles.length === 0 ? <p className="font-normal text-gray-600">Aucune ordonnance enregistrée pour ce vaccin.</p> : ordonnancesSessionEligibles.map((ordonnance) => <label key={ordonnance.id} className="mt-1 flex items-center gap-2 font-normal"><input type="radio" name="ordonnance-session" checked={ordonnanceIdSession === ordonnance.id} onChange={(event) => { setOrdonnancesSelectionnees(event.target.checked ? [ordonnance.id] : []); setOrdonnanceIdSession(event.target.checked ? ordonnance.id : ""); setOrdonnanceNumeroSession(""); setOrdonnanceEnAttente(false); }} />{ordonnance.numero || "Sans numéro"} · {new Date(ordonnance.date).toLocaleDateString("fr-FR")} · {ordonnance.veterinaireNom || "Vétérinaire non renseigné"}</label>)}
 
@@ -1013,9 +1036,9 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
             </label>
             <label className="flex min-h-10 items-center gap-2 text-xs font-semibold text-green-950"><input type="checkbox" checked={ordonnanceEnAttente} onChange={(event) => { setOrdonnanceEnAttente(event.target.checked); if (event.target.checked) { setOrdonnanceNumeroSession(""); setOrdonnanceIdSession(""); } }} />À rattacher plus tard</label>
           </div>
-          <button type="button" disabled={actes.length === 0 || enregistrement} onClick={enregistrerSelection} className="min-h-10 rounded-lg bg-green-800 px-3 text-sm font-bold text-white disabled:opacity-40">{enregistrement ? "Enregistrement…" : `Enregistrer ${actes.length} vaccination(s)`}</button>
+          <button type="button" disabled={(actes.length === 0 && soinsEnAttente.length === 0) || enregistrement || repriseBloquee} onClick={enregistrerSelection} className="min-h-10 rounded-lg bg-green-800 px-3 text-sm font-bold text-white disabled:opacity-40">{enregistrement ? "Enregistrement…" : `Enregistrer la séance · ${actes.length} vaccin(s) + ${soinsEnAttente.length} soin(s)`}</button>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2"><p className="mr-auto text-xs font-semibold text-green-950">{nombreAnimaux} animal(aux) · {actes.length} vaccination(s) sélectionnée(s)</p><button type="button" onClick={() => void ouvrirSoin()} className="min-h-8 rounded-lg border border-green-700 bg-white px-2 text-xs font-semibold text-green-900">+ Ajouter un soin / traitement</button>{soinMessage && <span className="text-xs font-semibold text-green-900">{soinMessage}</span>}{actes.length > 0 && <button type="button" onClick={() => setActesSelectionnes(new Set())} className="min-h-8 rounded-lg border bg-white px-2 text-xs font-semibold">Vider la sélection</button>}</div>
+        <div className="mt-2 flex flex-wrap items-center gap-2"><p className="mr-auto text-xs font-semibold text-green-950">{nombreAnimaux} animal(aux) · {actes.length} vaccination(s) sélectionnée(s)</p><button type="button" onClick={() => void ouvrirSoin()} className="min-h-8 rounded-lg border border-green-700 bg-white px-2 text-xs font-semibold text-green-900">+ Ajouter un soin / traitement</button>{soinMessage && <span className="text-xs font-semibold text-green-900">{soinMessage}</span>}{soinsEnAttente.length > 0 && <div className="flex flex-wrap items-center gap-2">{soinsEnAttente.map((soin, index) => <span key={index} className="rounded-lg bg-white px-2 py-1 text-xs font-semibold">{soin.traitements[0]?.medicamentNom} · {soin.animalIds.length} animaux {soinsEnregistres.has(index) ? "✓ enregistré" : <button type="button" disabled={enregistrement} onClick={() => { setSoinsEnAttente((actuels) => actuels.filter((_, i) => i !== index)); soinsTermines.current.clear(); setSoinsEnregistres(new Set()); }} aria-label={`Retirer le soin ${index + 1}`} className="ml-1 text-red-700 underline">Retirer</button>}</span>)}</div>}{actes.length > 0 && <button type="button" onClick={() => setActesSelectionnes(new Set())} className="min-h-8 rounded-lg border bg-white px-2 text-xs font-semibold">Vider la sélection</button>}</div>
         {erreur && !donneesManquantes && <p className="mt-2 text-sm font-semibold text-red-700">{erreur}</p>}
         </div>
       </div>
@@ -1073,7 +1096,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       {vaccinsMenuOuvert && <div className="vaccin-print-hidden fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Vaccins affichés" onMouseDown={(event) => { if (event.target === event.currentTarget) setVaccinsMenuOuvert(false); }}>
         <div className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
           <div className="border-b p-3"><h2 className="font-black text-gray-900">Vaccins · {vaccinsMasques} masqué{vaccinsMasques > 1 ? "s" : ""}</h2><div className="mt-2 flex flex-wrap gap-3 text-xs font-semibold"><button type="button" onClick={() => setVaccinModes(Object.fromEntries(blocs.map((bloc) => [bloc.cle, "OUVERT" as const])))} className="min-h-9 underline">Tout afficher</button><button type="button" onClick={() => setVaccinModes(Object.fromEntries(blocs.map((bloc) => [bloc.cle, "COMPACT" as const])))} className="min-h-9 underline">Tout réduire</button></div></div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">{blocs.map((bloc) => <div key={bloc.cle} className="border-b px-2 py-2"><p className="mb-1 break-words text-sm font-semibold">{bloc.nom}</p><div className="grid grid-cols-3 gap-1">{(["OUVERT", "COMPACT", "MASQUE"] as const).map((mode) => <button key={mode} type="button" onClick={() => changerModeVaccin(bloc.cle, mode)} aria-pressed={modeVaccin(bloc.cle) === mode} aria-label={`${mode === "OUVERT" ? "Afficher" : mode === "COMPACT" ? "Réduire" : "Masquer"} ${bloc.nom}`} className={`min-h-11 rounded border px-1 text-xs font-semibold ${modeVaccin(bloc.cle) === mode ? "border-green-800 bg-green-50 text-green-950" : "text-gray-700"}`}>{mode === "OUVERT" ? "Afficher" : mode === "COMPACT" ? "Réduire" : "Masquer"}</button>)}</div></div>)}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">{blocs.map((bloc) => <div key={bloc.cle} className="flex items-center gap-2 border-b px-2 py-2"><label className="flex min-h-11 flex-1 items-center gap-3 text-sm font-semibold"><input type="checkbox" className="h-5 w-5 accent-green-800" checked={modeVaccin(bloc.cle) !== "MASQUE"} onChange={(event) => changerModeVaccin(bloc.cle, event.target.checked ? "OUVERT" : "MASQUE")} />{bloc.nom}</label>{modeVaccin(bloc.cle) !== "MASQUE" && <button type="button" className="min-h-9 rounded border px-2 text-xs font-semibold" onClick={() => changerModeVaccin(bloc.cle, modeVaccin(bloc.cle) === "COMPACT" ? "OUVERT" : "COMPACT")}>{modeVaccin(bloc.cle) === "COMPACT" ? "Déplier" : "Réduire"}</button>}</div>)}</div>
           <div className="border-t p-3"><button type="button" onClick={() => setVaccinsMenuOuvert(false)} className="min-h-11 w-full rounded-lg bg-green-800 font-bold text-white">Fermer</button></div>
         </div>
       </div>}
@@ -1109,6 +1132,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         </div></div>}
       {renduPanneauHistorique()}
       {renduPanneauNonClasses()}
+      {ordonnancePanneauOuvert && <div className="vaccin-print-hidden fixed inset-0 z-[90] flex justify-end bg-black/40" role="dialog" aria-modal="true" aria-label="Ordonnance de la séance" onMouseDown={(event) => { if (event.target === event.currentTarget) setOrdonnancePanneauOuvert(false); }}><div className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-white p-4 shadow-2xl"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-lg font-black text-green-950">Ordonnance de la séance</h2><button type="button" onClick={() => setOrdonnancePanneauOuvert(false)} className="min-h-10 rounded-lg border px-3 font-semibold">Fermer</button></div><p className="mb-3 text-xs text-gray-600">Seules les ordonnances compatibles avec la date et le vaccin peuvent être associées.</p><fieldset className="rounded-lg border p-3"><legend className="px-1 text-sm font-bold">Ordonnances disponibles</legend>{medicamentsSession.length !== 1 ? <p className="text-sm text-amber-800">Sélectionne un seul vaccin pour proposer les ordonnances correspondantes.</p> : ordonnancesSessionEligibles.length === 0 ? <p className="text-sm text-gray-600">Aucune ordonnance enregistrée pour ce vaccin.</p> : ordonnancesSessionEligibles.map((ordonnance) => <label key={ordonnance.id} className="flex min-h-11 items-center gap-2 border-b py-2 text-sm"><input type="radio" name="ordonnance-session-panneau" checked={ordonnanceIdSession === ordonnance.id} onChange={() => { setOrdonnancesSelectionnees([ordonnance.id]); setOrdonnanceIdSession(ordonnance.id); setOrdonnanceNumeroSession(""); setOrdonnanceEnAttente(false); }} />{ordonnance.numero || "Sans numéro"} · {new Date(ordonnance.date).toLocaleDateString("fr-FR")}</label>)}</fieldset><button type="button" onClick={() => { setNouvelleOrdo((actuelle) => ({ ...actuelle, medicamentNom: medicamentsSession[0] || actuelle.medicamentNom })); setAjoutOrdonnanceOuvert((valeur) => !valeur); }} className="mt-3 min-h-11 rounded-lg border border-green-700 px-3 text-left font-semibold text-green-900">+ Ajouter une ordonnance</button>{ajoutOrdonnanceOuvert && <div className="mt-2 grid gap-2 rounded-lg bg-green-50 p-3 text-sm"><label>Numéro<input className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.numero} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, numero: e.target.value }))}/></label><label>Date<input type="date" className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.date} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, date: e.target.value }))}/></label><label>Vétérinaire<input className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.veterinaireNom} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, veterinaireNom: e.target.value }))}/></label><label>Médicament<input className="mt-1 w-full rounded border p-2" value={nouvelleOrdo.medicamentNom} onChange={(e) => setNouvelleOrdo((o) => ({ ...o, medicamentNom: e.target.value }))}/></label><button type="button" disabled={ajoutOrdoEnCours} onClick={() => void ajouterOrdonnanceSession()} className="min-h-11 rounded-lg bg-green-800 font-bold text-white">Enregistrer et associer</button></div>}<label className="mt-3 text-sm font-semibold">Ou numéro d’ordonnance<input className="mt-1 min-h-10 w-full rounded-lg border p-2 font-normal" value={ordonnanceNumeroSession} onChange={(event) => { setOrdonnanceNumeroSession(event.target.value); if (event.target.value.trim()) { setOrdonnancesSelectionnees([]); setOrdonnanceIdSession(""); setOrdonnanceEnAttente(false); } }} /></label><label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={ordonnanceEnAttente} onChange={(event) => { setOrdonnanceEnAttente(event.target.checked); if (event.target.checked) { setOrdonnanceNumeroSession(""); setOrdonnanceIdSession(""); } }} />À rattacher plus tard</label><button type="button" onClick={() => setOrdonnancePanneauOuvert(false)} className="mt-5 min-h-11 rounded-lg bg-green-800 font-bold text-white">Valider le choix</button></div></div>}
       {renduPanneauSoin()}
       <style jsx global>{`
         #tableau-vaccinal-impression .animal-fixed { position: sticky; }
