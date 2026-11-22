@@ -97,3 +97,14 @@ test("7500 événements de septembre et octobre sont deux injections distinctes,
  assert.equal(lignes.filter(l=>l.type==="Vaccination").length,2);
  assert.equal(lignes.filter(l=>l.type==="Traitement").length,0);
 });
+
+test("plusieurs produits explicitement liés à une vaccination conservent chacun leur commentaire sans événement en double",()=>{
+ const v1={...row,id:"tA",origine:"traitement" as const,evenementId:"evMulti",produit:"Produit A",dose:"2 ml"};
+ const v2={...row,id:"tB",origine:"traitement" as const,evenementId:"evMulti",produit:"Produit B",dose:"3 ml"};
+ const e={...event,id:"evMulti",produits:["Produit A","Produit B"],traitementIds:["tA","tB"],description:"Rappel"};
+ const lignes=construireCarnetUnique([v1,v2],[e],[]);
+ assert.equal(lignes.length,2);
+ assert.equal(lignes.filter(l=>l.type==="Vaccination").length,2);
+ assert.ok(lignes.every(l=>l.commentaire==="Rappel"));
+ assert.deepEqual(lignes.map(l=>l.dose),["2 ml","3 ml"]);
+});
