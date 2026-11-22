@@ -35,7 +35,7 @@ export default async function CarnetSanitairePage({searchParams}:{searchParams:P
    <button type="submit" className="rounded-lg bg-green-700 px-5 py-3 font-semibold text-white">Afficher</button>
    <Link href="/sanitaire/carnet" className="py-3 text-sm underline">Effacer</Link>
   </form>
-  <div className="mb-4 print:hidden"><ChoixImpression annee={annee} mois={mois} q={p.q??""}/></div>
+  <div className="mb-4 print:hidden"><ChoixImpression annee={annee} mois={mois} q={p.q??""} type={p.type??"tous"}/></div>
   <div className="mb-4 flex flex-wrap gap-3 print:hidden">
    <div className="rounded-xl border bg-white px-5 py-3"><strong className="text-xl">{total}</strong><p className="text-xs text-slate-600">Lignes affichées</p></div>
    {(["Vaccination","Traitement","Événement"] as const).map(t=><div key={t} className="rounded-xl border bg-white px-5 py-3"><strong className="text-xl">{triables.filter(l=>l.type===t).length}</strong><p className="text-xs text-slate-600">{t}s</p></div>)}
