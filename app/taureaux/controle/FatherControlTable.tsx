@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { nationalWithCountry, canonicalName, fullNational } from "@/lib/bull-identity";
-import { useRouter } from "next/navigation";
+import { nationalWithCountry, fullNational } from "@/lib/bull-identity";
+import RecordActionsMenu from "@/components/RecordActionsMenu";
 
 export type BullControlRow = {
   id: string; number: string; country: string; name: string | null; present: boolean;
@@ -26,20 +26,15 @@ function csvCell(value: string | number) {
 }
 
 export default function FatherControlTable({ rows: initial, conflicts }: { rows: BullControlRow[]; conflicts: FatherConflict[] }) {
-  const router = useRouter();
   const [rows, setRows] = useState(initial);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
   const [descending, setDescending] = useState(false);
   const [filter, setFilter] = useState("tous");
-  const [editing, setEditing] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [showConflicts, setShowConflicts] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [mergeFrom, setMergeFrom] = useState<string | null>(null);
-  const [mergeInto, setMergeInto] = useState("");
 
   const visible = useMemo(() => rows.filter((row) => {
     const phrase = [row.number, displayNumber(row), row.name ?? "", ...row.childNumbers].join(" ").toLocaleLowerCase("fr");
@@ -60,24 +55,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
     else { setSort(key); setDescending(false); }
   }
 
-  async function saveName(row: BullControlRow) {
-    setBusy(true); setError("");
-    try {
-      const response = await fetch("/api/taureaux", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: row.id, nopere: editName }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Modification refusée");
-      setRows((current) => current.map((item) => item.id === row.id ? { ...item, name: result.taureau.nopere } : item));
-      setEditing(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
-    } finally { setBusy(false); }
-  }
-
   async function deleteBull(row: BullControlRow) {
-    if (!window.confirm(`Supprimer la fiche ${row.name ?? row.number} (${nationalWithCountry(row.number)}) ? CESAM refusera si des animaux, saillies ou vêlages y sont encore rattachés.`)) return;
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/taureaux", {
@@ -89,30 +67,6 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
       setRows((current) => current.filter((item) => item.id !== row.id));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
-    } finally { setBusy(false); }
-  }
-
-  async function mergeAlias() {
-    const from = rows.find((row) => row.id === mergeFrom);
-    const into = rows.find((row) => row.id === mergeInto);
-    if (!from || !into) return;
-    if (!window.confirm(`Même reproducteur ?\n\nConserver ${nationalWithCountry(into.number)} · ${into.name ?? ""}\nRegrouper ${from.number} · ${from.name ?? ""}\n\n${from.breeding} saillies (dont ${from.inseminations} IA) et ${from.direct} liens animaux seront transférés. Les dates et les vaches restent inchangées. Confirmer ?`)) return;
-    setBusy(true); setError("");
-    try {
-      const response = await fetch("/api/taureaux/fusion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          keepId: into.id, removeId: from.id,
-          confirmation: "FUSIONNER", aliasConfirmed: true,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Fusion refusée");
-      setMergeFrom(null); setMergeInto("");
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Fusion impossible");
     } finally { setBusy(false); }
   }
 
@@ -165,51 +119,6 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
         </section>
       )}
 
-      {mergeFrom && (() => {
-        const from = rows.find((item) => item.id === mergeFrom);
-        const choices = rows.filter((candidate) => from
-          && candidate.id !== from.id
-          && fullNational(candidate.number)
-          && canonicalName(candidate.name) === canonicalName(from.name)
-        );
-        const into = choices.find((item) => item.id === mergeInto);
-        return from ? (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget && !busy) { setMergeFrom(null); setMergeInto(""); }
-            }}>
-            <section role="dialog" aria-modal="true" aria-labelledby="merge-title"
-              className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-2xl">
-              <div className="flex items-center justify-between gap-2">
-                <h2 id="merge-title" className="text-lg font-bold">Fusionner {from.name ?? from.number}</h2>
-                <button type="button" disabled={busy} onClick={() => { setMergeFrom(null); setMergeInto(""); }}
-                  aria-label="Fermer" className="rounded-lg px-2 py-1 text-xl text-gray-500">×</button>
-              </div>
-              <p className="text-sm text-gray-700">Regrouper <strong>{from.number}</strong> ({from.breeding} saillies dont {from.inseminations} IA) dans :</p>
-              <select aria-label="Fiche à conserver" value={mergeInto} onChange={(e) => setMergeInto(e.target.value)}
-                className="min-h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm font-semibold">
-                <option value="">Choisir le bon taureau</option>
-                {choices.map((candidate) => <option key={candidate.id} value={candidate.id}>
-                  {candidate.name ?? "Sans nom"} · {nationalWithCountry(candidate.number)}
-                </option>)}
-              </select>
-              {into && <p className="text-sm text-gray-600">
-                Après la fusion : <strong>{into.offspring} veaux déjà identifiés + {from.breeding} saillies</strong> rattachés au taureau conservé.
-              </p>}
-              {choices.length === 0 && <p className="text-sm text-red-700">Aucune fiche complète compatible. Fusion indisponible.</p>}
-              <div className="flex gap-2">
-                <button type="button" disabled={busy || !into} onClick={mergeAlias}
-                  className="min-h-11 flex-1 rounded-lg bg-green-700 px-3 font-semibold text-white disabled:opacity-40">
-                  {busy ? "Fusion en cours…" : "Fusionner"}
-                </button>
-                <button type="button" disabled={busy} onClick={() => { setMergeFrom(null); setMergeInto(""); }}
-                  className="min-h-11 rounded-lg border border-gray-300 px-4">Annuler</button>
-              </div>
-              <p className="text-xs text-gray-500">CESAM contrôle les filiations et bloque toute fusion contradictoire.</p>
-            </section>
-          </div>
-        ) : null;
-      })()}
 
       <div className="flex flex-wrap items-center gap-2">
         <input type="search" aria-label="Rechercher un taureau ou un veau" value={query} onChange={(e) => setQuery(e.target.value)}
@@ -222,7 +131,6 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
           <option value="ia">Avec IA identifiée</option>
         </select>
         <button type="button" onClick={exportCsv} className="min-h-11 rounded-lg border border-green-600 bg-white px-3 text-sm font-semibold text-green-800">Exporter CSV</button>
-        <Link href="/taureaux/doublons" className="rounded-lg border border-amber-500 bg-amber-50 px-3 py-3 text-sm font-semibold text-amber-900">Fusionner des doublons</Link>
       </div>
 
       <p className="text-xs text-gray-500">{visible.length} ligne(s) affichée(s). Clique sur un en-tête pour trier. Une IA est comptée uniquement si la saillie est enregistrée comme telle.</p>
@@ -245,16 +153,7 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
           <tbody>{visible.map((row) => (
             <tr key={row.id} className="border-t border-gray-100 hover:bg-green-50/40">
               <td className="px-3 py-2"><strong className="block font-mono text-green-900">{displayNumber(row)}</strong>{!fullNational(row.number) && <span className="text-xs font-semibold text-amber-800">Référence courte · national à vérifier</span>}{row.duplicateCandidates.length > 0 && <span className="block text-xs text-amber-800">Doublon possible : {row.duplicateCandidates.map(x => x.name ?? x.number).join(", ")}</span>}</td>
-              <td className="px-3 py-2">
-                {editing === row.id ? (
-                  <div className="flex gap-1">
-                    <input aria-label="Nouveau nom du taureau" value={editName} onChange={(e) => setEditName(e.target.value)}
-                      className="w-32 rounded border px-2 py-1 text-sm" />
-                    <button type="button" disabled={busy} onClick={() => saveName(row)} className="text-green-700 underline">OK</button>
-                    <button type="button" onClick={() => setEditing(null)} className="text-gray-500 underline">Annuler</button>
-                  </div>
-                ) : <span>{row.name || "Sans nom"}</span>}
-              </td>
+              <td className="px-3 py-2">{row.name || "Sans nom"}</td>
               <td className="px-3 py-2 text-center">{row.direct}</td>
               <td className="px-3 py-2 text-center">{row.manual}{row.historical > 0 && <span className="block text-xs text-amber-800">+{row.historical} par nom</span>}</td>
               <td className="px-3 py-2 text-center">{row.calving}</td>
@@ -265,20 +164,12 @@ export default function FatherControlTable({ rows: initial, conflicts }: { rows:
               <td className="px-3 py-2 text-center">{row.breeding}</td>
               <td className="px-3 py-2 text-center">{row.inseminations}</td>
               <td className="px-3 py-2">
-                <div className="flex items-center gap-3 whitespace-nowrap">
-                  <button type="button" onClick={() => { setEditing(row.id); setEditName(row.name ?? ""); }}
-                    className="text-green-800 underline">Corriger le nom</button>
-                  {!fullNational(row.number) && (
-                    <button type="button" onClick={() => {
-                      const choices = rows.filter((candidate) => candidate.id !== row.id && fullNational(candidate.number) && canonicalName(candidate.name) === canonicalName(row.name));
-                      setMergeFrom(row.id); setMergeInto(choices.length === 1 ? choices[0].id : ""); setError("");
-                    }}
-                      className="text-amber-900 underline">Fusionner</button>
-                  )}
-                  <Link href={`/taureaux/${row.id}`} className="text-blue-700 underline">Fiche</Link>
-                  <button type="button" disabled={busy} onClick={() => deleteBull(row)}
-                    className="text-red-700 underline disabled:opacity-40">Supprimer</button>
-                </div>
+                <RecordActionsMenu actions={[
+                  { label: "Voir la fiche", onSelect: () => { window.location.href = `/taureaux/${row.id}`; } },
+                  { label: "Supprimer", tone: "danger", disabled: busy,
+                    confirmMessage: `Supprimer la fiche ${row.name ?? row.number} ? CESAM refusera si des filiations ou saillies sont liées.`,
+                    onSelect: () => deleteBull(row) },
+                ]} />
               </td>
             </tr>
           ))}</tbody>
