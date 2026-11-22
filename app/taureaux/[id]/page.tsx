@@ -51,7 +51,8 @@ export default async function TaureauDescendancePage({ params }: { params: Promi
         <BackButton className="rounded-lg bg-white p-2 shadow" iconSize={18} />
         <div>
           <h1 className="text-xl font-bold">Descendance · {bull.nopere ?? bull.nupere}</h1>
-          <p className="text-xs text-gray-500">{nationalWithCountry(bull.nupere)}</p>
+          <p className="text-xs text-gray-500">N° national : {nationalWithCountry(bull.nupere) || "Non renseigné"}</p>
+          <p className="text-xs text-gray-500">N° de travail : {(/\d{4}$/.exec(bull.nupere?.replace(/\s+/g, "") ?? "")?.[0] ?? "Non renseigné")}</p>
         </div>
       </div>
       <p className="text-sm text-gray-600">{offspring.length} descendants directs · {present.length} présents · {absent.length} sortis</p>
