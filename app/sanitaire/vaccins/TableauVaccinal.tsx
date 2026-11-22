@@ -222,6 +222,9 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [soinModifierAnimaux, setSoinModifierAnimaux] = useState(false);
   const [soinEnCours, setSoinEnCours] = useState(false);
   const [soinMessage, setSoinMessage] = useState("");
+  const [soinsEnAttente, setSoinsEnAttente] = useState<ReturnType<typeof construireChargeSoin>[]>([]);
+  const [soinsEnregistres, setSoinsEnregistres] = useState<Set<number>>(new Set());
+  const enregistrementVerrou = useRef(false);
   const [vaccinsMenuOuvert, setVaccinsMenuOuvert] = useState(false);
   const [saisieOuverte, setSaisieOuverte] = useState(false);
   const [ordonnancePanneauOuvert, setOrdonnancePanneauOuvert] = useState(false);
@@ -448,7 +451,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
 
   function enregistrerSelection() {
     if (!ordonnanceSessionDateValide) { setErreur("L’ordonnance sélectionnée est postérieure à la séance ou n’est plus disponible."); return; }
-    if (!dateSession || !executant.trim() || groupesSession.length === 0) {
+    if (!dateSession || !executant.trim() || (groupesSession.length === 0 && soinsEnAttente.length === 0)) {
       setErreur("Indique la date, l’exécutant et sélectionne au moins un acte.");
       return;
     }
@@ -463,6 +466,8 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   }
 
   async function validerSession(administrations = ajustements) {
+    if (enregistrementVerrou.current) return;
+    enregistrementVerrou.current = true;
     setErreur("");
     const voieManquante = groupesSession.find((groupe) => !administrations[groupe.cle]?.voie.trim());
     if (voieManquante) {
@@ -524,6 +529,15 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         }
         groupe.actes.forEach((acte) => enregistres.add(acte.cle));
       }
+      for (let i = 0; i < soinsEnAttente.length; i++) {
+        if (soinsEnregistres.has(i)) continue;
+        const reponse = await fetch("/api/evenements/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(soinsEnAttente[i]) });
+        if (!reponse.ok) { const detail = await reponse.json().catch(() => ({})); throw new Error(detail.error || `Échec du traitement ${i + 1}`); }
+        setSoinsEnregistres((actuels) => new Set([...actuels, i]));
+        soinsEnregistres.add(i);
+      }
+      setSoinsEnAttente([]);
+      setSoinsEnregistres(new Set());
       viderBrouillon();
       setDonneesManquantes(false);
       router.refresh();
@@ -531,6 +545,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       if (enregistres.size > 0) setActesSelectionnes((actuels) => new Set([...actuels].filter((cle) => !enregistres.has(cle))));
       setErreur(cause instanceof Error ? cause.message : "La séance n’a pas pu être enregistrée.");
     } finally {
+      enregistrementVerrou.current = false;
       setEnregistrement(false);
     }
   }
@@ -872,13 +887,12 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     }
   }
 
-  async function enregistrerSoin() {
+  function enregistrerSoin() {
     if (!soinMedicament || soinAnimaux.size === 0) return;
     if (!dateSession || !executant.trim()) {
       setErreur("Indique la date et l’exécutant de la séance.");
       return;
     }
-    setSoinEnCours(true);
     setErreur("");
     try {
       const charge = construireChargeSoin({
@@ -893,15 +907,11 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         delaiAttenteViandeJ: soinMedicament.delaiAttenteViandeJ,
         delaiAttenteLaitJ: soinMedicament.delaiAttenteLaitJ,
       });
-      const reponse = await fetch("/api/evenements/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(charge) });
-      const detail = await reponse.json().catch(() => ({}));
-      if (!reponse.ok) throw new Error(detail.error || "Le soin n’a pas pu être enregistré.");
-      setSoinMessage(`${soinMedicament.nom} enregistré pour ${soinAnimaux.size} animal(aux).`);
+      setSoinsEnAttente((actuels) => [...actuels, charge]);
+      setSoinMessage(`${soinMedicament.nom} ajouté à la séance pour ${soinAnimaux.size} animal(aux).`);
       setSoinOuvert(false);
     } catch (cause) {
       setErreur(cause instanceof Error ? cause.message : "Le soin n’a pas pu être enregistré.");
-    } finally {
-      setSoinEnCours(false);
     }
   }
 
@@ -922,7 +932,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         {soinModifierAnimaux && <div className="mt-2 grid max-h-48 gap-1 overflow-y-auto">{animauxDuLot.map((ligne) => <label key={ligne.animalId} className="flex min-h-9 cursor-pointer items-center gap-2"><input type="checkbox" checked={soinAnimaux.has(ligne.animalId)} onChange={() => basculerDansSet(setSoinAnimaux, ligne.animalId)} className="h-5 w-5 accent-green-700" />{ligne.nutrav} {ligne.nom}</label>)}</div>}
       </div>
       {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
-      <button type="button" disabled={!soinMedicament || soinAnimaux.size === 0 || soinEnCours} onClick={() => void enregistrerSoin()} className="mt-3 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-40">{soinEnCours ? "Enregistrement…" : `Appliquer aux ${soinAnimaux.size} animaux`}</button>
+      <button type="button" disabled={!soinMedicament || soinAnimaux.size === 0 || soinEnCours} onClick={() => void enregistrerSoin()} className="mt-3 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-40">{soinEnCours ? "Enregistrement…" : `Ajouter à la séance (${soinAnimaux.size} animaux)`}</button>
       <button type="button" disabled={soinEnCours} onClick={fermer} className="mt-2 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Annuler</button>
     </div></div>;
   }
@@ -1015,9 +1025,9 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
             </label>
             <label className="flex min-h-10 items-center gap-2 text-xs font-semibold text-green-950"><input type="checkbox" checked={ordonnanceEnAttente} onChange={(event) => { setOrdonnanceEnAttente(event.target.checked); if (event.target.checked) { setOrdonnanceNumeroSession(""); setOrdonnanceIdSession(""); } }} />À rattacher plus tard</label>
           </div>
-          <button type="button" disabled={actes.length === 0 || enregistrement} onClick={enregistrerSelection} className="min-h-10 rounded-lg bg-green-800 px-3 text-sm font-bold text-white disabled:opacity-40">{enregistrement ? "Enregistrement…" : `Enregistrer ${actes.length} vaccination(s)`}</button>
+          <button type="button" disabled={(actes.length === 0 && soinsEnAttente.length === 0) || enregistrement} onClick={enregistrerSelection} className="min-h-10 rounded-lg bg-green-800 px-3 text-sm font-bold text-white disabled:opacity-40">{enregistrement ? "Enregistrement…" : `Enregistrer la séance · ${actes.length} vaccin(s) + ${soinsEnAttente.length} soin(s)`}</button>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2"><p className="mr-auto text-xs font-semibold text-green-950">{nombreAnimaux} animal(aux) · {actes.length} vaccination(s) sélectionnée(s)</p><button type="button" onClick={() => void ouvrirSoin()} className="min-h-8 rounded-lg border border-green-700 bg-white px-2 text-xs font-semibold text-green-900">+ Ajouter un soin / traitement</button>{soinMessage && <span className="text-xs font-semibold text-green-900">{soinMessage}</span>}{actes.length > 0 && <button type="button" onClick={() => setActesSelectionnes(new Set())} className="min-h-8 rounded-lg border bg-white px-2 text-xs font-semibold">Vider la sélection</button>}</div>
+        <div className="mt-2 flex flex-wrap items-center gap-2"><p className="mr-auto text-xs font-semibold text-green-950">{nombreAnimaux} animal(aux) · {actes.length} vaccination(s) sélectionnée(s)</p><button type="button" onClick={() => void ouvrirSoin()} className="min-h-8 rounded-lg border border-green-700 bg-white px-2 text-xs font-semibold text-green-900">+ Ajouter un soin / traitement</button>{soinMessage && <span className="text-xs font-semibold text-green-900">{soinMessage}</span>}{soinsEnAttente.length > 0 && <div className="flex flex-wrap items-center gap-2">{soinsEnAttente.map((soin, index) => <span key={index} className="rounded-lg bg-white px-2 py-1 text-xs font-semibold">{soin.traitements[0]?.medicamentNom} · {soin.animalIds.length} animaux {soinsEnregistres.has(index) ? "✓ enregistré" : <button type="button" disabled={enregistrement} onClick={() => { setSoinsEnAttente((actuels) => actuels.filter((_, i) => i !== index)); setSoinsEnregistres(new Set()); }} aria-label={`Retirer le soin ${index + 1}`} className="ml-1 text-red-700 underline">Retirer</button>}</span>)}</div>}{actes.length > 0 && <button type="button" onClick={() => setActesSelectionnes(new Set())} className="min-h-8 rounded-lg border bg-white px-2 text-xs font-semibold">Vider la sélection</button>}</div>
         {erreur && !donneesManquantes && <p className="mt-2 text-sm font-semibold text-red-700">{erreur}</p>}
         </div>
       </div>
