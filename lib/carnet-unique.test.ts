@@ -8,3 +8,19 @@ const event:EvenementCarnetRow={id:"e1",date:d,animalId:"a1",animalNutrav:"7485"
 test("vaccination et événement lié : une ligne enrichie du commentaire",()=>{const l=construireCarnetUnique([row],[event],[]);assert.equal(l.length,1);assert.equal(l[0].commentaire,"Primo");});
 test("événement distinct conservé et trouvable par symptôme",()=>{const l=construireCarnetUnique([row],[{...event,id:"e2",produits:[],symptomes:["Diarrhée"]}],[]);assert.equal(l.length,2);assert.equal(filtrerCarnetUnique(l,"diarrhée").length,1);});
 test("recherche ordonnance et période",()=>{const l=construireCarnetUnique([{...row,ordonnanceNumero:"ORD-23"}],[],[]);assert.equal(filtrerCarnetUnique(l,"ord-23","2026-01-01","2026-12-31").length,1);assert.equal(filtrerCarnetUnique(l,"","2027-01-01","2027-12-31").length,0);});
+
+test("administration appariée : conserver la vaccination, retirer seulement le traitement doublon",()=>{
+ const v={...row,id:"v2"};
+ const t={...row,id:"t2",motif:"VACCIN",dose:"4 ml"};
+ const acte={id:"vaccination:v2",animalId:"a1",nutrav:"7485",nom:"BANOUFEE",date:d,produit:"HEPIZOVAC",medicamentId:null,source:"Vaccination + Traitement" as const,ordonnanceNumero:null,executant:"Céline",protocoleNom:null,etapeNom:null};
+ const lignes=construireCarnetUnique([v,t],[event],[acte]);
+ assert.equal(lignes.length,1);
+ assert.equal(lignes[0].executant,"Céline");
+});
+test("ne pas supprimer des injections distinctes ambiguës",()=>{
+ const v={...row,id:"v2"};
+ const t1={...row,id:"t1",motif:"VACCIN"};
+ const t2={...row,id:"t2",motif:"VACCIN"};
+ const acte={id:"vaccination:v2",animalId:"a1",nutrav:"7485",nom:"BANOUFEE",date:d,produit:"HEPIZOVAC",medicamentId:null,source:"Vaccination + Traitement" as const,ordonnanceNumero:null,executant:null,protocoleNom:null,etapeNom:null};
+ assert.equal(construireCarnetUnique([v,t1,t2],[],[acte]).length,3);
+});
