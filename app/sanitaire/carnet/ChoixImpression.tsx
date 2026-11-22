@@ -17,7 +17,7 @@ export default function ChoixImpression({ annee, mois, q, duInitial, auInitial, 
       return;
     }
     if (mode === "selection" && !q.trim()) {
-      setErreur("Effectuez d'abord une recherche pour imprimer ses résultats.");
+      setErreur("Effectuez d&apos;abord une recherche pour imprimer ses résultats.");
       return;
     }
     setErreur("");
@@ -41,7 +41,7 @@ export default function ChoixImpression({ annee, mois, q, duInitial, auInitial, 
       <label className="text-sm">Au <input aria-label="Fin de période" type="date" value={au} onChange={(e) => setAu(e.target.value)} className="ml-2 rounded border p-2" /></label>
     </div>}
     {erreur && <p role="alert" className="mt-2 text-sm text-red-700">{erreur}</p>}
-    <button type="button" onClick={ouvrir} className="mt-3 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white">Préparer l'impression</button>
+    <button type="button" onClick={ouvrir} className="mt-3 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white">Préparer l&apos;impression</button>
     <p className="mt-2 text-xs text-gray-600">Vérifiez l'aperçu, puis utilisez « Imprimer la sélection » pour votre classeur papier.</p>
   </section>;
 }
