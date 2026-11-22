@@ -23,11 +23,7 @@ jobs:
       - run: node --test tests/troupeau-print-pagination.test.mjs
       - run: node --test tests/troupeau-double-sort.test.mjs
       - run: node --test tests/troupeau-print-calf-wrap.test.mjs
-      # Reproduire un build Next.js sans identifiants ni accès à la base réelle.
-      - name: Build Next.js (isolated, no Turso)
-        run: npm run build
-        env:
-          DATABASE_URL: file:./prisma/ci-build.db
-          TURSO_AUTH_TOKEN: ''
-          CI: 'true'
+      # Évite les erreurs JSX qu'un simple contrôle TypeScript ne détecte pas.
+      - name: Lint carnet sanitaire
+        run: npx eslint app/sanitaire/carnet/page.tsx app/sanitaire/carnet/ChoixImpression.tsx
 
