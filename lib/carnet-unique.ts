@@ -19,7 +19,8 @@ export function construireCarnetUnique(rows:CarnetSanitaireRow[], evenements:Eve
  const apparies=actes.filter(a=>a.source==="Vaccination + Traitement");
  const estMeme=(r:CarnetSanitaireRow,a:ActeSanitaireReel)=>r.animalId===a.animalId&&jour(r.date)===jour(a.date)&&r.produit.trim().toLocaleLowerCase("fr")===a.produit.trim().toLocaleLowerCase("fr");
  // Ne dédupliquer que les couples non ambigus : jamais effacer deux injections distinctes.
- const supprimerTraitements=new Set<string>();\n const completions=new Map<string,CarnetSanitaireRow>();
+ const supprimerTraitements=new Set<string>();
+ const completions=new Map<string,CarnetSanitaireRow>();
  for(const a of apparies){
    const vaccins=rows.filter(r=>(r.origine==="vaccination"||(!r.origine&&r.motif==="VACCINATION"))&&estMeme(r,a));
    const traitements=rows.filter(r=>(r.origine==="traitement"||(!r.origine&&r.motif!=="VACCINATION"))&&estMeme(r,a));
