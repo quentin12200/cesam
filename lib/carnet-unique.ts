@@ -45,11 +45,12 @@ export function construireCarnetUnique(rows:CarnetSanitaireRow[], evenements:Eve
    ? lignes.filter(l=>idsVisibles.has(l.id.slice("acte:".length)))
    : lignes.filter(l=>l.animalId===e.animalId&&jour(l.date)===jour(e.date)&&e.produits.some(p=>comparable(p)===comparable(l.produit)));
   if(ids.length>0 ? matches.length>=1 : matches.length===1){
-    // Une seule ligne reçoit le contexte de l'événement; les autres administrations
-    // restent distinctes et n'héritent pas de commentaires sans certitude.
-    const l=matches[0];
-    l.commentaire=[l.commentaire,commentaireEvenement(e,l.type==="Vaccination")].filter(Boolean).join(" · ");
-    if(!l.executant)l.executant=e.constatePar;
+    // Un lien explicite permet d'enrichir chacune des administrations réellement
+    // associées; le rapprochement historique sans ID reste limité à une seule ligne.
+    for(const l of matches){
+      l.commentaire=[l.commentaire,commentaireEvenement(e,l.type==="Vaccination")].filter(Boolean).join(" · ");
+      if(!l.executant)l.executant=e.constatePar;
+    }
     continue;
   }
   lignes.push({id:"evenement:"+e.id,date:e.date,animalId:e.animalId,animalNutrav:e.animalNutrav,animalNational:rows.find(r=>r.animalId===e.animalId)?.animalNational??"",animalNom:e.animalNom,type:"Événement",produit:e.produits.join(", ")||e.type,dose:"",voie:null,ordonnance:null,prescripteur:null,executant:e.constatePar,motif:e.categorie,commentaire:texte,statut:e.resolu?"Résolu":"À suivre",remiseLait:null,remiseViande:null});
