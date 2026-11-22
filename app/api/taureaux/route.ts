@@ -87,27 +87,41 @@ export async function POST(request: NextRequest) {
 }
 
 
-// Une correction de nom est possible sans toucher aux liens biologiques.
-// Changer un identifiant national lié à des animaux nécessite un audit séparé.
+// Les identifiants sont corrigés sur la même fiche : les relations par ID restent intactes.
+// Les anciennes références textuelles exactes sont conservées via une mise à jour atomique.
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null);
     const id = typeof body?.id === "string" ? body.id : "";
     const name = typeof body?.nopere === "string" ? body.nopere.trim() : null;
-    if (!id || name === null || name.length > 120) {
-      return NextResponse.json({ error: "Identifiant ou nom invalide." }, { status: 400 });
+    const number = typeof body?.nupere === "string" ? nationalWithCountry(body.nupere.trim()) : null;
+    if (!id || name === null || name.length > 120 || !number || !/^(?:[A-Z]{2})?\\d{8,15}$/.test(number)) {
+      return NextResponse.json({ error: "Nom ou numéro national invalide (8 à 15 chiffres, code pays facultatif)." }, { status: 400 });
     }
     const bull = await prisma.taureau.findUnique({ where: { id } });
     if (!bull) return NextResponse.json({ error: "Taureau introuvable." }, { status: 404 });
-    const updated = await prisma.taureau.update({ where: { id }, data: { nopere: name || null } });
+    const others = await prisma.taureau.findMany({ where: { id: { not: id } }, select: { id: true, nupere: true } });
+    if (others.some((other) => normalizeGenealogyNational(other.nupere) === normalizeGenealogyNational(number))) {
+      return NextResponse.json({ error: "Ce numéro national appartient déjà à un autre père. Vérifie les doublons avant correction." }, { status: 409 });
+    }
+    const oldNumber = bull.nupere;
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.taureau.update({ where: { id }, data: { nopere: name || null, nupere: number } });
+      if (oldNumber !== number) {
+        await tx.animal.updateMany({ where: { pereNationalManuel: oldNumber }, data: { pereNationalManuel: number } });
+        await tx.velage.updateMany({ where: { pereNunati: oldNumber }, data: { pereNunati: number } });
+      }
+      return result;
+    });
     try {
-      await logAction("PATCH_TAUREAU_NOM", `Nom du taureau ${bull.nupere} modifié`, {
-        op: "update", model: "taureau", where: { id }, data: { nopere: bull.nopere },
+      await logAction("PATCH_TAUREAU_IDENTITE", `Identité du taureau ${oldNumber} corrigée`, {
+        op: "update", model: "taureau", where: { id }, data: { nopere: bull.nopere, nupere: oldNumber },
       });
     } catch {}
     return NextResponse.json({ ok: true, taureau: updated });
-  } catch {
-    return NextResponse.json({ error: "Correction impossible." }, { status: 500 });
+  } catch (error) {
+    console.error("PATCH /api/taureaux error:", error);
+    return NextResponse.json({ error: "Correction impossible. Vérifie le numéro et les références." }, { status: 500 });
   }
 }
 
