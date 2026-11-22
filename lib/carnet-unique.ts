@@ -21,21 +21,38 @@ export function construireCarnetUnique(rows:CarnetSanitaireRow[], evenements:Eve
  // Ne dédupliquer que les couples non ambigus : jamais effacer deux injections distinctes.
  const supprimerTraitements=new Set<string>();
  const completions=new Map<string,CarnetSanitaireRow>();
+ const traitementVersVaccination=new Map<string,string>();
  for(const a of apparies){
    const vaccins=rows.filter(r=>(r.origine==="vaccination"||(!r.origine&&r.motif==="VACCINATION"))&&estMeme(r,a));
    const traitements=rows.filter(r=>(r.origine==="traitement"||(!r.origine&&r.motif!=="VACCINATION"))&&estMeme(r,a));
-   if(vaccins.length===1&&traitements.length===1){supprimerTraitements.add(traitements[0].id);completions.set(vaccins[0].id,traitements[0]);}
+   if(vaccins.length===1&&traitements.length===1){supprimerTraitements.add(traitements[0].id);completions.set(vaccins[0].id,traitements[0]);traitementVersVaccination.set(traitements[0].id,vaccins[0].id);}
  }
+ const evenementsParId=new Map(evenements.map(e=>[e.id,e]));
+ const evenementVaccinal=(r:CarnetSanitaireRow)=>r.origine==="traitement"&&!!r.evenementId&&comparable(evenementsParId.get(r.evenementId)?.type??"")==="vaccination";
  const lignes:LigneUnique[]=rows.filter(r=>!supprimerTraitements.has(r.id)).map(r=>{
   const a=actesParId.get("traitement:"+r.id)??actesParId.get("vaccination:"+r.id)??apparies.find(a=>estMeme(r,a));
   const complement=completions.get(r.id);
-  return {id:"acte:"+r.id,date:r.date,animalId:r.animalId,animalNutrav:r.animalNutrav,animalNational:r.animalNational,animalNom:r.animalNom,type:r.origine==="vaccination"||(!r.origine&&r.motif==="VACCINATION")?"Vaccination":"Traitement",produit:r.produit,dose:r.dose||complement?.dose||"",voie:r.voie??complement?.voie??null,ordonnance:r.ordonnanceNumero??complement?.ordonnanceNumero??null,prescripteur:r.prescripteur??complement?.prescripteur??null,executant:a?.executant??null,motif:r.motif,commentaire:"",statut:"Réalisé",remiseLait:r.dateRemiseLait,remiseViande:r.dateRemiseViande};
+  return {id:"acte:"+r.id,date:r.date,animalId:r.animalId,animalNutrav:r.animalNutrav,animalNational:r.animalNational,animalNom:r.animalNom,type:r.origine==="vaccination"||evenementVaccinal(r)||(!r.origine&&r.motif==="VACCINATION")?"Vaccination":"Traitement",produit:r.produit,dose:r.dose||complement?.dose||"",voie:r.voie??complement?.voie??null,ordonnance:r.ordonnanceNumero??complement?.ordonnanceNumero??null,prescripteur:r.prescripteur??complement?.prescripteur??null,executant:a?.executant??null,motif:r.motif,commentaire:"",statut:"Réalisé",remiseLait:r.dateRemiseLait,remiseViande:r.dateRemiseViande};
  });
  for(const e of evenements){
   const texte=commentaireEvenement(e,false);
   // Un événement qui décrit un acte du même animal, jour et produit enrichit la ligne au lieu de la répéter.
-  const matches=lignes.filter(l=>l.animalId===e.animalId&&jour(l.date)===jour(e.date)&&e.produits.some(p=>p.trim().toLowerCase()===l.produit.trim().toLowerCase()));
-  if(matches.length===1){const l=matches[0];l.commentaire=[l.commentaire,commentaireEvenement(e,l.type==="Vaccination")].filter(Boolean).join(" · ");if(!l.executant)l.executant=e.constatePar;continue;}
+  const ids=e.traitementIds??[];
+  // Le rattachement explicite en base est prioritaire : ni le produit ni la date seuls
+  // ne prouvent qu'une injection appartient à cet événement.
+  const idsVisibles=new Set(ids.map(id=>traitementVersVaccination.get(id)??id));
+  const matches=ids.length
+   ? lignes.filter(l=>idsVisibles.has(l.id.slice("acte:".length)))
+   : lignes.filter(l=>l.animalId===e.animalId&&jour(l.date)===jour(e.date)&&e.produits.some(p=>comparable(p)===comparable(l.produit)));
+  if(ids.length>0 ? matches.length>=1 : matches.length===1){
+    // Un lien explicite permet d'enrichir chacune des administrations réellement
+    // associées; le rapprochement historique sans ID reste limité à une seule ligne.
+    for(const l of matches){
+      l.commentaire=[l.commentaire,commentaireEvenement(e,l.type==="Vaccination")].filter(Boolean).join(" · ");
+      if(!l.executant)l.executant=e.constatePar;
+    }
+    continue;
+  }
   lignes.push({id:"evenement:"+e.id,date:e.date,animalId:e.animalId,animalNutrav:e.animalNutrav,animalNational:rows.find(r=>r.animalId===e.animalId)?.animalNational??"",animalNom:e.animalNom,type:"Événement",produit:e.produits.join(", ")||e.type,dose:"",voie:null,ordonnance:null,prescripteur:null,executant:e.constatePar,motif:e.categorie,commentaire:texte,statut:e.resolu?"Résolu":"À suivre",remiseLait:null,remiseViande:null});
  }
  return lignes;

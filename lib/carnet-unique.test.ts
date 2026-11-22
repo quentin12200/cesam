@@ -62,3 +62,49 @@ test("un traitement explicitement identifié reste un traitement, quel que soit 
  const traitement={...row,id:"t10",origine:"traitement" as const,motif:"VACCINATION"};
  assert.equal(construireCarnetUnique([traitement],[],[])[0].type,"Traitement");
 });
+
+test("7500 11/09: traitement lié à événement Vaccination classé Vaccination sans doublon",()=>{
+ const date=new Date("2026-09-11T12:00:00Z");
+ const traitement={...row,id:"t7500sept",date,animalId:"animal7500",animalNutrav:"7500",animalNom:"Ariane",produit:"BOVILIS BOVIGRIP",origine:"traitement" as const,evenementId:"evSept",dose:"5 ml",motif:"4 SEMAINES ENTRE 2 INJECTIONS"};
+ const evenement={...event,id:"evSept",animalId:"animal7500",animalNutrav:"7500",animalNom:"Ariane",date,type:"Vaccination",produits:["BOVILIS BOVIGRIP"],traitementIds:["t7500sept"],description:null,moment:"Soir"};
+ const lignes=construireCarnetUnique([traitement],[evenement],[]);
+ assert.equal(lignes.length,1);
+ assert.equal(lignes[0].type,"Vaccination");
+ assert.equal(lignes[0].dose,"5 ml");
+ assert.equal(lignes[0].voie,"SC");
+ assert.match(lignes[0].commentaire,/Soir/);
+ assert.equal(lignes.filter(l=>l.type==="Vaccination").length,1);
+ assert.equal(lignes.filter(l=>l.type==="Traitement").length,0);
+});
+test("7500 09/10: dose absente conservée et rappel rattaché",()=>{
+ const date=new Date("2026-10-09T12:00:00Z");
+ const vaccination={...row,id:"v7500oct",date,animalId:"animal7500",animalNutrav:"7500",animalNom:"Ariane",origine:"vaccination" as const,produit:"BOVILIS BOVIGRIP",dose:""};
+ const traitement={...row,id:"t7500oct",date,animalId:"animal7500",animalNutrav:"7500",animalNom:"Ariane",origine:"traitement" as const,evenementId:"evOct",produit:"BOVILIS BOVIGRIP",dose:"",motif:""};
+ const evenement={...event,id:"evOct",date,animalId:"animal7500",animalNutrav:"7500",animalNom:"Ariane",type:"Vaccination",traitementIds:["t7500oct"],produits:["BOVILIS BOVIGRIP"],description:"Rappel"};
+ const acte={id:"vaccination:v7500oct",animalId:"animal7500",nutrav:"7500",nom:"Ariane",date,produit:"BOVILIS BOVIGRIP",medicamentId:null,source:"Vaccination + Traitement" as const,ordonnanceNumero:null,executant:null,protocoleNom:null,etapeNom:null};
+ const lignes=construireCarnetUnique([vaccination,traitement],[evenement],[acte]);
+ assert.equal(lignes.length,1);
+ assert.equal(lignes[0].type,"Vaccination");
+ assert.equal(lignes[0].dose,"");
+ assert.equal(lignes[0].commentaire,"Rappel");
+});
+test("7500 événements de septembre et octobre sont deux injections distinctes, compteurs cohérents",()=>{
+ const sept=new Date("2026-09-11T12:00:00Z"),oct=new Date("2026-10-09T12:00:00Z");
+ const rows=[{...row,id:"tSept",date:sept,animalId:"animal7500",animalNutrav:"7500",origine:"traitement" as const,evenementId:"eSept",produit:"BOVILIS BOVIGRIP",dose:"5 ml"}, {...row,id:"vOct",date:oct,animalId:"animal7500",animalNutrav:"7500",origine:"vaccination" as const,produit:"BOVILIS BOVIGRIP",dose:""}];
+ const events=[{...event,id:"eSept",animalId:"animal7500",animalNutrav:"7500",date:sept,type:"Vaccination",traitementIds:["tSept"],produits:["BOVILIS BOVIGRIP"]}];
+ const lignes=construireCarnetUnique(rows,events,[]);
+ assert.equal(lignes.length,2);
+ assert.equal(lignes.filter(l=>l.type==="Vaccination").length,2);
+ assert.equal(lignes.filter(l=>l.type==="Traitement").length,0);
+});
+
+test("plusieurs produits explicitement liés à une vaccination conservent chacun leur commentaire sans événement en double",()=>{
+ const v1={...row,id:"tA",origine:"traitement" as const,evenementId:"evMulti",produit:"Produit A",dose:"2 ml"};
+ const v2={...row,id:"tB",origine:"traitement" as const,evenementId:"evMulti",produit:"Produit B",dose:"3 ml"};
+ const e={...event,id:"evMulti",produits:["Produit A","Produit B"],traitementIds:["tA","tB"],description:"Rappel"};
+ const lignes=construireCarnetUnique([v1,v2],[e],[]);
+ assert.equal(lignes.length,2);
+ assert.equal(lignes.filter(l=>l.type==="Vaccination").length,2);
+ assert.ok(lignes.every(l=>l.commentaire==="Rappel"));
+ assert.deepEqual(lignes.map(l=>l.dose),["2 ml","3 ml"]);
+});
