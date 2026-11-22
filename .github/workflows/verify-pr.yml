@@ -25,5 +25,5 @@ jobs:
       - run: node --test tests/troupeau-print-calf-wrap.test.mjs
       # Évite les erreurs JSX qu'un simple contrôle TypeScript ne détecte pas.
       - name: Lint carnet sanitaire
-        run: npx eslint app/sanitaire/carnet/page.tsx app/sanitaire/carnet/ChoixImpression.tsx
+        run: ESLINT_USE_FLAT_CONFIG=false npx eslint app/sanitaire/carnet/page.tsx app/sanitaire/carnet/ChoixImpression.tsx
 
