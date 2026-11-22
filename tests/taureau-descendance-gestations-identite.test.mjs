@@ -11,6 +11,8 @@ test("la fiche affiche les futures gestations sans attribution par nom", () => {
   assert.match(page, /taureauId: bull\.id/);
   assert.match(page, /Gestations confirmées/);
   assert.match(page, /Gestations à vérifier/);
+  assert.match(page, /"VERT", "ROSE"/);
+  assert.match(page, /"GRIS", "JAUNE"/);
   assert.match(page, /dateVelagePrevue/);
   assert.match(page, /saillie\.animal\.nutrav/);
   assert.doesNotMatch(page, /where: \{.*nopere: bull\.nopere/);
@@ -21,6 +23,7 @@ test("la correction préserve les liens et bloque les doublons", () => {
   assert.match(api, /normalizeGenealogyNational\(other\.nupere\)/);
   assert.match(api, /status: 409/);
   assert.match(api, /prisma\.\$transaction/);
+  assert.match(api, /fullNational\(oldNumber\)/);
   assert.match(api, /pereNationalManuel: oldNumber/);
   assert.match(api, /pereNunati: oldNumber/);
 });
