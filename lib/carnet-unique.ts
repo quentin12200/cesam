@@ -4,9 +4,17 @@ export type LigneUnique = { id:string; date:Date; animalId:string; animalNutrav:
 const jour=(d:Date)=>d.toISOString().slice(0,10);
 export function construireCarnetUnique(rows:CarnetSanitaireRow[], evenements:EvenementCarnetRow[], actes:ActeSanitaireReel[]):LigneUnique[]{
  const actesParId=new Map(actes.map(a=>[a.id,a]));
- const traitements=new Set(actes.filter(a=>a.source==="Vaccination + Traitement").map(a=>a.id.split(":")[1]));
- const lignes:LigneUnique[]=rows.filter(r=>!traitements.has(r.id)||r.motif==="VACCINATION").map(r=>{
-  const a=actesParId.get("traitement:"+r.id)??actesParId.get("vaccination:"+r.id);
+ const apparies=actes.filter(a=>a.source==="Vaccination + Traitement");
+ const estMeme=(r:CarnetSanitaireRow,a:ActeSanitaireReel)=>r.animalId===a.animalId&&jour(r.date)===jour(a.date)&&r.produit.trim().toLocaleLowerCase("fr")===a.produit.trim().toLocaleLowerCase("fr");
+ // Ne dédupliquer que les couples non ambigus : jamais effacer deux injections distinctes.
+ const supprimerTraitements=new Set<string>();
+ for(const a of apparies){
+   const vaccins=rows.filter(r=>r.motif==="VACCINATION"&&estMeme(r,a));
+   const traitements=rows.filter(r=>r.motif!=="VACCINATION"&&estMeme(r,a));
+   if(vaccins.length===1&&traitements.length===1)supprimerTraitements.add(traitements[0].id);
+ }
+ const lignes:LigneUnique[]=rows.filter(r=>!supprimerTraitements.has(r.id)).map(r=>{
+  const a=actesParId.get("traitement:"+r.id)??actesParId.get("vaccination:"+r.id)??apparies.find(a=>estMeme(r,a));
   return {id:"acte:"+r.id,date:r.date,animalId:r.animalId,animalNutrav:r.animalNutrav,animalNational:r.animalNational,animalNom:r.animalNom,type:r.motif==="VACCINATION"?"Vaccination":"Traitement",produit:r.produit,dose:r.dose,voie:r.voie,ordonnance:r.ordonnanceNumero,prescripteur:r.prescripteur,executant:a?.executant??null,motif:r.motif,commentaire:"",statut:"Réalisé",remiseLait:r.dateRemiseLait,remiseViande:r.dateRemiseViande};
  });
  for(const e of evenements){
