@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { numeroOrdonnanceCarnet, prescripteurCarnet } from "@/lib/carnet-ordonnance";
 import { unifierActesDuCarnet, type ActeSanitaireReel } from "@/lib/carnet-actes";
 
 /** Recherche du carnet : lecture seule des administrations, même sans protocole. */
@@ -9,6 +10,7 @@ export async function getActesSanitairesReels(): Promise<ActeSanitaireReel[]> {
       where: { statut: "FAIT" },
       select: {
         id: true, date: true, statut: true, vaccin: true, medicamentId: true, ordonnanceNumero: true,
+        ordonnance: { select: { numero: true, veterinaireNom: true } },
         animal: { select: { id: true, nutrav: true, nobovi: true } },
         medicament: { select: { nom: true } },
         protocole: { select: { label: true } },
@@ -18,6 +20,7 @@ export async function getActesSanitairesReels(): Promise<ActeSanitaireReel[]> {
     prisma.traitement.findMany({
       select: {
         id: true, dateDebut: true, medicamentNom: true, medicamentId: true, executant: true, ordonnanceNumero: true,
+        ordonnance: { select: { numero: true, veterinaireNom: true } },
         animal: { select: { id: true, nutrav: true, nobovi: true } },
         evenement: { select: { constatePar: true } },
         protocoleVaccin: { select: { label: true } },
@@ -27,11 +30,11 @@ export async function getActesSanitairesReels(): Promise<ActeSanitaireReel[]> {
   ]);
   return unifierActesDuCarnet(
     vaccinations.map((v) => ({ id: v.id, animal: { id: v.animal.id, nutrav: v.animal.nutrav, nom: v.animal.nobovi },
-      date: v.date, statut: v.statut, vaccin: v.vaccin, medicamentId: v.medicamentId, ordonnanceNumero: v.ordonnanceNumero,
+      date: v.date, statut: v.statut, vaccin: v.vaccin, medicamentId: v.medicamentId, ordonnanceNumero: numeroOrdonnanceCarnet(v.ordonnanceNumero, v.ordonnance),
       medicamentNom: v.medicament?.nom ?? null, protocoleNom: v.protocole?.label ?? null,
       etapeNom: v.etapeProtocole?.label ?? null })),
     traitements.map((t) => ({ id: t.id, animal: { id: t.animal.id, nutrav: t.animal.nutrav, nom: t.animal.nobovi },
-      date: t.dateDebut, medicamentNom: t.medicamentNom, medicamentId: t.medicamentId, ordonnanceNumero: t.ordonnanceNumero,
+      date: t.dateDebut, medicamentNom: t.medicamentNom, medicamentId: t.medicamentId, ordonnanceNumero: numeroOrdonnanceCarnet(t.ordonnanceNumero, t.ordonnance),
       executant: t.executant ?? t.evenement?.constatePar ?? null,
       protocoleNom: t.protocoleVaccin?.label ?? null, etapeNom: t.etapeProtocoleVaccin?.label ?? null })),
   );
@@ -62,12 +65,16 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
       include: {
         animal: { select: { id: true, nutrav: true, nunati: true, nobovi: true, copaip: true } },
         medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } },
+        ordonnance: { select: { numero: true, veterinaireNom: true } },
       },
       orderBy: { dateDebut: "asc" },
     }),
     prisma.vaccination.findMany({
       where: { statut: "FAIT" },
-      include: { animal: { select: { id: true, nutrav: true, nunati: true, nobovi: true, copaip: true } } },
+      include: {
+        animal: { select: { id: true, nutrav: true, nunati: true, nobovi: true, copaip: true } },
+        ordonnance: { select: { numero: true, veterinaireNom: true } },
+      },
       orderBy: { date: "asc" },
     }),
   ]);
@@ -87,8 +94,8 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
       animalNutrav: t.animal.nutrav,
       animalNational: t.animal.nunati,
       animalNom: t.animal.nobovi,
-      ordonnanceNumero: t.ordonnanceNumero,
-      prescripteur: t.veterinaire,
+      ordonnanceNumero: numeroOrdonnanceCarnet(t.ordonnanceNumero, t.ordonnance),
+      prescripteur: prescripteurCarnet(t.veterinaire, t.ordonnance),
       produit: t.medicamentNom,
       dose: t.dose != null ? `${t.dose} ${t.uniteDosage ?? ""}`.trim() : "",
       voie: t.voie,
@@ -107,8 +114,8 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
       animalNutrav: v.animal.nutrav,
       animalNational: v.animal.nunati,
       animalNom: v.animal.nobovi,
-      ordonnanceNumero: v.ordonnanceNumero,
-      prescripteur: v.veterinaire,
+      ordonnanceNumero: numeroOrdonnanceCarnet(v.ordonnanceNumero, v.ordonnance),
+      prescripteur: prescripteurCarnet(v.veterinaire, v.ordonnance),
       produit: v.vaccin,
       dose: v.dose != null ? `${v.dose} ml` : "",
       voie: v.voie,
