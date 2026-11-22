@@ -3,13 +3,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Mode = "mois" | "annee" | "periode" | "selection";
-export default function ChoixImpression({ annee, mois, q, duInitial = "2026-01-01", auInitial = "2026-12-31", type = "tous" }: {
+export default function ChoixImpression({ annee, mois, q, duInitial, auInitial, type = "tous" }: {
   annee: number; mois: number | null; q: string; duInitial?: string; auInitial?: string; type?: string;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("periode");
-  const [du, setDu] = useState(duInitial);
-  const [au, setAu] = useState(auInitial);
+  const [du, setDu] = useState(duInitial ?? `${annee}-01-01`);
+  const [au, setAu] = useState(auInitial ?? `${annee}-12-31`);
   const [erreur, setErreur] = useState("");
   const ouvrir = () => {
     if (mode === "periode" && (!du || !au || du > au)) {
@@ -42,6 +42,6 @@ export default function ChoixImpression({ annee, mois, q, duInitial = "2026-01-0
     </div>}
     {erreur && <p role="alert" className="mt-2 text-sm text-red-700">{erreur}</p>}
     <button type="button" onClick={ouvrir} className="mt-3 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white">Préparer l'impression</button>
-    <p className="mt-2 text-xs text-gray-600">Vérifiez l'aperçu, puis utilisez « Imprimer / Enregistrer PDF » pour votre classeur papier.</p>
+    <p className="mt-2 text-xs text-gray-600">Vérifiez l'aperçu, puis utilisez « Imprimer la sélection » pour votre classeur papier.</p>
   </section>;
 }
