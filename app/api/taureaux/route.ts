@@ -107,7 +107,7 @@ export async function PATCH(request: NextRequest) {
     const oldNumber = bull.nupere;
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.taureau.update({ where: { id }, data: { nopere: name || null, nupere: number } });
-      if (oldNumber !== number) {
+      if (oldNumber !== number && fullNational(oldNumber)) {
         await tx.animal.updateMany({ where: { pereNationalManuel: oldNumber }, data: { pereNationalManuel: number } });
         await tx.velage.updateMany({ where: { pereNunati: oldNumber }, data: { pereNunati: number } });
       }
