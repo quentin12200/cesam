@@ -38,6 +38,7 @@ export async function getActesSanitairesReels(): Promise<ActeSanitaireReel[]> {
 }
 
 export interface CarnetSanitaireRow {
+  origine?: "vaccination" | "traitement";
   id: string;
   date: Date;
   animalId: string;
@@ -77,6 +78,7 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
     const dateRemiseViande = attente.dateFinAttenteViande;
     const dateRemiseLait = attente.dateFinAttenteLait;
     rows.push({
+      origine: "traitement",
       id: t.id,
       date: t.dateDebut,
       animalId: t.animal.id,
@@ -96,6 +98,7 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
 
   for (const v of vaccinations) {
     rows.push({
+      origine: "vaccination",
       id: v.id,
       date: v.date,
       animalId: v.animal.id,
