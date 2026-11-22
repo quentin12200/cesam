@@ -42,6 +42,6 @@ export default function ChoixImpression({ annee, mois, q, duInitial, auInitial, 
     </div>}
     {erreur && <p role="alert" className="mt-2 text-sm text-red-700">{erreur}</p>}
     <button type="button" onClick={ouvrir} className="mt-3 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white">Préparer l&apos;impression</button>
-    <p className="mt-2 text-xs text-gray-600">Vérifiez l'aperçu, puis utilisez « Imprimer la sélection » pour votre classeur papier.</p>
+    <p className="mt-2 text-xs text-gray-600">Vérifiez l&apos;aperçu, puis utilisez « Imprimer la sélection » pour votre classeur papier.</p>
   </section>;
 }
