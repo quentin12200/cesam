@@ -21,8 +21,8 @@ export function construireCarnetUnique(rows:CarnetSanitaireRow[], evenements:Eve
   const texte=[...e.symptomes,e.description??"",e.temperature!==null?"Température : "+e.temperature+" °C":"",e.moment??""].filter(Boolean).join(" · ");
   // Un événement qui décrit un acte du même animal, jour et produit enrichit la ligne au lieu de la répéter.
   const matches=lignes.filter(l=>l.animalId===e.animalId&&jour(l.date)===jour(e.date)&&e.produits.some(p=>p.trim().toLowerCase()===l.produit.trim().toLowerCase()));
-  if(matches.length){for(const l of matches){l.commentaire=[l.commentaire,texte].filter(Boolean).join(" · ");if(!l.executant)l.executant=e.constatePar;}continue;}
-  lignes.push({id:"evenement:"+e.id,date:e.date,animalId:e.animalId,animalNutrav:e.animalNutrav,animalNational:"",animalNom:e.animalNom,type:"Événement",produit:e.produits.join(", ")||e.type,dose:"",voie:null,ordonnance:null,prescripteur:null,executant:e.constatePar,motif:e.categorie,commentaire:texte,statut:e.resolu?"Résolu":"À suivre",remiseLait:null,remiseViande:null});
+  if(matches.length===1){const l=matches[0];l.commentaire=[l.commentaire,e.type,texte].filter(Boolean).join(" · ");if(!l.executant)l.executant=e.constatePar;continue;}
+  lignes.push({id:"evenement:"+e.id,date:e.date,animalId:e.animalId,animalNutrav:e.animalNutrav,animalNational:rows.find(r=>r.animalId===e.animalId)?.animalNational??"",animalNom:e.animalNom,type:"Événement",produit:e.produits.join(", ")||e.type,dose:"",voie:null,ordonnance:null,prescripteur:null,executant:e.constatePar,motif:e.categorie,commentaire:texte,statut:e.resolu?"Résolu":"À suivre",remiseLait:null,remiseViande:null});
  }
  return lignes;
 }
