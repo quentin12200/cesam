@@ -25,7 +25,7 @@ export default async function CarnetSanitairePage({searchParams}:{searchParams:P
  const entete=(c:string,t:string)=><th className="px-2 py-3 text-left whitespace-nowrap"><Link href={lienTri(c)} className="hover:underline">{t} {cle===c?(asc?"↑":"↓"):"↕"}</Link></th>;
  const total=triables.length;
  return <div className="mx-auto max-w-[1800px] p-3 sm:p-5">
-  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden"><BackButton label="Retour"/><div className="flex items-center gap-2"><ImportHistoriqueButton/><PrintButton label="🖨️ Imprimer / Enregistrer PDF"/></div></div>
+  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden"><BackButton label="Retour"/><div className="flex items-center gap-2"><ImportHistoriqueButton/>{mode&&periodeValide(choix)&&<PrintButton label="🖨️ Imprimer la sélection"/>}</div></div>
   <div className="mb-5 print:hidden"><h1 className="text-3xl font-extrabold text-green-950">✚ Carnet sanitaire</h1><p className="text-sm text-slate-600">Vaccinations, traitements, événements, symptômes et commentaires — un seul tableau.</p></div>
   <form action="/sanitaire/carnet" method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-white p-4 print:hidden">
    <label className="min-w-[240px] flex-1 text-sm font-semibold">Recherche universelle<input name="q" type="search" defaultValue={p.q??""} placeholder="Animal, médicament, symptôme, ordonnance…" className="mt-1 w-full rounded-lg border p-3 font-normal"/></label>
@@ -35,7 +35,7 @@ export default async function CarnetSanitairePage({searchParams}:{searchParams:P
    <button type="submit" className="rounded-lg bg-green-700 px-5 py-3 font-semibold text-white">Afficher</button>
    <Link href="/sanitaire/carnet" className="py-3 text-sm underline">Effacer</Link>
   </form>
-  <div className="mb-4 print:hidden"><ChoixImpression annee={annee} mois={mois} q={p.q??""} type={p.type??"tous"}/></div>
+  <div className="mb-4 print:hidden"><ChoixImpression annee={annee} mois={mois} q={p.q??""} type={p.type??"tous"}/>{mode&&<p className="mt-2 text-sm font-semibold text-green-900" role="status">Sélection prête : {total} lignes. Utilisez « Imprimer la sélection » en haut de page.</p>}</div>
   <div className="mb-4 flex flex-wrap gap-3 print:hidden">
    <div className="rounded-xl border bg-white px-5 py-3"><strong className="text-xl">{total}</strong><p className="text-xs text-slate-600">Lignes affichées</p></div>
    {(["Vaccination","Traitement","Événement"] as const).map(t=><div key={t} className="rounded-xl border bg-white px-5 py-3"><strong className="text-xl">{triables.filter(l=>l.type===t).length}</strong><p className="text-xs text-slate-600">{t}s</p></div>)}
