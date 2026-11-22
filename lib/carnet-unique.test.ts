@@ -1,0 +1,10 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { construireCarnetUnique, filtrerCarnetUnique } from "./carnet-unique.ts";
+import type { CarnetSanitaireRow, EvenementCarnetRow } from "./carnet-sanitaire.ts";
+const d=new Date("2026-11-20T12:00:00Z");
+const row: CarnetSanitaireRow={id:"v1",date:d,animalId:"a1",animalNutrav:"7485",animalNational:"FR00007485",animalNom:"BANOUFEE",ordonnanceNumero:null,prescripteur:null,produit:"HEPIZOVAC",dose:"4 ml",voie:"SC",motif:"VACCINATION",dateRemiseLait:null,dateRemiseViande:null};
+const event:EvenementCarnetRow={id:"e1",date:d,animalId:"a1",animalNutrav:"7485",animalNom:"BANOUFEE",categorie:"Autre",type:"Vaccination",produits:["HEPIZOVAC"],symptomes:[],temperature:null,moment:null,description:"Primo",constatePar:"Céline",resolu:false};
+test("vaccination et événement lié : une ligne enrichie du commentaire",()=>{const l=construireCarnetUnique([row],[event],[]);assert.equal(l.length,1);assert.equal(l[0].commentaire,"Primo");});
+test("événement distinct conservé et trouvable par symptôme",()=>{const l=construireCarnetUnique([row],[{...event,id:"e2",produits:[],symptomes:["Diarrhée"]}],[]);assert.equal(l.length,2);assert.equal(filtrerCarnetUnique(l,"diarrhée").length,1);});
+test("recherche ordonnance et période",()=>{const l=construireCarnetUnique([{...row,ordonnanceNumero:"ORD-23"}],[],[]);assert.equal(filtrerCarnetUnique(l,"ord-23","2026-01-01","2026-12-31").length,1);assert.equal(filtrerCarnetUnique(l,"","2027-01-01","2027-12-31").length,0);});
