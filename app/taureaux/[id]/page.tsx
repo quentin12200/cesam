@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import BackButton from "@/app/components/BackButton";
+import BullIdentityEditor from "./BullIdentityEditor";
 import { nationalWithCountry } from "@/lib/bull-identity";
 
 function normalized(value: string | null | undefined): string {
@@ -34,6 +35,22 @@ export default async function TaureauDescendancePage({ params }: { params: Promi
     },
   });
 
+  const gestations = await prisma.gestation.findMany({
+    where: { saillie: { taureauId: bull.id }, velage: { is: null }, etat: { in: ["VERT", "ROSE", "GRIS", "JAUNE"] } },
+    select: {
+      id: true, etat: true, resultatEcho: true, dateVelagePrevue: true,
+      saillie: { select: {
+        date: true, type: true, estimation: true,
+        animal: { select: { id: true, nutrav: true, nobovi: true, statut: true } },
+      } },
+    },
+    orderBy: { dateVelagePrevue: "asc" },
+  });
+  const futures = gestations.filter(g => g.saillie.animal.statut === "ACTIF");
+  const confirmed = futures.filter(g => ["VERT", "ROSE"].includes(g.etat) || g.resultatEcho === "PLEINE");
+  const uncertain = futures.filter(g => !confirmed.includes(g));
+  const dateFr = (date: Date | null) => date ? new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC" }).format(date) : "Non renseignée";
+
   const national = normalized(bull.nupere);
   const hasCompleteNational = /^[0-9]{8,15}$/.test(national);
   const offspring = animals.filter((a) =>
@@ -53,9 +70,28 @@ export default async function TaureauDescendancePage({ params }: { params: Promi
           <h1 className="text-xl font-bold">Descendance · {bull.nopere ?? bull.nupere}</h1>
           <p className="text-xs text-gray-500">N° national : {nationalWithCountry(bull.nupere) || "Non renseigné"}</p>
           <p className="text-xs text-gray-500">N° de travail : {(/\d{4}$/.exec(bull.nupere?.replace(/\s+/g, "") ?? "")?.[0] ?? "Non renseigné")}</p>
+          <BullIdentityEditor id={bull.id} name={bull.nopere} national={bull.nupere} />
         </div>
       </div>
       <p className="text-sm text-gray-600">{offspring.length} descendants directs · {present.length} présents · {absent.length} sortis</p>
+      <section className="rounded-xl border border-gray-200 bg-white p-4">
+        <h2 className="mb-3 font-semibold">Futurs descendants ({futures.length})</h2>
+        {([{ title: "Gestations confirmées", rows: confirmed }, { title: "Gestations à vérifier", rows: uncertain }]).map(group => (
+          <div key={group.title} className="mb-3">
+            <h3 className="mb-2 text-sm font-semibold text-gray-700">{group.title} ({group.rows.length})</h3>
+            {group.rows.length === 0 && <p className="text-sm text-gray-400">Aucune.</p>}
+            <div className="space-y-2">{group.rows.map(g => (
+              <Link key={g.id} href={`/troupeau/${g.saillie.animal.nutrav}`} className="block rounded-lg border bg-gray-50 p-3 text-sm">
+                <strong>{g.saillie.animal.nutrav}{g.saillie.animal.nobovi ? ` · ${g.saillie.animal.nobovi}` : ""}</strong>
+                <span className="block">Saillie / IA : {dateFr(g.saillie.date)} · {g.saillie.type}</span>
+                <span className="block">Vêlage prévu : {dateFr(g.dateVelagePrevue)}</span>
+                <span className="block">Statut : {g.etat}{g.resultatEcho ? ` · Écho : ${g.resultatEcho}` : ""}{g.saillie.estimation ? " · Date estimée" : ""}</span>
+              </Link>
+            ))}</div>
+          </div>
+        ))}
+        <p className="text-xs text-gray-500">Seules les gestations liées explicitement à ce père sont affichées. Les références historiques par nom ne sont pas attribuées automatiquement.</p>
+      </section>
       {([
         { title: "Présents", rows: present, style: "border-green-200 bg-green-50 text-green-800" },
         { title: "Sortis du troupeau", rows: absent, style: "border-gray-200 bg-gray-50 text-gray-700" },
