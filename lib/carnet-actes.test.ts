@@ -79,7 +79,7 @@ test("filtres par période, médicament et animal, puis quatre tris cliquables",
 test("un traitement non classé reste trouvable par ses données propres, quel que soit le médicament", () => {
   const acte: ActeSanitaireReel = { id: "traitement:ancien", animalId: "a1234", nutrav: "1234", nom: "NUAGE",
     date: new Date("2026-09-07T12:00:00Z"), produit: "PRODUIT-EXEMPLE", medicamentId: null, source: "Traitement",
-    executant: null, protocoleNom: null, etapeNom: null };
+    ordonnanceNumero: null, executant: null, protocoleNom: null, etapeNom: null };
   assert.deepEqual(rechercherActes([acte], { du: "2026-09-07", au: "2026-09-07",
     produit: "produit exemple", animal: "nuage" }), [acte]);
 });

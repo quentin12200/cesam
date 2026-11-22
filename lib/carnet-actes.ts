@@ -2,13 +2,13 @@ type AnimalActe = { id: string; nutrav: string; nom: string | null };
 
 export type VaccinationCarnet = {
   id: string; animal: AnimalActe; date: Date; statut: string; vaccin: string;
-  medicamentId: string | null; medicamentNom: string | null;
+  medicamentId: string | null; medicamentNom: string | null; ordonnanceNumero?: string | null;
   protocoleNom: string | null; etapeNom: string | null;
 };
 
 export type TraitementCarnet = {
   id: string; animal: AnimalActe; date: Date; medicamentNom: string;
-  medicamentId: string | null; executant: string | null;
+  medicamentId: string | null; executant: string | null; ordonnanceNumero?: string | null;
   protocoleNom: string | null; etapeNom: string | null;
 };
 
@@ -16,7 +16,7 @@ export type ActeSanitaireReel = {
   id: string; animalId: string; nutrav: string; nom: string | null; date: Date;
   produit: string; medicamentId: string | null;
   source: "Vaccination" | "Traitement" | "Vaccination + Traitement";
-  executant: string | null; protocoleNom: string | null; etapeNom: string | null;
+  ordonnanceNumero: string | null; executant: string | null; protocoleNom: string | null; etapeNom: string | null;
 };
 
 const jour = (date: Date) => date.toISOString().slice(0, 10);
@@ -72,6 +72,7 @@ export function unifierActesDuCarnet(vaccinations: readonly VaccinationCarnet[],
         nom: v.animal.nom, date: v.date, produit: v.medicamentNom ?? v.vaccin,
         medicamentId: v.medicamentId ?? representant?.medicamentId ?? null,
         source: representant ? "Vaccination + Traitement" : "Vaccination",
+        ordonnanceNumero: v.ordonnanceNumero ?? representant?.ordonnanceNumero ?? null,
         executant: representant?.executant ?? null,
         protocoleNom: v.protocoleNom ?? representant?.protocoleNom ?? null,
         etapeNom: v.etapeNom ?? representant?.etapeNom ?? null });
@@ -80,7 +81,7 @@ export function unifierActesDuCarnet(vaccinations: readonly VaccinationCarnet[],
       if (!traitementsDisponibles.has(t.id)) continue;
       resultat.push({ id: `traitement:${t.id}`, animalId, nutrav: t.animal.nutrav,
         nom: t.animal.nom, date: t.date, produit: t.medicamentNom,
-        medicamentId: t.medicamentId, source: "Traitement", executant: t.executant,
+        medicamentId: t.medicamentId, source: "Traitement", ordonnanceNumero: t.ordonnanceNumero ?? null, executant: t.executant,
         protocoleNom: t.protocoleNom, etapeNom: t.etapeNom });
     }
   }
@@ -88,8 +89,8 @@ export function unifierActesDuCarnet(vaccinations: readonly VaccinationCarnet[],
 }
 
 export type RechercheActes = {
-  du?: string; au?: string; animal?: string; produit?: string;
-  tri?: "date" | "animal" | "produit" | "executant";
+  du?: string; au?: string; animal?: string; produit?: string; ordonnance?: string; q?: string;
+  tri?: "date" | "animal" | "produit" | "executant" | "ordonnance";
   direction?: "asc" | "desc";
 };
 
@@ -98,13 +99,20 @@ export function rechercherActes(actes: readonly ActeSanitaireReel[], recherche: 
   const au = /^\d{4}-\d{2}-\d{2}$/.test(recherche.au ?? "") ? recherche.au : undefined;
   const animal = nomComparable(recherche.animal ?? "");
   const produit = nomComparable(recherche.produit ?? "");
+  const ordonnance = nomComparable(recherche.ordonnance ?? "");
+  const q = nomComparable(recherche.q ?? "");
+  const dateRecherche = (recherche.q ?? "").trim().match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  const dateIso = dateRecherche ? `${dateRecherche[3]}-${dateRecherche[2].padStart(2, "0")}-${dateRecherche[1].padStart(2, "0")}` : null;
   const tri = recherche.tri ?? "date";
   const direction = recherche.direction === "asc" ? 1 : -1;
   const texte = (a: ActeSanitaireReel) => tri === "animal" ? a.nutrav
-    : tri === "produit" ? a.produit : a.executant ?? "";
+    : tri === "produit" ? a.produit : tri === "ordonnance" ? a.ordonnanceNumero ?? "" : a.executant ?? "";
   return actes.filter((a) => (!du || jour(a.date) >= du) && (!au || jour(a.date) <= au)
     && (!animal || nomComparable(`${a.nutrav} ${a.nom ?? ""}`).includes(animal))
-    && (!produit || nomComparable(a.produit).includes(produit)))
+    && (!produit || nomComparable(a.produit).includes(produit))
+    && (!ordonnance || nomComparable(a.ordonnanceNumero ?? "").includes(ordonnance))
+    && (!q || nomComparable([a.produit, a.nutrav, a.nom ?? "", a.ordonnanceNumero ?? "", jour(a.date), a.date.toLocaleDateString("fr-FR")].join(" ")).includes(q)
+      || Boolean(dateIso && jour(a.date) === dateIso)))
     .sort((a, b) => {
       const principal = tri === "date" ? a.date.getTime() - b.date.getTime()
         : tri === "animal" ? a.nutrav.localeCompare(b.nutrav, "fr", { numeric: true })
