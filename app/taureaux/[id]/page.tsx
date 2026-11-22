@@ -36,7 +36,7 @@ export default async function TaureauDescendancePage({ params }: { params: Promi
   });
 
   const gestations = await prisma.gestation.findMany({
-    where: { saillie: { taureauId: bull.id }, velage: { is: null } },
+    where: { saillie: { taureauId: bull.id }, velage: { is: null }, etat: { in: ["VERT", "ROSE", "GRIS", "JAUNE"] } },
     select: {
       id: true, etat: true, resultatEcho: true, dateVelagePrevue: true,
       saillie: { select: {
@@ -47,7 +47,7 @@ export default async function TaureauDescendancePage({ params }: { params: Promi
     orderBy: { dateVelagePrevue: "asc" },
   });
   const futures = gestations.filter(g => g.saillie.animal.statut === "ACTIF");
-  const confirmed = futures.filter(g => !g.saillie.estimation && /^(VERT|GESTANTE|PLEINE|POSITIF)$/i.test(g.etat));
+  const confirmed = futures.filter(g => ["VERT", "ROSE"].includes(g.etat) || g.resultatEcho === "PLEINE");
   const uncertain = futures.filter(g => !confirmed.includes(g));
   const dateFr = (date: Date | null) => date ? new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC" }).format(date) : "Non renseignée";
 
