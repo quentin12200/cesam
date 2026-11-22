@@ -5,7 +5,7 @@ import type { CarnetSanitaireRow, EvenementCarnetRow } from "./carnet-sanitaire.
 const d=new Date("2026-11-20T12:00:00Z");
 const row: CarnetSanitaireRow={id:"v1",date:d,animalId:"a1",animalNutrav:"7485",animalNational:"FR00007485",animalNom:"BANOUFEE",ordonnanceNumero:null,prescripteur:null,produit:"HEPIZOVAC",dose:"4 ml",voie:"SC",motif:"VACCINATION",dateRemiseLait:null,dateRemiseViande:null};
 const event:EvenementCarnetRow={id:"e1",date:d,animalId:"a1",animalNutrav:"7485",animalNom:"BANOUFEE",categorie:"Autre",type:"Vaccination",produits:["HEPIZOVAC"],symptomes:[],temperature:null,moment:null,description:"Primo",constatePar:"Céline",resolu:false};
-test("vaccination et événement lié : une ligne enrichie du commentaire",()=>{const l=construireCarnetUnique([row],[event],[]);assert.equal(l.length,1);assert.equal(l[0].commentaire,"Primo");});
+test("vaccination et événement lié : une ligne enrichie du commentaire",()=>{const l=construireCarnetUnique([row],[event],[]);assert.equal(l.length,1);assert.equal(l[0].commentaire,"Vaccination · Primo");});
 test("événement distinct conservé et trouvable par symptôme",()=>{const l=construireCarnetUnique([row],[{...event,id:"e2",produits:[],symptomes:["Diarrhée"]}],[]);assert.equal(l.length,2);assert.equal(filtrerCarnetUnique(l,"diarrhée").length,1);});
 test("recherche ordonnance et période",()=>{const l=construireCarnetUnique([{...row,ordonnanceNumero:"ORD-23"}],[],[]);assert.equal(filtrerCarnetUnique(l,"ord-23","2026-01-01","2026-12-31").length,1);assert.equal(filtrerCarnetUnique(l,"","2027-01-01","2027-12-31").length,0);});
 
@@ -23,4 +23,15 @@ test("ne pas supprimer des injections distinctes ambiguës",()=>{
  const t2={...row,id:"t2",motif:"VACCIN"};
  const acte={id:"vaccination:v2",animalId:"a1",nutrav:"7485",nom:"BANOUFEE",date:d,produit:"HEPIZOVAC",medicamentId:null,source:"Vaccination + Traitement" as const,ordonnanceNumero:null,executant:null,protocoleNom:null,etapeNom:null};
  assert.equal(construireCarnetUnique([v,t1,t2],[],[acte]).length,3);
+});
+
+test("événement ambigu : ne pas attribuer un commentaire à plusieurs injections",()=>{
+ const l=construireCarnetUnique([row,{...row,id:"v3"}],[event],[]);
+ assert.equal(l.length,3);
+ assert.equal(l.filter(x=>x.commentaire==="").length,2);
+ assert.equal(l.find(x=>x.id==="evenement:e1")?.commentaire,"Primo");
+});
+test("événement distinct : numéro national retrouvé sur les actes du même animal",()=>{
+ const l=construireCarnetUnique([row],[{...event,id:"e3",produits:[],description:"Surveillance"}],[]);
+ assert.equal(l.find(x=>x.id==="evenement:e3")?.animalNational,"FR00007485");
 });
