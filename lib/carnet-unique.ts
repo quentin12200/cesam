@@ -44,7 +44,7 @@ export function construireCarnetUnique(rows:CarnetSanitaireRow[], evenements:Eve
   const matches=ids.length
    ? lignes.filter(l=>idsVisibles.has(l.id.slice("acte:".length)))
    : lignes.filter(l=>l.animalId===e.animalId&&jour(l.date)===jour(e.date)&&e.produits.some(p=>comparable(p)===comparable(l.produit)));
-  if(matches.length>=1){
+  if(ids.length>0 ? matches.length>=1 : matches.length===1){
     // Une seule ligne reçoit le contexte de l'événement; les autres administrations
     // restent distinctes et n'héritent pas de commentaires sans certitude.
     const l=matches[0];
