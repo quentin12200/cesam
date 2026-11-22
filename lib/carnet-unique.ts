@@ -21,14 +21,14 @@ export function construireCarnetUnique(rows:CarnetSanitaireRow[], evenements:Eve
  // Ne dédupliquer que les couples non ambigus : jamais effacer deux injections distinctes.
  const supprimerTraitements=new Set<string>();\n const completions=new Map<string,CarnetSanitaireRow>();
  for(const a of apparies){
-   const vaccins=rows.filter(r=>r.motif==="VACCINATION"&&estMeme(r,a));
-   const traitements=rows.filter(r=>r.motif!=="VACCINATION"&&estMeme(r,a));
+   const vaccins=rows.filter(r=>(r.origine==="vaccination"||(!r.origine&&r.motif==="VACCINATION"))&&estMeme(r,a));
+   const traitements=rows.filter(r=>(r.origine==="traitement"||(!r.origine&&r.motif!=="VACCINATION"))&&estMeme(r,a));
    if(vaccins.length===1&&traitements.length===1){supprimerTraitements.add(traitements[0].id);completions.set(vaccins[0].id,traitements[0]);}
  }
  const lignes:LigneUnique[]=rows.filter(r=>!supprimerTraitements.has(r.id)).map(r=>{
   const a=actesParId.get("traitement:"+r.id)??actesParId.get("vaccination:"+r.id)??apparies.find(a=>estMeme(r,a));
   const complement=completions.get(r.id);
-  return {id:"acte:"+r.id,date:r.date,animalId:r.animalId,animalNutrav:r.animalNutrav,animalNational:r.animalNational,animalNom:r.animalNom,type:r.motif==="VACCINATION"?"Vaccination":"Traitement",produit:r.produit,dose:r.dose||complement?.dose||"",voie:r.voie??complement?.voie??null,ordonnance:r.ordonnanceNumero??complement?.ordonnanceNumero??null,prescripteur:r.prescripteur??complement?.prescripteur??null,executant:a?.executant??null,motif:r.motif,commentaire:"",statut:"Réalisé",remiseLait:r.dateRemiseLait,remiseViande:r.dateRemiseViande};
+  return {id:"acte:"+r.id,date:r.date,animalId:r.animalId,animalNutrav:r.animalNutrav,animalNational:r.animalNational,animalNom:r.animalNom,type:r.origine==="vaccination"||(!r.origine&&r.motif==="VACCINATION")?"Vaccination":"Traitement",produit:r.produit,dose:r.dose||complement?.dose||"",voie:r.voie??complement?.voie??null,ordonnance:r.ordonnanceNumero??complement?.ordonnanceNumero??null,prescripteur:r.prescripteur??complement?.prescripteur??null,executant:a?.executant??null,motif:r.motif,commentaire:"",statut:"Réalisé",remiseLait:r.dateRemiseLait,remiseViande:r.dateRemiseViande};
  });
  for(const e of evenements){
   const texte=commentaireEvenement(e,false);
