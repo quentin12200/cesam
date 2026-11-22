@@ -39,6 +39,7 @@ export async function getActesSanitairesReels(): Promise<ActeSanitaireReel[]> {
 
 export interface CarnetSanitaireRow {
   origine?: "vaccination" | "traitement";
+  evenementId?: string | null;
   id: string;
   date: Date;
   animalId: string;
@@ -79,6 +80,7 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
     const dateRemiseLait = attente.dateFinAttenteLait;
     rows.push({
       origine: "traitement",
+      evenementId: t.evenementId,
       id: t.id,
       date: t.dateDebut,
       animalId: t.animal.id,
@@ -140,6 +142,7 @@ export interface EvenementCarnetRow {
   categorie: string | null;
   type: string;
   produits: string[];
+  traitementIds?: string[];
   symptomes: string[];
   temperature: number | null;
   moment: string | null;
@@ -153,7 +156,7 @@ export async function getEvenementsCarnetRows(): Promise<EvenementCarnetRow[]> {
     include: {
       animal: { select: { id: true, nutrav: true, nobovi: true } },
       symptomes: { select: { libelle: true } },
-      traitements: { select: { medicamentNom: true } },
+      traitements: { select: { id: true, medicamentNom: true } },
     },
     orderBy: { date: "asc" },
   });
@@ -167,6 +170,7 @@ export async function getEvenementsCarnetRows(): Promise<EvenementCarnetRow[]> {
     categorie: e.categorie,
     type: e.type,
     produits: [...new Set(e.traitements.map((t) => t.medicamentNom).filter(Boolean))],
+    traitementIds: e.traitements.map((t) => t.id),
     symptomes: e.symptomes.map((s) => s.libelle),
     temperature: e.temperature,
     moment: e.moment,
