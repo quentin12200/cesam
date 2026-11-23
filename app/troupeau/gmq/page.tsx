@@ -13,6 +13,9 @@ export default async function GmqPage() {
       gestation: { select: { saillie: { select: { taureau: { select: { id: true, nopere: true, nupere: true } } } } } },
       veau: { select: {
         id: true, nutrav: true, nobovi: true, danais: true, sexbov: true,
+        pereNomManuel: true, pereNationalManuel: true, pereTravailManuel: true,
+        numeip: true, nomeip: true, tramip: true,
+        taureau: { select: { id: true, nopere: true, nupere: true, traper: true } },
         pesees: { orderBy: { date: "asc" }, select: { date: true, poids: true } },
       } },
     },
@@ -22,14 +25,22 @@ export default async function GmqPage() {
     const calf = v.veau;
     if (!calf || seen.has(calf.id)) return [];
     seen.add(calf.id);
-    const bull = v.gestation?.saillie?.taureau;
+    const bull = calf.taureau ?? v.gestation?.saillie?.taureau;
+    // The calf genealogy is the primary source. Older births may store father
+    // information on the calving or the linked breeding record instead.
+    const fatherNational = calf.pereNationalManuel?.trim() || calf.numeip?.trim()
+      || v.pereNunati?.trim() || bull?.nupere?.trim() || null;
+    const fatherName = calf.pereNomManuel?.trim() || calf.nomeip?.trim()
+      || bull?.nopere?.trim() || v.pereNom?.trim()
+      || calf.pereTravailManuel?.trim() || calf.tramip?.trim()
+      || fatherNational || null;
     return [{
       id: calf.id, numero: calf.nutrav, nom: calf.nobovi,
       naissance: calf.danais.toISOString(), sexe: calf.sexbov,
       mereId: v.vacheId, mere: [v.vache.nutrav, v.vache.nobovi].filter(Boolean).join(" · "),
       pereId: bull?.id ?? null,
-      pereNational: bull?.nupere ?? v.pereNunati ?? null,
-      pere: bull?.nopere ?? v.pereNom ?? bull?.nupere ?? v.pereNunati ?? null,
+      pereNational: fatherNational,
+      pere: fatherName,
       pesees: calf.pesees.map(p => ({ date: p.date.toISOString(), poids: p.poids })),
     }];
   });
