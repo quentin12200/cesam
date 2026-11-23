@@ -15,6 +15,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { vacheNutrav, date, moment, sousType, capteur, pereNom, notes } = body;
+    const pereTaureauId = typeof body.pereTaureauId === "string" ? body.pereTaureauId : null;
+    const pereSelectionne = pereTaureauId ? await prisma.taureau.findUnique({ where: { id: pereTaureauId } }) : null;
+    if (pereTaureauId && !pereSelectionne) return NextResponse.json({ error: "Père sélectionné introuvable" }, { status: 400 });
     const qualificatif = ["NORMAL", "DIFFICILE", "AVORTEMENT", "MORT_NEE"].includes(body.qualificatif) ? body.qualificatif : "NORMAL";
     if (!vacheNutrav || !date) return NextResponse.json({ error: "La vache et la date sont requises" }, { status: 400 });
 
@@ -77,15 +80,22 @@ export async function POST(request: NextRequest) {
     }
 
     const gestation = await prisma.gestation.findFirst({ where: { saillie: { animalId: vache.id }, etat: { in: ["VERT", "GRIS", "ROSE"] } }, include: { saillie: { include: { taureau: true } } }, orderBy: { createdAt: "desc" } });
+    if (pereSelectionne && gestation?.saillie.taureauId && gestation.saillie.taureauId !== pereSelectionne.id) return NextResponse.json({ error: "Père différent de la gestation confirmée : vérifier la filiation avant modification" }, { status: 409 });
+    const pereRetenu = gestation?.saillie.taureau ?? pereSelectionne;
     const premierVivant = resolus.find((v) => v.saisi.statut === "VIVANT" && v.animalId);
     const velage = await prisma.$transaction(async (tx) => {
       const cree = await tx.velage.create({ data: {
         vacheId: vache.id, veauId: premierVivant?.animalId ?? null, date: new Date(date), moment: moment?.trim() || null, qualificatif,
         sousType: sousType ?? (qualificatif === "NORMAL" ? "SEULE" : null), capteur: capteur ?? null,
-        pereNom: pereNom ?? null, pereNunati: gestation?.saillie.taureau?.nupere ?? null,
+        pereNom: pereRetenu?.nopere ?? pereNom ?? null, pereNunati: pereRetenu?.nupere ?? null,
         jumeaux: veaux.length === 2, nombreVeaux: veaux.length, gestationId: gestation?.id ?? null, notes: notes?.trim() || null,
         veauxDetails: { create: resolus.map((v) => ({ animalId: v.animalId, nutrav: v.saisi.nutrav ?? null, nunati: v.saisi.nunati ?? null, nom: v.saisi.nom ?? null, sexe: v.saisi.sexe ?? null, statut: v.saisi.statut ?? "VIVANT" })) },
       } });
+      if (pereRetenu) for (const veau of resolus) if (veau.animalId) {
+        const existant = await tx.animal.findUnique({ where: { id: veau.animalId }, select: { taureauId: true } });
+        if (existant?.taureauId && existant.taureauId !== pereRetenu.id) throw new Error("Filiation existante différente : correction manuelle nécessaire");
+        await tx.animal.update({ where: { id: veau.animalId }, data: { taureauId: pereRetenu.id } });
+      }
       if (gestation) await tx.gestation.update({ where: { id: gestation.id }, data: { etat: "VELAGE" } });
       await tx.animal.update({
         where: { id: vache.id },
