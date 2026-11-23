@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest) {
     const name = typeof body?.nopere === "string" ? body.nopere.trim() : null;
     const number = typeof body?.nupere === "string" ? nationalWithCountry(body.nupere.trim()) : null;
     const work = typeof body?.traper === "string" ? body.traper.trim() : null;
-    if (!id || name === null || name.length > 120 || !number || !/^(?:[A-Z]{2})?\d{8,15}$/.test(number)) {
+    if (!id || name === null || name.length > 120 || (work !== null && work.length > 40) || !number || !/^(?:[A-Z]{2})?\d{8,15}$/.test(number)) {
       return NextResponse.json({ error: "Nom ou numéro national invalide (8 à 15 chiffres, code pays facultatif)." }, { status: 400 });
     }
     const bull = await prisma.taureau.findUnique({ where: { id } });
