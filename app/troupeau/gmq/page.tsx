@@ -14,7 +14,6 @@ export default async function GmqPage() {
       veau: { select: {
         id: true, nutrav: true, nobovi: true, danais: true, sexbov: true,
         pereNomManuel: true, pereNationalManuel: true, pereTravailManuel: true,
-        numeip: true, nomeip: true, tramip: true,
         taureau: { select: { id: true, nopere: true, nupere: true, traper: true } },
         pesees: { orderBy: { date: "asc" }, select: { date: true, poids: true } },
       } },
@@ -28,11 +27,13 @@ export default async function GmqPage() {
     const bull = calf.taureau ?? v.gestation?.saillie?.taureau;
     // The calf genealogy is the primary source. Older births may store father
     // information on the calving or the linked breeding record instead.
-    const fatherNational = calf.pereNationalManuel?.trim() || calf.numeip?.trim()
-      || v.pereNunati?.trim() || bull?.nupere?.trim() || null;
-    const fatherName = calf.pereNomManuel?.trim() || calf.nomeip?.trim()
+    // NUMEIP/NOMEIP/TRAMIP describe the MOTHER (identification permanente),
+    // never the father. Only use explicitly paternal sources here.
+    const fatherNational = calf.pereNationalManuel?.trim()
+      || bull?.nupere?.trim() || v.pereNunati?.trim() || null;
+    const fatherName = calf.pereNomManuel?.trim()
       || bull?.nopere?.trim() || v.pereNom?.trim()
-      || calf.pereTravailManuel?.trim() || calf.tramip?.trim()
+      || calf.pereTravailManuel?.trim()
       || fatherNational || null;
     return [{
       id: calf.id, numero: calf.nutrav, nom: calf.nobovi,
