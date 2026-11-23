@@ -132,8 +132,9 @@ async function getExploitationDisplayConfig(): Promise<{
   }
 }
 
-async function getAnimal(nutrav: string) {
-  await syncAutomaticEchoRequests();
+async function getAnimal(nutrav: string, onglet: string) {
+  // La consultation sanitaire ne doit pas lancer de synchronisation reproductive en écriture.
+  if (onglet !== "sante") await syncAutomaticEchoRequests();
   return prisma.animal.findUnique({
     where: { nutrav },
     include: {
@@ -154,7 +155,7 @@ async function getAnimal(nutrav: string) {
       evenements: { orderBy: { date: "desc" }, include: { symptomes: true, reponses: { include: { question: true } } } },
       traitements: {
         orderBy: { dateDebut: "desc" },
-        take: 10,
+        ...(onglet === "sante" ? {} : { take: 10 }),
         include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
       },
       pesees: { orderBy: { date: "asc" } },
@@ -199,12 +200,12 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const { nutrav } = await params;
   const { onglet = "identite", pesee, poids, testRepro } = await searchParams;
   const [animal, groupes, protocoles, configAffichage] = await Promise.all([
-    getAnimal(nutrav), getGroupes(), getProtocoles(), getExploitationDisplayConfig(),
+    getAnimal(nutrav, onglet), getGroupes(), getProtocoles(), getExploitationDisplayConfig(),
   ]);
 
   if (!animal) notFound();
   // Read-only, using existing animal, weighing and exit records.
-  const growthAnimals = animal.veaux.length > 0
+  const growthAnimals = onglet === "identite" && animal.veaux.length > 0
     ? await prisma.animal.findMany({
         where: { mereId: { not: null }, OR: [{ sortie: { is: { type: { in: ["ELEVAGE", "BOUCHERIE", "ENGRAISSEMENT", "MORT"] } } } }, { estGenisse: true }, { categorie: { in: ["PRESELECTION_GENISSE", "GENISSE_VALIDEE", "PETITE_GENISSE", "MOYENNE_GENISSE", "GRANDE_GENISSE"] } }] },
         select: {
