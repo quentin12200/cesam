@@ -1,3 +1,4 @@
+import { valeurCategoriePersonnalisee } from "@/lib/medicament-categories";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
       data: {
         nom: nom.trim().toUpperCase(),
         dci: dci?.trim() || null,
-        categorie: categorie ?? "AUTRE",
+        categorie: categorie ? valeurCategoriePersonnalisee(categorie) : "AUTRE",
         voie: voie?.trim() || null,
         dosagePourKg: dosagePourKg ?? null,
         uniteDosage: uniteDosage?.trim() || "ml",
