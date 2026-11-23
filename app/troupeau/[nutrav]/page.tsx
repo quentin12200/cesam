@@ -518,7 +518,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
       <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 mt-2">
         <div className="flex">
           {tabs.map((tab) => (
-            <Link
+            <a
               key={tab.id}
               href={tabHref(tab.id)}
               className={`flex-1 text-center py-2.5 text-sm font-semibold border-b-2 transition-colors ${
@@ -528,7 +528,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               }`}
             >
               {tab.label}
-            </Link>
+            </a>
           ))}
         </div>
       </div>
@@ -867,7 +867,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   questionId: r.questionId,
                   libelleEnregistre: r.libelleEnregistre,
                   valeur: r.valeur,
-                  questionType: r.question.type,
+                  questionType: r.question?.type ?? "TEXTE",
                 })),
                 traitements: animal.traitements
                   .filter((t) => t.evenementId === e.id)
