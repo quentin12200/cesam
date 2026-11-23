@@ -115,6 +115,7 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
         <div>
           <label className="text-xs text-gray-500 block mb-1">Catégorie principale</label>
           <select value={categorie} onChange={(e) => { setCategorie(e.target.value); setErreurCategorie(""); }} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" aria-label="Catégorie principale">
+            {!categories.some((c) => c.code === categorie) && <option value={categorie}>{categorie} (nouvelle)</option>}
             {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
           </select>
           <button type="button" onClick={() => { setCreationCategorie((v) => !v); setErreurCategorie(""); }} className="mt-2 flex items-center gap-1 text-xs font-semibold text-blue-700">
