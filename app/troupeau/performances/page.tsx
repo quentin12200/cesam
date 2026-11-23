@@ -1,3 +1,4 @@
+import { calculerGmq, comparerGmqParPere } from "@/lib/performance-gmq";
 import { prisma } from "@/lib/prisma";
 import { BarChart2 } from "lucide-react";
 import PerformancesClient from "./PerformancesClient";
@@ -29,6 +30,8 @@ export interface VachePerf {
     poids1: number | null;
     poidsN: number | null;
   }[];
+  // Comparaison des GMQ selon le père (uniquement les veaux avec 2 pesées)
+  peresGmq: { pereNom: string; nombreVeaux: number; gmqMoyen: number }[];
   // Score combiné 0-100
   score: number | null;
 }
@@ -119,6 +122,7 @@ async function getPerformancesData(): Promise<VachePerf[]> {
     let gmqSum = 0;
     let gmqCount = 0;
 
+
     for (const velage of velages) {
       if (!velage.veau) continue;
       const veau = velage.veau;
@@ -126,18 +130,9 @@ async function getPerformancesData(): Promise<VachePerf[]> {
 
       const poids1 = pesees.length > 0 ? pesees[0].poids : null;
       const poidsN = pesees.length > 1 ? pesees[pesees.length - 1].poids : null;
-      const dateDerniere = pesees.length > 1 ? pesees[pesees.length - 1].date : null;
 
-      let gmq: number | null = null;
-      if (poids1 !== null && poidsN !== null && dateDerniere !== null) {
-        const ageJours =
-          (dateDerniere.getTime() - veau.danais.getTime()) / (1000 * 60 * 60 * 24);
-        if (ageJours > 0) {
-          gmq = Math.round(((poidsN - poids1) / ageJours) * 1000);
-          gmqSum += gmq;
-          gmqCount++;
-        }
-      }
+      const gmq = calculerGmq(pesees);
+      if (gmq !== null) { gmqSum += gmq; gmqCount++; }
 
       const pereLabel =
         velage.gestation?.saillie?.taureau?.nopere ??
@@ -190,6 +185,7 @@ async function getPerformancesData(): Promise<VachePerf[]> {
       nbVeauxAvecGmq: gmqCount,
       gmqMoyen,
       veaux: veauxDetail,
+      peresGmq: comparerGmqParPere(veauxDetail),
       score,
     });
   }
