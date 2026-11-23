@@ -17,7 +17,7 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx tsc --noEmit
-      - run: node --test --experimental-strip-types lib/performance-gmq.test.ts
+      - run: node --test tests/taureaux-identity-edit.test.mjs
       - run: node --test --experimental-strip-types lib/medicament-custom-categories.test.ts
       - run: node --test --experimental-strip-types lib/validate-breeding.test.ts lib/grouped-sale.test.ts
       - run: node --test --experimental-strip-types lib/carnet-actes.test.ts lib/carnet-actes-recherche.test.ts lib/carnet-periode-impression.test.ts lib/carnet-unique.test.ts lib/carnet-ordonnance.test.ts
