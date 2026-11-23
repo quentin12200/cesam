@@ -9,17 +9,24 @@ type Calf = {
   pere: string | null; pesees: { date: string; poids: number }[];
 };
 type Period = "12" | "24" | "year" | "all";
+type AgeBand = "all" | "0-3" | "3-6" | "6-9" | "9-12";
 type Group = "couples" | "meres" | "peres";
 type Row = { key: string; label: string; url?: string; total: number; gmqs: number[]; calves: { numero: string; gmq: number }[] };
 const norm = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase().replace(/\s+/g, " ");
 const average = (values: number[]) => values.length ? Math.round(values.reduce((a,b) => a+b,0)/values.length) : null;
 const fmt = (n: number | null) => n === null ? "—" : `${n.toLocaleString("fr-FR")} g/j`;
-export function calculateCalfGmq(pesees: Calf["pesees"]): number | null {
+export function calculateCalfGmq(pesees: Calf["pesees"], naissance?: string, ageBand: AgeBand = "all"): number | null {
   const valid = pesees.filter(p => Number.isFinite(p.poids) && p.poids > 0 && Number.isFinite(new Date(p.date).getTime()))
     .sort((a,b) => new Date(a.date).getTime()-new Date(b.date).getTime());
-  if (valid.length < 2) return null;
-  const days = (new Date(valid[valid.length-1].date).getTime() - new Date(valid[0].date).getTime()) / 86400000;
-  return days > 0 ? Math.round((valid[valid.length-1].poids - valid[0].poids) / days * 1000) : null;
+  const band = ageBand === "all" ? valid : valid.filter(p => {
+    if (!naissance) return false;
+    const months = (new Date(p.date).getTime()-new Date(naissance).getTime()) / (86400000 * 30.4375);
+    const [min,max] = ageBand.split("-").map(Number);
+    return months >= min && months < max;
+  });
+  if (band.length < 2) return null;
+  const days = (new Date(band[band.length-1].date).getTime() - new Date(band[0].date).getTime()) / 86400000;
+  return days > 0 ? Math.round((band[band.length-1].poids - band[0].poids) / days * 1000) : null;
 }
 function parentKey(c: Calf) {
   // Prefer stable national identity, then the registered bull ID, then normalized name.
@@ -42,6 +49,7 @@ export default function PerformancesVeauxClient({veaux}:{veaux:Calf[]}) {
   const [period,setPeriod] = useState<Period>("12");
   const [year,setYear] = useState(String(new Date().getFullYear()));
   const [group,setGroup] = useState<Group>("couples");
+  const [ageBand,setAgeBand] = useState<AgeBand>("all");
   const [expanded,setExpanded] = useState<string | null>(null);
   const years = [...new Set(veaux.map(v=>new Date(v.naissance).getFullYear()))].sort((a,b)=>b-a);
   const result = useMemo(()=>{
@@ -51,9 +59,9 @@ export default function PerformancesVeauxClient({veaux}:{veaux:Calf[]}) {
       const born = new Date(c.naissance);
       return period === "all" || (period === "year" ? born.getFullYear() === Number(year) : born >= cutoff && born <= new Date());
     });
-    const measured = selected.flatMap(c=>{const gmq=calculateCalfGmq(c.pesees);return gmq===null?[]:[{calf:c,gmq}];});
+    const measured = selected.flatMap(c=>{const gmq=calculateCalfGmq(c.pesees,c.naissance,ageBand);return gmq===null?[]:[{calf:c,gmq}];});
     return { selected:selected.length, measured, male:measured.filter(x=>x.calf.sexe==="M"), female:measured.filter(x=>x.calf.sexe==="F") };
-  },[veaux,period,year]);
+  },[veaux,period,year,ageBand]);
   const rows = useMemo(()=>makeGroups(result.measured,group),[result.measured,group]);
   const metric = (title:string,items:typeof result.measured) => <div className="rounded-xl border bg-white p-3">
     <p className="text-xs text-gray-500">{title}</p><p className="text-xl sm:text-2xl font-bold text-green-800 mt-1">{fmt(average(items.map(x=>x.gmq)))}</p>
@@ -72,6 +80,7 @@ export default function PerformancesVeauxClient({veaux}:{veaux:Calf[]}) {
       </div>
       <p className="text-xs text-gray-500">{result.selected} veaux nés sur la période · {result.measured.length} avec au moins deux pesées valides. Les veaux vendus restent inclus.</p>
     </div>
+    <div className="rounded-xl bg-white shadow p-3 space-y-2"><label htmlFor="gmq-age" className="block text-sm font-semibold">Âge des veaux au moment des pesées</label><select id="gmq-age" value={ageBand} onChange={e=>setAgeBand(e.target.value as AgeBand)} className="w-full border rounded-lg p-2.5 text-sm bg-white"><option value="all">GMQ global (toutes pesées)</option><option value="0-3">0 à 3 mois</option><option value="3-6">3 à 6 mois</option><option value="6-9">6 à 9 mois</option><option value="9-12">9 à 12 mois</option></select><p className="text-xs text-gray-500">Par tranche, deux pesées réelles au minimum dans la tranche. Aucune estimation entre les tranches.</p></div>
     <div className="grid grid-cols-2 gap-2">
       <div className="col-span-2">{metric("GMQ moyen · Tous les veaux",result.measured)}</div>
       {metric("♂ Mâles",result.male)}{metric("♀ Femelles",result.female)}
@@ -97,6 +106,6 @@ export default function PerformancesVeauxClient({veaux}:{veaux:Calf[]}) {
           </div>)}
         </div>}
     </section>
-    <p className="text-xs text-gray-500 px-1">GMQ = (dernière pesée − première pesée) ÷ jours écoulés × 1 000. Un veau compte une seule fois. Les âges et périodes de pesée peuvent différer : ces classements décrivent la croissance observée, pas la valeur génétique. Aucun animal ni pesée n’est modifié.</p>
+    <p className="text-xs text-gray-500 px-1">GMQ = (dernière pesée − première pesée de la sélection) ÷ jours écoulés × 1 000. Un veau compte une seule fois. Les âges et périodes de pesée peuvent différer : ces classements décrivent la croissance observée, pas la valeur génétique. Aucun animal ni pesée n’est modifié.</p>
   </div>;
 }
