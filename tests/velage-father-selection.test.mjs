@@ -20,3 +20,20 @@ test("new bulls can be recorded pending a national identifier, and duplicate nam
   assert.match(bulls, /numeroACompleter/);
   assert.match(bulls, /sameNames.length > 0/);
 });
+
+const audit = readFileSync("app/taureaux/controle/anciens-velages/page.tsx", "utf8");
+test("father conflict checks happen before the first calf write", () => {
+  assert.ok(create.indexOf("const gestationPrecontrole") < create.indexOf("const resolus:"));
+  assert.match(create, /existing\.taureauId !== perePrecontrole\.id/);
+  assert.match(edit, /existing\.taureauId !== pereSelectionne\.id/);
+});
+test("legacy father audit is read-only and requires explicit user validation", () => {
+  assert.match(audit, /validation humaine obligatoire/);
+  assert.match(audit, /Plusieurs candidats/);
+  assert.doesNotMatch(audit, /prisma\.(animal|velage)\.(update|create|delete)/);
+  assert.match(audit, /\/velage\?modifier=/);
+});
+test("father picker supports mobile touch targets and accented name search", () => {
+  assert.match(form, /normalize\("NFD"\)/);
+  assert.match(form, /max-h-40 overflow-auto/);
+});
