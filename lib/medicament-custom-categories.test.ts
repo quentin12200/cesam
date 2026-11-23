@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getCategorieMedicament, getCategoriesMedicamentUtilisees, valeurCategoriePersonnalisee } from "./medicament-categories";
+import { getCategorieMedicament, getCategoriesMedicamentUtilisees, valeurCategoriePersonnalisee } from "./medicament-categories.ts";
 
 test("une catégorie libre est conservée et réutilisable", () => {
   const name = valeurCategoriePersonnalisee("  Antispasmodique  ");
