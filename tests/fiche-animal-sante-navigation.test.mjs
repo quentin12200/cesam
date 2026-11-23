@@ -16,3 +16,14 @@ test("l'onglet santé est accessible et ses données tolèrent une question supp
   assert.match(source, /onglet === "sante"/);
   assert.match(source, /r\.question\?\.type/);
 });
+
+
+test("la consultation Santé ne déclenche pas de synchronisation reproductive", () => {
+  assert.match(source, /if \(onglet !== "sante"\) await syncAutomaticEchoRequests\(\)/);
+  assert.match(source, /getAnimal\(nutrav, onglet\)/);
+});
+
+test("la santé affiche les traitements sans limite de dix et évite les calculs de croissance", () => {
+  assert.match(source, /onglet === "sante" \? \{\} : \{ take: 10 \}/);
+  assert.match(source, /onglet === "identite" && animal\.veaux\.length > 0/);
+});
