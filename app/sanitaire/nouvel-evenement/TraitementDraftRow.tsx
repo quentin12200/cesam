@@ -52,12 +52,9 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
       ...draft,
       medicament: m,
       voie: voieNormalisee || draft.voie,
-      dose:
-        preconisation?.dose != null
-          ? String(preconisation.dose)
-          : m.dosagePourKg != null
-            ? String(m.dosagePourKg)
-            : draft.dose,
+      // Une préconisation par kg ou par 100 kg n'est pas une dose administrée.
+      // Ne jamais recopier une valeur de référence dans la dose réelle.
+      dose: "",
       uniteDosage: preconisation?.unite ?? m.uniteDosage ?? draft.uniteDosage,
       motif: preconisation?.indicationMotif ?? draft.motif,
     });
@@ -77,6 +74,29 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
         )}
       </div>
 
+      {draft.medicament && (
+        <section aria-label="Informations de posologie de la pharmacie" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm space-y-2">
+          <p className="font-semibold text-amber-950">Posologie de référence — à vérifier avant administration</p>
+          <p className="text-xs text-amber-900">Ces informations proviennent de la pharmacie CESAM. Elles ne constituent pas une dose calculée ou une prescription. La dose administrée reste à renseigner manuellement.</p>
+          <p>Fiche pharmacie : {draft.medicament.dosagePourKg != null ? `${draft.medicament.dosagePourKg} ${draft.medicament.uniteDosage ?? "unité non renseignée"} / kg (valeur enregistrée, à vérifier)` : "Aucune posologie par kg renseignée"}</p>
+          <p>Voie de la fiche : {draft.medicament.voie || "Non renseignée"}</p>
+          <p>Attente viande : {draft.medicament.delaiAttenteViandeJ != null ? `${draft.medicament.delaiAttenteViandeJ} jour(s)` : "Non renseignée"} · Attente lait : {draft.medicament.delaiAttenteLaitJ != null ? `${draft.medicament.delaiAttenteLaitJ} jour(s)` : "Non renseignée"}</p>
+          {(draft.medicament.preconisations ?? []).length ? (
+            <div className="space-y-2">
+              {draft.medicament.preconisations.map((p) => (
+                <div key={p.id} className="rounded-md border border-amber-200 bg-white p-2">
+                  <p className="font-medium">{p.indicationMotif || "Préconisation sans indication"} · {p.statut === "VALIDE" ? "Validée" : p.statut === "A_VERIFIER" ? "À vérifier" : "Importée / non validée"}</p>
+                  <p>Dose de référence : {p.dose != null ? `${p.dose} ${p.unite ?? "unité non renseignée"} ${p.doseBase ?? "(base non renseignée)"}` : "Non renseignée"}</p>
+                  <p>Voie : {p.voie || "Non renseignée"} · Fréquence : {p.frequence || "Non renseignée"}</p>
+                  <p>Durée : {p.dureeValeur != null ? `${p.dureeValeur} ${p.dureeUnite || "unité non renseignée"}` : "Non renseignée"}</p>
+                  <p>Attente viande : {p.delaiAttenteViandeJ != null ? `${p.delaiAttenteViandeJ} j` : "Non renseignée"} · Lait : {p.delaiAttenteLaitTraites != null ? `${p.delaiAttenteLaitTraites} traites` : "Non renseignée"}</p>
+                </div>
+              ))}
+            </div>
+          ) : <p>Aucune préconisation enregistrée pour ce médicament.</p>}
+          <a className="font-semibold text-blue-800 underline" href={`/pharmacie/${draft.medicament.id}`} target="_blank" rel="noopener noreferrer">Voir la fiche pharmacie</a>
+        </section>
+      )}
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Voie d&apos;administration *</label>
