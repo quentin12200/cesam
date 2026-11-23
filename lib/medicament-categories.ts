@@ -74,7 +74,7 @@ export function getCategoriesMedicamentUtilisees(codes: Array<string | null | un
   for (const code of codes) {
     if (code && !categories.has(code)) categories.set(code, getCategorieMedicament(code));
   }
-  return [...categories.values()];
+  return [...categories.values()].filter((category) => category.code !== "AUTRE" || codes.includes("AUTRE"));
 }
 
 function distanceLevenshtein(a: string, b: string): number {
