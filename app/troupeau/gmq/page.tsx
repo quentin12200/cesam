@@ -33,7 +33,7 @@ export default async function GmqPage() {
     const fatherName = calf.pereNomManuel?.trim() || calf.nomeip?.trim()
       || bull?.nopere?.trim() || v.pereNom?.trim()
       || calf.pereTravailManuel?.trim() || calf.tramip?.trim()
-      || bull?.traper?.trim() || fatherNational || null;
+      || fatherNational || null;
     return [{
       id: calf.id, numero: calf.nutrav, nom: calf.nobovi,
       naissance: calf.danais.toISOString(), sexe: calf.sexbov,
