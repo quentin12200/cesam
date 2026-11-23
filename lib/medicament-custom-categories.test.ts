@@ -5,6 +5,8 @@ import { getCategorieMedicament, getCategoriesMedicamentUtilisees, valeurCategor
 test("une catégorie libre est conservée et réutilisable", () => {
   const name = valeurCategoriePersonnalisee("  Antispasmodique  ");
   assert.equal(name, "Antispasmodique");
+  assert.equal(valeurCategoriePersonnalisee("Antibiotique"), "ANTIBIOTIQUE");
+  assert.equal(valeurCategoriePersonnalisee("anti-inflammatoire"), "ANTI_INFLAMMATOIRE");
   const options = getCategoriesMedicamentUtilisees([name]);
   assert.equal(options.find((c) => c.code === name)?.label, name);
   assert.equal(getCategorieMedicament(name).label, name);
