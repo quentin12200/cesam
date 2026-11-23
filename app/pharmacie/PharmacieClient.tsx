@@ -128,7 +128,7 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
               {erreurCategorie && <p role="alert" className="text-xs text-amber-800">{erreurCategorie}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={() => {
-                  const value = nouvelleCategorie.trim().replace(/\\s+/g, " ");
+                  const value = nouvelleCategorie.trim().replace(/\s+/g, " ");
                   if (!value) { setErreurCategorie("Indique un nom de catégorie."); return; }
                   const proche = trouverCategorieProche(value, categories);
                   if (proche) { setErreurCategorie(`Catégorie existante ou très proche : « ${proche.label} ». Sélectionne-la dans la liste plutôt que de créer un doublon.`); return; }
