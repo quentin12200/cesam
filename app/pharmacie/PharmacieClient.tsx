@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Star, ChevronDown, Search, Plus, Save, X, Stethoscope } from "lucide-react";
 import { normalizeSearch } from "@/lib/fuzzy-search";
-import { CATEGORIES_MEDICAMENT, getCategorieMedicament, getCategoriesMedicamentUtilisees, formatVoie, formatDoseBase, formatStatutConsultation } from "@/lib/medicament-categories";
+import { CATEGORIES_MEDICAMENT, getCategorieMedicament, getCategoriesMedicamentUtilisees, trouverCategorieProche, normaliserLibelleCategorie, formatVoie, formatDoseBase, formatStatutConsultation } from "@/lib/medicament-categories";
 import OrdonnancesClient, { type OrdonnanceItem } from "@/app/ordonnances/OrdonnancesClient";
 import SaisiePrixClient from "./SaisiePrixClient";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
@@ -62,6 +62,9 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
   const [nom, setNom] = useState("");
   const [dci, setDci] = useState("");
   const [categorie, setCategorie] = useState("ANTIBIOTIQUE");
+  const [creationCategorie, setCreationCategorie] = useState(false);
+  const [nouvelleCategorie, setNouvelleCategorie] = useState("");
+  const [erreurCategorie, setErreurCategorie] = useState("");
   const [voie, setVoie] = useState("");
   const [delai, setDelai] = useState("");
   const [delaiLait, setDelaiLait] = useState("");
@@ -72,7 +75,7 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!nom.trim() || !categorie.trim()) return;
+    if (!nom.trim() || !categorie.trim() || creationCategorie) return;
     setError("");
     setSaving(true);
     const response = await fetch("/api/medicaments", {
@@ -111,9 +114,34 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Catégorie principale</label>
-          <input list="categories-medicament-ajout" value={categorie} onChange={(e) => setCategorie(e.target.value)} maxLength={80} placeholder="Ex. Antispasmodique" className="w-full border rounded-lg px-3 py-2 text-sm" />
-          <datalist id="categories-medicament-ajout">{categories.filter((c) => c.code !== "AUTRE").map((c) => <option key={c.code} value={c.code} label={c.label} />)}</datalist>
-          <p className="text-xs text-gray-500 mt-1">Choisir ou créer une catégorie.</p>
+          <select value={categorie} onChange={(e) => { setCategorie(e.target.value); setErreurCategorie(""); }} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" aria-label="Catégorie principale">
+            {!categories.some((c) => c.code === categorie) && <option value={categorie}>{categorie} (nouvelle)</option>}
+            {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+          </select>
+          <button type="button" onClick={() => { setCreationCategorie((v) => !v); setErreurCategorie(""); }} className="mt-2 flex items-center gap-1 text-xs font-semibold text-blue-700">
+            <Plus size={14} /> Nouvelle catégorie
+          </button>
+          {creationCategorie && (
+            <div className="mt-2 rounded-lg border border-blue-200 bg-white p-2 space-y-2">
+              <label className="block text-xs text-gray-600">Nom de la nouvelle catégorie</label>
+              <input value={nouvelleCategorie} maxLength={80} onChange={(e) => { setNouvelleCategorie(e.target.value); setErreurCategorie(""); }} placeholder="Ex. Antispasmodique" className="w-full border rounded-lg px-2 py-2 text-sm" />
+              {erreurCategorie && <p role="alert" className="text-xs text-amber-800">{erreurCategorie}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={() => {
+                  const value = nouvelleCategorie.trim().replace(/\s+/g, " ");
+                  if (!value) { setErreurCategorie("Indique un nom de catégorie."); return; }
+                  const proche = trouverCategorieProche(value, categories);
+                  if (proche) { setErreurCategorie(`Catégorie existante ou très proche : « ${proche.label} ». Sélectionne-la dans la liste plutôt que de créer un doublon.`); return; }
+                  if (categories.some((c) => normaliserLibelleCategorie(c.label) === normaliserLibelleCategorie(value))) { setErreurCategorie("Cette catégorie existe déjà."); return; }
+                  setCategorie(value);
+                  setCreationCategorie(false);
+                  setNouvelleCategorie("");
+                }} className="rounded-lg bg-blue-600 px-3 py-2 text-xs text-white">Ajouter et sélectionner</button>
+                <button type="button" onClick={() => { setCreationCategorie(false); setNouvelleCategorie(""); }} className="rounded-lg border px-3 py-2 text-xs">Annuler</button>
+              </div>
+            </div>
+          )}
+          {!creationCategorie && !categories.some((c) => c.code === categorie) && <p className="mt-1 text-xs text-blue-700">Nouvelle catégorie « {categorie} » : elle sera conservée avec le médicament et proposée lors des prochains ajouts.</p>}
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Voie admin.</label>
