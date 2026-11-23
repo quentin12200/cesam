@@ -101,8 +101,14 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
 
   async function saveFiche(e: React.FormEvent) {
     e.preventDefault();
+    const selected = valeurCategoriePersonnalisee(form.categorie);
+    if (!selected || selected.length > 80) {
+      setCategoryError("Catégorie requise (80 caractères maximum).");
+      return;
+    }
+    setCategoryError("");
     setSaving(true);
-    await fetch(`/api/medicaments/${medicament.id}`, {
+    const response = await fetch(`/api/medicaments/${medicament.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -120,6 +126,10 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
       }),
     });
     setSaving(false);
+    if (!response.ok) {
+      setCategoryError("Impossible d’enregistrer la fiche médicament.");
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
     router.refresh();
