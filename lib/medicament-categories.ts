@@ -49,7 +49,12 @@ export function normaliserLibelleCategorie(value: string): string {
 }
 
 export function valeurCategoriePersonnalisee(label: string): string {
-  return label.trim().replace(/\s+/g, " ");
+  const value = label.trim().replace(/\s+/g, " ");
+  const standard = CATEGORIES_MEDICAMENT.find((category) =>
+    normaliserLibelleCategorie(category.label) === normaliserLibelleCategorie(value)
+    || normaliserLibelleCategorie(category.code) === normaliserLibelleCategorie(value)
+  );
+  return standard?.code ?? value;
 }
 
 function labelDepuisCode(code: string): string {
@@ -74,7 +79,7 @@ export function getCategoriesMedicamentUtilisees(codes: Array<string | null | un
   for (const code of codes) {
     if (code && !categories.has(code)) categories.set(code, getCategorieMedicament(code));
   }
-  return [...categories.values()];
+  return [...categories.values()].filter((category) => category.code !== "AUTRE" || codes.includes("AUTRE"));
 }
 
 function distanceLevenshtein(a: string, b: string): number {

@@ -1,3 +1,4 @@
+import { valeurCategoriePersonnalisee } from "@/lib/medicament-categories";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
@@ -60,7 +61,7 @@ export async function PATCH(
         ...(nom !== undefined && { nom: nom.trim().toUpperCase() }),
         ...(dci !== undefined && { dci: dci?.trim() || null }),
         ...(forme !== undefined && { forme: forme?.trim() || null }),
-        ...(categorie !== undefined && { categorie }),
+        ...(categorie !== undefined && { categorie: valeurCategoriePersonnalisee(categorie) }),
         ...(voie !== undefined && { voie: voie?.trim() || null }),
         ...(dosagePourKg !== undefined && { dosagePourKg }),
         ...(uniteDosage !== undefined && { uniteDosage: uniteDosage?.trim() || null }),
