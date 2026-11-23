@@ -65,6 +65,7 @@ const calfAnimalSelect = {
   numeroNational: true,
   nobovi: true,
   sexbov: true,
+  taureauId: true,
   danais: true,
 } satisfies Prisma.AnimalSelect;
 
@@ -164,7 +165,7 @@ function editableView(velage: LoadedVelage) {
     sousType: velage.sousType,
     capteur: velage.capteur,
     pereNom: velage.pereNom,
-    pereTaureauId: null,
+    pereTaureauId: velage.veau?.taureauId ?? velage.veauxDetails.find(d => d.animal?.taureauId)?.animal?.taureauId ?? null,
     notes: velage.notes,
     veaux: normalizeVelageCalves(velage).map(({ animal: _animal, ...calf }) => calf),
   };
