@@ -1,3 +1,4 @@
+import { calculerGmq, comparerGmqParPere } from "@/lib/performance-gmq";
 import { prisma } from "@/lib/prisma";
 import { BarChart2 } from "lucide-react";
 import PerformancesClient from "./PerformancesClient";
@@ -120,7 +121,7 @@ async function getPerformancesData(): Promise<VachePerf[]> {
     const veauxDetail: VachePerf["veaux"] = [];
     let gmqSum = 0;
     let gmqCount = 0;
-    const gmqParPere = new Map<string, { total: number; count: number }>();
+
 
     for (const velage of velages) {
       if (!velage.veau) continue;
@@ -129,19 +130,9 @@ async function getPerformancesData(): Promise<VachePerf[]> {
 
       const poids1 = pesees.length > 0 ? pesees[0].poids : null;
       const poidsN = pesees.length > 1 ? pesees[pesees.length - 1].poids : null;
-      const datePremiere = pesees.length > 0 ? pesees[0].date : null;
-      const dateDerniere = pesees.length > 1 ? pesees[pesees.length - 1].date : null;
 
-      let gmq: number | null = null;
-      if (poids1 !== null && poidsN !== null && datePremiere !== null && dateDerniere !== null) {
-        const ageJours =
-          (dateDerniere.getTime() - datePremiere.getTime()) / (1000 * 60 * 60 * 24);
-        if (ageJours > 0) {
-          gmq = Math.round(((poidsN - poids1) / ageJours) * 1000);
-          gmqSum += gmq;
-          gmqCount++;
-        }
-      }
+      const gmq = calculerGmq(pesees);
+      if (gmq !== null) { gmqSum += gmq; gmqCount++; }
 
       const pereLabel =
         velage.gestation?.saillie?.taureau?.nopere ??
@@ -149,11 +140,6 @@ async function getPerformancesData(): Promise<VachePerf[]> {
         velage.pereNom ??
         velage.pereNunati ??
         null;
-
-      if (gmq !== null && pereLabel) {
-        const previous = gmqParPere.get(pereLabel) ?? { total: 0, count: 0 };
-        gmqParPere.set(pereLabel, { total: previous.total + gmq, count: previous.count + 1 });
-      }
 
       veauxDetail.push({
         veauId: veau.id,
@@ -199,7 +185,7 @@ async function getPerformancesData(): Promise<VachePerf[]> {
       nbVeauxAvecGmq: gmqCount,
       gmqMoyen,
       veaux: veauxDetail,
-      peresGmq: [...gmqParPere.entries()].map(([pereNom, values]) => ({ pereNom, nombreVeaux: values.count, gmqMoyen: Math.round(values.total / values.count) })).sort((a, b) => b.gmqMoyen - a.gmqMoyen),
+      peresGmq: comparerGmqParPere(veauxDetail),
       score,
     });
   }
