@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculerGmq, comparerGmqParPere } from "./performance-gmq";
+import { calculerGmq, comparerGmqParPere } from "./performance-gmq.ts";
 
 const p = (date: string, poids: number) => ({ date: new Date(date), poids });
 test("GMQ uses elapsed time between first and last weighings, not calf age", () => {
