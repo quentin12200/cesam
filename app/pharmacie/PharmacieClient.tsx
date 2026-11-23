@@ -58,7 +58,7 @@ interface Props {
 
 // ── Add Médicament form ────────────────────────────────────────────────────────
 
-function AddMedicamentForm({ onDone }: { onDone: () => void }) {
+function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categories: ReturnType<typeof getCategoriesMedicamentUtilisees> }) {
   const [nom, setNom] = useState("");
   const [dci, setDci] = useState("");
   const [categorie, setCategorie] = useState("ANTIBIOTIQUE");
@@ -67,13 +67,15 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
   const [delaiLait, setDelaiLait] = useState("");
   const [rx, setRx] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const router = useRouter();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!nom.trim()) return;
+    if (!nom.trim() || !categorie.trim()) return;
+    setError("");
     setSaving(true);
-    await fetch("/api/medicaments", {
+    const response = await fetch("/api/medicaments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -87,6 +89,7 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
       }),
     });
     setSaving(false);
+    if (!response.ok) { setError("Impossible d’ajouter ce médicament."); return; }
     onDone();
     router.refresh();
   }
@@ -108,10 +111,9 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Catégorie principale</label>
-          <select value={categorie} onChange={(e) => setCategorie(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm">
-            {CATEGORIES_MEDICAMENT.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-          </select>
+          <input list="categories-medicament-ajout" value={categorie} onChange={(e) => setCategorie(e.target.value)} maxLength={80} placeholder="Ex. Antispasmodique" className="w-full border rounded-lg px-3 py-2 text-sm" />
+          <datalist id="categories-medicament-ajout">{categories.filter((c) => c.code !== "AUTRE").map((c) => <option key={c.code} value={c.code} label={c.label} />)}</datalist>
+          <p className="text-xs text-gray-500 mt-1">Choisir ou créer une catégorie.</p>
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Voie admin.</label>
@@ -137,6 +139,7 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
           <span className="text-sm">Ordonnance requise</span>
         </label>
       </div>
+      {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
       <div className="flex gap-2 pt-1">
         <button type="submit" disabled={saving || !nom.trim()}
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
@@ -345,7 +348,7 @@ function Repertoire({ medicaments, onSaisiePrix }: { medicaments: MedicamentItem
         </div>
       </div>
 
-      {showAddMed && <AddMedicamentForm onDone={() => setShowAddMed(false)} />}
+      {showAddMed && <AddMedicamentForm categories={categories} onDone={() => setShowAddMed(false)} />}
 
       {filtered.length === 0 && (
         <div className="text-center py-12 text-gray-400 text-sm">Aucun médicament ne correspond à la recherche</div>
