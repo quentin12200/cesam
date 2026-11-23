@@ -4,7 +4,7 @@ import { useState } from "react";
 import { formatFrequence, formatDureePreconisation } from "@/lib/preconisation-schedule";
 import { useRouter } from "next/navigation";
 import { Save, CheckCircle2, Plus, AlertTriangle, ShieldCheck } from "lucide-react";
-import { getCategoriesMedicamentUtilisees } from "@/lib/medicament-categories";
+import { getCategoriesMedicamentUtilisees, getCategorieMedicament, valeurCategoriePersonnalisee } from "@/lib/medicament-categories";
 import PreconisationFields, { VoieSelect } from "./PreconisationFields";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import { voiesPossibles } from "@/lib/vaccine-administration";
@@ -85,6 +85,9 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
     stockSeuilAlert: medicament.stockSeuilAlert != null ? String(medicament.stockSeuilAlert) : "",
   });
   const [saving, setSaving] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [renameLabel, setRenameLabel] = useState("");
   const [saved, setSaved] = useState(false);
 
   const [erreurPreconisation, setErreurPreconisation] = useState("");
@@ -106,7 +109,7 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
         nom: form.nom,
         dci: form.dci || null,
         forme: form.forme || null,
-        categorie: form.categorie,
+        categorie: selected,
         voie: form.voie || null,
         prescriptionRequise: form.prescriptionRequise,
         actif: form.actif,
@@ -201,10 +204,11 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-gray-500 block mb-1">Catégorie</label>
-            <select value={form.categorie} onChange={(e) => setForm((f) => ({ ...f, categorie: e.target.value }))}
-              className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-              {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-            </select>
+            <input list="categories-medicament-fiche" value={form.categorie} onChange={(e) => setForm((f) => ({ ...f, categorie: e.target.value }))} maxLength={80} placeholder="Ex. Antispasmodique" className="w-full border rounded-lg px-3 py-2 text-sm bg-white" />
+            <datalist id="categories-medicament-fiche">{categories.filter((c) => c.code !== "AUTRE").map((c) => <option key={c.code} value={c.code} label={c.label} />)}</datalist>
+            <p className="text-xs text-gray-500 mt-1">Choisir ou saisir une nouvelle catégorie.</p>
+            {medicament.categorie !== "AUTRE" && <button type="button" onClick={() => { setRenaming(!renaming); setRenameLabel(getCategorieMedicament(medicament.categorie).label); }} className="mt-2 text-xs text-blue-700 underline">Renommer cette catégorie partout</button>}
+            {renaming && <div className="mt-2 space-y-2"><input aria-label="Nouveau nom de catégorie" value={renameLabel} maxLength={80} onChange={(e) => setRenameLabel(e.target.value)} className="w-full border rounded px-2 py-2 text-sm" /><button type="button" className="rounded bg-blue-600 px-3 py-2 text-white text-xs" onClick={async () => { const response = await fetch("/api/medicaments/categories", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ancienCode: medicament.categorie, nouveauNom: renameLabel }) }); if (!response.ok) { setCategoryError((await response.json()).error || "Renommage impossible"); return; } setRenaming(false); router.refresh(); }}>Confirmer le renommage</button></div>}
           </div>
           <VoieSelect
             label="Voie usuelle"
@@ -212,6 +216,7 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
             onChange={(value) => setForm((f) => ({ ...f, voie: value }))}
           />
         </div>
+        {categoryError && <p role="alert" className="text-xs text-red-700">{categoryError}</p>}
         <p className="text-xs text-gray-600" data-testid="voies-possibles">
           <span className="font-semibold">Voies possibles :</span>{" "}
           {voiesPossibles(preconisations, form.voie).join(" · ") || "à renseigner dans les préconisations"}
