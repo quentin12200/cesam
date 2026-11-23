@@ -49,7 +49,7 @@ export function normaliserLibelleCategorie(value: string): string {
 }
 
 export function valeurCategoriePersonnalisee(label: string): string {
-  const value = label.trim().replace(/\\s+/g, " ");
+  const value = label.trim().replace(/\s+/g, " ");
   const standard = CATEGORIES_MEDICAMENT.find((category) =>
     normaliserLibelleCategorie(category.label) === normaliserLibelleCategorie(value)
     || normaliserLibelleCategorie(category.code) === normaliserLibelleCategorie(value)
