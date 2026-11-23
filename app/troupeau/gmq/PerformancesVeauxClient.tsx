@@ -43,7 +43,6 @@ export default function PerformancesVeauxClient({veaux}:{veaux:Calf[]}) {
   const [year,setYear] = useState(String(new Date().getFullYear()));
   const [group,setGroup] = useState<Group>("couples");
   const [expanded,setExpanded] = useState<string | null>(null);
-  const now = new Date();
   const years = [...new Set(veaux.map(v=>new Date(v.naissance).getFullYear()))].sort((a,b)=>b-a);
   const result = useMemo(()=>{
     const cutoff = new Date();
