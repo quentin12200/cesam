@@ -6,12 +6,12 @@ import Link from "next/link";
 type Calf = {
   id: string; numero: string; nom: string | null; naissance: string; sexe: string;
   mereId: string; mere: string; pereId: string | null; pereNational: string | null;
-  pere: string | null; pesees: { date: string; poids: number }[];
+  pere: string | null; fatherSource: string | null; fatherMissing: string[]; pesees: { date: string; poids: number }[];
 };
 type Period = "12" | "24" | "year" | "all";
 type AgeBand = "all" | "0-3" | "3-6" | "6-9" | "9-12";
 type Group = "couples" | "meres" | "peres";
-type Row = { key: string; label: string; url?: string; total: number; gmqs: number[]; calves: { numero: string; gmq: number }[] };
+type Row = { key: string; label: string; url?: string; total: number; gmqs: number[]; calves: { numero: string; gmq: number; pere: string | null; fatherSource: string | null; fatherMissing: string[] }[] };
 const norm = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase().replace(/\s+/g, " ");
 const average = (values: number[]) => values.length ? Math.round(values.reduce((a,b) => a+b,0)/values.length) : null;
 const fmt = (n: number | null) => n === null ? "—" : `${n.toLocaleString("fr-FR")} g/j`;
@@ -40,7 +40,7 @@ function makeGroups(calves: { calf: Calf; gmq: number }[], group: Group): Row[] 
     const key = group === "meres" ? calf.mereId : group === "peres" ? father : `${calf.mereId}:${father}`;
     const label = group === "meres" ? calf.mere : group === "peres" ? calf.pere ?? "Père inconnu" : `${calf.mere} × ${calf.pere ?? "Père inconnu"}`;
     const row = map.get(key) ?? { key, label, url: group === "meres" ? `/troupeau/${calf.mere.split(" · ")[0]}` : undefined, total: 0, gmqs: [], calves: [] };
-    row.total++; row.gmqs.push(gmq); row.calves.push({numero:calf.numero,gmq});
+    row.total++; row.gmqs.push(gmq); row.calves.push({numero:calf.numero,gmq,pere:calf.pere,fatherSource:calf.fatherSource,fatherMissing:calf.fatherMissing});
     map.set(key,row);
   }
   return [...map.values()].sort((a,b)=>(average(b.gmqs)??-Infinity)-(average(a.gmqs)??-Infinity));
@@ -101,7 +101,11 @@ export default function PerformancesVeauxClient({veaux}:{veaux:Calf[]}) {
             </button>
             {expanded===r.key&&<div className="ml-7 mt-2 bg-gray-50 rounded-lg p-2 space-y-1">
               {r.url&&<Link href={r.url} className="text-xs text-green-800 underline">Voir la fiche de la vache</Link>}
-              {r.calves.map(c=><div key={c.numero} className="flex justify-between gap-2 text-sm"><Link href={`/troupeau/${c.numero}`} className="underline text-green-800">Veau {c.numero}</Link><span>{fmt(c.gmq)}</span></div>)}
+              {r.calves.map(c=><div key={c.numero} className="border-t border-gray-200 pt-2 first:border-0 first:pt-0 space-y-1">
+                <div className="flex justify-between gap-2 text-sm"><Link href={`/troupeau/${c.numero}`} className="underline text-green-800">Veau {c.numero}</Link><span>{fmt(c.gmq)}</span></div>
+                <p className="text-xs text-gray-600">Filiation paternelle : {c.fatherSource ?? "aucune source identifiée"}{c.pere ? ` · ${c.pere}` : ""}</p>
+                {!c.fatherSource && <p className="text-xs font-medium text-amber-800">Père inconnu : {c.fatherMissing.join(" ; ")}</p>}
+              </div>)}
             </div>}
           </div>)}
         </div>}
