@@ -35,6 +35,21 @@ export default async function GmqPage() {
       || bull?.nopere?.trim() || v.pereNom?.trim()
       || calf.pereTravailManuel?.trim()
       || fatherNational || null;
+    const fatherSource = calf.pereNomManuel?.trim() || calf.pereNationalManuel?.trim() || calf.pereTravailManuel?.trim()
+      ? "Filiation manuelle du veau"
+      : calf.taureau?.nopere?.trim() || calf.taureau?.nupere?.trim()
+        ? "Taureau lié au veau"
+        : v.gestation?.saillie?.taureau?.nopere?.trim() || v.gestation?.saillie?.taureau?.nupere?.trim()
+          ? "Taureau de la gestation"
+          : v.pereNom?.trim() || v.pereNunati?.trim()
+            ? "Père indiqué au vêlage"
+            : null;
+    const fatherMissing = [
+      ...(!calf.pereNomManuel?.trim() && !calf.pereNationalManuel?.trim() && !calf.pereTravailManuel?.trim() ? ["Filiation manuelle du veau non renseignée"] : []),
+      ...(!calf.taureau?.nopere?.trim() && !calf.taureau?.nupere?.trim() ? ["Aucune identité sur le taureau lié au veau"] : []),
+      ...(!v.gestation?.saillie?.taureau?.nopere?.trim() && !v.gestation?.saillie?.taureau?.nupere?.trim() ? ["Aucun taureau identifié sur la gestation"] : []),
+      ...(!v.pereNom?.trim() && !v.pereNunati?.trim() ? ["Père non renseigné au vêlage"] : []),
+    ];
     return [{
       id: calf.id, numero: calf.nutrav, nom: calf.nobovi,
       naissance: calf.danais.toISOString(), sexe: calf.sexbov,
@@ -42,6 +57,7 @@ export default async function GmqPage() {
       pereId: bull?.id ?? null,
       pereNational: fatherNational,
       pere: fatherName,
+      fatherSource, fatherMissing,
       pesees: calf.pesees.map(p => ({ date: p.date.toISOString(), poids: p.poids })),
     }];
   });
