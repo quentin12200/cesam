@@ -56,6 +56,26 @@ export async function POST(request: NextRequest) {
       if (saisi.nunati && (await prisma.veauVelage.findFirst({ where: { nunati: saisi.nunati } }) || await prisma.animal.findUnique({ where: { numeroNational: saisi.nunati } }))) return NextResponse.json({ error: `Le numéro national ${saisi.nunati} est déjà utilisé` }, { status: 409 });
     }
 
+    // Précontrôle avant toute écriture : une filiation déjà confirmée ne doit pas
+    // être remplacée, même si l'enregistrement du vêlage échoue ensuite.
+    const gestationPrecontrole = await prisma.gestation.findFirst({
+      where: { saillie: { animalId: vache.id }, etat: { in: ["VERT", "GRIS", "ROSE"] } },
+      include: { saillie: { include: { taureau: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (pereSelectionne && gestationPrecontrole?.saillie.taureauId && gestationPrecontrole.saillie.taureauId !== pereSelectionne.id) {
+      return NextResponse.json({ error: "Père différent de la gestation confirmée" }, { status: 409 });
+    }
+    const perePrecontrole = gestationPrecontrole?.saillie.taureau ?? pereSelectionne;
+    if (perePrecontrole) {
+      for (const saisi of veaux.filter(v => v.statut === "VIVANT" && v.nutrav)) {
+        const existing = await prisma.animal.findUnique({ where: { nutrav: saisi.nutrav! }, select: { taureauId: true } });
+        if (existing?.taureauId && existing.taureauId !== perePrecontrole.id) {
+          return NextResponse.json({ error: `Le veau ${saisi.nutrav} possède déjà un autre père fiable. Vérification manuelle nécessaire.` }, { status: 409 });
+        }
+      }
+    }
+
     const resolus: { saisi: VeauSaisi; animalId: string | null; cree: boolean; precedent?: { sexbov: string; nobovi: string | null; mereId: string | null; danais: Date | null; numeroNational: string | null } }[] = [];
     for (const saisi of veaux) {
       if (saisi.statut === "MORT_NE" || !saisi.nutrav) { resolus.push({ saisi, animalId: null, cree: false }); continue; }
@@ -79,7 +99,7 @@ export async function POST(request: NextRequest) {
       resolus.push({ saisi, animalId: animal.id, cree, precedent });
     }
 
-    const gestation = await prisma.gestation.findFirst({ where: { saillie: { animalId: vache.id }, etat: { in: ["VERT", "GRIS", "ROSE"] } }, include: { saillie: { include: { taureau: true } } }, orderBy: { createdAt: "desc" } });
+    const gestation = gestationPrecontrole;
     if (pereSelectionne && gestation?.saillie.taureauId && gestation.saillie.taureauId !== pereSelectionne.id) return NextResponse.json({ error: "Père différent de la gestation confirmée : vérifier la filiation avant modification" }, { status: 409 });
     const pereRetenu = gestation?.saillie.taureau ?? pereSelectionne;
     const premierVivant = resolus.find((v) => v.saisi.statut === "VIVANT" && v.animalId);
