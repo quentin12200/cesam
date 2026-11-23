@@ -14,7 +14,7 @@ function normalizedFull(value: string | null | undefined): string | null {
 export default async function FatherControlPage() {
   const [bulls, animals, breedings] = await Promise.all([
     prisma.taureau.findMany({
-      select: { id: true, nupere: true, nopere: true, copaip: true, present: true, _count: { select: { animaux: true, saillies: true } } },
+      select: { id: true, nupere: true, nopere: true, traper: true, copaip: true, present: true, _count: { select: { animaux: true, saillies: true } } },
       orderBy: { nopere: "asc" },
     }),
     prisma.animal.findMany({
@@ -46,6 +46,7 @@ export default async function FatherControlPage() {
     return {
       id: bull.id,
       number: bull.nupere,
+      work: bull.traper,
       country: bull.copaip,
       duplicateCandidates,
       historical: historical.length,
