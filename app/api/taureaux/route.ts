@@ -95,6 +95,7 @@ export async function PATCH(request: NextRequest) {
     const id = typeof body?.id === "string" ? body.id : "";
     const name = typeof body?.nopere === "string" ? body.nopere.trim() : null;
     const number = typeof body?.nupere === "string" ? nationalWithCountry(body.nupere.trim()) : null;
+    const work = typeof body?.traper === "string" ? body.traper.trim() : null;
     if (!id || name === null || name.length > 120 || !number || !/^(?:[A-Z]{2})?\d{8,15}$/.test(number)) {
       return NextResponse.json({ error: "Nom ou numéro national invalide (8 à 15 chiffres, code pays facultatif)." }, { status: 400 });
     }
@@ -106,7 +107,7 @@ export async function PATCH(request: NextRequest) {
     }
     const oldNumber = bull.nupere;
     const updated = await prisma.$transaction(async (tx) => {
-      const result = await tx.taureau.update({ where: { id }, data: { nopere: name || null, nupere: number } });
+      const result = await tx.taureau.update({ where: { id }, data: { nopere: name || null, nupere: number, ...(work !== null ? { traper: work || null } : {}) } });
       if (oldNumber !== number && fullNational(oldNumber)) {
         await tx.animal.updateMany({ where: { pereNationalManuel: oldNumber }, data: { pereNationalManuel: number } });
         await tx.velage.updateMany({ where: { pereNunati: oldNumber }, data: { pereNunati: number } });
@@ -115,7 +116,7 @@ export async function PATCH(request: NextRequest) {
     });
     try {
       await logAction("PATCH_TAUREAU_IDENTITE", `Identité du taureau ${oldNumber} corrigée`, {
-        op: "update", model: "taureau", where: { id }, data: { nopere: bull.nopere, nupere: oldNumber },
+        op: "update", model: "taureau", where: { id }, data: { nopere: bull.nopere, nupere: oldNumber, traper: bull.traper },
       });
     } catch {}
     return NextResponse.json({ ok: true, taureau: updated });
