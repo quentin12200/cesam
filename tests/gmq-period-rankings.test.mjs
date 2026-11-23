@@ -9,7 +9,11 @@ test("calves including sold are selected from births without active status",()=>
  assert.match(page,/seen\.has\(calf\.id\)/);
 });
 test("GMQ excludes unweighed calves and counts each measured calf once",()=>{
- assert.match(client,/valid\.length < 2/);
+ assert.match(client,/band\.length < 2/);
+ assert.match(client,/0 à 3 mois/);
+ assert.match(client,/3 à 6 mois/);
+ assert.match(client,/6 à 9 mois/);
+ assert.match(client,/9 à 12 mois/);
  assert.match(client,/days > 0/);
  assert.match(client,/gmq===null\?\[\]:\[\{calf:c,gmq\}\]/);
 });
