@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const page = readFileSync(new URL("../app/troupeau/gmq/page.tsx", import.meta.url), "utf8");
+const page = readFileSync(new URL("../app/troupeau/gmq/page.tsx", import.meta.url), "utf8")+readFileSync(new URL("../lib/gmq-calves.ts",import.meta.url),"utf8");
 const herd = readFileSync(new URL("../app/troupeau/page.tsx", import.meta.url), "utf8");
 
 test("GMQ loads only paternal genealogy sources", () => {
@@ -30,7 +30,7 @@ test("paternal identity prefers calf father, then linked bull, then birth record
   assert.match(page, /pere: conflict \? null : fatherName/);
 });
 
-const client = readFileSync(new URL("../app/troupeau/gmq/PerformancesVeauxClient.tsx", import.meta.url), "utf8");
+const client = readFileSync(new URL("../app/troupeau/gmq/PerformancesVeauxClient.tsx", import.meta.url), "utf8")+readFileSync(new URL("../lib/gmq-rankings.ts",import.meta.url),"utf8");
 
 test("GMQ diagnosis exposes paternal provenance in read-only calf rows", () => {
   for (const source of [

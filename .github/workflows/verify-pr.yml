@@ -32,3 +32,5 @@ jobs:
       - name: Lint carnet sanitaire
         run: ESLINT_USE_FLAT_CONFIG=false npx eslint app/sanitaire/carnet/page.tsx app/sanitaire/carnet/ChoixImpression.tsx
       - run: node --test --experimental-strip-types lib/gmq-father-conflict.test.ts
+
+      - run: node --test --experimental-strip-types lib/gmq-rankings-functional.test.ts

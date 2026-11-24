@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-const page=readFileSync(new URL("../app/troupeau/gmq/page.tsx",import.meta.url),"utf8");
-const client=readFileSync(new URL("../app/troupeau/gmq/PerformancesVeauxClient.tsx",import.meta.url),"utf8");
+const page=readFileSync(new URL("../app/troupeau/gmq/page.tsx",import.meta.url),"utf8")+readFileSync(new URL("../lib/gmq-calves.ts",import.meta.url),"utf8");
+const client=readFileSync(new URL("../app/troupeau/gmq/PerformancesVeauxClient.tsx",import.meta.url),"utf8")+readFileSync(new URL("../lib/gmq-rankings.ts",import.meta.url),"utf8");
 test("calves including sold are selected from births without active status",()=>{
  assert.match(page,/veauId: \{ not: null \}/);
  assert.doesNotMatch(page,/statut: "ACTIF"/);
