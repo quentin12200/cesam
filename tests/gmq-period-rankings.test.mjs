@@ -33,3 +33,9 @@ test("parent rankings expose measured and recorded offspring counts",()=>{
  assert.match(client,/row\.born\+\+/);
  assert.match(client,/makeGroups\(result\.measured,group,result\.born\)/);
 });
+
+test("includes linked twin calves without duplicate counting",()=>{
+ assert.match(page,/veauxDetails: \{ some: \{ animalId: \{ not: null \}/);
+ assert.match(page,/v\.veauxDetails\.map\(d => d\.animal\)/);
+ assert.match(page,/seen\.has\(calf\.id\)/);
+});
