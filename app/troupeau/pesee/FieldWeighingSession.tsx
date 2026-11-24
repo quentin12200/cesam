@@ -50,6 +50,7 @@ import {
 } from "@/lib/field-weighing-session-api";
 import { sortEntriesByWeight } from "@/lib/price-simulation";
 import PriceSimulation from "./PriceSimulation";
+import ShareWeighingImage from "./ShareWeighingImage";
 import WeighingAnimalDetails from "./WeighingAnimalDetails";
 import { useSwipeActions } from "./useSwipeActions";
 
@@ -757,6 +758,10 @@ export default function FieldWeighingSession() {
             >
               VENDRE / SORTIR DES ANIMAUX
             </button>
+          )}
+
+          {session.entries.length > 0 && (
+            <ShareWeighingImage males={males} females={females} startedAt={session.startedAt} />
           )}
 
           {error && !editingInSummary && (

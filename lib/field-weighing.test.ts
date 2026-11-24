@@ -26,6 +26,7 @@ import {
   stopSwipeActionPointerDown,
   SWIPE_ACTION_WIDTH,
   swipeToggleLabel,
+  weighingShareRows,
   weightProgressLabel,
 } from "./field-weighing.ts";
 import type { FieldSessionEntry } from "./field-weighing.ts";
@@ -35,6 +36,31 @@ const entries: FieldSessionEntry[] = [
   { id: "p2", nutrav: "2002", sexe: "F", poids: 280, gmq: 0.9, selected: true },
   { id: "p1", nutrav: "1001", sexe: "M", poids: 250, gmq: 0.7, selected: false },
 ];
+
+test("prépare les lignes partagées avec les pesées cochées et décochées", () => {
+  const reference = new Date(2026, 7, 20, 12);
+  const rows = weighingShareRows(
+    [entries[0], { ...entries[2], gmq: null }],
+    reference,
+  );
+
+  assert.deepEqual(rows, [
+    {
+      selected: true,
+      weight: "3003 — 310 kg",
+      details: `Mère 6393 · ${fieldAgeInfo(entries[0].birthDate, reference).label}`,
+      progress: "GMQ 1,2 kg/j",
+      alert: "⚠ Approche 12 mois",
+    },
+    {
+      selected: false,
+      weight: "1001 — 250 kg",
+      details: "Mère inconnue · Âge inconnu",
+      progress: "Première pesée",
+      alert: null,
+    },
+  ]);
+});
 
 test("affiche le numéro de la mère sans le confondre avec celui du veau", () => {
   assert.equal(entries[0].nutrav, "3003");
