@@ -138,8 +138,9 @@ export default function ShareWeighingImage(props: WeighingImageProps) {
         className="flex min-h-16 w-full items-center justify-center gap-3 border-4 border-black bg-white px-4 text-xl font-black disabled:bg-neutral-300"
       >
         <Share2 aria-hidden="true" size={24} />
-        PARTAGER L’IMAGE DES PESÉES
+        PARTAGER SUR WHATSAPP
       </button>
+      <p className="mt-1 text-center text-sm">Choisis WhatsApp dans le menu de partage, ou enregistre l’image si le partage direct est indisponible.</p>
       {message && <p role="status" className="mt-2 text-center font-bold">{message}</p>}
     </div>
   );
