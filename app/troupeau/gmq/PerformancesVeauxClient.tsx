@@ -11,7 +11,7 @@ type Calf = {
 type Period = "12" | "24" | "year" | "all";
 type AgeBand = "all" | "0-3" | "3-6" | "6-9" | "9-12";
 type Group = "couples" | "meres" | "peres";
-type Row = { key: string; label: string; url?: string; total: number; gmqs: number[]; calves: { numero: string; gmq: number; pere: string | null; fatherSource: string | null; fatherMissing: string[] }[] };
+type Row = { key: string; label: string; url?: string; total: number; born: number; gmqs: number[]; calves: { numero: string; gmq: number; pere: string | null; fatherSource: string | null; fatherMissing: string[] }[] };
 const norm = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase().replace(/\s+/g, " ");
 const average = (values: number[]) => values.length ? Math.round(values.reduce((a,b) => a+b,0)/values.length) : null;
 const fmt = (n: number | null) => n === null ? "—" : `${n.toLocaleString("fr-FR")} g/j`;
@@ -33,15 +33,21 @@ function parentKey(c: Calf) {
   // Do not group an unidentified father with a known bull.
   return c.pereNational ? `nat:${norm(c.pereNational)}` : c.pereId ? `id:${c.pereId}` : c.pere ? `nom:${norm(c.pere)}` : "unknown";
 }
-function makeGroups(calves: { calf: Calf; gmq: number }[], group: Group): Row[] {
+function makeGroups(calves: { calf: Calf; gmq: number }[], group: Group, born: Calf[]): Row[] {
   const map = new Map<string,Row>();
   for (const {calf,gmq} of calves) {
     const father = parentKey(calf);
     const key = group === "meres" ? calf.mereId : group === "peres" ? father : `${calf.mereId}:${father}`;
     const label = group === "meres" ? calf.mere : group === "peres" ? calf.pere ?? "Père inconnu" : `${calf.mere} × ${calf.pere ?? "Père inconnu"}`;
-    const row = map.get(key) ?? { key, label, url: group === "meres" ? `/troupeau/${calf.mere.split(" · ")[0]}` : undefined, total: 0, gmqs: [], calves: [] };
+    const row = map.get(key) ?? { key, label, url: group === "meres" ? `/troupeau/${calf.mere.split(" · ")[0]}` : undefined, total: 0, born: 0, gmqs: [], calves: [] };
     row.total++; row.gmqs.push(gmq); row.calves.push({numero:calf.numero,gmq,pere:calf.pere,fatherSource:calf.fatherSource,fatherMissing:calf.fatherMissing});
     map.set(key,row);
+  }
+  for (const calf of born) {
+    const father = parentKey(calf);
+    const key = group === "meres" ? calf.mereId : group === "peres" ? father : `${calf.mereId}:${father}`;
+    const row = map.get(key);
+    if (row) row.born++;
   }
   return [...map.values()].sort((a,b)=>(average(b.gmqs)??-Infinity)-(average(a.gmqs)??-Infinity));
 }
@@ -60,9 +66,9 @@ export default function PerformancesVeauxClient({veaux}:{veaux:Calf[]}) {
       return period === "all" || (period === "year" ? born.getFullYear() === Number(year) : born >= cutoff && born <= new Date());
     });
     const measured = selected.flatMap(c=>{const gmq=calculateCalfGmq(c.pesees,c.naissance,ageBand);return gmq===null?[]:[{calf:c,gmq}];});
-    return { selected:selected.length, measured, male:measured.filter(x=>x.calf.sexe==="M"), female:measured.filter(x=>x.calf.sexe==="F") };
+    return { selected:selected.length, born:selected, measured, male:measured.filter(x=>x.calf.sexe==="M"), female:measured.filter(x=>x.calf.sexe==="F") };
   },[veaux,period,year,ageBand]);
-  const rows = useMemo(()=>makeGroups(result.measured,group),[result.measured,group]);
+  const rows = useMemo(()=>makeGroups(result.measured,group,result.born),[result.measured,group,result.born]);
   const metric = (title:string,items:typeof result.measured) => <div className="rounded-xl border bg-white p-3">
     <p className="text-xs text-gray-500">{title}</p><p className="text-xl sm:text-2xl font-bold text-green-800 mt-1">{fmt(average(items.map(x=>x.gmq)))}</p>
     <p className="text-xs text-gray-500 mt-1">{items.length} veau{items.length>1?"x":""} avec GMQ</p>
@@ -90,13 +96,13 @@ export default function PerformancesVeauxClient({veaux}:{veaux:Calf[]}) {
       <div role="group" aria-label="Type de classement" className="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-lg">
         {([["couples","Couples"],["meres","Vaches"],["peres","Taureaux"]] as const).map(([value,label])=><button type="button" key={value} aria-pressed={group===value} onClick={()=>{setGroup(value);setExpanded(null);}} className={`rounded-md py-2.5 text-sm font-medium ${group===value?"bg-white shadow text-green-800":"text-gray-600"}`}>{label}</button>)}
       </div>
-      <p className="text-xs text-gray-500">Classement par GMQ moyen décroissant. Effectif = veaux avec GMQ calculable.</p>
+      <p className="text-xs text-gray-500">Classement par GMQ moyen décroissant. Effectif : veaux avec GMQ calculable / veaux recensés sur la période.</p>
       {rows.length===0?<p className="py-5 text-center text-sm text-gray-500">Aucun GMQ calculable pour cette période.</p>:
         <div className="divide-y">
           {rows.map((r,i)=><div key={r.key} className="py-2">
             <button type="button" aria-expanded={expanded===r.key} onClick={()=>setExpanded(expanded===r.key?null:r.key)} className="w-full text-left flex items-center gap-2 min-h-12">
               <span className="text-xs text-gray-400 w-5 shrink-0">{i+1}.</span>
-              <span className="flex-1 min-w-0"><span className="block text-sm font-semibold text-gray-800 break-words">{r.label}</span><span className="text-xs text-gray-500">{r.total} veau{r.total>1?"x":""} pesé{r.total>1?"s":""}{r.total===1?" · résultat indicatif":""}</span></span>
+              <span className="flex-1 min-w-0"><span className="block text-sm font-semibold text-gray-800 break-words">{r.label}</span><span className="text-xs text-gray-500">{r.total} / {r.born} veaux avec GMQ{r.total===1?" · résultat indicatif":""}</span></span>
               <span className="font-bold text-green-800 whitespace-nowrap text-sm">{fmt(average(r.gmqs))}</span><span className="text-gray-400 text-xs">{expanded===r.key?"−":"+"}</span>
             </button>
             {expanded===r.key&&<div className="ml-7 mt-2 bg-gray-50 rounded-lg p-2 space-y-1">
