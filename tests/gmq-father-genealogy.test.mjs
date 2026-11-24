@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const page = readFileSync(new URL("../app/troupeau/gmq/page.tsx", import.meta.url), "utf8");
+const page = readFileSync(new URL("../app/troupeau/gmq/page.tsx", import.meta.url), "utf8")+readFileSync(new URL("../lib/gmq-calves.ts",import.meta.url),"utf8");
 const herd = readFileSync(new URL("../app/troupeau/page.tsx", import.meta.url), "utf8");
 
 test("GMQ loads only paternal genealogy sources", () => {
@@ -26,18 +26,18 @@ test("historical NUMEIP/NOMEIP are maternal fields, never sire fallbacks", () =>
 test("paternal identity prefers calf father, then linked bull, then birth record", () => {
   assert.match(page, /calf\.pereNationalManuel\?\.trim\(\)[\s\S]*?bull\?\.nupere\?\.trim\(\)[\s\S]*?v\.pereNunati\?\.trim\(\)/);
   assert.match(page, /calf\.pereNomManuel\?\.trim\(\)[\s\S]*?bull\?\.nopere\?\.trim\(\)[\s\S]*?v\.pereNom\?\.trim\(\)/);
-  assert.match(page, /pereNational: fatherNational/);
-  assert.match(page, /pere: fatherName/);
+  assert.match(page, /pereNational: conflict \? null : fatherNational/);
+  assert.match(page, /pere: conflict \? null : fatherName/);
 });
 
-const client = readFileSync(new URL("../app/troupeau/gmq/PerformancesVeauxClient.tsx", import.meta.url), "utf8");
+const client = readFileSync(new URL("../app/troupeau/gmq/PerformancesVeauxClient.tsx", import.meta.url), "utf8")+readFileSync(new URL("../lib/gmq-rankings.ts",import.meta.url),"utf8");
 
 test("GMQ diagnosis exposes paternal provenance in read-only calf rows", () => {
   for (const source of [
     "Filiation manuelle du veau", "Taureau lié au veau",
     "Taureau de la gestation", "Père indiqué au vêlage",
   ]) assert.ok(page.includes(source), `Missing father source: ${source}`);
-  assert.match(page, /fatherSource, fatherMissing/);
+  assert.match(page, /fatherSource: conflict \? null : fatherSource, fatherMissing/);
   assert.match(client, /fatherSource: string \| null; fatherMissing: string\[\]/);
   assert.match(client, /Filiation paternelle :/);
   assert.match(client, /Père inconnu :/);

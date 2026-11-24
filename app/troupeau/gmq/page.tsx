@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { mapGmqCalves } from "@/lib/gmq-calves";
 import BackButton from "@/app/components/BackButton";
 import PerformancesVeauxClient from "./PerformancesVeauxClient";
 
@@ -7,12 +8,18 @@ export const dynamic = "force-dynamic";
 export default async function GmqPage() {
   // Read-only. Keep sold/deceased calves in the history; select by birth date in the client.
   const velages = await prisma.velage.findMany({
-    where: { veauId: { not: null } },
+    where: { OR: [{ veauId: { not: null } }, { veauxDetails: { some: { animalId: { not: null } } } }] },
     select: {
       vacheId: true,
       vache: { select: { nutrav: true, nobovi: true } },
       pereNom: true, pereNunati: true,
       gestation: { select: { saillie: { select: { taureau: { select: { id: true, nopere: true, nupere: true } } } } } },
+      veauxDetails: { select: { animal: { select: {
+        id: true, nutrav: true, nobovi: true, danais: true, sexbov: true,
+        pereNomManuel: true, pereNationalManuel: true, pereTravailManuel: true,
+        taureau: { select: { id: true, nopere: true, nupere: true, traper: true } },
+        pesees: { orderBy: { date: "asc" }, select: { date: true, poids: true } },
+      } } } },
       veau: { select: {
         id: true, nutrav: true, nobovi: true, danais: true, sexbov: true,
         pereNomManuel: true, pereNationalManuel: true, pereTravailManuel: true,
@@ -21,48 +28,7 @@ export default async function GmqPage() {
       } },
     },
   });
-  const seen = new Set<string>();
-  const veaux = velages.flatMap(v => {
-    const calf = v.veau;
-    if (!calf || seen.has(calf.id)) return [];
-    seen.add(calf.id);
-    const bull = calf.taureau ?? v.gestation?.saillie?.taureau;
-    // The calf genealogy is the primary source. Older births may store father
-    // information on the calving or the linked breeding record instead.
-    // NUMEIP/NOMEIP/TRAMIP describe the MOTHER (identification permanente),
-    // never the father. Only use explicitly paternal sources here.
-    const fatherNational = calf.pereNationalManuel?.trim()
-      || bull?.nupere?.trim() || v.pereNunati?.trim() || null;
-    const fatherName = calf.pereNomManuel?.trim()
-      || bull?.nopere?.trim() || v.pereNom?.trim()
-      || calf.pereTravailManuel?.trim()
-      || fatherNational || null;
-    const fatherSource = calf.pereNomManuel?.trim() || calf.pereNationalManuel?.trim() || calf.pereTravailManuel?.trim()
-      ? "Filiation manuelle du veau"
-      : calf.taureau?.nopere?.trim() || calf.taureau?.nupere?.trim()
-        ? "Taureau lié au veau"
-        : v.gestation?.saillie?.taureau?.nopere?.trim() || v.gestation?.saillie?.taureau?.nupere?.trim()
-          ? "Taureau de la gestation"
-          : v.pereNom?.trim() || v.pereNunati?.trim()
-            ? "Père indiqué au vêlage"
-            : null;
-    const fatherMissing = [
-      ...(!calf.pereNomManuel?.trim() && !calf.pereNationalManuel?.trim() && !calf.pereTravailManuel?.trim() ? ["Filiation manuelle du veau non renseignée"] : []),
-      ...(!calf.taureau?.nopere?.trim() && !calf.taureau?.nupere?.trim() ? ["Aucune identité sur le taureau lié au veau"] : []),
-      ...(!v.gestation?.saillie?.taureau?.nopere?.trim() && !v.gestation?.saillie?.taureau?.nupere?.trim() ? ["Aucun taureau identifié sur la gestation"] : []),
-      ...(!v.pereNom?.trim() && !v.pereNunati?.trim() ? ["Père non renseigné au vêlage"] : []),
-    ];
-    return [{
-      id: calf.id, numero: calf.nutrav, nom: calf.nobovi,
-      naissance: calf.danais.toISOString(), sexe: calf.sexbov,
-      mereId: v.vacheId, mere: [v.vache.nutrav, v.vache.nobovi].filter(Boolean).join(" · "),
-      pereId: bull?.id ?? null,
-      pereNational: fatherNational,
-      pere: fatherName,
-      fatherSource, fatherMissing,
-      pesees: calf.pesees.map(p => ({ date: p.date.toISOString(), poids: p.poids })),
-    }];
-  });
+  const veaux = mapGmqCalves(velages);
   return <main className="max-w-5xl mx-auto px-3 sm:px-5 py-4 pb-24 space-y-4">
     <div className="flex items-center gap-3"><BackButton className="p-2 bg-white rounded-lg shadow text-gray-500" iconSize={18} />
       <div><h1 className="text-xl font-bold text-gray-800">Performances des veaux</h1>
