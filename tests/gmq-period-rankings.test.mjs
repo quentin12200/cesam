@@ -27,3 +27,9 @@ test("birth period, sex summaries and parent pair rankings are available",()=>{
  assert.match(client,/calf\.mereId.*father/);
  assert.match(client,/pereNational/);
 });
+
+test("parent rankings expose measured and recorded offspring counts",()=>{
+ assert.match(client,/for \(const calf of born\)/);
+ assert.match(client,/row\.born\+\+/);
+ assert.match(client,/makeGroups\(result\.measured,group,result\.born\)/);
+});
