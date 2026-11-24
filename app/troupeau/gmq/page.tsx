@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import BackButton from "@/app/components/BackButton";
 import PerformancesVeauxClient from "./PerformancesVeauxClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function GmqPage() {
   // Read-only. Keep sold/deceased calves in the history; select by birth date in the client.
   const velages = await prisma.velage.findMany({

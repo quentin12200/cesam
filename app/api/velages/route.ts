@@ -11,10 +11,15 @@ import { motherUpdateAfterCalving } from "@/lib/herd-renewal";
 
 type VeauSaisi = { nutrav?: string; nunati?: string; sexe?: "M" | "F"; nom?: string; statut?: "VIVANT" | "MORT_NE" };
 
+class CalvingConflict extends Error {}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { vacheNutrav, date, moment, sousType, capteur, pereNom, notes } = body;
+    const pereTaureauId = typeof body.pereTaureauId === "string" ? body.pereTaureauId : null;
+    const pereSelectionne = pereTaureauId ? await prisma.taureau.findUnique({ where: { id: pereTaureauId } }) : null;
+    if (pereTaureauId && !pereSelectionne) return NextResponse.json({ error: "Père sélectionné introuvable" }, { status: 400 });
     const qualificatif = ["NORMAL", "DIFFICILE", "AVORTEMENT", "MORT_NEE"].includes(body.qualificatif) ? body.qualificatif : "NORMAL";
     if (!vacheNutrav || !date) return NextResponse.json({ error: "La vache et la date sont requises" }, { status: 400 });
 
@@ -53,39 +58,64 @@ export async function POST(request: NextRequest) {
       if (saisi.nunati && (await prisma.veauVelage.findFirst({ where: { nunati: saisi.nunati } }) || await prisma.animal.findUnique({ where: { numeroNational: saisi.nunati } }))) return NextResponse.json({ error: `Le numéro national ${saisi.nunati} est déjà utilisé` }, { status: 409 });
     }
 
-    const resolus: { saisi: VeauSaisi; animalId: string | null; cree: boolean; precedent?: { sexbov: string; nobovi: string | null; mereId: string | null; danais: Date | null; numeroNational: string | null } }[] = [];
-    for (const saisi of veaux) {
-      if (saisi.statut === "MORT_NE" || !saisi.nutrav) { resolus.push({ saisi, animalId: null, cree: false }); continue; }
-      const dejaLie = await prisma.veauVelage.findFirst({ where: { animal: { nutrav: saisi.nutrav } }, include: { velage: true } });
-      if (dejaLie) return NextResponse.json({ error: `Le veau ${saisi.nutrav} est déjà lié à un vêlage` }, { status: 409 });
-      let animal = await prisma.animal.findUnique({ where: { nutrav: saisi.nutrav } });
-      const nationalExistant = saisi.nunati ? await prisma.animal.findUnique({ where: { numeroNational: saisi.nunati } }) : null;
-      const nationalVelageExistant = saisi.nunati ? await prisma.veauVelage.findFirst({ where: { nunati: saisi.nunati } }) : null;
-      if ((nationalExistant && nationalExistant.id !== animal?.id) || nationalVelageExistant) return NextResponse.json({ error: `Le numéro national ${saisi.nunati} est déjà utilisé` }, { status: 409 });
-      let cree = false, precedent;
-      if (!animal) {
-        const sexe = saisi.sexe ?? "F";
-        animal = await prisma.animal.create({ data: { nutrav: saisi.nutrav, nunati: saisi.nunati ?? `AUTO${saisi.nutrav}`, numeroNational: saisi.nunati ?? null, nobovi: saisi.nom ?? null, danais: new Date(date), sexbov: sexe, statut: "ACTIF", estGenisse: sexe === "F", categorie: sexe === "F" ? "VELLE" : null, mereId: vache.id, declarationsAdministratives: { create: { type: "NAISSANCE", statut: "A_DECLARER", service: identificationConfig?.serviceDeclaration ?? "AUCUN" } } } });
-        cree = true;
-      } else {
-        precedent = { sexbov: animal.sexbov, nobovi: animal.nobovi, mereId: animal.mereId, danais: animal.danais, numeroNational: animal.numeroNational };
-        await prisma.animal.update({ where: { id: animal.id }, data: { mereId: vache.id, danais: new Date(date), ...(saisi.sexe ? { sexbov: saisi.sexe } : {}), ...(saisi.nom ? { nobovi: saisi.nom } : {}), ...(saisi.nunati ? { numeroNational: saisi.nunati } : {}) } });
-        const declaration = await prisma.declarationAdministrative.findFirst({ where: { animalId: animal.id, type: "NAISSANCE" } });
-        if (!declaration) await prisma.declarationAdministrative.create({ data: { animalId: animal.id, type: "NAISSANCE", statut: "A_DECLARER", service: identificationConfig?.serviceDeclaration ?? "AUCUN" } });
+    // Précontrôle avant toute écriture : une filiation déjà confirmée ne doit pas
+    // être remplacée, même si l'enregistrement du vêlage échoue ensuite.
+    const gestationPrecontrole = await prisma.gestation.findFirst({
+      where: { saillie: { animalId: vache.id }, etat: { in: ["VERT", "GRIS", "ROSE"] } },
+      include: { saillie: { include: { taureau: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (pereSelectionne && gestationPrecontrole?.saillie.taureauId && gestationPrecontrole.saillie.taureauId !== pereSelectionne.id) {
+      return NextResponse.json({ error: "Père différent de la gestation confirmée" }, { status: 409 });
+    }
+    const perePrecontrole = pereSelectionne;
+    if (perePrecontrole) {
+      for (const saisi of veaux.filter(v => v.statut === "VIVANT" && v.nutrav)) {
+        const existing = await prisma.animal.findUnique({ where: { nutrav: saisi.nutrav! }, select: { taureauId: true } });
+        if (existing?.taureauId && existing.taureauId !== perePrecontrole.id) {
+          return NextResponse.json({ error: `Le veau ${saisi.nutrav} possède déjà un autre père fiable. Vérification manuelle nécessaire.` }, { status: 409 });
+        }
       }
-      resolus.push({ saisi, animalId: animal.id, cree, precedent });
     }
 
-    const gestation = await prisma.gestation.findFirst({ where: { saillie: { animalId: vache.id }, etat: { in: ["VERT", "GRIS", "ROSE"] } }, include: { saillie: { include: { taureau: true } } }, orderBy: { createdAt: "desc" } });
-    const premierVivant = resolus.find((v) => v.saisi.statut === "VIVANT" && v.animalId);
+    const resolus: { saisi: VeauSaisi; animalId: string | null; cree: boolean; precedent?: { sexbov: string; nobovi: string | null; mereId: string | null; danais: Date | null; numeroNational: string | null; taureauId: string | null } }[] = [];
+    const gestation = gestationPrecontrole;
+    const pereRetenu = pereSelectionne;
     const velage = await prisma.$transaction(async (tx) => {
+      for (const saisi of veaux) {
+        if (saisi.statut === "MORT_NE" || !saisi.nutrav) { resolus.push({ saisi, animalId: null, cree: false }); continue; }
+        const dejaLie = await tx.veauVelage.findFirst({ where: { animal: { nutrav: saisi.nutrav } }, include: { velage: true } });
+        if (dejaLie) throw new CalvingConflict(`Le veau ${saisi.nutrav} est déjà lié à un vêlage`);
+        let animal = await tx.animal.findUnique({ where: { nutrav: saisi.nutrav } });
+        const nationalExistant = saisi.nunati ? await tx.animal.findUnique({ where: { numeroNational: saisi.nunati } }) : null;
+        const nationalVelageExistant = saisi.nunati ? await tx.veauVelage.findFirst({ where: { nunati: saisi.nunati } }) : null;
+        if ((nationalExistant && nationalExistant.id !== animal?.id) || nationalVelageExistant) throw new CalvingConflict(`Le numéro national ${saisi.nunati} est déjà utilisé`);
+        let cree = false, precedent;
+        if (!animal) {
+          const sexe = saisi.sexe ?? "F";
+          animal = await tx.animal.create({ data: { nutrav: saisi.nutrav, nunati: saisi.nunati ?? `AUTO${saisi.nutrav}`, numeroNational: saisi.nunati ?? null, nobovi: saisi.nom ?? null, danais: new Date(date), sexbov: sexe, statut: "ACTIF", estGenisse: sexe === "F", categorie: sexe === "F" ? "VELLE" : null, mereId: vache.id, declarationsAdministratives: { create: { type: "NAISSANCE", statut: "A_DECLARER", service: identificationConfig?.serviceDeclaration ?? "AUCUN" } } } });
+          cree = true;
+        } else {
+          precedent = { sexbov: animal.sexbov, nobovi: animal.nobovi, mereId: animal.mereId, danais: animal.danais, numeroNational: animal.numeroNational, taureauId: animal.taureauId };
+          await tx.animal.update({ where: { id: animal.id }, data: { mereId: vache.id, danais: new Date(date), ...(saisi.sexe ? { sexbov: saisi.sexe } : {}), ...(saisi.nom ? { nobovi: saisi.nom } : {}), ...(saisi.nunati ? { numeroNational: saisi.nunati } : {}) } });
+          const declaration = await tx.declarationAdministrative.findFirst({ where: { animalId: animal.id, type: "NAISSANCE" } });
+          if (!declaration) await tx.declarationAdministrative.create({ data: { animalId: animal.id, type: "NAISSANCE", statut: "A_DECLARER", service: identificationConfig?.serviceDeclaration ?? "AUCUN" } });
+        }
+        resolus.push({ saisi, animalId: animal.id, cree, precedent });
+      }
+      const premierVivant = resolus.find((v) => v.saisi.statut === "VIVANT" && v.animalId);
       const cree = await tx.velage.create({ data: {
         vacheId: vache.id, veauId: premierVivant?.animalId ?? null, date: new Date(date), moment: moment?.trim() || null, qualificatif,
         sousType: sousType ?? (qualificatif === "NORMAL" ? "SEULE" : null), capteur: capteur ?? null,
-        pereNom: pereNom ?? null, pereNunati: gestation?.saillie.taureau?.nupere ?? null,
+        pereNom: pereRetenu?.nopere ?? pereNom ?? null, pereNunati: pereRetenu?.nupere ?? gestation?.saillie.taureau?.nupere ?? null,
         jumeaux: veaux.length === 2, nombreVeaux: veaux.length, gestationId: gestation?.id ?? null, notes: notes?.trim() || null,
         veauxDetails: { create: resolus.map((v) => ({ animalId: v.animalId, nutrav: v.saisi.nutrav ?? null, nunati: v.saisi.nunati ?? null, nom: v.saisi.nom ?? null, sexe: v.saisi.sexe ?? null, statut: v.saisi.statut ?? "VIVANT" })) },
       } });
+      if (pereRetenu) for (const veau of resolus) if (veau.animalId) {
+        const existant = await tx.animal.findUnique({ where: { id: veau.animalId }, select: { taureauId: true } });
+        if (existant?.taureauId && existant.taureauId !== pereRetenu.id) throw new CalvingConflict("Filiation existante différente : correction manuelle nécessaire");
+        await tx.animal.update({ where: { id: veau.animalId }, data: { taureauId: pereRetenu.id } });
+      }
       if (gestation) await tx.gestation.update({ where: { id: gestation.id }, data: { etat: "VELAGE" } });
       await tx.animal.update({
         where: { id: vache.id },
@@ -128,6 +158,7 @@ export async function POST(request: NextRequest) {
     } catch {}
     return NextResponse.json({ ...velage, vacheId: vache.id, _undoId: undoId }, { status: 201 });
   } catch (error) {
+    if (error instanceof CalvingConflict) return NextResponse.json({ error: error.message }, { status: 409 });
     console.error("POST /api/velages error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
