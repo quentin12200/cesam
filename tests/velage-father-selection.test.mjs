@@ -13,7 +13,7 @@ test("creation and edition use selected bull identity rather than free text alon
   assert.match(edit, /taureauId: pereSelectionne.id/);
 });
 test("confirmed breeding cannot be overwritten by a different selected bull", () => {
-  assert.match(create, /gestation\.saillie\.taureauId !== pereSelectionne.id/);
+  assert.match(create, /gestationPrecontrole\.saillie\.taureauId !== pereSelectionne.id/);
   assert.match(edit, /gestationLiee\.saillie\.taureauId !== pereSelectionne.id/);
 });
 test("new bulls can be recorded pending a national identifier, and duplicate names are checked", () => {
@@ -36,4 +36,10 @@ test("legacy father audit is read-only and requires explicit user validation", (
 test("father picker supports mobile touch targets and accented name search", () => {
   assert.match(form, /normalize\("NFD"\)/);
   assert.match(form, /max-h-40 overflow-auto/);
+});
+
+test("the father selection is cleared before reusing the calving form", () => {
+  assert.match(form, /function reset\(\).*reinitialiserPere\(\)/);
+  assert.match(form, /function reinitialiserPere\(\) \{[\s\S]*?setPereTaureauId\(""\)/);
+  assert.match(form, /if \(nom && !pereSaisi\.current\)/);
 });

@@ -372,7 +372,7 @@ export async function editVelage(
 
     const pereSelectionne = input.pereTaureauId ? await tx.taureau.findUnique({ where: { id: input.pereTaureauId } }) : null;
     if (input.pereTaureauId && !pereSelectionne) throw new VelageEditError("Père sélectionné introuvable", "INVALID");
-    const gestationLiee = current.gestationId ? await tx.gestation.findUnique({ where: { id: current.gestationId }, include: { saillie: true } }) : null;
+    const gestationLiee = pereSelectionne && current.gestationId ? await tx.gestation.findUnique({ where: { id: current.gestationId }, include: { saillie: true } }) : null;
     if (pereSelectionne && gestationLiee?.saillie.taureauId && gestationLiee.saillie.taureauId !== pereSelectionne.id) throw new VelageEditError("Filiation de gestation différente : correction manuelle nécessaire", "CONFLICT");
     const existingDetails = new Map(current.veauxDetails.map((detail) => [detail.id, detail]));
     for (const calf of input.veaux) {

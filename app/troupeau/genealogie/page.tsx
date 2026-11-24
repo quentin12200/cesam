@@ -5,6 +5,9 @@ import GeneaClient from "./GeneaClient";
 import { GENEA_DATA, type GeneaEntry } from "@/app/api/genealogie-import/data";
 
 import BackButton from "@/app/components/BackButton";
+
+export const dynamic = "force-dynamic";
+
 export type { GeneaEntry };
 
 export interface AnimalGeneaNode {
