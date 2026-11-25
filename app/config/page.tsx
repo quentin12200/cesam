@@ -108,7 +108,7 @@ export default function ConfigPage() {
 
       <Link href="/lab" className="mt-3 flex min-h-11 min-w-0 items-center gap-3 rounded-xl border-2 border-green-200 bg-green-50 p-4 text-green-900">
         <FlaskConical size={26} className="shrink-0" aria-hidden="true" />
-        <span className="min-w-0 flex-1"><span className="block font-black">CESAM LAB · Tester la nouvelle interface</span><span className="mt-1 block text-xs">Prototype actuel utilisant des données réelles, non isolé</span></span>
+        <span className="min-w-0 flex-1"><span className="block font-black">CESAM LAB · Tester la nouvelle interface</span><span className="mt-1 block text-xs">Prototypes sur données fictives ; environnement complet à venir</span></span>
         <ChevronRight size={20} className="shrink-0" aria-hidden="true" />
       </Link>
 

@@ -6,6 +6,7 @@ const groups = [
     title: "Filiations et reproducteurs",
     description: "Contrôler les liens entre les animaux et leurs reproducteurs.",
     tools: [
+      { href: "/config/coulisses/peres", title: "Tableau des pères", description: "Consulter les descendants et corriger manuellement les noms." },
       { href: "/taureaux/controle", title: "Contrôle des pères", description: "Consulter les filiations et les contradictions existantes." },
       { href: "/taureaux/controle/anciens-velages", title: "Anciens pères de vêlage", description: "Diagnostic en lecture seule des anciennes saisies." },
       { href: "/taureaux/doublons", title: "Doublons des reproducteurs", description: "Vérifier les rapprochements et accéder aux corrections existantes." },
@@ -73,7 +74,7 @@ export default function CoulissesPage() {
       </section>
       <Link href="/lab" prefetch={false} className="flex min-h-11 min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 focus-visible:ring-2 focus-visible:ring-green-700">
         <FlaskConical size={24} className="shrink-0 text-blue-700" aria-hidden="true" />
-        <span className="min-w-0 flex-1"><span className="block text-base font-bold text-slate-900">CESAM Lab actuel</span><span className="block text-sm text-slate-600">Prototypes existants : données réelles, pas encore isolés.</span></span>
+        <span className="min-w-0 flex-1"><span className="block text-base font-bold text-slate-900">CESAM Lab</span><span className="block text-sm text-slate-600">Prototypes sur données fictives ; environnement complet à venir.</span></span>
         <ChevronRight size={20} className="shrink-0 text-slate-500" aria-hidden="true" />
       </Link>
     </div>

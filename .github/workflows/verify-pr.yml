@@ -37,3 +37,4 @@ jobs:
       - run: npm run test:field-weighing
       - run: node --test tests/ergonomie-phase1.test.mjs
       - run: node --test tests/coulisses-phase1.test.mjs
+      - run: node --test tests/coulisses-phase2.test.mjs
