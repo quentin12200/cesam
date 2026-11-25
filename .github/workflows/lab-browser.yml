@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   browser-lab:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -16,10 +16,11 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - run: npm install --prefix /tmp/cesam-playwright --no-save --package-lock=false @playwright/test@1.56.1
+      - run: ln -s /tmp/cesam-playwright/node_modules/@playwright node_modules/@playwright
       - run: npx prisma generate
-      - run: npm install --no-save --package-lock=false @playwright/test@1.56.1
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npx playwright test --config=playwright.lab.config.cjs
+      - run: /tmp/cesam-playwright/node_modules/.bin/playwright install --with-deps chromium webkit
+      - run: /tmp/cesam-playwright/node_modules/.bin/playwright test --config=playwright.lab.config.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
