@@ -70,8 +70,9 @@ export default function CoulissesPage() {
       ))}
       <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
         <h2 className="text-lg font-bold text-slate-900">À venir</h2>
-        <p className="text-sm text-slate-600">Contrôles transversaux de la reproduction, des pesées, du sanitaire et des effectifs ; historique centralisé des corrections. Ces diagnostics ne sont pas encore disponibles ici.</p>
+        <p className="text-sm text-slate-600">Contrôles transversaux de la reproduction, des pesées, du sanitaire et des effectifs. Ces diagnostics ne sont pas encore disponibles ici.</p>
       </section>
+      <Link href="/config/coulisses/historique" prefetch={false} className="flex min-h-11 min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3"><span className="min-w-0 flex-1"><span className="block font-bold">Historique des modifications</span><span className="block text-sm text-slate-600">Journal existant en lecture seule</span></span><ChevronRight size={20} className="shrink-0"/></Link>
       <Link href="/lab" prefetch={false} className="flex min-h-11 min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 focus-visible:ring-2 focus-visible:ring-green-700">
         <FlaskConical size={24} className="shrink-0 text-blue-700" aria-hidden="true" />
         <span className="min-w-0 flex-1"><span className="block text-base font-bold text-slate-900">CESAM Lab</span><span className="block text-sm text-slate-600">Prototypes sur données fictives ; environnement complet à venir.</span></span>
