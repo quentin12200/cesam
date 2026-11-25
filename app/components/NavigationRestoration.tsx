@@ -61,7 +61,12 @@ export default function NavigationRestoration() {
     if (sessionStorage.getItem(SCROLL_RESTORE_KEY) === "1") {
       sessionStorage.removeItem(SCROLL_RESTORE_KEY);
       const saved = Number(sessionStorage.getItem(key) ?? "0");
-      requestAnimationFrame(() => requestAnimationFrame(() => restorePosition(saved)));
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const hash = window.location.hash.slice(1);
+        const anchor = hash ? document.getElementById(decodeURIComponent(hash)) : null;
+        if (anchor) { anchor.scrollIntoView({block:"center"}); anchor.focus({preventScroll:true}); }
+        else restorePosition(saved);
+      }));
     }
 
     return () => {

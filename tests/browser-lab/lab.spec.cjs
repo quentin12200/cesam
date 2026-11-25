@@ -80,3 +80,16 @@ test("vêlage : filiation contradictoire et cycle postérieur",async({page})=>{
  await expect(page.getByText("Cycle ultérieur préservé",{exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
 });
+
+test("validation du père : retour au contexte et prochain contrôle",async({page})=>{
+ await page.goto("/lab");
+ const section=page.getByRole("region",{name:"Contrôle fictif des filiations"});
+ await section.getByLabel("Filtre de vérification").selectOption("tous");
+ await section.getByRole("button",{name:"Vérifier demo-1"}).click();
+ await section.getByLabel("Père à valider").selectOption("A");
+ await section.getByRole("button",{name:"Valider le père fictif"}).click();
+ await expect(section.getByText("2 filiations fictives restantes")).toBeVisible();
+ await expect(section.getByLabel("Filtre de vérification")).toHaveValue("tous");
+ await expect(section.locator("#filiation-demo-2")).toBeFocused();
+ await expect(section.getByRole("button",{name:"Vérifier demo-1"})).toHaveCount(0);
+});

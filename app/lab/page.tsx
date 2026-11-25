@@ -1,3 +1,4 @@
+import LabFatherAudit from "./LabFatherAudit";
 import LabCalvingPanel from "./LabCalvingPanel";
 import Link from "next/link";
 import LabExplorer from "./LabExplorer";
@@ -24,6 +25,7 @@ export default function CesamLabPage() {
     </nav>
     <LabExplorer animaux={animaux} echeances={echeances} />
     <LabCalvingPanel />
+    <LabFatherAudit />
     <Link href="/config" prefetch={false} className="inline-flex min-h-11 items-center font-bold underline">Quitter le Lab — paramètres réels</Link>
   </div>;
 }
