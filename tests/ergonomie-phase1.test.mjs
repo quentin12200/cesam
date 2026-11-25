@@ -30,3 +30,11 @@ test("accès mobile et généalogie visibles",()=>{
  assert.doesNotMatch(g,/hidden sm:inline[^\n]*sorti/);
  assert.match(read("app/velage/VelageFormWrapper.tsx"),/aria-label="Fermer le formulaire de vêlage"/);
 });
+
+test("mobile: long labels and weighing actions can wrap",()=>{
+ const home=read("app/page.tsx");
+ const block=home.slice(home.indexOf("{data.neverWeighedCount > 0 && ("),home.indexOf("{weaningThresholdNews.map",home.indexOf("{data.neverWeighedCount > 0 && (")));
+ assert.match(block,/flex-wrap/); assert.match(block,/w-full flex-wrap items-center gap-1 sm:w-auto/);
+ const med=read("app/pharmacie/PharmacieClient.tsx"); assert.match(med,/max-w-full break-words[^\n]*cat.bg/);
+ const genea=read("app/troupeau/genealogie/GeneaClient.tsx"); assert.match(genea,/max-w-full break-words[^\n]*node.pereNom/);
+});

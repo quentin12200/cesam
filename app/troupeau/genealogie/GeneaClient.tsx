@@ -146,7 +146,7 @@ function GeneaNode({
         <Link
           href={`/troupeau/${node.nutrav}`}
           className={`
-            ml-1 flex min-h-11 flex-wrap items-center gap-2 px-2.5 py-1.5 rounded-lg border text-sm
+            ml-1 flex min-h-11 min-w-0 flex-wrap items-center gap-2 px-2.5 py-1.5 rounded-lg border text-sm
             transition-all hover:shadow-md hover:scale-[1.02] active:scale-100
             ${style.badge}
             ${matchesSearch ? "ring-2 ring-yellow-400 ring-offset-1 shadow-yellow-100 shadow-md" : ""}
@@ -170,7 +170,7 @@ function GeneaNode({
 
           {/* Père */}
           {node.pereNom && (
-            <span className="text-xs opacity-80">× {node.pereNom}</span>
+            <span className="min-w-0 max-w-full break-words text-xs opacity-80">× {node.pereNom}</span>
           )}
 
           {/* Nb enfants */}

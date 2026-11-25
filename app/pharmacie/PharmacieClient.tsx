@@ -223,7 +223,7 @@ function MedicamentRow({ med, expanded, onToggle }: { med: MedicamentItem; expan
         </button>
         <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-2 text-left focus-visible:ring-2 focus-visible:ring-green-700">
         <span className="font-mono text-sm font-bold text-gray-800 break-all">{med.nom}</span>
-        <span className="text-xs px-1.5 py-0.5 rounded-full font-medium shrink-0" style={{ background: cat.bg, color: cat.text }}>
+        <span className="text-xs max-w-full break-words px-1.5 py-0.5 rounded-full font-medium" style={{ background: cat.bg, color: cat.text }}>
           {cat.label}
         </span>
         {med.dci && <span className="text-xs text-gray-500 truncate min-w-0 flex-1 hidden sm:inline">{med.dci}</span>}
