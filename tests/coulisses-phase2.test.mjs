@@ -19,3 +19,16 @@ test("real father tool retained in private Coulisses route", () => {
  assert.match(read("app/lab/LabFathers.tsx"), /method:"PATCH"/);
  assert.doesNotMatch(read("middleware.ts"), /"\/config(?:\/coulisses)?"/);
 });
+
+test("global settings opens the same Coulisses hub and retains existing settings", () => {
+ const panel = read("components/GlobalSettingsButton.tsx");
+ assert.match(panel, /href="\/config\/coulisses" prefetch=\{false\} onClick=\{\(\) => setOpen\(false\)\}/);
+ assert.match(panel, /href="\/lab"/);
+ assert.match(panel, /Prototypes sur données fictives/);
+ assert.doesNotMatch(panel, /Prototype en lecture seule|href="\/taureaux\/controle"/);
+ for (const item of ["IdentificationSettings", "PreconisationReferentielsSettings", "ouvrirHistorique", "setProfile", "/config/notifications", "/config/reproduction"]) assert.ok(panel.includes(item), item);
+ assert.match(panel, /min-h-12 min-w-0/);
+ assert.match(panel, /break-words/);
+ assert.match(panel, /aria-label="Fermer les paramètres"/);
+ assert.match(read("app/config/coulisses/page.tsx"), /href: "\/taureaux\/controle"/);
+});
