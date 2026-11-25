@@ -40,5 +40,6 @@ jobs:
       - run: node --test tests/coulisses-phase2.test.mjs
       - run: node --test --experimental-strip-types lib/calving-reproduction-reset.test.ts lib/velage-edit.test.ts
       - run: node --test tests/coulisses-history.test.mjs
+      - run: node --test --experimental-strip-types lib/coulisses-diagnostics.test.ts
       - run: node --test tests/lab-isolation.test.mjs
       - run: node --test --experimental-strip-types lib/lab-route.test.ts

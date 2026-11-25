@@ -12,7 +12,8 @@ test("hub has no database, mutation, API calls or unverified counters", () => {
   assert.doesNotMatch(page, /\b(?:prisma|fetch|useServer|onClick|formAction|process\.env)\b|<form|\/api\//);
   assert.match(page, /Cette page n’effectue aucune correction/);
   assert.match(page, /données fictives/);
-  assert.match(page, /ne sont pas encore disponibles/);
+  assert.match(page, /href="\/config\/coulisses\/diagnostics"/);
+  assert.ok(existsSync(new URL("../app/config/coulisses/diagnostics/page.tsx", import.meta.url)));
 });
 test("settings retain Lab and expose hub; hub retains back link and mobile sizing", () => {
   const settings = read("app/config/page.tsx");
@@ -27,4 +28,11 @@ test("settings retain Lab and expose hub; hub retains back link and mobile sizin
   assert.match(page, /focus-visible:ring-2/);
   assert.match(page, /prefetch=\{false\}/);
   assert.doesNotMatch(read("middleware.ts"), /"\/config(?:\/coulisses)?"/);
+});
+
+test("diagnostic page reads only, without mutation or automatic correction", () => {
+ const source = read("app/config/coulisses/diagnostics/page.tsx");
+ assert.match(source, /Lecture seule/);
+ assert.match(source, /detectFindings/);
+ assert.doesNotMatch(source, /\.(?:create|update|delete|upsert|executeRaw|createMany|updateMany|deleteMany)\s*\(|\$transaction|fetch\(|<form|onClick|useServer/);
 });
