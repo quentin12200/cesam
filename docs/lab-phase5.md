@@ -1,0 +1,2 @@
+# Lab phase 5 — isolation de l’interface
+Le Lab et les deux prototypes ne montent plus les fournisseurs, recherche, scanner, notifications et navigation de CESAM réel. La politique d’authentification reste inchangée. Ce n’est pas une isolation réseau ni un environnement de test autonome : les routes réelles demeurent accessibles après sortie volontaire. Les tests navigateur et un environnement sans secrets restent à construire. Aucune migration ou connexion à la base réelle.
