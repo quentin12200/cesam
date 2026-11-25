@@ -1,3 +1,4 @@
+import LabCalvingPanel from "./LabCalvingPanel";
 import Link from "next/link";
 import LabExplorer from "./LabExplorer";
 import { DEMO_WORKSPACE_ANIMALS } from "@/app/prototype-espace-travail/demo-data";
@@ -22,6 +23,7 @@ export default function CesamLabPage() {
       <Link href="/prototype-accueil-v3" prefetch={false} className="min-h-11 rounded-xl border bg-white p-3 text-sm font-bold">Prototype accueil V3</Link>
     </nav>
     <LabExplorer animaux={animaux} echeances={echeances} />
+    <LabCalvingPanel />
     <Link href="/config" prefetch={false} className="inline-flex min-h-11 items-center font-bold underline">Quitter le Lab — paramètres réels</Link>
   </div>;
 }
