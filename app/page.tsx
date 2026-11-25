@@ -933,7 +933,7 @@ export default async function Dashboard({ searchParams }: PageProps) {
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <Link href="/troupeau/pesee/jamais-peses" className="flex min-h-11 items-center px-2 text-sm font-bold text-amber-950 underline">Voir</Link>
-                  <Link href="/troupeau/pesee" className="hidden min-h-11 items-center px-2 text-xs font-semibold text-amber-900 underline sm:flex">Démarrer une pesée</Link>
+                  <Link href="/troupeau/pesee" className="flex min-h-11 items-center px-2 text-xs font-semibold text-amber-900 underline">Démarrer une pesée</Link>
                 </div>
               </div>
             )}

@@ -146,7 +146,7 @@ function GeneaNode({
         <Link
           href={`/troupeau/${node.nutrav}`}
           className={`
-            ml-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-sm
+            ml-1 flex min-h-11 flex-wrap items-center gap-2 px-2.5 py-1.5 rounded-lg border text-sm
             transition-all hover:shadow-md hover:scale-[1.02] active:scale-100
             ${style.badge}
             ${matchesSearch ? "ring-2 ring-yellow-400 ring-offset-1 shadow-yellow-100 shadow-md" : ""}
@@ -156,7 +156,7 @@ function GeneaNode({
           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${style.dot}`} />
 
           {/* Nutrav */}
-          <span className="font-mono font-bold text-xs">{node.nutrav}</span>
+          <span className="font-mono font-bold text-sm">{node.nutrav}</span>
 
           {/* Nom */}
           {node.nobovi && (
@@ -170,7 +170,7 @@ function GeneaNode({
 
           {/* Père */}
           {node.pereNom && (
-            <span className="text-[10px] opacity-50 hidden sm:inline">× {node.pereNom}</span>
+            <span className="text-xs opacity-80">× {node.pereNom}</span>
           )}
 
           {/* Nb enfants */}
@@ -182,7 +182,7 @@ function GeneaNode({
 
           {/* Sorti */}
           {node.statut === "SORTI" && (
-            <span className="text-[9px] opacity-50 line-through hidden sm:inline">sorti</span>
+            <span className="text-xs opacity-80 line-through">sorti</span>
           )}
         </Link>
       </div>
