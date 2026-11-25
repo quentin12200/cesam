@@ -1,3 +1,4 @@
+import { effectiveManualReproduction } from "@/lib/calving-reproduction-reset";
 import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
@@ -181,6 +182,7 @@ async function getDashboardData() {
         nutrav: true,
         nobovi: true,
         reproductionEtatManuel: true,
+        reproductionEtatModifieAt: true,
         chaleurs: {
           orderBy: { date: "desc" },
           take: 1,
@@ -231,7 +233,7 @@ async function getDashboardData() {
           animal.velagesVache[0]?.date ?? null,
           reproductionRules.heatReturnMonitoring,
           now,
-          animal.reproductionEtatManuel === "VERT" || animal.reproductionEtatManuel === "ROSE"
+          ["VERT", "ROSE"].includes(effectiveManualReproduction(animal.reproductionEtatManuel, animal.reproductionEtatModifieAt, animal.velagesVache[0]?.date ?? null) ?? "")
         ),
       }))
       .filter((item): item is typeof item & { reminder: NonNullable<typeof item.reminder> } => item.reminder !== null)
@@ -258,12 +260,12 @@ async function getDashboardData() {
       false,
       reproductionConfig?.reproReposObjectifJours ?? 60
     );
-    motherReproductionStatuses[vache.id] =
-      (vache.reproductionEtatManuel as EtatGestation | null) ?? etat;
+    const effective = effectiveManualReproduction(vache.reproductionEtatManuel as EtatGestation | null, vache.reproductionEtatModifieAt, dernierVelage) ?? etat;
+    motherReproductionStatuses[vache.id] = effective;
 
-    if (etat === "VERT" || etat === "ROSE") vachesPleine++;
+    if (effective === "VERT" || effective === "ROSE") vachesPleine++;
     if (vache.aEchographier) aEchographier++;
-    if (etat === "ROUGE") vachesVidesEnRetard++;
+    if (effective === "ROUGE") vachesVidesEnRetard++;
   }
 
   let veauxAVacciner = 0;

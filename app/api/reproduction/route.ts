@@ -1,3 +1,4 @@
+import { effectiveManualReproduction } from "@/lib/calving-reproduction-reset";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
@@ -94,6 +95,7 @@ export async function GET() {
   const result = vaches.map((v) => {
     const lastCalving = v.velagesVache[0]?.date ?? null;
     const currentBreeding = getCurrentCycleBreeding(v.saillies, lastCalving);
+    const manual = effectiveManualReproduction(v.reproductionEtatManuel, v.reproductionEtatModifieAt, lastCalving);
     const activeRequest = v.demandesEchographie[0] ?? null;
     const daysSinceBreeding = currentBreeding ? differenceInDays(now, currentBreeding.date) : null;
     const explicitControl = activeRequest?.origine === "MANUELLE";
@@ -142,8 +144,8 @@ export async function GET() {
     echoCountdown: echoStatus?.countdown ?? null,
     echoSortGroup: echoStatus?.sortGroup ?? null,
     echoDueDate: echoDueDate?.toISOString() ?? null,
-    reproductionEtatManuel: v.reproductionEtatManuel,
-    reproductionEtatPrecedent: v.reproductionEtatPrecedent,
+    reproductionEtatManuel: manual,
+    reproductionEtatPrecedent: manual === null ? null : v.reproductionEtatPrecedent,
     reproductionEtatModifieAt: v.reproductionEtatModifieAt?.toISOString() ?? null,
     estGenisse: v.estGenisse,
     categorie: v.categorie ?? null,
