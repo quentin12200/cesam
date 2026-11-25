@@ -12,7 +12,7 @@ test.beforeEach(async({context,page})=>{
  const violations=[];
  await context.route("**/*",async route=>{
   const u=new URL(route.request().url());
-  if(u.origin!==base||!(u.pathname==="/lab"||u.pathname==="/prototype-espace-travail"||u.pathname==="/prototype-accueil-v3"||u.pathname.startsWith("/_next/")||["/logo-cesam.jpg","/favicon.ico","/manifest.json"].includes(u.pathname))){violations.push(u.origin+u.pathname);return route.abort();}
+  if(u.origin!==base||!(u.pathname==="/lab"||u.pathname==="/prototype-espace-travail"||u.pathname==="/prototype-accueil-v3"||u.pathname.startsWith("/_next/")||/^\/__nextjs_font\/geist-[a-z-]+\.woff2$/.test(u.pathname)||["/logo-cesam.jpg","/favicon.ico","/manifest.json"].includes(u.pathname))){violations.push(u.origin+u.pathname);return route.abort();}
   return route.continue();
  });
  page.on("pageerror",error=>violations.push(error.message));

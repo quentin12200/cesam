@@ -3,3 +3,5 @@ Exécution dans un checkout propre sans fichiers .env : npm ci, npx prisma gener
 Le serveur écoute uniquement sur 127.0.0.1, utilise un environnement explicitement réduit et une signature de session locale fictive. Aucun secret GitHub ou Vercel n'est transmis. Aucun seed ni migration. Les tests bloquent les requêtes navigateur API et externes et échouent si elles surviennent. La garde TCP est une protection supplémentaire, pas une sandbox OS exhaustive. L'iPhone est émulé via WebKit, pas un appareil physique. Les tests portent sur les prototypes fictifs, pas sur les opérations métier réelles.
 
 La garde est héritée par les processus enfants via NODE_OPTIONS ; les sockets Unix et les connexions hors boucle locale sont bloquées. Les routes navigateur sont limitées aux prototypes et aux ressources statiques autorisées. Les polices distantes sont simulées pour le test. Ces protections ne constituent pas une sandbox OS.
+
+Les tests sont exécutés séquentiellement pour éviter les rechargements concurrents de Next en développement. Seules les ressources de police Geist locales précisément identifiées sont autorisées en complément des ressources existantes.
