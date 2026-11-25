@@ -925,15 +925,15 @@ export default async function Dashboard({ searchParams }: PageProps) {
               }} />
             )}
             {data.neverWeighedCount > 0 && (
-              <div className="flex min-h-14 items-center gap-3 rounded-lg border-l-4 border-l-amber-600 bg-amber-50 px-3 py-2">
+              <div className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border-l-4 border-l-amber-600 bg-amber-50 px-3 py-2">
                 <Scale size={20} className="shrink-0 text-amber-800" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-amber-950">Veaux jamais pesés</p>
                   <p className="text-xs text-amber-800">{data.neverWeighedCount} animaux de 10 mois ou plus</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto sm:shrink-0">
                   <Link href="/troupeau/pesee/jamais-peses" className="flex min-h-11 items-center px-2 text-sm font-bold text-amber-950 underline">Voir</Link>
-                  <Link href="/troupeau/pesee" className="hidden min-h-11 items-center px-2 text-xs font-semibold text-amber-900 underline sm:flex">Démarrer une pesée</Link>
+                  <Link href="/troupeau/pesee" className="flex min-h-11 items-center px-2 text-xs font-semibold text-amber-900 underline">Démarrer une pesée</Link>
                 </div>
               </div>
             )}

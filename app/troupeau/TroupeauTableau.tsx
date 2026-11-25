@@ -111,13 +111,13 @@ function SortHeader({
         if (!triAsc) { navigate("tri", "numero_asc"); return; }
         if (isDesc) navigate("tri", "numero_asc");
         else navigate("tri", isAsc ? triDesc : triAsc);
-      }} title={`Tri principal : ${label}`} className={`inline-flex min-w-0 items-center gap-1 hover:text-yellow-200 ${primary ? "text-yellow-300" : ""}`}>
+      }} title={`Tri principal : ${label}`} className={`inline-flex min-h-8 min-w-0 items-center gap-1 hover:text-yellow-200 focus-visible:outline focus-visible:outline-2 ${primary ? "text-yellow-300" : ""}`}>
         <span>{label}</span><span className="inline-block w-3 shrink-0 text-center text-[10px] leading-none">{isDesc ? "↓" : isAsc ? "↑" : "↕"}</span>
-        {primary && <span className="rounded bg-yellow-300 px-1 text-[9px] font-bold text-green-900 print:hidden">1</span>}
+        {primary && <span className="rounded bg-yellow-300 px-1 text-xs font-bold text-green-900 print:hidden">1</span>}
       </button>
       {multiSort && triAsc && !sameField && <button type="button" title={`Ajouter ${label} en tri secondaire ; recliquer pour inverser`}
         onClick={() => navigate("tri2", isSecondary ? secondary === triAsc ? triDesc : undefined : triAsc)}
-        className={`inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded px-1 text-[10px] print:hidden ${isSecondary ? "bg-yellow-300 text-green-900 font-bold" : "text-green-100/70 hover:bg-green-700"}`}>
+        className={`inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded px-1 text-[10px] print:hidden ${isSecondary ? "bg-yellow-300 text-green-900 font-bold" : "text-green-100/70 hover:bg-green-700"}`}>
         {isSecondary ? `2${secondary === triAsc ? "↑" : "↓"}` : "+"}
       </button>}
     </span>

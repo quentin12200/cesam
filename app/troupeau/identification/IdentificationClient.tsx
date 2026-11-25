@@ -79,7 +79,7 @@ export default function IdentificationClient({
     return (
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <Link href={`/troupeau/${veau.nutrav}`} className="font-mono text-sm font-bold text-green-800 hover:underline">
+          <Link href={`/troupeau/${veau.nutrav}`} className="inline-flex min-h-11 items-center font-mono text-base font-bold text-green-800 hover:underline">
             {veau.nutrav}
           </Link>
           <span className="truncate text-sm font-semibold text-gray-900">{veau.nobovi ?? "Sans nom"}</span>
@@ -88,14 +88,14 @@ export default function IdentificationClient({
           <span>{veau.ageJours} j</span>
           <span className="inline-flex items-center gap-1">
             <span className="font-bold text-gray-800">{veau.sexbov === "M" || veau.sexbov === "F" ? veau.sexbov : "?"}</span>
-            <button type="button" title="Modifier le sexe" aria-label={`Modifier le sexe de ${veau.nutrav}`} onClick={() => setEditingSex(editingSex === veau.id ? null : veau.id)} className="rounded p-1 text-gray-500 hover:bg-gray-100" disabled={loading !== null}><Pencil size={13} /></button>
+            <button type="button" title="Modifier le sexe" aria-label={`Modifier le sexe de ${veau.nutrav}`} onClick={() => setEditingSex(editingSex === veau.id ? null : veau.id)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100" disabled={loading !== null}><Pencil size={13} /></button>
           </span>
           {veau.mereNutrav && <span>Mère <strong className="text-base font-bold text-gray-900">{veau.mereNutrav}</strong>{veau.mereNom ? ` — ${veau.mereNom}` : ""}</span>}
         </div>
         {editingSex === veau.id && (
           <div className="mt-2 flex gap-2" role="group" aria-label="Choisir le sexe du veau">
             {(["M", "F"] as const).map((sexe) => (
-              <button key={sexe} type="button" disabled={loading !== null} onClick={() => updateSexe(veau, sexe)} className={`rounded-lg border px-3 py-1.5 text-sm font-bold disabled:opacity-50 ${veau.sexbov === sexe ? "border-green-700 bg-green-50 text-green-800" : "border-gray-300 text-gray-700"}`}>{sexe}</button>
+              <button key={sexe} type="button" disabled={loading !== null} onClick={() => updateSexe(veau, sexe)} className={`min-h-11 min-w-11 rounded-lg border px-3 py-2 text-sm font-bold disabled:opacity-50 ${veau.sexbov === sexe ? "border-green-700 bg-green-50 text-green-800" : "border-gray-300 text-gray-700"}`}>{sexe}</button>
             ))}
           </div>
         )}
@@ -128,7 +128,7 @@ export default function IdentificationClient({
                   type="button"
                   disabled={loading === veau.id}
                   onClick={() => updateBouclage(veau, true)}
-                  className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg bg-violet-100 px-3 text-xs font-bold text-violet-800 hover:bg-violet-200 disabled:opacity-50"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-violet-100 px-3 text-xs font-bold text-violet-800 hover:bg-violet-200 disabled:opacity-50"
                 >
                   <Check size={15} />
                   {loading === veau.id ? "…" : "Bouclé"}
@@ -151,7 +151,7 @@ export default function IdentificationClient({
                 <AnimalIdentity veau={veau} />
                 <div className="shrink-0 text-right">
                   {veau.dateBouclage && (
-                    <p className="mb-1 text-[10px] text-gray-400">
+                    <p className="mb-1 text-xs text-gray-600">
                       {new Date(veau.dateBouclage).toLocaleDateString("fr-FR")}
                     </p>
                   )}
@@ -161,7 +161,7 @@ export default function IdentificationClient({
                     onClick={() => updateBouclage(veau, false)}
                     aria-label={`Corriger le statut de ${veau.nutrav}`}
                     title="Remettre à boucler"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-violet-700 disabled:opacity-50"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-violet-700 disabled:opacity-50"
                   >
                     <Pencil size={15} />
                   </button>

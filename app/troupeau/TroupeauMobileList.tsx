@@ -94,7 +94,7 @@ export default function TroupeauMobileList({
         <button
           type="button"
           onClick={() => setSettingsOpen((open) => !open)}
-          className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm"
           aria-expanded={settingsOpen}
         >
           <Settings2 size={15} /> Affichage
@@ -108,7 +108,7 @@ export default function TroupeauMobileList({
             <button
               type="button"
               onClick={() => setSettingsOpen(false)}
-              className="grid min-h-9 min-w-9 place-items-center rounded-lg text-gray-500"
+              className="grid min-h-11 min-w-11 place-items-center rounded-lg text-gray-500"
               aria-label="Fermer les réglages d’affichage"
             >
               <X size={17} />
@@ -122,7 +122,7 @@ export default function TroupeauMobileList({
                   key={option.key}
                   type="button"
                   onClick={() => toggleVisible(option.key)}
-                  className={`min-h-9 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  className={`min-h-11 rounded-full border px-3 py-1.5 text-xs font-semibold ${
                     active
                       ? "border-green-700 bg-green-700 text-white"
                       : "border-gray-200 bg-gray-50 text-gray-600"
@@ -146,7 +146,7 @@ export default function TroupeauMobileList({
                   key={value}
                   type="button"
                   onClick={() => savePreferences({ ...preferences, gestation: value })}
-                  className={`min-h-9 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                  className={`min-h-11 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
                     preferences.gestation === value
                       ? "border-green-700 bg-green-50 text-green-800"
                       : "border-gray-200 text-gray-600"
@@ -162,7 +162,7 @@ export default function TroupeauMobileList({
           <button
             type="button"
             onClick={() => savePreferences(copyDefaultPreferences())}
-            className="mt-3 min-h-9 text-xs font-semibold text-green-700 underline-offset-2 hover:underline"
+            className="mt-3 min-h-11 text-xs font-semibold text-green-700 underline-offset-2 hover:underline"
           >
             Réinitialiser l’affichage
           </button>
@@ -194,7 +194,7 @@ export default function TroupeauMobileList({
         return (
           <article key={animal.id} className={`rounded-xl border bg-white px-3 py-2 shadow-sm ${expandedId === animal.id ? "border-green-300" : "border-transparent"}`}>
             <div className="flex items-center gap-2">
-              <Link href={`/troupeau/${animal.nutrav}`} className="flex min-h-10 min-w-0 flex-1 items-center gap-2">
+              <Link href={`/troupeau/${animal.nutrav}`} className="flex min-h-11 min-w-0 flex-1 items-center gap-2">
                 <NutravBadge nutrav={animal.nutrav} className="!bg-emerald-600" />
                 <span className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900">
                   {animal.nobovi ?? <span className="font-medium italic text-gray-400">Sans nom</span>}
@@ -205,7 +205,7 @@ export default function TroupeauMobileList({
               {animal.statut === "ACTIF" && <button type="button" aria-label={`Actions pour ${animal.nutrav}`}
                 aria-expanded={expandedId === animal.id}
                 onClick={() => setExpandedId((current) => current === animal.id ? null : animal.id)}
-                className="flex min-h-10 items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 text-xs font-semibold text-green-800">
+                className="flex min-h-11 items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 text-xs font-semibold text-green-800">
                 Actions {expandedId === animal.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
               </button>}
             </div>

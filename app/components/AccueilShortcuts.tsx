@@ -173,7 +173,7 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
     <section data-layout-section="accueil-actions-rapides" data-layout-label="Actions rapides" className="space-y-1.5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-bold text-gray-800">Actions rapides</h2>
-        <button type="button" onClick={ouvrir} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-600 hover:bg-gray-50">
+        <button type="button" onClick={ouvrir} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-600 hover:bg-gray-50">
           <Plus size={15} /> Gérer
         </button>
       </div>
@@ -257,7 +257,7 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
                       />
                       <Icon size={17} className="shrink-0 text-green-700" />
                       <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800">{item.label}</span>
-                      <button type="button" onClick={() => retirer(id)} className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-red-600 hover:bg-red-50"><Check size={15} /> Retirer</button>
+                      <button type="button" onClick={() => retirer(id)} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-red-600 hover:bg-red-50"><Check size={15} /> Retirer</button>
                     </div>
                   );
                 })}

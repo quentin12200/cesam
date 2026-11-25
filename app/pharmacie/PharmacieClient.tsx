@@ -217,27 +217,28 @@ function MedicamentRow({ med, expanded, onToggle }: { med: MedicamentItem; expan
 
   return (
     <div className={`bg-white rounded-xl shadow border overflow-hidden ${!med.actif ? "opacity-50" : ""}`}>
-      <button type="button" onClick={onToggle} className="w-full flex items-center gap-2 px-3 py-2.5 text-left">
-        <button type="button" onClick={toggleFavori} disabled={favBusy} className="shrink-0" aria-label="Favori">
+      <div className="flex items-start gap-1 px-2 py-1">
+        <button type="button" onClick={toggleFavori} disabled={favBusy} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-green-700" aria-label={`Favori : ${med.nom}`} aria-pressed={med.favori}>
           <Star size={17} className={med.favori ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} />
         </button>
-        <span className="font-mono text-sm font-bold text-gray-800 shrink-0">{med.nom}</span>
-        <span className="text-xs px-1.5 py-0.5 rounded-full font-medium shrink-0" style={{ background: cat.bg, color: cat.text }}>
+        <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-2 text-left focus-visible:ring-2 focus-visible:ring-green-700">
+        <span className="font-mono text-sm font-bold text-gray-800 break-all">{med.nom}</span>
+        <span className="text-xs max-w-full break-words px-1.5 py-0.5 rounded-full font-medium" style={{ background: cat.bg, color: cat.text }}>
           {cat.label}
         </span>
         {med.dci && <span className="text-xs text-gray-500 truncate min-w-0 flex-1 hidden sm:inline">{med.dci}</span>}
         {med.prescriptionRequise && (
-          <span className="text-xs text-red-600 font-medium shrink-0 hidden md:inline">Ordonnance requise</span>
+          <span className="text-xs text-red-700 font-semibold">Ordonnance requise</span>
         )}
         <span className="ml-auto flex items-center gap-1 text-xs text-gray-400 shrink-0">
-          Voir plus <ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
+          {expanded ? "Voir moins" : "Voir plus"} <ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
         </span>
       </button>
+      </div>
 
       {expanded && (
         <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/60 space-y-3 text-sm">
           {med.dci && <p className="text-xs text-gray-500 sm:hidden">{med.dci}</p>}
-          {med.prescriptionRequise && <p className="text-xs text-red-600 font-medium md:hidden">Ordonnance requise</p>}
 
           {actionsList.length > 0 && (
             <div>
@@ -284,22 +285,22 @@ function MedicamentRow({ med, expanded, onToggle }: { med: MedicamentItem; expan
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-400">Stock :</span>
               <button type="button" onClick={() => adjustStock(-1)}
-                className="w-6 h-6 flex items-center justify-center bg-white border rounded text-gray-600 hover:bg-gray-100 text-sm font-bold">−</button>
+                className="min-w-11 min-h-11 flex items-center justify-center bg-white border rounded text-gray-600 hover:bg-gray-100 text-sm font-bold">−</button>
               <span className={`text-xs min-w-[48px] text-center ${stockBas ? "text-red-600 font-semibold" : "text-gray-600"}`}>
                 {med.stockActuel} {med.stockUnite ?? "u"}{stockBas && " ⚠"}
               </span>
               <button type="button" onClick={() => adjustStock(1)}
-                className="w-6 h-6 flex items-center justify-center bg-white border rounded text-gray-600 hover:bg-gray-100 text-sm font-bold">+</button>
+                className="min-w-11 min-h-11 flex items-center justify-center bg-white border rounded text-gray-600 hover:bg-gray-100 text-sm font-bold">+</button>
             </div>
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">
             <Link href={`/pharmacie/${med.id}`}
-              className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-white">
+              className="inline-flex min-h-11 items-center text-sm px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white">
               Consulter la fiche complète
             </Link>
             <Link href={hrefWithOrigin(`/sanitaire/nouvel-evenement?medicament=${med.id}`)}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              className="flex min-h-11 items-center gap-1 text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               <Stethoscope size={12} /> Créer un événement sanitaire avec ce médicament
             </Link>
           </div>
