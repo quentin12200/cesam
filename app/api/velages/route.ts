@@ -7,6 +7,7 @@ import {
   obtenirNumerosIdentificationUtilises,
 } from "@/lib/lot-boucles";
 import { consumesLoopNumber } from "@/lib/velage-safety";
+import { shouldResetReproductionAtCalving, automaticReproductionReset } from "@/lib/calving-reproduction-reset";
 import { motherUpdateAfterCalving } from "@/lib/herd-renewal";
 
 type VeauSaisi = { nutrav?: string; nunati?: string; sexe?: "M" | "F"; nom?: string; statut?: "VIVANT" | "MORT_NE" };
@@ -29,6 +30,8 @@ export async function POST(request: NextRequest) {
     const prevDateTarie = vache.dateTarie;
     const prevCategorie = vache.categorie;
     const prevEstGenisse = vache.estGenisse;
+    const calvingDate = new Date(date);
+    if (!Number.isFinite(calvingDate.getTime())) return NextResponse.json({ error: "Date de vêlage invalide" }, { status: 400 });
     const isFirstCalving = vache._count.velagesVache === 0;
     const identificationConfig = await prisma.exploitationConfig.findUnique({ where: { id: "singleton" } });
     const lotActif = await obtenirLotBouclesActif();
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
     // Précontrôle avant toute écriture : une filiation déjà confirmée ne doit pas
     // être remplacée, même si l'enregistrement du vêlage échoue ensuite.
     const gestationPrecontrole = await prisma.gestation.findFirst({
-      where: { saillie: { animalId: vache.id }, etat: { in: ["VERT", "GRIS", "ROSE"] } },
+      where: { saillie: { animalId: vache.id, date: { lte: calvingDate } }, velage: { is: null }, etat: { in: ["VERT", "GRIS", "ROSE"] } },
       include: { saillie: { include: { taureau: true } } },
       orderBy: { createdAt: "desc" },
     });
@@ -81,7 +84,14 @@ export async function POST(request: NextRequest) {
     const resolus: { saisi: VeauSaisi; animalId: string | null; cree: boolean; precedent?: { sexbov: string; nobovi: string | null; mereId: string | null; danais: Date | null; numeroNational: string | null; taureauId: string | null } }[] = [];
     const gestation = gestationPrecontrole;
     const pereRetenu = pereSelectionne;
+    let resetReproduction = false;
     const velage = await prisma.$transaction(async (tx) => {
+      const [lastCalving, latestBreeding, motherNow] = await Promise.all([
+        tx.velage.findFirst({ where: { vacheId: vache.id }, orderBy: { date: "desc" }, select: { date: true } }),
+        tx.saillie.findFirst({ where: { animalId: vache.id }, orderBy: { date: "desc" }, select: { date: true } }),
+        tx.animal.findUniqueOrThrow({ where: { id: vache.id }, select: { reproductionEtatModifieAt: true } }),
+      ]);
+      resetReproduction = shouldResetReproductionAtCalving(calvingDate, lastCalving?.date ?? null, latestBreeding?.date ?? null, motherNow.reproductionEtatModifieAt);
       for (const saisi of veaux) {
         if (saisi.statut === "MORT_NE" || !saisi.nutrav) { resolus.push({ saisi, animalId: null, cree: false }); continue; }
         const dejaLie = await tx.veauVelage.findFirst({ where: { animal: { nutrav: saisi.nutrav } }, include: { velage: true } });
@@ -107,7 +117,7 @@ export async function POST(request: NextRequest) {
       const cree = await tx.velage.create({ data: {
         vacheId: vache.id, veauId: premierVivant?.animalId ?? null, date: new Date(date), moment: moment?.trim() || null, qualificatif,
         sousType: sousType ?? (qualificatif === "NORMAL" ? "SEULE" : null), capteur: capteur ?? null,
-        pereNom: pereRetenu?.nopere ?? pereNom ?? null, pereNunati: pereRetenu?.nupere ?? gestation?.saillie.taureau?.nupere ?? null,
+        pereNom: pereRetenu?.nopere ?? pereNom ?? gestation?.saillie.taureau?.nopere ?? null, pereNunati: pereRetenu?.nupere ?? gestation?.saillie.taureau?.nupere ?? null,
         jumeaux: veaux.length === 2, nombreVeaux: veaux.length, gestationId: gestation?.id ?? null, notes: notes?.trim() || null,
         veauxDetails: { create: resolus.map((v) => ({ animalId: v.animalId, nutrav: v.saisi.nutrav ?? null, nunati: v.saisi.nunati ?? null, nom: v.saisi.nom ?? null, sexe: v.saisi.sexe ?? null, statut: v.saisi.statut ?? "VIVANT" })) },
       } });
@@ -119,7 +129,7 @@ export async function POST(request: NextRequest) {
       if (gestation) await tx.gestation.update({ where: { id: gestation.id }, data: { etat: "VELAGE" } });
       await tx.animal.update({
         where: { id: vache.id },
-        data: { tarieFaite: false, dateTarie: null, ...motherUpdateAfterCalving(isFirstCalving) },
+        data: { tarieFaite: false, dateTarie: null, ...motherUpdateAfterCalving(isFirstCalving), ...(resetReproduction ? automaticReproductionReset : {}) },
       });
       return cree;
     });
@@ -148,7 +158,7 @@ export async function POST(request: NextRequest) {
     }
     let undoId = "";
     try {
-      const ops: import("@/lib/action-log").RevertStep[] = [{ op: "delete", model: "velage", id: velage.id }, { op: "update", model: "animal", where: { nutrav: vacheNutrav }, data: { tarieFaite: prevTarieFaite, dateTarie: prevDateTarie?.toISOString() ?? null, categorie: prevCategorie, estGenisse: prevEstGenisse } }];
+      const ops: import("@/lib/action-log").RevertStep[] = [{ op: "delete", model: "velage", id: velage.id }, { op: "update", model: "animal", where: { nutrav: vacheNutrav }, data: { tarieFaite: prevTarieFaite, dateTarie: prevDateTarie?.toISOString() ?? null, categorie: prevCategorie, estGenisse: prevEstGenisse, ...(resetReproduction ? { reproductionEtatManuel: vache.reproductionEtatManuel, reproductionEtatPrecedent: vache.reproductionEtatPrecedent, reproductionEtatModifieAt: vache.reproductionEtatModifieAt?.toISOString() ?? null } : {}) } }];
       for (const v of resolus) {
         if (v.cree && v.animalId) ops.push({ op: "delete", model: "animal", id: v.animalId });
         else if (v.precedent && v.saisi.nutrav) ops.push({ op: "update", model: "animal", where: { nutrav: v.saisi.nutrav }, data: { ...v.precedent, danais: v.precedent.danais?.toISOString() ?? null } });

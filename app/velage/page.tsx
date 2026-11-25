@@ -134,7 +134,7 @@ export default async function VelagePage({ searchParams }: { searchParams: Promi
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {velage.qualificatif === "AVORTEMENT" ? "Aucun veau" : velage.veauxDetails.length > 0
-                      ? velage.veauxDetails.map((v, i) => <span key={v.id} className="block">Veau {i + 1}: {v.animal?.nobovi ?? v.nutrav ?? v.nom ?? "sans numéro"} ({v.sexe ?? "sexe inconnu"}) — {v.statut === "MORT_NE" ? "mort-né" : "vivant"}</span>)
+                      ? velage.veauxDetails.map((v, i) => <div key={v.id} className="flex flex-wrap items-center gap-2"><span>Veau {i + 1}:</span>{v.statut === "MORT_NE" ? <Link href={`/velage/veau/${v.id}`} className="inline-flex min-h-11 items-center font-semibold underline">{v.nom ?? v.nutrav ?? "Sans numéro"} · Mort-né</Link> : v.animal ? <Link href={`/troupeau/${v.animal.nutrav}`} className="inline-flex min-h-11 items-center text-green-800 underline">{v.animal.nutrav} · {v.animal.nobovi ?? "Sans nom"}</Link> : <span>{v.nutrav ?? v.nom ?? "sans numéro"} · Vivant</span>}<span>({v.sexe ?? "sexe inconnu"})</span></div>)
                       : velage.veau ? `Veau: ${velage.veau.nobovi ?? velage.veau.nutrav} (${velage.veau.sexbov})` : "Veau non renseigné"}
                     {velage.capteur && <span className="block">Capteur utilisé : {velage.capteur}</span>}
                   </div>
