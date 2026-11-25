@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import { effectiveManualReproduction } from "@/lib/calving-reproduction-reset";
+import { readGridProtocols, projectGridProtocols } from "@/lib/vaccine-grid-protocols";
+import { construireGrilleVaccinale, extraireActionsPrevues } from "@/lib/vaccine-grid";
+import type { StatutProtocoleVaccinal } from "@/lib/vaccine-planner";
 import DescendantGrowthChart, { type GrowthPoint, type GrowthReference, type DeathMarker } from "./DescendantGrowthChart";
 import {
   formatAge,
@@ -191,6 +195,7 @@ async function getAnimal(nutrav: string, onglet: string) {
         orderBy: { createdAt: "desc" },
         take: 1,
       },
+      statutsProtocolesVaccinaux: { select: { protocoleId: true, statut: true, brancheInitialeId: true } },
       sortie: true,
     },
   });
@@ -313,7 +318,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
   const etat: EtatGestation | null =
     animal.sexbov === "F"
-      ? (animal.reproductionEtatManuel as EtatGestation | null) ?? getEtatGestation(
+      ? effectiveManualReproduction(animal.reproductionEtatManuel as EtatGestation | null, animal.reproductionEtatModifieAt, lastCalving) ?? getEtatGestation(
           currentBreeding?.date ?? null,
           currentBreeding?.gestation?.etat ?? null,
           currentBreeding?.gestation?.dateVelagePrevue ?? null,
@@ -350,6 +355,24 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
   const protocolSteps = getVaccinProtocolSteps(animal.danais, actesVaccinaux, protocoles);
   const mheStatus = isMheVendable(actesVaccinaux);
+  const gridProtocols = animal.statut === "ACTIF" && onglet === "identite" ? projectGridProtocols(await readGridProtocols()) : [];
+  const currentGestation = currentBreeding?.gestation;
+  const confirmedGestation = currentGestation && ["VERT", "ROSE"].includes(currentGestation.etat) ? currentGestation : null;
+  const vaccineGrid = construireGrilleVaccinale([{
+    id: animal.id, nutrav: animal.nutrav, nom: animal.nobovi, sexe: animal.sexbov, danaisIso: animal.danais.toISOString(),
+    categorie: getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie),
+    nombreVelages: animal.velagesVache.length, groupeNom: animal.groupe?.nom ?? null,
+    gestationId: confirmedGestation?.id ?? null, dateVelagePrevueIso: confirmedGestation?.dateVelagePrevue?.toISOString() ?? null,
+    statutsProtocoles: animal.statutsProtocolesVaccinaux.map(s => ({ ...s, statut: s.statut as StatutProtocoleVaccinal })),
+    actes: actesVaccinaux,
+  }], gridProtocols, []);
+  const vaccineActions = extraireActionsPrevues(vaccineGrid);
+  const vaccineCells = Object.values(vaccineGrid.lignes[0]?.cellules ?? {});
+  const vaccinesDue = vaccineActions.some(a => a.statut === "A_FAIRE" || a.statut === "EN_RETARD");
+  const vaccinesUncertain = vaccineCells.some(c => c.aValider || c.motifSansEcheance === "CALCUL_A_CONFIRMER" || c.motifSansEcheance === "ACQUIS_SANS_PREUVE");
+  const vaccineStatus = vaccinesDue ? "Non à jour" : vaccinesUncertain ? "À vérifier" : vaccineCells.some(c => c.statut !== "VIDE") ? "À jour selon le planning" : "Aucune échéance calculable";
+  const recentTreatments = animal.traitements.filter(t => t.dateDebut <= new Date() && t.statut !== "ANNULE").slice(0,3);
+
   const affichageDelaiAttente = configAffichage.affichageDelaiAttente;
   const testReproEnabled = animal.nutrav === "0000" && testRepro === "1";
   const reproductiveCycleProps = {
@@ -415,13 +438,15 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               <span className="shrink-0 rounded-lg bg-green-700 px-2.5 py-1 font-mono text-xl font-bold leading-tight text-white sm:text-2xl">
                 {animal.nutrav}
               </span>
-              <h2 className="truncate text-lg font-bold text-gray-900 sm:text-2xl">{animal.nobovi ?? "Sans nom"}</h2>
+              <h2 className="min-w-0 break-words text-lg font-bold text-gray-900 sm:text-2xl">{animal.nobovi ?? "Sans nom"}</h2>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getCategorieColor(getCategorie(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie))}`}>
                 {getCategorieLabel(animal.sexbov, animal.danais, animal.estGenisse, animal.categorie)}
               </span>
               <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">{formatAge(animal.danais)}</span>
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">{animal.sexbov === "F" ? "Femelle" : "Mâle"}</span>
+              {etat && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${getBadgeClass(etat)}`}>{getEtatLabel(etat)}</span>}
               {animal.demandesEchographie.length > 0 && (
                 <EchoStatusBadge
                   nutrav={animal.nutrav}
@@ -434,7 +459,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-600">{animal.statut}</span>
               )}
             </div>
-            <p className="mt-1.5 break-all font-mono text-[11px] text-gray-400 sm:text-xs">
+            <p className="mt-1.5 break-all font-mono text-sm text-gray-700">
               N° national : {animal.numeroNational ?? "à compléter"}
             </p>
           </div>
@@ -538,6 +563,14 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
         {/* ─── ONGLET IDENTITÉ ─── */}
         {onglet === "identite" && (
           <>
+            <section className="rounded-xl bg-white p-3 shadow space-y-2">
+              <h3 className="font-bold text-gray-900">Santé &amp; traitements</h3>
+              {animal.statut === "ACTIF" && <p className={`text-sm font-semibold ${vaccinesDue ? "text-red-700" : vaccinesUncertain ? "text-amber-800" : "text-gray-700"}`}>Vaccination : {vaccineStatus}</p>}
+              {recentTreatments.length ? recentTreatments.map(t => <p key={t.id} className="text-sm break-words">{formatDate(t.dateDebut)} · {t.medicamentNom} · {t.statut}</p>) : <p className="text-sm text-gray-600">Aucun traitement récent enregistré.</p>}
+              <h4 className="text-sm font-semibold">Échéances vaccinales</h4>
+              {vaccineActions.length ? [...vaccineActions].sort((a,b) => a.dateMin.getTime()-b.dateMin.getTime()).slice(0,3).map(a => <p key={`${a.protocoleId}-${a.etapeId}-${a.dateMin.toISOString()}`} className="text-sm break-words">{a.medicamentNom ?? a.etapeLabel} · {formatDate(a.dateMin)} · {a.statut.replaceAll("_", " ")}</p>) : <p className="text-sm text-gray-600">Aucune échéance vaccinale affichée.</p>}
+              <Link href={tabHref("sante")} className="inline-flex min-h-11 items-center font-semibold text-green-800 underline">Voir le suivi sanitaire complet</Link>
+            </section>
             {/* Identité */}
             <div className="bg-white rounded-xl shadow overflow-hidden">
               <dl className="grid grid-cols-2">
@@ -660,7 +693,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
             {/* Parenté : une seule présentation des parents et de la naissance. */}
             <div className="bg-white rounded-xl shadow p-3">
-              <h3 className="font-semibold text-gray-800 mb-1">Parenté</h3>
+              <h3 className="font-semibold text-gray-800 mb-1">Filiation &amp; vêlages</h3>
+              {animal.velagesVache.length > 0 && <Link href={tabHref("reproduction")+"#historique-velages"} className="inline-flex min-h-11 items-center text-sm font-semibold text-green-800 underline">Historique des vêlages ({animal.velagesVache.length})</Link>}
               <div className="space-y-1.5 text-sm">
                 {/* Mère */}
                 <div className="flex min-h-11 items-center justify-between gap-3">
@@ -1049,7 +1083,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
             {/* Historique vélages + IVV */}
             {animal.velagesVache.length > 0 && (
-              <div className="bg-white rounded-xl shadow p-4">
+              <div id="historique-velages" className="scroll-mt-24 bg-white rounded-xl shadow p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                     <Baby size={16} className="text-pink-500" />
@@ -1120,10 +1154,12 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                             {veauxAffiches.map((veau, index) => (
                               <div
                                 key={veau.key}
-                                className={`flex items-center gap-2 text-xs text-gray-600 ${numeroterVeaux ? "" : "flex-wrap"}`}
+                                className="flex flex-wrap items-center gap-2 text-sm text-gray-700"
                               >
                                 {numeroterVeaux && <span>Veau {index + 1}:</span>}
-                                {veau.animal ? (
+                                {veau.statut === "MORT_NE" ? (
+                                  <Link href={`/velage/veau/${veau.key}`} className="inline-flex min-h-11 items-center font-semibold text-gray-800 underline">Fiche mort-né · {veau.nutrav ?? veau.nom ?? "sans numéro"}</Link>
+                                ) : veau.animal ? (
                                   <Link
                                     href={`/troupeau/${veau.animal.nutrav}`}
                                     className={numeroterVeaux
