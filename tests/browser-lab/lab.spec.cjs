@@ -16,6 +16,7 @@ test.beforeEach(async({context,page})=>{
   return route.continue();
  });
  page.on("pageerror",error=>violations.push([error.message,error.stack].filter(Boolean).join("\n")));
+ page.on("response",response=>{if(response.request().resourceType()==="script"&&!response.ok()&&response.status()!==304)violations.push("Script HTTP "+response.status()+" "+response.url());});
  page.__violations=violations;
 });
 test.afterEach(async({page})=>{expect(page.__violations).toEqual([]);});
