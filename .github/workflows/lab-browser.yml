@@ -1,0 +1,29 @@
+name: Lab browser tests
+on:
+  pull_request:
+    branches: [principal]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm install --no-save --package-lock=false @playwright/test@1.56.1
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npx playwright test --config=playwright.lab.config.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lab-browser-report
+          path: |
+            playwright-report/
+            test-results/
