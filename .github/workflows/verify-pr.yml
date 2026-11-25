@@ -38,3 +38,4 @@ jobs:
       - run: node --test tests/ergonomie-phase1.test.mjs
       - run: node --test tests/coulisses-phase1.test.mjs
       - run: node --test tests/coulisses-phase2.test.mjs
+      - run: node --test --experimental-strip-types lib/coulisses-diagnostics.test.ts
