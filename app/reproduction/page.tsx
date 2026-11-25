@@ -1,5 +1,7 @@
 "use client";
 
+import { effectiveManualReproduction } from "@/lib/calving-reproduction-reset";
+
 import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { differenceInDays, addDays } from "date-fns";
@@ -518,7 +520,7 @@ function ReproductionContent() {
   // ── Computed ──
   const vachesAvecEtat = vaches.map((v) => ({
     ...v,
-    etat: v.reproductionEtatManuel ?? getEtatGestation(
+    etat: effectiveManualReproduction(v.reproductionEtatManuel, v.reproductionEtatModifieAt ? new Date(v.reproductionEtatModifieAt) : null, v.dernierVelage ? new Date(v.dernierVelage) : null) ?? getEtatGestation(
       v.derniereSaillie ? new Date(v.derniereSaillie) : null,
       v.gestationEtat,
       v.dateVelagePrevue ? new Date(v.dateVelagePrevue) : null,

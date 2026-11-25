@@ -621,3 +621,24 @@ test("le formulaire propose les prochaines vaches à vêler sans remplacer la sa
   assert.match(form, /suggestion\.dateVelagePrevue/);
   assert.match(form, /setSuggestionsOpen\(false\)/);
 });
+
+ test("jumeau mort-né sans aucun numéro : identité historique stable et aucun animal supplémentaire", async () => {
+ const seed = initialState();
+ seed.lot = { id: "lot1", premierNunati: "FR2001", quantite: 10, prochainIndex: 1, actif: true, createdAt: new Date() };
+ const db = createDatabase(seed);
+ await editVelage("v1", editInput({ veaux: [...editInput().veaux, { nutrav: "", nunati: "", nom: "Historique", sexe: "M", statut: "MORT_NE" }] }), db as never, fakeInspect as never);
+ const detail = db.state.details.find(d => d.statut === "MORT_NE")!;
+ assert.ok(detail.id);
+ assert.equal(detail.animalId, null);
+ assert.equal(detail.nutrav, null);
+ assert.equal(detail.nunati, null);
+ assert.equal(db.state.animals.length, 1);
+ assert.equal(db.state.velage?.veauId, "a1");
+ assert.equal(db.state.velage?.nombreVeaux, 2);
+ assert.equal(db.state.velage?.jumeaux, true);
+ assert.equal(db.state.lot?.prochainIndex, 1);
+ await editVelage("v1", editInput({ veaux: [...editInput().veaux, { detailId: detail.id, animalId: null, nutrav: "", nunati: "", nom: "Historique", sexe: "M", statut: "MORT_NE" }] }), db as never, fakeInspect as never);
+ assert.equal(db.state.details.length, 2);
+ assert.equal(db.state.details.find(d => d.statut === "MORT_NE")?.id, detail.id);
+ assert.equal(db.state.animals.length, 1);
+});

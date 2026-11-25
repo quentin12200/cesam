@@ -1,3 +1,4 @@
+import { effectiveManualReproduction } from "@/lib/calving-reproduction-reset";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -109,6 +110,7 @@ async function getAnimaux(params: TroupeauFilterParams & { tri2?: string; multi?
           select: { origine: true, motif: true, etat: true },
         },
         reproductionEtatManuel: true,
+        reproductionEtatModifieAt: true,
         reproductionEtatPrecedent: true,
         groupe: { select: { id: true, nom: true, couleur: true } },
         saillies: {
@@ -259,6 +261,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
 
   const tableauAnimaux = animaux.map<AnimalRow>((animal) => {
     const dernierVelage = animal.velagesVache[0];
+    const manual = effectiveManualReproduction(animal.reproductionEtatManuel, animal.reproductionEtatModifieAt, dernierVelage?.date ?? null);
     const reproductionSummary = getCurrentReproductionSummary(
       animal.saillies,
       dernierVelage?.date ?? null,
@@ -307,11 +310,11 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       estGenisse: animal.estGenisse,
       aEchographier: belongsToEchoActionList({
         aEchographier: animal.aEchographier,
-        reproductionEtatManuel: animal.reproductionEtatManuel,
+        reproductionEtatManuel: manual,
         demandesEchographie: animal.demandesEchographie,
       }),
-      reproductionEtatManuel: animal.reproductionEtatManuel as AnimalRow["reproductionEtatManuel"],
-      reproductionEtatPrecedent: animal.reproductionEtatPrecedent as AnimalRow["reproductionEtatPrecedent"],
+      reproductionEtatManuel: manual as AnimalRow["reproductionEtatManuel"],
+      reproductionEtatPrecedent: (manual === null ? null : animal.reproductionEtatPrecedent) as AnimalRow["reproductionEtatPrecedent"],
       categorie: animal.categorie,
       groupeNom: animal.groupe?.nom ?? null,
       saillieDate: currentBreeding?.date.toISOString() ?? null,
