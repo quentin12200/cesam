@@ -31,7 +31,7 @@ test("legacy father audit is read-only and requires explicit user validation", (
   assert.match(audit, /validation humaine obligatoire/);
   assert.match(audit, /Plusieurs candidats/);
   assert.doesNotMatch(audit, /prisma\.(animal|velage)\.(update|create|delete)/);
-  assert.match(audit, /\/velage\?modifier=/);
+  assert.match(audit, /fatherAuditEditHref\(v\.id,origin,/);
 });
 test("father picker supports mobile touch targets and accented name search", () => {
   assert.match(form, /normalize\("NFD"\)/);

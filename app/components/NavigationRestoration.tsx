@@ -63,7 +63,9 @@ export default function NavigationRestoration() {
       const saved = Number(sessionStorage.getItem(key) ?? "0");
       requestAnimationFrame(() => requestAnimationFrame(() => {
         const hash = window.location.hash.slice(1);
-        const anchor = hash ? document.getElementById(decodeURIComponent(hash)) : null;
+        let anchor: HTMLElement | null = null;
+        try { if (hash) anchor = document.getElementById(decodeURIComponent(hash)); } catch { /* malformed fragment */ }
+        if (!anchor && hash.startsWith("filiation-")) anchor = document.querySelector<HTMLElement>("tr[id^=\"filiation-\"]") ?? document.getElementById("filiations-fin");
         if (anchor) { anchor.scrollIntoView({block:"center"}); anchor.focus({preventScroll:true}); }
         else restorePosition(saved);
       }));

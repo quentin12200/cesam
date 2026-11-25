@@ -15,7 +15,7 @@ test.beforeEach(async({context,page})=>{
   if(u.origin!==base||!(u.pathname==="/lab"||u.pathname==="/prototype-espace-travail"||u.pathname==="/prototype-accueil-v3"||u.pathname.startsWith("/_next/")||/^\/__nextjs_font\/geist-[a-z-]+\.woff2$/.test(u.pathname)||["/logo-cesam.jpg","/favicon.ico","/manifest.json"].includes(u.pathname))){violations.push(u.origin+u.pathname);return route.abort();}
   return route.continue();
  });
- page.on("pageerror",error=>violations.push(error.message));
+ page.on("pageerror",error=>violations.push(error.stack ?? error.message));
  page.__violations=violations;
 });
 test.afterEach(async({page})=>{expect(page.__violations).toEqual([]);});
