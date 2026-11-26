@@ -771,6 +771,7 @@ function ReproductionContent() {
       </div>
 
       {/* Actions de travail */}
+      <EchoRecap />
       <div className="flex flex-wrap gap-2">
         {vachesAvecEtat.some((vache) => vache.aEchographier) && (
           <button
@@ -1469,4 +1470,27 @@ export default function ReproductionPage() {
       <ReproductionContent />
     </Suspense>
   );
+}
+
+function EchoRecap() {
+  const [day,setDay]=useState(()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Paris"}).format(new Date()));
+  const [open,setOpen]=useState(false);
+  const [rows,setRows]=useState<{id:string;number:string;name:string|null;result:string;days:number|null}[]>([]);
+  const [status,setStatus]=useState("");
+  async function load(date:string) {
+    setDay(date);setOpen(true);setRows([]);setStatus("Chargement…");
+    try {const response=await fetch("/api/echographies?date="+encodeURIComponent(date),{cache:"no-store"});
+      if(!response.ok) throw new Error();setRows(await response.json());setStatus("");
+    } catch {setStatus("Impossible de charger la liste. Réessayez.");}
+  }
+  const summary=["Échographies du "+day,"Total : "+rows.length,...rows.map(r=>[r.number,r.name,r.result,r.days===null?"":r.days+" j"].filter(Boolean).join(" · "))].join("\n");
+  return <div className="w-full">
+    <button type="button" className="min-h-11 rounded-xl bg-white border px-3 font-bold" onClick={()=>void load(day)}>Échographies réalisées</button>
+    {open&&<section className="mt-2 rounded-xl bg-white p-3 border">
+      <div className="flex flex-wrap gap-2 items-center"><h3 className="font-bold">Récapitulatif des échographies</h3><input aria-label="Date des échographies" type="date" value={day} onChange={e=>void load(e.target.value)}/><button onClick={()=>setOpen(false)}>Fermer</button></div>
+      {status?<p role="status">{status}</p>:<><p>Total : {rows.length} · Pleines : {rows.filter(r=>r.result==="PLEINE").length} · Vides : {rows.filter(r=>r.result==="VIDE").length}</p>
+      <div className="flex gap-2 flex-wrap"><button className="min-h-11 border rounded px-3" onClick={()=>{const w=window.open("","_blank");if(!w){setStatus("Autorisez les fenêtres pour imprimer.");return;}const pre=w.document.createElement("pre");pre.textContent=summary;w.document.body.appendChild(pre);w.print();}}>Imprimer</button><button className="min-h-11 border rounded px-3" onClick={async()=>{try{if(navigator.share) await navigator.share({text:summary});else await navigator.clipboard.writeText(summary);}catch{}}}>Partager / copier</button></div>
+      <table className="w-full text-sm"><thead><tr><th>Numéro</th><th>Nom</th><th>Résultat</th><th>Gestation</th></tr></thead><tbody>{rows.map(r=><tr key={r.id} className="border-t"><td>{r.number}</td><td>{r.name||"—"}</td><td>{r.result}</td><td>{r.days===null?"—":r.days+" j"}</td></tr>)}</tbody></table></>}
+    </section>}
+  </div>;
 }
