@@ -125,6 +125,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Saillie non trouvée" }, { status: 404 });
     }
 
+    if (animalId && animalId !== saillie.animalId) return NextResponse.json({error:"Saillie incompatible avec cet animal"},{status:409});
+    if (updateTaureau === true && taureauId !== null && (typeof taureauId !== "string" || !await prisma.taureau.findUnique({where:{id:taureauId},select:{id:true}}))) return NextResponse.json({error:"Taureau introuvable"},{status:400});
+
     // Capture previous states for undo
     const prevGestation = saillie.gestation ? { ...saillie.gestation } : null;
     const prevAnimal = await prisma.animal.findUnique({ where: { id: saillie.animalId }, select: { aEchographier: true } });
