@@ -1,3 +1,4 @@
+import { LabReproductionModalProvider } from "../components/ReproductionModalProvider";
 import QuickActionsBar from "../troupeau/[nutrav]/QuickActionsBar";
 import LabBouclage from "./LabBouclage";
 import EchoShortcut from "@/app/components/EchoShortcut";
@@ -33,7 +34,7 @@ export default function CesamLabPage() {
     <div aria-label="Raccourci échographie fictif" role="region" className="grid grid-cols-3 gap-1.5"><EchoShortcut echoCount={animaux.filter(a => a.aEchographier).length} /></div>
     <LabEchoSession />
     <LabBouclage />
-    <section aria-label="Actions rapides fictives" className="rounded-xl border p-3"><h2>Actions rapides fictives</h2><QuickActionsBar animalId="DEMO-ACTIONS" nutrav="DEMO-ACTIONS" isFemelle={true} isActif={true} /></section>
+    <section aria-label="Actions rapides fictives" className="rounded-xl border p-3"><h2>Actions rapides fictives</h2><LabReproductionModalProvider><QuickActionsBar animalId="DEMO-ACTIONS" nutrav="DEMO-ACTIONS" isFemelle={true} isActif={true} /></LabReproductionModalProvider></section>
     <Link href="/config" prefetch={false} className="inline-flex min-h-11 items-center font-bold underline">Quitter le Lab — paramètres réels</Link>
   </div>;
 }
