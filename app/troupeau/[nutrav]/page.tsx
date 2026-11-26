@@ -426,7 +426,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
 
   function tabHref(id: string) {
     const testParam = testReproEnabled ? "&testRepro=1" : "";
-    const origin = safeReturnTo(returnTo);
+    const origin = safeReturnTo(returnTo ?? null);
     return `/troupeau/${animal!.nutrav}?onglet=${id}${testParam}${origin ? "&returnTo=" + encodeURIComponent(origin) : ""}`;
   }
 
