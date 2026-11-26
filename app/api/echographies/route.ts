@@ -262,7 +262,8 @@ export async function GET(request: NextRequest) {
       prisma.demandeEchographie.findMany({where:{etat:"REALISEE",clotureeAt:range},select:{id:true,clotureeAt:true,saillieId:true,observation:true,animal}})
     ]);
     const rows = buildEchoRecap(gestations, requests.filter(r=>r.saillieId===null || (r.animal.reproductionEtatManuel==="ROUGE" && r.animal.reproductionEtatModifieAt && r.animal.reproductionEtatModifieAt>=start && r.animal.reproductionEtatModifieAt<end)));
-    return NextResponse.json(rows);
+    const actions = await prisma.evenementSanitaire.findMany({where:{animalId:{in:rows.map(r=>r.animalId)},description:"Action à prévoir — séance du "+day},select:{animalId:true,type:true,date:true,resolu:true}});
+    return NextResponse.json(rows.map(r=>({...r,actions:actions.filter(a=>a.animalId===r.animalId).map(a=>a.type+" ("+a.date.toISOString().slice(0,10)+(a.resolu?", réalisée":"")+")").join(" · ")})));
   } catch(err) {
     console.error("GET /api/echographies",err);
     return NextResponse.json({error:"Impossible de charger le récapitulatif"}, {status:500});
