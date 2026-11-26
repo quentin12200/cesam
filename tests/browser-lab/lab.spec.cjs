@@ -133,3 +133,13 @@ test("raccourci échographies : compteur et destination sur écran ordinateur et
  await expect(shortcut.getByLabel("Nombre de femelles à échographier")).toHaveText(/^\d+$/);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
 });
+
+test("bouclage fictif : annulation puis confirmation",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Bouclage fictif"});
+ const button=zone.getByRole("button",{name:"Marquer bouclé"});
+ page.once("dialog",d=>d.dismiss()); await button.click(); await expect(button).toBeVisible();
+ page.once("dialog",d=>d.accept()); await button.click();
+ await expect(zone.getByRole("status")).toHaveText("Boucle posée (simulation)");
+ await expect(button).toHaveCount(0);
+});
