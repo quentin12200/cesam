@@ -106,6 +106,7 @@ test("écho : père, événement personnalisé et action avec échéance",async(
  await cow.getByRole("button",{name:"Pleine",exact:true}).click();
  await cow.getByRole("button",{name:"Taureau Choisir"}).click();
  const picker=page.getByRole("dialog",{name:"Choisir un taureau"});
+ await expect(picker.getByRole("button",{name:/Taureau démo|AAA IA/}).first()).toContainText("Taureau démo");
  await picker.getByPlaceholder("Nom ou numéro du taureau").fill("DEMO");
  await picker.getByRole("button",{name:/Taureau démo/}).click();
  await cow.getByRole("button",{name:/Événements · Actions · Note/}).click();
@@ -159,8 +160,8 @@ test("écho compacte : largeur 320, 375 et 390 et conservation des saisies",asyn
  expect(await dialog.evaluate(el=>[el,...el.querySelectorAll("header,main,article,footer")].every(n=>n.scrollWidth<=n.clientWidth+1))).toBe(true);
  await cow.getByRole("button",{name:/Événements · Actions · Note/}).click();
  await cow.getByPlaceholder("Note facultative").fill("Note fictive");
- await cow.getByRole("button",{name:/Note/}).click();
- await cow.getByRole("button",{name:/Note/}).click();
+ await cow.getByRole("button",{name:"Note",exact:true}).click();
+ await cow.getByRole("button",{name:"Note",exact:true}).click();
  await expect(cow.getByPlaceholder("Note facultative")).toHaveValue("Note fictive");
  await dialog.getByRole("button",{name:"Fermer",exact:true}).click();
  }
