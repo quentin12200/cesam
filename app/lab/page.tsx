@@ -1,3 +1,4 @@
+import LabBouclage from "./LabBouclage";
 import LabEchoSession from "./LabEchoSession";
 import LabFatherAudit from "./LabFatherAudit";
 import LabCalvingPanel from "./LabCalvingPanel";
@@ -28,6 +29,7 @@ export default function CesamLabPage() {
     <LabCalvingPanel />
     <LabFatherAudit />
     <LabEchoSession />
+    <LabBouclage />
     <Link href="/config" prefetch={false} className="inline-flex min-h-11 items-center font-bold underline">Quitter le Lab — paramètres réels</Link>
   </div>;
 }
