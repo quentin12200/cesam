@@ -44,8 +44,10 @@ export default function QuickActionsBar({
         setMenuOpen(false);
       }
     }
-    document.addEventListener("mousedown", closeMenu);
-    return () => document.removeEventListener("mousedown", closeMenu);
+    function closeOnEscape(event: KeyboardEvent) { if (event.key === "Escape") setMenuOpen(false); }
+    document.addEventListener("pointerdown", closeMenu);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => { document.removeEventListener("pointerdown", closeMenu); document.removeEventListener("keydown", closeOnEscape); };
   }, []);
 
   function openReproduction(action: "chaleur" | "saillie") {
@@ -80,12 +82,12 @@ export default function QuickActionsBar({
           {inlineActions ? actions : (
             <>
               <button type="button" onClick={() => setMenuOpen((open) => !open)}
-                aria-expanded={menuOpen} aria-haspopup="menu"
+                aria-expanded={menuOpen} aria-controls={`animal-actions-${nutrav}`}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-800">
                 <Plus size={19} /> Actions
               </button>
               {menuOpen && (
-                <div role="menu" className="absolute left-0 top-full z-30 mt-1 w-[min(19rem,calc(100vw-3rem))] rounded-xl border border-gray-200 bg-white p-2 shadow-xl">
+                <div id={`animal-actions-${nutrav}`} role="group" aria-label="Actions rapides" className="absolute left-0 top-full z-30 mt-1 w-[min(19rem,calc(100vw-3rem))] rounded-xl border border-gray-200 bg-white p-2 shadow-xl">
                   {actions}
                 </div>
               )}
