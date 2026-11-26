@@ -96,3 +96,12 @@ test("validation du père : retour au contexte et prochain contrôle",async({pag
  await expect(section.locator("#filiation-demo-2")).toBeFocused();
  await expect(section.getByRole("button",{name:"Vérifier demo-1"})).toHaveCount(0);
 });
+
+test("raccourci échographies : compteur et destination sur écran ordinateur et iPhone",async({page})=>{
+ await page.goto("/lab");
+ const shortcut=page.getByRole("region",{name:"Raccourci échographie fictif"}).getByRole("link",{name:/Échographies à faire/});
+ await expect(shortcut).toBeVisible();
+ await expect(shortcut).toHaveAttribute("href","/reproduction?filtre=JAUNE");
+ await expect(shortcut.getByLabel("Nombre de femelles à échographier")).toHaveText(/^\d+$/);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+});
