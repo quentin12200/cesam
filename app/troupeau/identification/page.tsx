@@ -13,7 +13,7 @@ export default async function IdentificationPage() {
     prisma.animal.findMany({
       where: {
         statut: "ACTIF",
-        boucleFaite: false,
+        boucleFaite: false, danais: { gt: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) },
         velageVeau: { isNot: null },
       },
       select: {
