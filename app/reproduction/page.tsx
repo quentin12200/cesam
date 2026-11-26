@@ -771,7 +771,7 @@ function ReproductionContent() {
       </div>
 
       {/* Actions de travail */}
-      <EchoRecap />
+      <EchoRecap bulls={taureaux} />
       <div className="flex flex-wrap gap-2">
         {vachesAvecEtat.some((vache) => vache.aEchographier) && (
           <button
@@ -1452,6 +1452,7 @@ function ReproductionContent() {
           taureaux={taureaux}
           onClose={() => setEchoSessionCows([])}
           onDone={async (count, actionsCount) => {
+            window.dispatchEvent(new Event("cesam-echo-saved"));
             setEchoSessionCows([]);
             setSelectedAnimalIds([]);
             setSelectionMode(false);
@@ -1472,13 +1473,14 @@ export default function ReproductionPage() {
   );
 }
 
-type RecapRow = {id:string;animalId:string;saillieId:string|null;number:string;name:string|null;result:string;days:number|null;date:string|null;bull:string|null;observation:string|null;actions:string};
-function EchoRecap() {
+type RecapRow = {id:string;animalId:string;saillieId:string|null;number:string;name:string|null;result:string;days:number|null;date:string|null;bull:string|null;bullId:string|null;observation:string|null;actions:string};
+function EchoRecap({bulls}:{bulls:Taureau[]}) {
  const [day,setDay]=useState(()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Paris"}).format(new Date()));
  const [open,setOpen]=useState(false),[rows,setRows]=useState<RecapRow[]>([]),[status,setStatus]=useState(""),[notice,setNotice]=useState("");
  const [sort,setSort]=useState<keyof RecapRow>("number"),[descending,setDescending]=useState(false);
  const [edit,setEdit]=useState<RecapRow|null>(null),[saving,setSaving]=useState(false);
  const requestId=useRef(0);
+ useEffect(()=>{const refresh=()=>{if(open&&!edit&&!saving)void load(day);};window.addEventListener("cesam-echo-saved",refresh);return()=>window.removeEventListener("cesam-echo-saved",refresh);},[open,day,edit,saving]);
  async function load(date:string) {
   if(!date)return; const token=++requestId.current;setDay(date);setOpen(true);setStatus("Chargement…");setRows([]);
   try {const response=await fetch("/api/echographies?date="+encodeURIComponent(date),{cache:"no-store"});if(!response.ok)throw Error();const result=await response.json();if(token===requestId.current){setRows(result);setStatus("");}}
@@ -1493,7 +1495,7 @@ function EchoRecap() {
   if(!edit||saving||!edit.saillieId)return;
   if(edit.result==="PLEINE"&&(!edit.days||edit.days<1||edit.days>285)){setNotice("Durée de gestation invalide.");return;}
   setSaving(true);setNotice("");
-  try {const response=await fetch("/api/echographies",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({animalId:edit.animalId,saillieId:edit.saillieId,date:day,resultat:edit.result,joursGestation:edit.days,remarque:edit.observation})});if(!response.ok)throw Error();setEdit(null);await load(day);}
+  try {const response=await fetch("/api/echographies",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({animalId:edit.animalId,saillieId:edit.saillieId,date:day,resultat:edit.result,joursGestation:edit.days,remarque:edit.observation,updateTaureau:true,taureauId:edit.bullId})});if(!response.ok)throw Error();setEdit(null);await load(day);}
   catch{setNotice("Correction non confirmée. Vérifiez avant de réessayer.");}finally{setSaving(false);}
  }
  return <div className="w-full min-w-0">
@@ -1504,7 +1506,7 @@ function EchoRecap() {
  {status?<p role="status">{status}</p>:<><p>{totals}</p>
  <div className="flex gap-2 flex-wrap"><button className="min-h-11 border rounded px-3" onClick={()=>{const w=window.open("","_blank");if(!w){setNotice("Autorisez les fenêtres pour imprimer.");return;}const h=w.document.createElement("h2");h.textContent="Échographies du "+day;w.document.body.append(h);const p=w.document.createElement("p");p.textContent=totals;w.document.body.append(p);const t=w.document.createElement("table");t.style.cssText="border-collapse:collapse;width:100%;font:12px sans-serif";for(const values of [columns.map(c=>c[1]),...sorted.map(r=>columns.map(c=>display(r,c[0])))]){const tr=t.insertRow();for(const v of values){const td=tr.insertCell();td.textContent=v;td.style.cssText="border:1px solid #999;padding:5px";}}w.document.body.append(t);w.print();}}>Imprimer</button><button className="min-h-11 border rounded px-3" onClick={async()=>{try{if(navigator.share)await navigator.share({text:summary});else{await navigator.clipboard.writeText(summary);setNotice("Compte rendu copié.");}}catch{setNotice("Partage non effectué.");}}}>Partager / copier (WhatsApp)</button></div>
  <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr>{columns.map(([k,label])=><th key={k} aria-sort={sort===k?(descending?"descending":"ascending"):"none"}><button className="min-h-11 px-2" onClick={()=>{setDescending(sort===k?!descending:false);setSort(k);}}>{label}{sort===k?(descending?" ↓":" ↑"):""}</button></th>)}<th>Correction</th></tr></thead><tbody>{sorted.map(r=><tr key={r.id} className="border-t">{columns.map(([k])=><td className="p-2" key={k}>{display(r,k)}</td>)}<td>{r.saillieId?<button disabled={saving} className="min-h-11 underline" onClick={()=>{setEdit({...r});setNotice("");}}>Modifier</button>:<span>Sans saillie</span>}</td></tr>)}</tbody></table></div>
- {edit&&<div className="border rounded p-3 mt-2 space-y-2"><h4>Modifier {edit.number}</h4><label>Résultat <select disabled={saving} value={edit.result} onChange={e=>setEdit({...edit,result:e.target.value})}><option value="PLEINE">Pleine</option><option value="VIDE">Vide</option></select></label>{edit.result==="PLEINE"&&<label> Jours <input type="number" min={1} max={285} value={edit.days??""} onChange={e=>setEdit({...edit,days:Number(e.target.value)})}/></label>}<label className="block">Observations <textarea className="block border w-full" value={edit.observation??""} onChange={e=>setEdit({...edit,observation:e.target.value})}/></label><button disabled={saving} className="border rounded p-2" onClick={()=>void save()}>Enregistrer la correction</button> <button disabled={saving} onClick={()=>setEdit(null)}>Annuler</button></div>}
+ {edit&&<div className="border rounded p-3 mt-2 space-y-2"><h4>Modifier {edit.number}</h4><label>Résultat <select disabled={saving} value={edit.result} onChange={e=>setEdit({...edit,result:e.target.value})}><option value="PLEINE">Pleine</option><option value="VIDE">Vide</option></select></label>{edit.result==="PLEINE"&&<label> Jours <input type="number" min={1} max={285} value={edit.days??""} onChange={e=>setEdit({...edit,days:Number(e.target.value)})}/></label>}<label className="block">Taureau <select disabled={saving} value={edit.bullId??""} onChange={e=>setEdit({...edit,bullId:e.target.value||null})}><option value="">Non renseigné</option>{[...bulls].sort((a,b)=>Number(!a.nopere)-Number(!b.nopere)||(a.nopere||a.nupere).localeCompare(b.nopere||b.nupere)).map(b=><option key={b.id} value={b.id}>{b.nopere||b.nupere}</option>)}</select></label><label className="block">Observations <textarea className="block border w-full" value={edit.observation??""} onChange={e=>setEdit({...edit,observation:e.target.value})}/></label><button disabled={saving} className="border rounded p-2" onClick={()=>void save()}>Enregistrer la correction</button> <button disabled={saving} onClick={()=>setEdit(null)}>Annuler</button></div>}
  </>}
  </section>}
  </div>;
