@@ -96,3 +96,26 @@ test("validation du père : retour au contexte et prochain contrôle",async({pag
  await expect(section.locator("#filiation-demo-2")).toBeFocused();
  await expect(section.getByRole("button",{name:"Vérifier demo-1"})).toHaveCount(0);
 });
+
+test("écho : père, événement personnalisé et action avec échéance",async({page})=>{
+ await page.goto("/lab");
+ await page.getByRole("button",{name:"Séance écho fictive"}).click();
+ const dialog=page.getByRole("dialog",{name:"Saisie d’une séance d’échographies"});
+ await expect(dialog.getByText(/Père : Père démo/)).toBeVisible();
+ const cow=dialog.locator("article").filter({hasText:"9802"});
+ await cow.getByLabel("Enregistrer un taureau ?").selectOption("demo-bull");
+ await cow.getByRole("button",{name:"Pleine",exact:true}).click();
+ await cow.getByRole("button",{name:"Événements et actions"}).click();
+ await cow.getByRole("button",{name:"Cyclée",exact:true}).click();
+ await cow.getByRole("button",{name:"Non cyclée",exact:true}).click();
+ await expect(cow.getByRole("button",{name:"Cyclée",exact:true})).toHaveAttribute("aria-pressed","false");
+ await cow.getByLabel("Rechercher ou créer un événement").fill("Contrôle fictif");
+ await cow.getByRole("button",{name:"+ Ajouter un événement"}).click();
+ await cow.getByRole("checkbox",{name:"À revérifier",exact:true}).check();
+ await cow.getByLabel("Échéance À revérifier").fill("2099-01-01");
+ await dialog.getByRole("button",{name:/Enregistrer 1 résultat/}).click();
+ await expect(dialog).toHaveCount(0);
+ await expect(page.locator("pre").filter({hasText:"demo-echo-b"})).toContainText("Contrôle fictif");
+ await expect(page.locator("pre").filter({hasText:"demo-echo-b"})).toContainText("2099-01-01");
+ await expect(page.locator("pre").filter({hasText:"demo-echo-b"})).toContainText("demo-bull");
+});
