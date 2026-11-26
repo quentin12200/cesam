@@ -124,3 +124,13 @@ test("écho : père, événement personnalisé et action avec échéance",async(
 });
 
 test("écho : action personnalisée réutilisée sans doublon",async({page})=>{await page.goto("/lab");await page.getByRole("button",{name:"Séance écho fictive"}).click();const dialog=page.getByRole("dialog",{name:"Saisie d’une séance d’échographies"});const a=dialog.locator("article").filter({hasText:"9801"}),b=dialog.locator("article").filter({hasText:"9802"});await a.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await a.getByLabel("Rechercher ou créer une action").fill("Prélèvement fictif");await a.getByRole("button",{name:"Créer et sélectionner l’action"}).click();await a.getByLabel("Échéance Prélèvement fictif").fill("2099-01-02");await b.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await b.getByLabel("Rechercher ou créer une action").fill("prelevement fictif");await b.getByRole("button",{name:"Prélèvement fictif",exact:true}).click();await b.getByLabel("Échéance Prélèvement fictif").fill("2099-01-03");await b.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await b.getByLabel("Rechercher ou créer une action").fill("PRELEVEMENT FICTIF");await b.getByRole("button",{name:"Créer et sélectionner l’action"}).click();await expect(b.getByLabel("Échéance Prélèvement fictif")).toHaveCount(1);await dialog.getByRole("button",{name:/Enregistrer 2 résultats/}).click();await expect(dialog).toHaveCount(0);const data=JSON.parse(await page.locator("pre").filter({hasText:"demo-echo-b"}).innerText());expect(data.resultats.map(r=>r.actions)).toEqual([[{type:"Prélèvement fictif",due:"2099-01-02"}],[{type:"Prélèvement fictif",due:"2099-01-03"}]]);});
+
+test("bouclage fictif : annulation puis confirmation",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Bouclage fictif"});
+ const button=zone.getByRole("button",{name:"Marquer bouclé"});
+ page.once("dialog",d=>d.dismiss()); await button.click(); await expect(button).toBeVisible();
+ page.once("dialog",d=>d.accept()); await button.click();
+ await expect(zone.getByRole("status")).toHaveText("Boucle posée (simulation)");
+ await expect(button).toHaveCount(0);
+});
