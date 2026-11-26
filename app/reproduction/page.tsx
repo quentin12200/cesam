@@ -1472,7 +1472,7 @@ export default function ReproductionPage() {
   );
 }
 
-type RecapRow = {id:string;animalId:string;saillieId:string|null;number:string;name:string|null;result:string;days:number|null;date:string|null;bull:string|null;observation:string|null};
+type RecapRow = {id:string;animalId:string;saillieId:string|null;number:string;name:string|null;result:string;days:number|null;date:string|null;bull:string|null;observation:string|null;actions:string};
 function EchoRecap() {
  const [day,setDay]=useState(()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Paris"}).format(new Date()));
  const [open,setOpen]=useState(false),[rows,setRows]=useState<RecapRow[]>([]),[status,setStatus]=useState(""),[notice,setNotice]=useState("");
@@ -1484,7 +1484,7 @@ function EchoRecap() {
   try {const response=await fetch("/api/echographies?date="+encodeURIComponent(date),{cache:"no-store"});if(!response.ok)throw Error();const result=await response.json();if(token===requestId.current){setRows(result);setStatus("");}}
   catch {if(token===requestId.current)setStatus("Impossible de charger la liste. Réessayez.");}
  }
- const columns:[keyof RecapRow,string][]=[["number","Numéro"],["name","Nom"],["date","Date"],["result","Résultat"],["days","Durée (j)"],["bull","Taureau"],["observation","Observations"]];
+ const columns:[keyof RecapRow,string][]=[["number","Numéro"],["name","Nom"],["date","Date"],["result","Résultat"],["days","Durée (j)"],["bull","Taureau"],["observation","Observations"],["actions","Actions programmées"]];
  const sorted=[...rows].sort((a,b)=>String(a[sort]??"").localeCompare(String(b[sort]??""),"fr",{numeric:true})*(descending?-1:1));
  const display=(r:RecapRow,k:keyof RecapRow)=>k==="date"?r.date?.slice(0,10)||"—":k==="result"?r.result==="PLEINE"?"Pleine":"Vide":String(r[k]??"—");
  const totals="Total : "+rows.length+" · Pleines : "+rows.filter(r=>r.result==="PLEINE").length+" · Vides : "+rows.filter(r=>r.result==="VIDE").length;
