@@ -103,8 +103,13 @@ test("écho : père, événement personnalisé et action avec échéance",async(
  const dialog=page.getByRole("dialog",{name:"Saisie d’une séance d’échographies"});
  await expect(dialog.getByText(/Père : Père démo/)).toBeVisible();
  const cow=dialog.locator("article").filter({hasText:"9802"});
- await cow.getByLabel("Enregistrer un taureau ?").selectOption("demo-bull");
  await cow.getByRole("button",{name:"Pleine",exact:true}).click();
+ await cow.getByRole("button",{name:"Taureau Choisir"}).click();
+ const picker=page.getByRole("dialog",{name:"Choisir un taureau"});
+ await expect(picker.getByRole("button",{name:/Taureau démo|AAA IA/}).first()).toContainText("Taureau démo");
+ await picker.getByPlaceholder("Nom ou numéro du taureau").fill("DEMO");
+ await picker.getByRole("button",{name:/Taureau démo/}).click();
+ await cow.getByRole("button",{name:/Événements · Actions · Note/}).click();
  await expect(cow.getByRole("button",{name:"Cyclée",exact:true})).toBeVisible();
  await expect(cow.getByRole("checkbox",{name:"À revérifier",exact:true})).toBeVisible();
  await cow.getByRole("button",{name:"Cyclée",exact:true}).click();
@@ -123,7 +128,7 @@ test("écho : père, événement personnalisé et action avec échéance",async(
  await expect(page.locator("pre").filter({hasText:"demo-echo-b"})).toContainText("demo-bull");
 });
 
-test("écho : action personnalisée réutilisée sans doublon",async({page})=>{await page.goto("/lab");await page.getByRole("button",{name:"Séance écho fictive"}).click();const dialog=page.getByRole("dialog",{name:"Saisie d’une séance d’échographies"});const a=dialog.locator("article").filter({hasText:"9801"}),b=dialog.locator("article").filter({hasText:"9802"});await a.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await a.getByLabel("Rechercher ou créer une action").fill("Prélèvement fictif");await a.getByRole("button",{name:"Créer et sélectionner l’action"}).click();await a.getByLabel("Échéance Prélèvement fictif").fill("2099-01-02");await b.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await b.getByLabel("Rechercher ou créer une action").fill("prelevement fictif");await b.getByRole("button",{name:"Prélèvement fictif",exact:true}).click();await b.getByLabel("Échéance Prélèvement fictif").fill("2099-01-03");await b.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await b.getByLabel("Rechercher ou créer une action").fill("PRELEVEMENT FICTIF");await b.getByRole("button",{name:"Créer et sélectionner l’action"}).click();await expect(b.getByLabel("Échéance Prélèvement fictif")).toHaveCount(1);await dialog.getByRole("button",{name:/Enregistrer 2 résultats/}).click();await expect(dialog).toHaveCount(0);const data=JSON.parse(await page.locator("pre").filter({hasText:"demo-echo-b"}).innerText());expect(data.resultats.map(r=>r.actions)).toEqual([[{type:"Prélèvement fictif",due:"2099-01-02"}],[{type:"Prélèvement fictif",due:"2099-01-03"}]]);});
+test("écho : action personnalisée réutilisée sans doublon",async({page})=>{await page.goto("/lab");await page.getByRole("button",{name:"Séance écho fictive"}).click();const dialog=page.getByRole("dialog",{name:"Saisie d’une séance d’échographies"});const a=dialog.locator("article").filter({hasText:"9801"}),b=dialog.locator("article").filter({hasText:"9802"});await a.getByRole("button",{name:/Événements · Actions · Note/}).click();await b.getByRole("button",{name:/Événements · Actions · Note/}).click();await a.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await a.getByLabel("Rechercher ou créer une action").fill("Prélèvement fictif");await a.getByRole("button",{name:"Créer et sélectionner l’action"}).click();await a.getByLabel("Échéance Prélèvement fictif").fill("2099-01-02");await b.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await b.getByLabel("Rechercher ou créer une action").fill("prelevement fictif");await b.getByRole("button",{name:"Prélèvement fictif",exact:true}).click();await b.getByLabel("Échéance Prélèvement fictif").fill("2099-01-03");await b.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await b.getByLabel("Rechercher ou créer une action").fill("PRELEVEMENT FICTIF");await b.getByRole("button",{name:"Créer et sélectionner l’action"}).click();await expect(b.getByLabel("Échéance Prélèvement fictif")).toHaveCount(1);await dialog.getByRole("button",{name:/Enregistrer 2 résultats/}).click();await expect(dialog).toHaveCount(0);const data=JSON.parse(await page.locator("pre").filter({hasText:"demo-echo-b"}).innerText());expect(data.resultats.map(r=>r.actions)).toEqual([[{type:"Prélèvement fictif",due:"2099-01-02"}],[{type:"Prélèvement fictif",due:"2099-01-03"}]]);});
 
 test("raccourci échographies : compteur et destination sur écran ordinateur et iPhone",async({page})=>{
  await page.goto("/lab");
@@ -142,4 +147,22 @@ test("bouclage fictif : annulation puis confirmation",async({page})=>{
  page.once("dialog",d=>d.accept()); await button.click();
  await expect(zone.getByRole("status")).toHaveText("Boucle posée (simulation)");
  await expect(button).toHaveCount(0);
+});
+
+test("écho compacte : largeur 320, 375 et 390 et conservation des saisies",async({page})=>{
+ for(const width of [320,375,390]){
+ await page.setViewportSize({width,height:844}); await page.goto("/lab");
+ await page.getByRole("button",{name:"Séance écho fictive"}).click();
+ const dialog=page.getByRole("dialog",{name:"Saisie d’une séance d’échographies"});
+ const cow=dialog.locator("article").filter({hasText:"9802"});
+ await expect(cow.getByRole("button",{name:"Cyclée",exact:true})).toBeHidden();
+ expect((await cow.boundingBox()).height).toBeLessThan(180);
+ expect(await dialog.evaluate(el=>[el,...el.querySelectorAll("header,main,article,footer")].every(n=>n.scrollWidth<=n.clientWidth+1))).toBe(true);
+ await cow.getByRole("button",{name:/Événements · Actions · Note/}).click();
+ await cow.getByPlaceholder("Note facultative").fill("Note fictive");
+ await cow.getByRole("button",{name:"Note",exact:true}).click();
+ await cow.getByRole("button",{name:"Note",exact:true}).click();
+ await expect(cow.getByPlaceholder("Note facultative")).toHaveValue("Note fictive");
+ await dialog.getByRole("button",{name:"Fermer",exact:true}).click();
+ }
 });
