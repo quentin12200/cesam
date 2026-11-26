@@ -5,7 +5,7 @@ import { addDays, differenceInDays, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { CalendarDays, Check, Search, X } from "lucide-react";
 
-import { ECHO_ACTIONS, ECHO_OBSERVATIONS, normEcho, toggleEchoEvent, type EchoEvent, type EchoAction } from "@/lib/echo-session-extras";
+import { ECHO_ACTIONS, ECHO_OBSERVATIONS, actionKey, validActionName, mergeActionNames, normEcho, toggleEchoEvent, type EchoEvent, type EchoAction } from "@/lib/echo-session-extras";
 const DUREE_GESTATION = 285;
 
 export interface EchoSessionCow {
@@ -35,7 +35,7 @@ interface EchoDraft {
 interface Props {
   vaches: EchoSessionCow[];
   taureaux?: {id:string; nopere:string|null; nupere:string}[];
-  fixture?: { catalogue: EchoEvent[]; save: (payload:unknown)=>Promise<{count:number;actionsCount:number}> };
+  fixture?: { catalogue: EchoEvent[]; actions?: EchoEvent[]; save: (payload:unknown)=>Promise<{count:number;actionsCount:number}> };
   onClose: () => void;
   onDone: (count: number, actionsCount: number) => void;
 }
@@ -73,6 +73,11 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
   const [error, setError] = useState("");
   const [catalogue,setCatalogue]=useState<EchoEvent[]>(fixture?.catalogue??[]);
   const [catalogueError,setCatalogueError]=useState("");
+  const [actionNames,setActionNames]=useState(()=>mergeActionNames([...ECHO_ACTIONS,...(fixture?.actions??[]).map(a=>a.nom)]));
+  const [actionPicker,setActionPicker]=useState<Record<string,boolean>>({});
+  const [actionQuery,setActionQuery]=useState<Record<string,string>>({});
+  const [actionError,setActionError]=useState("");
+  useEffect(()=>{if(fixture)return;let active=true;fetch("/api/event-types?kind=actions").then(r=>{if(!r.ok)throw Error();return r.json();}).then((items:EchoEvent[])=>{if(active)setActionNames(old=>mergeActionNames([...old,...items.map(a=>a.nom)]));}).catch(()=>{if(active)setActionError("Catalogue des actions indisponible");});return()=>{active=false;};},[fixture]);
   const [eventPickerOpen,setEventPickerOpen]=useState<Record<string,boolean>>({});
   const [eventQuery,setEventQuery]=useState<Record<string,string>>({});
   const inFlight=useRef(false);
@@ -81,7 +86,9 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
   function change(id:string,patch:Partial<EchoDraft>){setDrafts(old=>updateDraft(old,id,d=>({...d,...patch})));}
   function selectEvent(id:string,event:EchoEvent){setDrafts(old=>updateDraft(old,id,d=>({...d,events:toggleEchoEvent(d.events??[],event)})));}
   function addEvent(id:string){const nom=(eventQuery[id]??"").trim();if(!nom)return;const found=catalogue.find(e=>normEcho(e.nom)===normEcho(nom));const entry=found??{nom};if(!found)setCatalogue(old=>[...old,entry]);setDrafts(old=>updateDraft(old,id,d=>({...d,events:(d.events??[]).some(e=>normEcho(e.nom)===normEcho(entry.nom))?d.events:toggleEchoEvent(d.events??[],entry)})));setEventQuery(old=>({...old,[id]:""}));}
-  function toggleAction(id:string,type:EchoAction["type"]){setDrafts(old=>updateDraft(old,id,d=>({...d,actions:(d.actions??[]).some(a=>a.type===type)?(d.actions??[]).filter(a=>a.type!==type):[...(d.actions??[]),{type,due:date}]})));}
+  function toggleAction(id:string,type:EchoAction["type"]){setDrafts(old=>updateDraft(old,id,d=>({...d,actions:(d.actions??[]).some(a=>actionKey(a.type)===actionKey(type))?(d.actions??[]).filter(a=>actionKey(a.type)!==actionKey(type)):[...(d.actions??[]),{type,due:date}]})));}
+
+  function addAction(id:string,name:string){if(!validActionName(name))return;const type=actionNames.find(n=>actionKey(n)===actionKey(name))??name.trim().replace(/\s+/g," ");setActionNames(old=>mergeActionNames([...old,type]));setDrafts(old=>updateDraft(old,id,d=>({...d,actions:(d.actions??[]).some(a=>actionKey(a.type)===actionKey(type))?d.actions:[...(d.actions??[]),{type,due:date}]})));setActionPicker(old=>({...old,[id]:false}));setActionQuery(old=>({...old,[id]:""}));}
 
   const sortedCows = useMemo(() => [...vaches].sort((left, right) =>
     left.nutrav.localeCompare(right.nutrav, "fr", { numeric: true })
@@ -235,7 +242,8 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
                     <button type="button" disabled={saving||!(eventQuery[vache.id]??"").trim()} className="min-h-11 w-full rounded-lg bg-blue-600 px-2 text-sm font-bold text-white disabled:opacity-40" onClick={()=>{addEvent(vache.id);setEventPickerOpen(old=>({...old,[vache.id]:false}));}}>Créer et sélectionner</button>
                   </div>}
                   <p className="pt-1 text-xs font-bold text-gray-600">Actions à prévoir</p>
-                  <div className="flex flex-wrap gap-1.5">{ECHO_ACTIONS.map(type=>{const action=draft.actions?.find(a=>a.type===type);return <label key={type} className={`inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold ${action?"border-orange-500 bg-orange-100 text-orange-900":"border-gray-200 text-gray-700"}`}><input type="checkbox" checked={!!action} disabled={saving} onChange={()=>toggleAction(vache.id,type)}/>{type}</label>;})}</div>
+                  <div className="flex flex-wrap gap-1.5">{mergeActionNames([...ECHO_ACTIONS,...(draft.actions??[]).map(a=>a.type)]).map(type=>{const action=draft.actions?.find(a=>a.type===type);return <label key={type} className={`inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold ${action?"border-orange-500 bg-orange-100 text-orange-900":"border-gray-200 text-gray-700"}`}><input type="checkbox" checked={!!action} disabled={saving} onChange={()=>toggleAction(vache.id,type)}/>{type}</label>;})}<button type="button" disabled={saving} aria-expanded={!!actionPicker[vache.id]} onClick={()=>setActionPicker(old=>({...old,[vache.id]:!old[vache.id]}))} className="min-h-11 rounded-xl border border-dashed border-orange-400 px-2.5 text-xs font-bold text-orange-900">+ Ajouter une action</button></div>
+                  {actionPicker[vache.id]&&<div className="space-y-2 rounded-xl border bg-orange-50 p-2">{actionError&&<p role="alert" className="text-xs">{actionError}</p>}<label className="block text-xs">Rechercher ou créer une action<input maxLength={100} className="mt-1 block min-h-11 w-full rounded-lg border bg-white px-2" value={actionQuery[vache.id]??""} onChange={e=>setActionQuery(old=>({...old,[vache.id]:e.target.value}))}/></label><div className="max-h-40 space-y-1 overflow-y-auto">{actionNames.filter(n=>actionKey(n).includes(actionKey(actionQuery[vache.id]??""))).slice(0,12).map(n=><button key={n} type="button" disabled={saving} className="block min-h-11 w-full rounded-lg border bg-white px-2 text-left text-sm" onClick={()=>addAction(vache.id,n)}>{n}</button>)}</div><button type="button" disabled={saving||!validActionName(actionQuery[vache.id])} className="min-h-11 w-full rounded-lg bg-orange-700 px-2 text-sm font-bold text-white disabled:opacity-40" onClick={()=>addAction(vache.id,actionQuery[vache.id])}>Créer et sélectionner l’action</button></div>}
                   {(draft.actions??[]).map(action=><label key={action.type} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-950">Échéance {action.type}<input type="date" min={date} value={action.due} disabled={saving} className="min-h-11 max-w-full rounded border bg-white px-2" onChange={e=>change(vache.id,{actions:(draft.actions??[]).map(a=>a.type===action.type?{...a,due:e.target.value}:a)})}/></label>)}
                 </div>
                 {(

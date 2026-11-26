@@ -1,3 +1,4 @@
+import { ECHO_ACTION_CATEGORY } from "@/lib/echo-session-extras";
 import { effectiveManualReproduction } from "@/lib/calving-reproduction-reset";
 import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
@@ -98,6 +99,8 @@ async function getDashboardData() {
       select: {
         id: true,
         type: true,
+        categorie: true,
+        date: true,
         animal: { select: { nutrav: true } },
       },
     }),
@@ -763,11 +766,11 @@ export default async function Dashboard({ searchParams }: PageProps) {
     data.bolusPreVelage;
   if (santeTotal > 0) {
     const suivisEcho = data.interventionsSanitairesUrgentes.filter((intervention) =>
-      ["Métrite", "Metrabol à prévoir", "Métrabole à prévoir", "Estrumate à prévoir", "À revérifier", "Bolus à prévoir"].includes(intervention.type)
+      intervention.categorie===ECHO_ACTION_CATEGORY || ["Métrite", "Metrabol à prévoir", "Métrabole à prévoir", "Estrumate à prévoir", "À revérifier", "Bolus à prévoir"].includes(intervention.type)
     );
-    const resumeSuivisEcho = ["Métrite", "Metrabol à prévoir", "Métrabole à prévoir", "Estrumate à prévoir", "À revérifier", "Bolus à prévoir"]
+    const resumeSuivisEcho = [...new Set(suivisEcho.map(i=>i.type))]
       .map((type) => {
-        const numeros = suivisEcho.filter((intervention) => intervention.type === type).map((intervention) => intervention.animal.nutrav);
+        const numeros = suivisEcho.filter((intervention) => intervention.type === type).map((intervention) => intervention.categorie===ECHO_ACTION_CATEGORY?`${intervention.animal.nutrav} (${intervention.date.toLocaleDateString("fr-FR",{day:"numeric",month:"numeric",timeZone:"Europe/Paris"})})`:intervention.animal.nutrav);
         return numeros.length > 0 ? `${type} : ${numeros.join(", ")}` : null;
       })
       .filter(Boolean)

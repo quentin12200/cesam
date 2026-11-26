@@ -244,7 +244,7 @@ function EvenementCard({ animalId, evt, affichageDelaiAttente, onTerminer }: {
             <span className="font-medium">{evt.type}</span>
             {evt.categorie && (
               <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
-                {getCategorieLabel(evt.categorie)}
+                {evt.categorie==="ACTION_ECHO"?"Action planifiée":getCategorieLabel(evt.categorie)}
               </span>
             )}
             {editTemp ? (
@@ -273,7 +273,7 @@ function EvenementCard({ animalId, evt, affichageDelaiAttente, onTerminer }: {
             </div>
           )}
           <div className="text-xs text-gray-500 mt-0.5">
-            {formatDate(evt.date)}{evt.moment ? ` — ${evt.moment}` : ""}
+            {evt.categorie==="ACTION_ECHO"?"Échéance : ":""}{formatDate(evt.date)}{evt.moment ? ` — ${evt.moment}` : ""}
             {evt.constatePar ? ` · Constaté par ${evt.constatePar}` : ""}
           </div>
         </div>
@@ -283,7 +283,7 @@ function EvenementCard({ animalId, evt, affichageDelaiAttente, onTerminer }: {
               evt.resolu ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
             }`}
           >
-            {evt.resolu ? "Résolu" : evt.categorie === "REPRODUCTION" && /à prévoir|À revérifier/i.test(evt.type) ? "À prévoir" : "En cours"}
+            {evt.resolu ? "Résolu" : (evt.categorie === "ACTION_ECHO" || evt.categorie === "REPRODUCTION" && /à prévoir|À revérifier/i.test(evt.type)) ? "À prévoir" : "En cours"}
           </span>
           <RecordActionsMenu
             onEdit={() => setEditionOuverte((value) => !value)}
