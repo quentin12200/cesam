@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 const read=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
 test("les onglets conservent uniquement un retour validé",()=>{
  const s=read("app/troupeau/[nutrav]/page.tsx");
- assert.match(s,/safeReturnTo\(returnTo\)/);
+ assert.match(s,/safeReturnTo\(returnTo \?\? null\)/);
  assert.match(s,/encodeURIComponent\(origin\)/);
  assert.match(s,/aria-current=\{onglet === tab.id/);
 });
