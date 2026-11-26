@@ -1,3 +1,4 @@
+import EchoShortcut from "@/app/components/EchoShortcut";
 import LabFatherAudit from "./LabFatherAudit";
 import LabCalvingPanel from "./LabCalvingPanel";
 import Link from "next/link";
@@ -23,6 +24,7 @@ export default function CesamLabPage() {
       <Link href="/prototype-espace-travail" prefetch={false} className="min-h-11 rounded-xl border bg-white p-3 text-sm font-bold">Prototype espace de travail</Link>
       <Link href="/prototype-accueil-v3" prefetch={false} className="min-h-11 rounded-xl border bg-white p-3 text-sm font-bold">Prototype accueil V3</Link>
     </nav>
+    <div aria-label="Raccourci échographie fictif" role="region" className="grid grid-cols-3 gap-1.5"><EchoShortcut echoCount={animaux.filter(a => a.aEchographier).length} /></div>
     <LabExplorer animaux={animaux} echeances={echeances} />
     <LabCalvingPanel />
     <LabFatherAudit />
