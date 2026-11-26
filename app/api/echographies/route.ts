@@ -1,3 +1,4 @@
+import { buildEchoRecap } from "@/lib/echo-recap";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { addDays, differenceInDays } from "date-fns";
@@ -244,5 +245,26 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("POST /api/echographies error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const day = request.nextUrl.searchParams.get("date");
+    if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return NextResponse.json({error:"Date requise"}, {status:400});
+    const start = new Date(day+"T00:00:00.000Z");
+    if (!Number.isFinite(start.getTime()) || start.toISOString().slice(0,10)!==day) return NextResponse.json({error:"Date invalide"}, {status:400});
+    const end = addDays(start,1);
+    const range = {gte:start,lt:end};
+    const animal = {select:{id:true,nutrav:true,nobovi:true}};
+    const [gestations, requests] = await Promise.all([
+      prisma.gestation.findMany({where:{dateEcho:range,resultatEcho:{in:["PLEINE","VIDE"]}},select:{id:true,dateEcho:true,resultatEcho:true,joursGestation:true,saillie:{select:{animal}}}}),
+      prisma.demandeEchographie.findMany({where:{etat:"REALISEE",saillieId:null,clotureeAt:range},select:{id:true,clotureeAt:true,animal}})
+    ]);
+    const rows = buildEchoRecap(gestations, requests);
+    return NextResponse.json(rows);
+  } catch(err) {
+    console.error("GET /api/echographies",err);
+    return NextResponse.json({error:"Impossible de charger le récapitulatif"}, {status:500});
   }
 }
