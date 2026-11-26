@@ -33,12 +33,13 @@ export async function GET() {
           ],
         },
         {
-          // Entrent en repro : vaches ≥ 24 mois, ou jeune vache ayant déjà vêlé,
-          // ou grande génisse ≥ 24 mois. Exclut toute femelle < 24 mois sans velage.
+          // Les antécédents reproductifs et demandes explicites priment sur l'âge.
           OR: [
-            { estGenisse: false, danais: { lte: dateMin24Mois } },
-            { estGenisse: false, velagesVache: { some: {} } },
-            { estGenisse: true, danais: { lte: dateMin24Mois } },
+            { danais: { lte: dateMin24Mois } },
+            { velagesVache: { some: {} } },
+            { saillies: { some: { gestation: { isNot: null } } } },
+            { demandesEchographie: { some: { etat: "A_FAIRE", origine: "MANUELLE" } } },
+            { aEchographier: true },
           ],
         },
       ],
@@ -53,7 +54,6 @@ export async function GET() {
       demandesEchographie: {
         where: { etat: "A_FAIRE" },
         orderBy: { createdAt: "desc" },
-        take: 1,
         select: { origine: true, motif: true },
       },
       reproductionEtatManuel: true,
@@ -96,9 +96,9 @@ export async function GET() {
     const lastCalving = v.velagesVache[0]?.date ?? null;
     const currentBreeding = getCurrentCycleBreeding(v.saillies, lastCalving);
     const manual = effectiveManualReproduction(v.reproductionEtatManuel, v.reproductionEtatModifieAt, lastCalving);
-    const activeRequest = v.demandesEchographie[0] ?? null;
+    const activeRequest = v.demandesEchographie.find((request) => request.origine === "MANUELLE") ?? v.demandesEchographie[0] ?? null;
     const daysSinceBreeding = currentBreeding ? differenceInDays(now, currentBreeding.date) : null;
-    const explicitControl = activeRequest?.origine === "MANUELLE";
+    const explicitControl = activeRequest?.origine === "MANUELLE" || v.aEchographier;
 
     // Une demande manuelle est un ordre utilisateur explicite : elle doit toujours
     // apparaître dans « À écho », même sans saillie/IA courante ou hors délai auto.
