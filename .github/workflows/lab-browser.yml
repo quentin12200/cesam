@@ -8,7 +8,7 @@ permissions:
 jobs:
   browser-lab:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,7 +19,11 @@ jobs:
       - run: npm install --prefix /tmp/cesam-playwright --no-save --package-lock=false @playwright/test@1.56.1
       - run: ln -s /tmp/cesam-playwright/node_modules/@playwright node_modules/@playwright
       - run: npx prisma generate
-      - run: /tmp/cesam-playwright/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Install browser dependencies with bounded network retries
+        run: |
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+          /tmp/cesam-playwright/node_modules/.bin/playwright install --with-deps chromium webkit
+        timeout-minutes: 15
       - run: /tmp/cesam-playwright/node_modules/.bin/playwright test --config=playwright.lab.config.cjs
       - uses: actions/upload-artifact@v4
         if: always()
