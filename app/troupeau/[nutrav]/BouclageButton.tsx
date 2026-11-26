@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-export default function BouclageButton({ nutrav }: { nutrav: string }) {
+export default function BouclageButton({ nutrav, onConfirm }: { nutrav: string; onConfirm?: () => Promise<void> }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -9,6 +9,7 @@ export default function BouclageButton({ nutrav }: { nutrav: string }) {
     if (busy || !window.confirm("Confirmer que la boucle est posée ?")) return;
     setBusy(true); setError("");
     try {
+      if (onConfirm) { await onConfirm(); return; }
       const response = await fetch("/api/animaux/" + encodeURIComponent(nutrav), {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({boucleFaite:true})});
       if (!response.ok) throw new Error("Enregistrement impossible");
       router.refresh();
