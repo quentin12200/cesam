@@ -115,7 +115,8 @@ export default function PrototypeAccueilV3() {
       />
 
       <main className="mx-auto w-full max-w-6xl px-3 py-3 sm:px-5 sm:py-5">
-        <NewsSection onSimulate={simulate} />
+        <WorkBoard />
+        <details className="mt-5 rounded-md bg-white p-3"><summary className="cursor-pointer font-bold">Ancien prototype · comparaison</summary>
 
         <section className="mt-5" aria-labelledby="daily-title">
           <div className="mb-2 flex items-center justify-between gap-3">
@@ -135,6 +136,7 @@ export default function PrototypeAccueilV3() {
           </div>
         </section>
 
+        </details>
         <section className="mt-5 overflow-hidden rounded-md bg-white shadow-sm">
           <button type="button" onClick={() => setOverviewOpen((open) => !open)} className="flex min-h-14 w-full items-center justify-between px-4 text-left" aria-expanded={overviewOpen}>
             <span><strong className="block font-black">Aperçu de l’élevage</strong><span className="text-xs text-slate-500">Quelques repères, quand vous en avez besoin</span></span>
@@ -405,4 +407,31 @@ function FavoritesEditor({ favorites, onChange, onClose, onAction }: { favorites
 
 function ExitDialog({ onClose, onSelect }: { onClose: () => void; onSelect: (reason: string) => void }) {
   return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 sm:items-center sm:p-4" onMouseDown={onClose}><section role="dialog" aria-modal="true" aria-labelledby="exit-title" onMouseDown={(event) => event.stopPropagation()} className="w-full max-w-md rounded-t-lg bg-white p-4 shadow-2xl sm:rounded-lg"><div className="flex items-center justify-between"><div><h2 id="exit-title" className="text-lg font-black">Sortir un animal</h2><p className="text-xs text-slate-500">Simulation des motifs issus de SINal</p></div><button type="button" onClick={onClose} className="p-2" aria-label="Fermer"><X /></button></div><div className="mt-4 space-y-2">{PROTOTYPE_EXIT_REASONS.map((reason) => <button key={reason} type="button" onClick={() => onSelect(reason)} className="flex min-h-12 w-full items-center rounded-md border border-slate-200 px-3 text-left text-sm font-bold hover:bg-slate-50">{reason}</button>)}</div></section></div>;
+}
+
+const WORK_ITEMS = [
+  ["Vêlages", 1, 6], ["Vaccinations", 3, 8], ["Soins", 2, 4],
+  ["Identification", 2, 1], ["Échographies", 4, 5], ["Sevrages et tarissements", 0, 3],
+  ["Pesées", null, null], ["Parage", 0, 2], ["Chaleurs", null, null], ["Saillies", null, null],
+  ["Événements", null, null], ["Troupeau", null, null], ["Reproduction", null, null],
+  ["Sanitaire", null, null], ["Pharmacie", null, null], ["Ordonnances", null, null],
+  ["Finances", null, null], ["Calendrier de gestation", null, null], ["Carnet sanitaire", null, null], ["Taureaux", null, null],
+] as const;
+function WorkBoard() {
+  const [order, setOrder] = useState(WORK_ITEMS.map((_, i) => i));
+  const [editing, setEditing] = useState(false);
+  const [active, setActive] = useState<number | null>(null);
+  const [period, setPeriod] = useState<"now" | "soon">("now");
+  function move(index: number, delta: number) {
+    setOrder(current => { const next = [...current]; const target = index + delta;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]]; return next; });
+  }
+  const item = active === null ? null : WORK_ITEMS[active];
+  const count = item ? item[period === "now" ? 1 : 2] : null;
+  return <section aria-label="Mon travail" className="space-y-3">
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-xl font-black">Mon travail</h2><p className="text-xs text-slate-600">Simulation · anticipation à 15 jours · données fictives</p></div><button type="button" onClick={() => setEditing(!editing)} className="min-h-11 rounded border px-3 text-sm font-bold">{editing ? "Terminer" : "Modifier l’ordre"}</button></div>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">{order.map((id, index) => { const [label, now, soon] = WORK_ITEMS[id]; return <div key={id} className="min-w-0 rounded-md border bg-white p-2 shadow-sm"><button type="button" disabled={editing} onClick={() => { setActive(id); setPeriod(now === 0 && soon ? "soon" : "now"); }} className="min-h-16 w-full text-left"><strong className="block break-words text-sm">{label}</strong>{now !== null && <span className="mt-1 flex flex-wrap gap-x-2 text-xs"><span className={now ? "font-bold text-red-800" : "text-slate-500"}>{now} à faire</span><span className="text-amber-800">{soon} à anticiper</span></span>}</button>{editing && <div className="flex gap-2"><button type="button" disabled={index === 0} onClick={() => move(index,-1)} aria-label={"Avancer "+label} className="min-h-11 flex-1 rounded border">↑</button><button type="button" disabled={index === order.length-1} onClick={() => move(index,1)} aria-label={"Reculer "+label} className="min-h-11 flex-1 rounded border">↓</button></div>}</div>; })}</div>
+    {item && <div role="dialog" aria-label={item[0]} className="rounded-md border bg-white p-3"><div className="flex justify-between gap-2"><h3 className="font-black">{item[0]}</h3><button type="button" onClick={() => setActive(null)} className="min-h-11 px-3">Fermer</button></div>{count !== null ? <><div className="flex gap-2">{(["now","soon"] as const).map(p => <button key={p} type="button" aria-pressed={period===p} onClick={() => setPeriod(p)} className="min-h-11 rounded border px-3">{p==="now"?"À faire":"À anticiper"}</button>)}</div><p className="my-2 text-xs text-slate-600">Liste fictive · {count} animaux</p>{Array.from({length:count},(_,i)=><label key={period+i} className="flex min-h-11 items-center gap-2 border-t"><input type="checkbox" /> Animal fictif {9000+i} · {period==="now"?"À traiter":"Dans les 15 jours"}</label>)}</> : <p className="text-sm text-slate-600">Accès simulé · aucun compteur défini.</p>}</div>}
+  </section>;
 }
