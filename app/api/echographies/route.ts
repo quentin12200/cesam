@@ -168,36 +168,21 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    const [gestation] = await prisma.$transaction([
-      saillie.gestation
-        ? prisma.gestation.update({ where: { id: saillie.gestation.id }, data: gestationData })
-        : prisma.gestation.create({ data: { saillieId, ...gestationData } }),
-      // Clear the "à échographier" flag automatically
-      prisma.animal.update({
-        where: { id: saillie.animalId },
-        data: { aEchographier: false },
-      }),
-      prisma.demandeEchographie.updateMany({
-        where: { animalId: saillie.animalId, etat: "A_FAIRE", origine: "AUTOMATIQUE", OR: [{ saillieId }, { saillieId: null }] },
-        data: { etat: "REALISEE", clotureeAt: new Date(date) },
-      }),
-      prisma.demandeEchographie.updateMany({
-        where: { animalId: saillie.animalId, etat: "A_FAIRE", origine: "MANUELLE", OR: [{ saillieId }, { saillieId: null }] },
-        data: { etat: "REALISEE", clotureeAt: new Date(date), requestKey: null },
-      }),
-    ]);
-    const remainingEchoRequests = await prisma.demandeEchographie.count({
-      where: { animalId: saillie.animalId, etat: "A_FAIRE" },
-    });
-    if (remainingEchoRequests > 0) {
-      await prisma.animal.update({ where: { id: saillie.animalId }, data: { aEchographier: true } });
-    }
-    if (updateTaureau === true) {
-      await prisma.saillie.update({
-        where: { id: saillieId },
-        data: { taureauId: typeof taureauId === "string" && taureauId ? taureauId : null },
+    const gestation = await prisma.$transaction(async tx => {
+      const saved = await tx.gestation.upsert({where:{saillieId},create:{saillieId,...gestationData},update:gestationData});
+      await tx.demandeEchographie.updateMany({
+        where:{animalId:saillie.animalId,etat:"A_FAIRE",origine:"AUTOMATIQUE",OR:[{saillieId},{saillieId:null}]},
+        data:{etat:"REALISEE",clotureeAt:new Date(date)}
       });
-    }
+      await tx.demandeEchographie.updateMany({
+        where:{animalId:saillie.animalId,etat:"A_FAIRE",origine:"MANUELLE",OR:[{saillieId},{saillieId:null}]},
+        data:{etat:"REALISEE",clotureeAt:new Date(date),requestKey:null}
+      });
+      const remaining=await tx.demandeEchographie.count({where:{animalId:saillie.animalId,etat:"A_FAIRE"}});
+      await tx.animal.update({where:{id:saillie.animalId},data:{aEchographier:remaining>0}});
+      if(updateTaureau===true) await tx.saillie.update({where:{id:saillieId},data:{taureauId:typeof taureauId==="string"&&taureauId?taureauId:null}});
+      return saved;
+    });
 
     const desc = `Échographie ${resultat === "PLEINE" ? "positive" : "négative"} enregistrée`;
     let undoId = "";
