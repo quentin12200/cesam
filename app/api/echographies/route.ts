@@ -257,3 +257,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({error:"Impossible de charger le récapitulatif"}, {status:500});
   }
 }
+
+export async function PATCH(request: NextRequest) {
+ try {
+  const {id,animalId,date,remarque}=await request.json();
+  if(typeof id!=="string"||typeof animalId!=="string"||typeof date!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(date))return NextResponse.json({error:"Correction invalide"},{status:400});
+  const start=new Date(date+"T00:00:00.000Z");
+  if(!Number.isFinite(start.getTime())||start.toISOString().slice(0,10)!==date)return NextResponse.json({error:"Date invalide"},{status:400});
+  const range={gte:start,lt:addDays(start,1)};
+  const result=await prisma.$transaction(async tx=>{
+   const row=await tx.demandeEchographie.findFirst({where:{id,animalId,etat:"REALISEE",clotureeAt:range},include:{animal:true}});
+   if(!row|| (row.saillieId!==null && !(row.animal.reproductionEtatManuel==="ROUGE"&&row.animal.reproductionEtatModifieAt&&row.animal.reproductionEtatModifieAt>=start&&row.animal.reproductionEtatModifieAt<range.lt)))return false;
+   if(await tx.gestation.findFirst({where:{saillie:{animalId},dateEcho:range}}))return false;
+   const observation=typeof remarque==="string"?remarque.trim()||null:null;
+   await tx.demandeEchographie.update({where:{id},data:{observation}});
+   await tx.actionLog.create({data:{type:"CORRECT_ECHOGRAPHIE",description:"Correction observation échographie négative",revertData:JSON.stringify([{op:"update",model:"demandeEchographie",where:{id},data:{observation:row.observation}}])}});
+   return true;
+  });
+  return result?NextResponse.json({ok:true}):NextResponse.json({error:"Échographie non modifiable ou résultat déjà associé"}, {status:409});
+ }catch{return NextResponse.json({error:"Correction impossible"},{status:500});}
+}
