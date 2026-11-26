@@ -69,6 +69,9 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
   const [date, setDate] = useState(today);
   const [query, setQuery] = useState("");
   const [drafts, setDrafts] = useState<Record<string, EchoDraft>>({});
+  const [expanded,setExpanded]=useState<Record<string,boolean>>({});
+  const [bullPicker,setBullPicker]=useState<string|null>(null);
+  const [bullQuery,setBullQuery]=useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [catalogue,setCatalogue]=useState<EchoEvent[]>(fixture?.catalogue??[]);
@@ -146,7 +149,7 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
 
   return (
     <div className="fixed inset-0 z-50 flex bg-black/50 sm:items-center sm:justify-center sm:p-4" role="dialog" aria-modal="true" aria-label="Saisie d’une séance d’échographies">
-      <div className="flex h-full w-full flex-col bg-gray-50 sm:h-[min(94vh,900px)] sm:max-w-2xl sm:rounded-2xl sm:shadow-2xl">
+      <div className="flex h-full w-full min-w-0 max-w-full flex-col overflow-hidden bg-gray-50 sm:h-[min(94vh,900px)] sm:max-w-2xl sm:rounded-2xl sm:shadow-2xl">
         <header className="shrink-0 border-b border-gray-200 bg-white px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:rounded-t-2xl sm:pt-4">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
@@ -158,12 +161,12 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2">
+          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
             <label className="flex min-h-12 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3">
               <Search size={17} className="shrink-0 text-gray-400" />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Numéro ou nom" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
             </label>
-            <label className="relative flex min-h-12 items-center rounded-xl border border-amber-300 bg-amber-50 px-3">
+            <label className="relative flex min-w-0 min-h-12 items-center rounded-xl border border-amber-300 bg-amber-50 px-3">
               <CalendarDays size={17} className="pointer-events-none absolute left-3 text-amber-700" />
               <input
                 type="date"
@@ -171,33 +174,32 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
                 max={today}
                 onChange={(event) => setDate(event.target.value)}
                 aria-label="Date de la séance"
-                className="w-full bg-transparent pl-6 text-sm font-bold text-amber-950 outline-none"
+                className="w-full min-w-0 max-w-full bg-transparent pl-6 text-sm font-bold text-amber-950 outline-none"
               />
             </label>
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 sm:p-4">
+        <main className="min-h-0 min-w-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto p-3 sm:p-4">
           {displayedCows.map((vache) => {
             const draft = drafts[vache.id] ?? { suivis: [], remarque: "" };
             const joursGestation = draft.joursGestation ?? defaultGestationDays(vache, date);
             const conception = addDays(safeDate(date || today), -joursGestation);
             const terme = addDays(safeDate(date || today), DUREE_GESTATION - joursGestation);
             return (
-              <article key={vache.id} className={`rounded-2xl border bg-white p-3 shadow-sm ${draft.resultat === "PLEINE" ? "border-green-400" : draft.resultat === "VIDE" ? "border-red-400" : "border-gray-200"}`}>
+              <article key={vache.id} className={`min-w-0 max-w-full rounded-xl border bg-white p-2 shadow-sm ${draft.resultat === "PLEINE" ? "border-green-400" : draft.resultat === "VIDE" ? "border-red-400" : "border-gray-200"}`}>
                 <div className="flex min-w-0 items-baseline gap-2">
                   <strong className="shrink-0 font-mono text-lg text-green-900">{vache.nutrav}</strong>
                   <span className="min-w-0 flex-1 truncate text-sm font-bold text-gray-800">{vache.nobovi ?? "Sans nom"}</span>
                   {draft.resultat && <Check size={18} className={draft.resultat === "PLEINE" ? "text-green-600" : "text-red-600"} />}
                 </div>
-                <p className="mb-3 mt-0.5 text-[11px] text-gray-500">
+                <p className="mb-1 mt-0.5 text-[11px] text-gray-500">
                   {vache.derniereSaillie
                     ? `${vache.saillieType === "IA" ? "IA" : "Saillie"} du ${format(new Date(vache.derniereSaillie), "d MMM yyyy", { locale: fr })}`
                     : "Aucune saillie enregistrée"}
                   {vache.derniereSaillie && ` · Père : ${vache.taureauNom ?? "non renseigné"}`}
                 </p>
 
-                {!vache.saillieId && <div className="mb-3 space-y-2"><label className="block text-xs font-semibold">Enregistrer un taureau ?<select className="mt-1 min-h-11 w-full rounded-xl border px-2" value={draft.bullId??""} onChange={e=>change(vache.id,{bullId:e.target.value})}><option value="">Non renseigné</option>{taureaux.map(t=><option key={t.id} value={t.id}>{t.nopere??t.nupere} · {t.nupere}</option>)}</select></label>{draft.bullId&&draft.resultat!=="PLEINE"&&<label className="block text-xs">Date de saillie connue (obligatoire hors diagnostic pleine)<input type="date" max={date} className="block min-h-11 w-full rounded border" value={draft.breedingDate??""} onChange={e=>change(vache.id,{breedingDate:e.target.value})}/></label>}</div>}
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => chooseResult(vache, "PLEINE")} className={`min-h-12 rounded-xl border-2 text-sm font-black ${draft.resultat === "PLEINE" ? "border-green-600 bg-green-600 text-white" : "border-gray-200 bg-white text-gray-700"}`}>
                     Pleine
@@ -209,7 +211,7 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
 
                 {draft.resultat === "PLEINE" && (
                   <div className="mt-3 rounded-xl bg-green-50 p-3">
-                    <label className="flex items-center justify-between gap-3 text-sm text-green-950">
+                    <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-green-950">
                       <span className="font-semibold">Stade de gestation</span>
                       <span className="flex items-center gap-2">
                         <input
@@ -228,7 +230,10 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
                   </div>
                 )}
 
-                <div className="mt-3 space-y-2">
+                {draft.resultat==="PLEINE" && (!vache.saillieId && <div className="mt-2 min-w-0 space-y-1"><button type="button" className="flex min-h-11 w-full min-w-0 items-center justify-between gap-2 rounded-lg border px-2 text-left text-xs font-semibold" onClick={()=>{setBullQuery("");setBullPicker(vache.id);}}><span>Taureau</span><span className="min-w-0 truncate">{taureaux.find(t=>t.id===draft.bullId)?.nopere || taureaux.find(t=>t.id===draft.bullId)?.nupere || "Choisir"}</span></button>{draft.bullId&&draft.resultat!=="PLEINE"&&<label className="block text-xs">Date de saillie connue (obligatoire hors diagnostic pleine)<input type="date" max={date} className="block min-h-11 w-full min-w-0 rounded border" value={draft.breedingDate??""} onChange={e=>change(vache.id,{breedingDate:e.target.value})}/></label>}</div>)}
+                <button type="button" aria-expanded={!!expanded[vache.id]} onClick={()=>setExpanded(old=>({...old,[vache.id]:!old[vache.id]}))} className="mt-1 flex min-h-11 w-full min-w-0 items-center justify-between gap-1 text-left text-xs text-gray-600"><span className="min-w-0 break-words">{[...(draft.events??[]).map(e=>e.nom),...(draft.actions??[]).map(a=>a.type),draft.remarque?"Note":""].filter(Boolean).join(" · ")||"Événements · Actions · Note"}</span><span aria-hidden="true">{expanded[vache.id]?"−":"+"}</span></button>
+                <div hidden={!expanded[vache.id]} className="min-w-0 space-y-2">
+                {draft.resultat!=="PLEINE" && (!vache.saillieId && <div className="mt-2 min-w-0 space-y-1"><button type="button" className="flex min-h-11 w-full min-w-0 items-center justify-between gap-2 rounded-lg border px-2 text-left text-xs font-semibold" onClick={()=>{setBullQuery("");setBullPicker(vache.id);}}><span>Taureau</span><span className="min-w-0 truncate">{taureaux.find(t=>t.id===draft.bullId)?.nopere || taureaux.find(t=>t.id===draft.bullId)?.nupere || "Choisir"}</span></button>{draft.bullId&&draft.resultat!=="PLEINE"&&<label className="block text-xs">Date de saillie connue (obligatoire hors diagnostic pleine)<input type="date" max={date} className="block min-h-11 w-full min-w-0 rounded border" value={draft.breedingDate??""} onChange={e=>change(vache.id,{breedingDate:e.target.value})}/></label>}</div>)}
                   <p className="text-xs font-bold text-gray-600">Événements sanitaires</p>
                   {catalogueError&&<p role="alert" className="text-xs text-red-700">{catalogueError}</p>}
                   <div className="flex flex-wrap gap-1.5">
@@ -245,7 +250,6 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
                   <div className="flex flex-wrap gap-1.5">{mergeActionNames([...ECHO_ACTIONS,...(draft.actions??[]).map(a=>a.type)]).map(type=>{const action=draft.actions?.find(a=>a.type===type);return <label key={type} className={`inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold ${action?"border-orange-500 bg-orange-100 text-orange-900":"border-gray-200 text-gray-700"}`}><input type="checkbox" checked={!!action} disabled={saving} onChange={()=>toggleAction(vache.id,type)}/>{type}</label>;})}<button type="button" disabled={saving} aria-expanded={!!actionPicker[vache.id]} onClick={()=>setActionPicker(old=>({...old,[vache.id]:!old[vache.id]}))} className="min-h-11 rounded-xl border border-dashed border-orange-400 px-2.5 text-xs font-bold text-orange-900">+ Ajouter une action</button></div>
                   {actionPicker[vache.id]&&<div className="space-y-2 rounded-xl border bg-orange-50 p-2">{actionError&&<p role="alert" className="text-xs">{actionError}</p>}<label className="block text-xs">Rechercher ou créer une action<input maxLength={100} className="mt-1 block min-h-11 w-full rounded-lg border bg-white px-2" value={actionQuery[vache.id]??""} onChange={e=>setActionQuery(old=>({...old,[vache.id]:e.target.value}))}/></label><div className="max-h-40 space-y-1 overflow-y-auto">{actionNames.filter(n=>actionKey(n).includes(actionKey(actionQuery[vache.id]??""))).slice(0,12).map(n=><button key={n} type="button" disabled={saving} className="block min-h-11 w-full rounded-lg border bg-white px-2 text-left text-sm" onClick={()=>addAction(vache.id,n)}>{n}</button>)}</div><button type="button" disabled={saving||!validActionName(actionQuery[vache.id])} className="min-h-11 w-full rounded-lg bg-orange-700 px-2 text-sm font-bold text-white disabled:opacity-40" onClick={()=>addAction(vache.id,actionQuery[vache.id])}>Créer et sélectionner l’action</button></div>}
                   {(draft.actions??[]).map(action=><label key={action.type} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-950">Échéance {action.type}<input type="date" min={date} value={action.due} disabled={saving} className="min-h-11 max-w-full rounded border bg-white px-2" onChange={e=>change(vache.id,{actions:(draft.actions??[]).map(a=>a.type===action.type?{...a,due:e.target.value}:a)})}/></label>)}
-                </div>
                 {(
                   <input
                     value={draft.remarque}
@@ -254,12 +258,14 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
                     className="mt-3 min-h-11 w-full rounded-xl border border-gray-200 px-3 text-sm outline-none focus:border-green-500"
                   />
                 )}
+                </div>
               </article>
             );
           })}
           {displayedCows.length === 0 && <p className="py-10 text-center text-sm text-gray-500">Aucune vache trouvée</p>}
         </main>
 
+        {bullPicker && <div className="absolute inset-0 z-10 flex items-end justify-center bg-black/40 sm:items-center" role="dialog" aria-label="Choisir un taureau"><div className="flex max-h-[80%] w-full min-w-0 max-w-md flex-col rounded-t-xl bg-white p-3 sm:rounded-xl"><div className="flex items-center justify-between"><h3 className="font-bold">Choisir un taureau</h3><button type="button" className="min-h-11 min-w-11" aria-label="Fermer le choix du taureau" onClick={()=>setBullPicker(null)}>×</button></div><input autoFocus value={bullQuery} onChange={e=>setBullQuery(e.target.value)} placeholder="Nom ou numéro du taureau" className="min-h-11 w-full min-w-0 rounded-lg border px-2"/><div className="min-h-0 overflow-y-auto"><button type="button" className="block min-h-11 w-full text-left" onClick={()=>{change(bullPicker,{bullId:"",breedingDate:""});setBullPicker(null);}}>Non renseigné</button>{taureaux.filter(t=>normEcho((t.nopere??"")+" "+t.nupere+" "+t.nupere.slice(-4)).includes(normEcho(bullQuery))).sort((a,b)=>(a.nopere||a.nupere).localeCompare(b.nopere||b.nupere,"fr")).map(t=><button type="button" key={t.id} className="block min-h-11 w-full border-t py-2 text-left" onClick={()=>{change(bullPicker,{bullId:t.id});setBullPicker(null);}}><strong className="block break-all">{t.nopere||t.nupere}</strong>{t.nopere&&t.nopere!==t.nupere&&<span className="text-xs text-gray-500">{t.nupere}</span>}</button>)}</div></div></div>}
         <footer className="shrink-0 border-t border-gray-200 bg-white p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] sm:rounded-b-2xl">
           {error && <p className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
           {actionCount > 0 && <p className="mb-2 text-center text-xs font-semibold text-orange-700">{actionCount} action{actionCount > 1 ? "s" : ""} à faire {actionCount > 1 ? "seront ajoutées" : "sera ajoutée"} aux actualités</p>}
