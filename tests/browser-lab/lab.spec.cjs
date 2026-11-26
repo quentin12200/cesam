@@ -97,6 +97,34 @@ test("validation du père : retour au contexte et prochain contrôle",async({pag
  await expect(section.getByRole("button",{name:"Vérifier demo-1"})).toHaveCount(0);
 });
 
+test("écho : père, événement personnalisé et action avec échéance",async({page})=>{
+ await page.goto("/lab");
+ await page.getByRole("button",{name:"Séance écho fictive"}).click();
+ const dialog=page.getByRole("dialog",{name:"Saisie d’une séance d’échographies"});
+ await expect(dialog.getByText(/Père : Père démo/)).toBeVisible();
+ const cow=dialog.locator("article").filter({hasText:"9802"});
+ await cow.getByLabel("Enregistrer un taureau ?").selectOption("demo-bull");
+ await cow.getByRole("button",{name:"Pleine",exact:true}).click();
+ await expect(cow.getByRole("button",{name:"Cyclée",exact:true})).toBeVisible();
+ await expect(cow.getByRole("checkbox",{name:"À revérifier",exact:true})).toBeVisible();
+ await cow.getByRole("button",{name:"Cyclée",exact:true}).click();
+ await cow.getByRole("button",{name:"Non cyclée",exact:true}).click();
+ await expect(cow.getByRole("button",{name:"Cyclée",exact:true})).toHaveAttribute("aria-pressed","false");
+ await cow.getByRole("button",{name:"+ Ajouter un événement",exact:true}).click();
+ await cow.getByLabel("Rechercher ou créer un événement").fill("Contrôle fictif");
+ await cow.getByRole("button",{name:"Créer et sélectionner"}).click();
+ await expect(cow.getByRole("button",{name:"Contrôle fictif ×"})).toBeVisible();
+ await cow.getByRole("checkbox",{name:"À revérifier",exact:true}).check();
+ await cow.getByLabel("Échéance À revérifier").fill("2099-01-01");
+ await dialog.getByRole("button",{name:/Enregistrer 1 résultat/}).click();
+ await expect(dialog).toHaveCount(0);
+ await expect(page.locator("pre").filter({hasText:"demo-echo-b"})).toContainText("Contrôle fictif");
+ await expect(page.locator("pre").filter({hasText:"demo-echo-b"})).toContainText("2099-01-01");
+ await expect(page.locator("pre").filter({hasText:"demo-echo-b"})).toContainText("demo-bull");
+});
+
+test("écho : action personnalisée réutilisée sans doublon",async({page})=>{await page.goto("/lab");await page.getByRole("button",{name:"Séance écho fictive"}).click();const dialog=page.getByRole("dialog",{name:"Saisie d’une séance d’échographies"});const a=dialog.locator("article").filter({hasText:"9801"}),b=dialog.locator("article").filter({hasText:"9802"});await a.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await a.getByLabel("Rechercher ou créer une action").fill("Prélèvement fictif");await a.getByRole("button",{name:"Créer et sélectionner l’action"}).click();await a.getByLabel("Échéance Prélèvement fictif").fill("2099-01-02");await b.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await b.getByLabel("Rechercher ou créer une action").fill("prelevement fictif");await b.getByRole("button",{name:"Prélèvement fictif",exact:true}).click();await b.getByLabel("Échéance Prélèvement fictif").fill("2099-01-03");await b.getByRole("button",{name:"+ Ajouter une action",exact:true}).click();await b.getByLabel("Rechercher ou créer une action").fill("PRELEVEMENT FICTIF");await b.getByRole("button",{name:"Créer et sélectionner l’action"}).click();await expect(b.getByLabel("Échéance Prélèvement fictif")).toHaveCount(1);await dialog.getByRole("button",{name:/Enregistrer 2 résultats/}).click();await expect(dialog).toHaveCount(0);const data=JSON.parse(await page.locator("pre").filter({hasText:"demo-echo-b"}).innerText());expect(data.resultats.map(r=>r.actions)).toEqual([[{type:"Prélèvement fictif",due:"2099-01-02"}],[{type:"Prélèvement fictif",due:"2099-01-03"}]]);});
+
 test("raccourci échographies : compteur et destination sur écran ordinateur et iPhone",async({page})=>{
  await page.goto("/lab");
  const shortcut=page.getByRole("region",{name:"Raccourci échographie fictif"}).getByRole("link",{name:/Échographies à faire/});
