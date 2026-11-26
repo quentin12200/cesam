@@ -1,0 +1,8 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {simulateBirth,type DemoBirth} from "./lab-calving.ts";
+const mixed:DemoBirth={date:"2026-11-25",father:"DEMO-PERE-A",observedFather:"DEMO-PERE-A",laterBreeding:false,calves:[{status:"VIVANT",sex:"F",number:"9901"},{status:"MORT_NE",sex:"M",number:"9902"}]};
+test("jumeaux mixtes : une fiche et une boucle, deux naissances, même père",()=>{const r=simulateBirth(mixed);assert.equal(r.births,2);assert.equal(r.living,1);assert.equal(r.loops,1);assert.equal(r.stillborn,1);assert.equal(r.calves[1].animalId,null);assert.equal(r.calves[1].number,null);assert.ok(r.calves.every(c=>c.fatherNational==="DEMO-PERE-A"));assert.equal(r.reset,true);assert.equal(r.manual,null);});
+test("deux vivants : deux fiches distinctes et deux boucles",()=>{const r=simulateBirth({...mixed,calves:[mixed.calves[0],{...mixed.calves[1],status:"VIVANT"}]});assert.equal(r.loops,2);assert.notEqual(r.calves[0].animalId,r.calves[1].animalId);});
+test("conflits paternels, doublons et dates invalides bloqués",()=>{assert.throws(()=>simulateBirth({...mixed,observedFather:"DEMO-PERE-B"}),/contradictoire/);assert.throws(()=>simulateBirth({...mixed,calves:[mixed.calves[0],mixed.calves[0]]}),/double/);assert.throws(()=>simulateBirth({...mixed,date:"2026-02-30"}),/invalide/);});
+test("un vêlage rétroactif ne change pas le cycle suivant, père inconnu reste nul",()=>{const r=simulateBirth({...mixed,father:"INCONNU",observedFather:"",laterBreeding:true});assert.equal(r.reset,false);assert.equal(r.manual,"VERT");assert.equal(r.calves[0].fatherNational,null);});

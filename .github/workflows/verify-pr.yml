@@ -43,3 +43,6 @@ jobs:
       - run: node --test --experimental-strip-types lib/coulisses-diagnostics.test.ts
       - run: node --test tests/lab-isolation.test.mjs
       - run: node --test --experimental-strip-types lib/lab-route.test.ts
+      - run: node --test --experimental-strip-types lib/lab-calving.test.ts
+      - run: node --test --experimental-strip-types lib/father-audit-navigation.test.ts lib/velage-navigation.test.ts tests/origin-navigation.test.mjs
+      - run: node --test tests/velage-father-selection.test.mjs
