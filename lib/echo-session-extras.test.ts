@@ -1,0 +1,3 @@
+import test from "node:test";import assert from "node:assert/strict";import {validateEchoExtras,toggleEchoEvent} from "./echo-session-extras.ts";
+test("observations incompatibles et échéances invalides refusées",()=>{assert.throws(()=>validateEchoExtras([{nom:"Cyclée"},{nom:"Non cyclée"}],[],"2026-11-26"));assert.throws(()=>validateEchoExtras([],[{type:"Estrumate à prévoir",due:"2026-11-25"}],"2026-11-26"));});
+test("événement personnalisé et action distincts",()=>{assert.doesNotThrow(()=>validateEchoExtras([{nom:"Observation fictive"}],[{type:"À revérifier",due:"2026-12-01"}],"2026-11-26"));assert.deepEqual(toggleEchoEvent([{nom:"Cyclée"}],{nom:"Non cyclée"}),[{nom:"Non cyclée"}]);});

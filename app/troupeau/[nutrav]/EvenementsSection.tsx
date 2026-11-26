@@ -283,7 +283,7 @@ function EvenementCard({ animalId, evt, affichageDelaiAttente, onTerminer }: {
               evt.resolu ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
             }`}
           >
-            {evt.resolu ? "Résolu" : "En cours"}
+            {evt.resolu ? "Résolu" : evt.categorie === "REPRODUCTION" && /à prévoir|À revérifier/i.test(evt.type) ? "À prévoir" : "En cours"}
           </span>
           <RecordActionsMenu
             onEdit={() => setEditionOuverte((value) => !value)}

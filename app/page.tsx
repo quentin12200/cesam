@@ -763,9 +763,9 @@ export default async function Dashboard({ searchParams }: PageProps) {
     data.bolusPreVelage;
   if (santeTotal > 0) {
     const suivisEcho = data.interventionsSanitairesUrgentes.filter((intervention) =>
-      ["Métrite", "Metrabol à prévoir", "Bolus à prévoir"].includes(intervention.type)
+      ["Métrite", "Metrabol à prévoir", "Métrabole à prévoir", "Estrumate à prévoir", "À revérifier", "Bolus à prévoir"].includes(intervention.type)
     );
-    const resumeSuivisEcho = ["Métrite", "Metrabol à prévoir", "Bolus à prévoir"]
+    const resumeSuivisEcho = ["Métrite", "Metrabol à prévoir", "Métrabole à prévoir", "Estrumate à prévoir", "À revérifier", "Bolus à prévoir"]
       .map((type) => {
         const numeros = suivisEcho.filter((intervention) => intervention.type === type).map((intervention) => intervention.animal.nutrav);
         return numeros.length > 0 ? `${type} : ${numeros.join(", ")}` : null;
