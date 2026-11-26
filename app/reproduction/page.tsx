@@ -453,8 +453,8 @@ function ReproductionContent() {
     }
   }, [loading, searchParams, taureaux, vaches]);
 
-  async function fetchData() {
-    setLoading(true);
+  async function fetchData(quiet=false) {
+    if(!quiet)setLoading(true);
     try {
       const [repro, taureauData] = await Promise.all([
         fetch("/api/reproduction", { cache: "no-store" }).then((r) => r.json()),
@@ -988,7 +988,7 @@ function ReproductionContent() {
                       animalIds={[vache.id]}
                       currentStatus={vache.etat as EtatGestationPartage}
                       previousStatus={vache.reproductionEtatPrecedent as EtatGestationPartage | null}
-                      onChanged={fetchData}
+                      onChanged={()=>fetchData()}
                     />
                   </div>
                 </div>
@@ -1448,13 +1448,14 @@ function ReproductionContent() {
       {echoSessionCows.length > 0 && (
         <EchoFieldSessionModal
           vaches={echoSessionCows}
+          taureaux={taureaux}
           onClose={() => setEchoSessionCows([])}
           onDone={async (count, actionsCount) => {
             setEchoSessionCows([]);
             setSelectedAnimalIds([]);
             setSelectionMode(false);
             setMessage(`✓ ${count} résultat${count > 1 ? "s" : ""} enregistré${count > 1 ? "s" : ""}${actionsCount > 0 ? ` · ${actionsCount} action${actionsCount > 1 ? "s" : ""} ajoutée${actionsCount > 1 ? "s" : ""}` : ""}`);
-            await fetchData();
+            await fetchData(true);
           }}
         />
       )}
