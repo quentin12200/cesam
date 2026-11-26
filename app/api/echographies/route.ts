@@ -256,12 +256,12 @@ export async function GET(request: NextRequest) {
     if (!Number.isFinite(start.getTime()) || start.toISOString().slice(0,10)!==day) return NextResponse.json({error:"Date invalide"}, {status:400});
     const end = addDays(start,1);
     const range = {gte:start,lt:end};
-    const animal = {select:{id:true,nutrav:true,nobovi:true}};
+    const animal = {select:{id:true,nutrav:true,nobovi:true,reproductionEtatManuel:true,reproductionEtatModifieAt:true}};
     const [gestations, requests] = await Promise.all([
-      prisma.gestation.findMany({where:{dateEcho:range,resultatEcho:{in:["PLEINE","VIDE"]}},select:{id:true,dateEcho:true,resultatEcho:true,joursGestation:true,saillie:{select:{animal}}}}),
-      prisma.demandeEchographie.findMany({where:{etat:"REALISEE",saillieId:null,clotureeAt:range},select:{id:true,clotureeAt:true,animal}})
+      prisma.gestation.findMany({where:{dateEcho:range,resultatEcho:{in:["PLEINE","VIDE"]}},select:{id:true,dateEcho:true,resultatEcho:true,joursGestation:true,observationEcho:true,saillie:{select:{id:true,animal,taureau:{select:{id:true,nopere:true,nupere:true}}}}}}),
+      prisma.demandeEchographie.findMany({where:{etat:"REALISEE",clotureeAt:range},select:{id:true,clotureeAt:true,saillieId:true,observation:true,animal}})
     ]);
-    const rows = buildEchoRecap(gestations, requests);
+    const rows = buildEchoRecap(gestations, requests.filter(r=>r.saillieId===null || (r.animal.reproductionEtatManuel==="ROUGE" && r.animal.reproductionEtatModifieAt && r.animal.reproductionEtatModifieAt>=start && r.animal.reproductionEtatModifieAt<end)));
     return NextResponse.json(rows);
   } catch(err) {
     console.error("GET /api/echographies",err);
