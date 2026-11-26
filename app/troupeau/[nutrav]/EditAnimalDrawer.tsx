@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { differenceInYears } from "date-fns";
 import { Pencil, X, Save } from "lucide-react";
 
 interface EditAnimalDrawerProps {
@@ -48,7 +49,7 @@ export default function EditAnimalDrawer({
       const res = await fetch(`/api/animaux/${nutrav}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, boucleFaite: differenceInYears(new Date(), new Date(form.danais)) < 1 && form.boucleFaite !== boucleFaite ? form.boucleFaite : undefined }),
       });
       if (!res.ok) throw new Error(await res.text());
       setOpen(false);
@@ -152,7 +153,7 @@ export default function EditAnimalDrawer({
             )}
 
             {/* Boucle faite */}
-            <div className="flex items-center justify-between">
+            {differenceInYears(new Date(), new Date(form.danais)) < 1 && <div className="flex items-center justify-between">
               <label className="text-sm font-medium text-gray-700">Boucle posée</label>
               <button
                 type="button"
@@ -161,7 +162,7 @@ export default function EditAnimalDrawer({
               >
                 <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${form.boucleFaite ? "translate-x-6" : "translate-x-0"}`} />
               </button>
-            </div>
+            </div>}
 
             {/* Notes */}
             <div>
