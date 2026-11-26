@@ -37,10 +37,11 @@ import {
   Printer,
   GitBranch,
 } from "lucide-react";
-import { differenceInDays } from "date-fns";
+import { differenceInDays, differenceInYears } from "date-fns";
 import EditAnimalDrawer from "./EditAnimalDrawer";
 import PeseeInlineForm from "./PeseeInlineForm";
 import SevrageButton from "./SevrageButton";
+import BouclageButton from "./BouclageButton";
 import QuickActionsBar from "./QuickActionsBar";
 import CategorieButton from "./CategorieButton";
 import EchoStatusBadge from "./EchoStatusBadge";
@@ -586,18 +587,15 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                 </div>
               </dl>
 
-              {(!animal.boucleFaite ||
-                ((animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150) ||
+              {((!animal.boucleFaite && differenceInYears(new Date(), animal.danais) < 1 && animal.statut === "ACTIF") || animal.dateSevrage ||
+                ((animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150 && differenceInYears(new Date(), animal.danais) < 1 && animal.statut === "ACTIF") ||
                 (animal.sexbov === "F" && !animal.estGenisse && animal.tarieFaite)) && (
                 <div className="border-t border-gray-100 bg-gray-50 px-3 py-2.5">
                   <div className="text-[11px] font-medium text-gray-500 uppercase mb-1.5">Suivi</div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {!animal.boucleFaite && (
-                      <span className="text-xs font-medium text-orange-700 bg-orange-100 px-2 py-1 rounded-full">
-                        Boucle à poser
-                      </span>
-                    )}
-                    {(animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150 && (
+                    {!animal.boucleFaite && differenceInYears(new Date(), animal.danais) < 1 && animal.statut === "ACTIF" && <BouclageButton nutrav={animal.nutrav} />}
+                    {animal.dateSevrage && differenceInYears(new Date(), animal.danais) >= 1 && <span className="text-xs font-medium text-slate-700">Sevré à {formatAge(animal.danais, animal.dateSevrage)}</span>}
+                    {(animal.estGenisse || animal.sexbov === "M") && differenceInDays(new Date(), animal.danais) >= 150 && differenceInYears(new Date(), animal.danais) < 1 && animal.statut === "ACTIF" && (
                       <SevrageButton
                         animalId={animal.id}
                         nutrav={animal.nutrav}
