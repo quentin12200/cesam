@@ -40,12 +40,6 @@ interface Props {
   onDone: (count: number, actionsCount: number) => void;
 }
 
-const FOLLOW_UPS: Array<{ id: FollowUp; label: string; createsAction?: boolean }> = [
-  { id: "CYCLEE", label: "Cyclée" },
-  { id: "METRITE", label: "Métrite", createsAction: true },
-  { id: "METRABOL", label: "Metrabol à prévoir", createsAction: true },
-  { id: "BOLUS", label: "Bolus à prévoir", createsAction: true },
-];
 
 function localDateValue() {
   const now = new Date();
@@ -79,7 +73,7 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
   const [error, setError] = useState("");
   const [catalogue,setCatalogue]=useState<EchoEvent[]>(fixture?.catalogue??[]);
   const [catalogueError,setCatalogueError]=useState("");
-  const [expanded,setExpanded]=useState<Record<string,boolean>>({});
+  const [eventPickerOpen,setEventPickerOpen]=useState<Record<string,boolean>>({});
   const [eventQuery,setEventQuery]=useState<Record<string,string>>({});
   const inFlight=useRef(false);
   const sessionId=useRef<string>("");
@@ -111,15 +105,6 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
         ? draft.joursGestation ?? defaultGestationDays(vache, date)
         : undefined,
       suivis: draft.suivis,
-    })));
-  }
-
-  function toggleFollowUp(animalId: string, suivi: FollowUp) {
-    setDrafts((current) => updateDraft(current, animalId, (draft) => ({
-      ...draft,
-      suivis: draft.suivis.includes(suivi)
-        ? draft.suivis.filter((item) => item !== suivi)
-        : [...draft.suivis, suivi],
     })));
   }
 
@@ -189,8 +174,8 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
           {displayedCows.map((vache) => {
             const draft = drafts[vache.id] ?? { suivis: [], remarque: "" };
             const joursGestation = draft.joursGestation ?? defaultGestationDays(vache, date);
-            const conception = addDays(safeDate(date), -joursGestation);
-            const terme = addDays(safeDate(date), DUREE_GESTATION - joursGestation);
+            const conception = addDays(safeDate(date || today), -joursGestation);
+            const terme = addDays(safeDate(date || today), DUREE_GESTATION - joursGestation);
             return (
               <article key={vache.id} className={`rounded-2xl border bg-white p-3 shadow-sm ${draft.resultat === "PLEINE" ? "border-green-400" : draft.resultat === "VIDE" ? "border-red-400" : "border-gray-200"}`}>
                 <div className="flex min-w-0 items-baseline gap-2">
@@ -236,18 +221,24 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
                   </div>
                 )}
 
-                <button type="button" aria-expanded={!!expanded[vache.id]} onClick={()=>setExpanded(old=>({...old,[vache.id]:!old[vache.id]}))} className="mt-3 min-h-11 w-full rounded-xl border text-sm font-bold">Événements et actions{(draft.events?.length??0)+(draft.actions?.length??0)>0?" · "+((draft.events?.length??0)+(draft.actions?.length??0)):""}</button>
-                {expanded[vache.id]&&<div className="mt-2 space-y-3 rounded-xl border p-3">
-                  <p className="text-xs font-bold">Événements sanitaires</p>
-                  {catalogueError&&<p role="alert">{catalogueError}</p>}
-                  <div className="flex flex-wrap gap-2">{ECHO_OBSERVATIONS.map(nom=>{const event=catalogue.find(e=>normEcho(e.nom)===normEcho(nom))??{nom};return <button type="button" key={nom} aria-pressed={(draft.events??[]).some(e=>normEcho(e.nom)===normEcho(nom))} onClick={()=>selectEvent(vache.id,event)} className="min-h-11 rounded-xl border px-3 aria-pressed:bg-blue-100">{nom}</button>;})}</div>
-                  <label className="block text-xs">Rechercher ou créer un événement<input className="block min-h-11 w-full rounded border px-2" value={eventQuery[vache.id]??""} onChange={e=>setEventQuery(old=>({...old,[vache.id]:e.target.value}))}/></label>
-                  {(eventQuery[vache.id]??"").trim()&&<div className="space-y-1">{catalogue.filter(e=>normEcho(e.nom).includes(normEcho(eventQuery[vache.id]))).slice(0,10).map(e=><button type="button" key={e.id??e.nom} className="block min-h-11 w-full rounded border text-left px-2" onClick={()=>selectEvent(vache.id,e)}>{e.nom}</button>)}<button type="button" className="min-h-11 w-full rounded border font-bold" onClick={()=>addEvent(vache.id)}>+ Ajouter un événement</button></div>}
-                  {(draft.events??[]).map(e=><button type="button" key={e.nom} onClick={()=>selectEvent(vache.id,e)} className="mr-1 rounded bg-blue-100 p-2">{e.nom} ×</button>)}
-                  <p className="text-xs font-bold">Actions à prévoir</p>
-                  {ECHO_ACTIONS.map(type=>{const action=draft.actions?.find(a=>a.type===type);return <div key={type}><label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={!!action} onChange={()=>toggleAction(vache.id,type)}/>{type}</label>{action&&<label className="block text-xs">Échéance {type}<input type="date" min={date} value={action.due} className="block min-h-11 w-full rounded border" onChange={e=>change(vache.id,{actions:(draft.actions??[]).map(a=>a.type===type?{...a,due:e.target.value}:a)})}/></label>}</div>;})}
-                </div>}
-                {(draft.resultat || expanded[vache.id]) && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs font-bold text-gray-600">Événements sanitaires</p>
+                  {catalogueError&&<p role="alert" className="text-xs text-red-700">{catalogueError}</p>}
+                  <div className="flex flex-wrap gap-1.5">
+                    {ECHO_OBSERVATIONS.map(nom=>{const event=catalogue.find(e=>normEcho(e.nom)===normEcho(nom))??{nom};return <button type="button" key={nom} aria-pressed={(draft.events??[]).some(e=>normEcho(e.nom)===normEcho(nom))} disabled={saving} onClick={()=>selectEvent(vache.id,event)} className="min-h-11 rounded-xl border border-gray-200 px-2.5 text-xs font-bold aria-pressed:border-blue-500 aria-pressed:bg-blue-100 aria-pressed:text-blue-900">{nom}</button>;})}
+                    <button type="button" disabled={saving} aria-expanded={!!eventPickerOpen[vache.id]} onClick={()=>setEventPickerOpen(old=>({...old,[vache.id]:!old[vache.id]}))} className="min-h-11 rounded-xl border border-dashed border-blue-400 px-2.5 text-xs font-bold text-blue-800">+ Ajouter un événement</button>
+                    {(draft.events??[]).filter(e=>!ECHO_OBSERVATIONS.some(nom=>normEcho(nom)===normEcho(e.nom))).map(e=><button type="button" key={e.nom} disabled={saving} onClick={()=>selectEvent(vache.id,e)} className="min-h-11 rounded-xl border border-blue-500 bg-blue-100 px-2.5 text-xs font-bold text-blue-900">{e.nom} ×</button>)}
+                  </div>
+                  {eventPickerOpen[vache.id]&&<div className="space-y-2 rounded-xl border bg-gray-50 p-2">
+                    <label className="block text-xs">Rechercher ou créer un événement<input className="mt-1 block min-h-11 w-full rounded-lg border bg-white px-2" value={eventQuery[vache.id]??""} onChange={e=>setEventQuery(old=>({...old,[vache.id]:e.target.value}))}/></label>
+                    <div className="max-h-40 space-y-1 overflow-y-auto">{catalogue.filter(e=>normEcho(e.nom).includes(normEcho(eventQuery[vache.id]??""))).slice(0,10).map(e=><button type="button" key={e.id??e.nom} disabled={saving} aria-pressed={(draft.events??[]).some(item=>normEcho(item.nom)===normEcho(e.nom))} className="block min-h-11 w-full rounded-lg border bg-white px-2 text-left text-sm aria-pressed:bg-blue-100" onClick={()=>{selectEvent(vache.id,e);setEventPickerOpen(old=>({...old,[vache.id]:false}));setEventQuery(old=>({...old,[vache.id]:""}));}}>{e.nom}</button>)}</div>
+                    <button type="button" disabled={saving||!(eventQuery[vache.id]??"").trim()} className="min-h-11 w-full rounded-lg bg-blue-600 px-2 text-sm font-bold text-white disabled:opacity-40" onClick={()=>{addEvent(vache.id);setEventPickerOpen(old=>({...old,[vache.id]:false}));}}>Créer et sélectionner</button>
+                  </div>}
+                  <p className="pt-1 text-xs font-bold text-gray-600">Actions à prévoir</p>
+                  <div className="flex flex-wrap gap-1.5">{ECHO_ACTIONS.map(type=>{const action=draft.actions?.find(a=>a.type===type);return <label key={type} className={`inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold ${action?"border-orange-500 bg-orange-100 text-orange-900":"border-gray-200 text-gray-700"}`}><input type="checkbox" checked={!!action} disabled={saving} onChange={()=>toggleAction(vache.id,type)}/>{type}</label>;})}</div>
+                  {(draft.actions??[]).map(action=><label key={action.type} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-950">Échéance {action.type}<input type="date" min={date} value={action.due} disabled={saving} className="min-h-11 max-w-full rounded border bg-white px-2" onChange={e=>change(vache.id,{actions:(draft.actions??[]).map(a=>a.type===action.type?{...a,due:e.target.value}:a)})}/></label>)}
+                </div>
+                {(
                   <input
                     value={draft.remarque}
                     onChange={(event) => setDrafts((current) => updateDraft(current, vache.id, (item) => ({ ...item, remarque: event.target.value })))}

@@ -105,12 +105,15 @@ test("écho : père, événement personnalisé et action avec échéance",async(
  const cow=dialog.locator("article").filter({hasText:"9802"});
  await cow.getByLabel("Enregistrer un taureau ?").selectOption("demo-bull");
  await cow.getByRole("button",{name:"Pleine",exact:true}).click();
- await cow.getByRole("button",{name:"Événements et actions"}).click();
+ await expect(cow.getByRole("button",{name:"Cyclée",exact:true})).toBeVisible();
+ await expect(cow.getByRole("checkbox",{name:"À revérifier",exact:true})).toBeVisible();
  await cow.getByRole("button",{name:"Cyclée",exact:true}).click();
  await cow.getByRole("button",{name:"Non cyclée",exact:true}).click();
  await expect(cow.getByRole("button",{name:"Cyclée",exact:true})).toHaveAttribute("aria-pressed","false");
+ await cow.getByRole("button",{name:"+ Ajouter un événement",exact:true}).click();
  await cow.getByLabel("Rechercher ou créer un événement").fill("Contrôle fictif");
- await cow.getByRole("button",{name:"+ Ajouter un événement"}).click();
+ await cow.getByRole("button",{name:"Créer et sélectionner"}).click();
+ await expect(cow.getByRole("button",{name:"Contrôle fictif ×"})).toBeVisible();
  await cow.getByRole("checkbox",{name:"À revérifier",exact:true}).check();
  await cow.getByLabel("Échéance À revérifier").fill("2099-01-01");
  await dialog.getByRole("button",{name:/Enregistrer 1 résultat/}).click();
