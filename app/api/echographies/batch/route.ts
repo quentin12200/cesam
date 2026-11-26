@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
-import { ECHO_ACTIONS, normEcho, validateEchoExtras, validEchoDate, type EchoEvent, type EchoAction } from "@/lib/echo-session-extras";
+import { ECHO_ACTION_CATEGORY, actionCatalogName, actionLabel, actionKey, normEcho, validateEchoExtras, validEchoDate, type EchoEvent, type EchoAction } from "@/lib/echo-session-extras";
 import { addDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { logAction, type RevertStep } from "@/lib/action-log";
@@ -103,11 +103,22 @@ export async function POST(request: NextRequest) {
         const observation = buildObservation(input);
         if(input.bullId&&!await tx.taureau.findUnique({where:{id:input.bullId},select:{id:true}}))throw Error("Taureau introuvable");
         const events=input.events??[];
-        for(const event of events){let entry=event.id?catalogue.find(e=>e.id===event.id&&e.actif):catalogue.find(e=>normEcho(e.nom)===normEcho(event.nom));if(event.id&&!entry)throw Error("Événement du catalogue introuvable");if(entry&&!entry.actif)throw Error("Événement désactivé");if(!entry){entry=await tx.typeEvenement.create({data:{nom:event.nom.trim(),categorie:normEcho(event.nom)==="metrite"?"MALADIE":"AUTRE"},select:{id:true,nom:true,categorie:true,actif:true}});catalogue.push(entry);}
+        for(const event of events){let entry=event.id?catalogue.find(e=>e.id===event.id&&e.actif&&e.categorie!==ECHO_ACTION_CATEGORY):catalogue.find(e=>e.categorie!==ECHO_ACTION_CATEGORY&&normEcho(e.nom)===normEcho(event.nom));if(event.id&&!entry)throw Error("Événement du catalogue introuvable");if(entry&&!entry.actif)throw Error("Événement désactivé");if(!entry){entry=await tx.typeEvenement.create({data:{nom:event.nom.trim(),categorie:normEcho(event.nom)==="metrite"?"MALADIE":"AUTRE"},select:{id:true,nom:true,categorie:true,actif:true}});catalogue.push(entry);}
           const existing=await tx.evenementSanitaire.findFirst({where:{animalId:animal.id,date:dateEcho,type:entry.nom,symptomes:{some:{typeEvenementId:entry.id}}},select:{id:true}});
           if(!existing){const created=await tx.evenementSanitaire.create({data:{animalId:animal.id,date:dateEcho,type:entry.nom,categorie:entry.categorie,resolu:["cyclee","non cyclee"].includes(normEcho(entry.nom)),description:"Observé pendant la séance d’échographie",symptomes:{create:{libelle:entry.nom,typeEvenementId:entry.id}}},select:{id:true}});revertSteps.push({op:"delete",model:"evenementSanitaire",id:created.id});}
         }
-        for(const action of input.actions??[]){const due=new Date(action.due);const existing=await tx.evenementSanitaire.findFirst({where:{animalId:animal.id,type:action.type,date:due,resolu:false},select:{id:true}});if(!existing){const created=await tx.evenementSanitaire.create({data:{animalId:animal.id,categorie:"REPRODUCTION",type:action.type,date:due,resolu:false,description:"Action à prévoir — séance du "+date},select:{id:true}});revertSteps.push({op:"delete",model:"evenementSanitaire",id:created.id});actionsCreees.push(action.type);}}
+        for(const action of input.actions??[]){
+          let entry=catalogue.find(e=>e.categorie===ECHO_ACTION_CATEGORY&&actionKey(actionLabel(e.nom))===actionKey(action.type));
+          if(entry&&!entry.actif)throw Error("Action désactivée");
+          if(!entry){entry=await tx.typeEvenement.create({data:{nom:actionCatalogName(action.type),categorie:ECHO_ACTION_CATEGORY},select:{id:true,nom:true,categorie:true,actif:true}});catalogue.push(entry);}
+          const type=actionLabel(entry.nom);
+          const due=new Date(action.due);
+          const candidates=await tx.evenementSanitaire.findMany({where:{animalId:animal.id,date:due,categorie:{in:[ECHO_ACTION_CATEGORY,"REPRODUCTION"]}},select:{id:true,type:true}});
+          if(!candidates.some(e=>actionKey(e.type)===actionKey(type))){
+            const created=await tx.evenementSanitaire.create({data:{animalId:animal.id,categorie:ECHO_ACTION_CATEGORY,type,date:due,resolu:false,description:"Action à prévoir — séance du "+date},select:{id:true}});
+            revertSteps.push({op:"delete",model:"evenementSanitaire",id:created.id});actionsCreees.push(type);
+          }
+        }
         if(!input.resultat&&!input.bullId)continue;
         let saillie = input.saillieId
           ? await tx.saillie.findFirst({
