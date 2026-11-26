@@ -22,7 +22,7 @@ import {
 } from "@/lib/utils";
 import Link from "next/link";
 import BackButton from "./BackButton";
-import { safeReturnTo } from "@/lib/origin-navigation";
+import { animalTabHref } from "@/lib/origin-navigation";
 import { notFound } from "next/navigation";
 import {
   Scale,
@@ -425,9 +425,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   ];
 
   function tabHref(id: string) {
-    const testParam = testReproEnabled ? "&testRepro=1" : "";
-    const origin = safeReturnTo(returnTo ?? null);
-    return `/troupeau/${animal!.nutrav}?onglet=${id}${testParam}${origin ? "&returnTo=" + encodeURIComponent(origin) : ""}`;
+    return animalTabHref(animal!.nutrav, id, testReproEnabled, returnTo ?? null);
   }
 
   return (
