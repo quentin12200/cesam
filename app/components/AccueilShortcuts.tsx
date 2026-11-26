@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import Link from "next/link";
+import EchoShortcut from "./EchoShortcut";
 import {
   Baby,
   BarChart3,
@@ -175,13 +176,7 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
 
   const mobileActions = raccourcis.slice(0, raccourcis.length > 5 ? 4 : 5);
   const desktopActions = raccourcis.slice(0, raccourcis.length > 11 ? 10 : 11);
-  const echoShortcut = (
-    <Link href="/reproduction?filtre=JAUNE" className="flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-amber-300 bg-amber-50 px-1 py-1 text-center text-xs font-semibold leading-tight text-amber-900 shadow-sm">
-      <HeartPulse size={16} className="shrink-0" />
-      <span>Échographies à faire</span>
-      <span aria-label="Nombre de femelles à échographier">{echoCount ?? "—"}</span>
-    </Link>
-  );
+  const echoShortcut = <EchoShortcut echoCount={echoCount} />;
   const weighingShortcut = (
     <Link href="/troupeau/pesee" className="flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-green-300 bg-green-50 px-1 py-1 text-center text-xs font-semibold leading-tight text-green-900 shadow-sm transition active:scale-[0.97]">
       <Scale size={16} className="shrink-0" />
