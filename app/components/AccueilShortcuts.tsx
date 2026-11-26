@@ -67,6 +67,19 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
   const [brouillon, setBrouillon] = useState<AccueilShortcutId[]>(DEFAULT_ACCUEIL_SHORTCUTS);
   const [open, setOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [echoCount, setEchoCount] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      fetch('/api/reproduction', { cache: 'no-store' })
+        .then(response => { if (!response.ok) throw new Error(); return response.json(); })
+        .then(data => { if (active) setEchoCount(data.vaches.filter((v: { aEchographier: boolean }) => v.aEchographier).length); })
+        .catch(() => { if (active) setEchoCount(null); });
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    return () => { active = false; window.removeEventListener('focus', refresh); };
+  }, []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -162,6 +175,13 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
 
   const mobileActions = raccourcis.slice(0, raccourcis.length > 5 ? 4 : 5);
   const desktopActions = raccourcis.slice(0, raccourcis.length > 11 ? 10 : 11);
+  const echoShortcut = (
+    <Link href="/reproduction?filtre=JAUNE" className="flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-amber-300 bg-amber-50 px-1 py-1 text-center text-xs font-semibold leading-tight text-amber-900 shadow-sm">
+      <HeartPulse size={16} className="shrink-0" />
+      <span>Échographies à faire</span>
+      <span aria-label="Nombre de femelles à échographier">{echoCount ?? "—"}</span>
+    </Link>
+  );
   const weighingShortcut = (
     <Link href="/troupeau/pesee" className="flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-green-300 bg-green-50 px-1 py-1 text-center text-xs font-semibold leading-tight text-green-900 shadow-sm transition active:scale-[0.97]">
       <Scale size={16} className="shrink-0" />
@@ -181,6 +201,7 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
       {raccourcis.length === 0 ? (
         <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
           {weighingShortcut}
+            {echoShortcut}
           <button type="button" onClick={ouvrir} className="min-h-14 rounded-lg border border-dashed border-gray-300 bg-white text-xs font-medium text-gray-500">
             + Ajouter une action
           </button>
@@ -190,11 +211,13 @@ export default function AccueilShortcuts({ onAction }: { onAction: (action: Acti
           <div className="grid grid-cols-3 gap-1.5 sm:hidden">
             {mobileActions.map((id) => afficherAction(id))}
             {weighingShortcut}
+            {echoShortcut}
             {raccourcis.length > 5 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-gray-200 bg-white px-1 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={16} />Plus</button>}
           </div>
           <div className="hidden grid-cols-6 gap-1.5 sm:grid">
             {desktopActions.map((id) => afficherAction(id))}
             {weighingShortcut}
+            {echoShortcut}
             {raccourcis.length > 11 && <button type="button" onClick={() => setShowAll(true)} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-gray-200 bg-white px-1 text-xs font-semibold text-gray-700 shadow-sm"><Plus size={16} />Plus</button>}
           </div>
         </>
