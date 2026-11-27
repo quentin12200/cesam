@@ -8,14 +8,15 @@ test("selecting a medicine clears administered dose rather than copying dosage p
   assert.doesNotMatch(selection, /String\(preconisation\.dose\)|String\(m\.dosagePourKg\)/);
 });
 test("reference guidance is displayed with status, base, route, duration and withdrawal", () => {
-  for (const field of ["p.statut","p.doseBase","p.voie","p.dureeValeur","p.delaiAttenteViandeJ","p.delaiAttenteLaitTraites","draft.medicament.delaiAttenteLaitJ"]) {
+  for (const field of ["p.statut","p.doseBase","p.voie","p.dureeValeur","p.delaiAttenteViandeJ","p.delaiAttenteLaitTraites","medicament.delaiAttenteLaitJ"]) {
     assert.ok(form.includes(field), field);
   }
   assert.match(form,/Voir la fiche pharmacie/);
-  assert.match(form,/La dose administrée reste à renseigner manuellement/);
+  assert.match(form,/Détails de la posologie/);
+  assert.match(form,/renseigne la dose réellement administrée/);
 });
 
-import { calculerDose, preparerExecutants, referencePourCalcul } from "../app/sanitaire/nouvel-evenement/saisie-traitement.ts";
+import { calculerDose, formatBaseKg, preparerExecutants, preconisationsPourVoie, referencePourCalcul } from "../app/sanitaire/nouvel-evenement/saisie-traitement.ts";
 
 const reference = { id: "demo", statut: "VALIDE", dose: 1, unite: "mL", doseBase: "10 KG", voie: "SC" };
 
@@ -50,6 +51,19 @@ test("le formulaire limite le calcul à un animal et enregistre l’exécutant a
   const page = readFileSync(new URL("../app/sanitaire/nouvel-evenement/NouvelEvenementForm.tsx", import.meta.url), "utf8");
   assert.match(page, /selectedAnimaux\.length === 1 \? selectedAnimaux\[0\]\.id : null/);
   assert.match(page, /draft\.executant \?\? executants\.parDefaut/);
-  assert.match(form, /animalPourCalcul && reference/);
+  assert.match(form, /animalId && reference/);
   assert.match(form, /value=\{draft\.executant \?\? executantParDefaut\}/);
+});
+
+test("la posologie résumée suit la voie choisie et affiche la base en français", () => {
+  const intraveineuse = { ...reference, id: "iv", voie: "IV", doseBase: "100KG" };
+  const intramusculaire = { ...reference, id: "im", voie: "IM", statut: "IMPORTE" };
+  assert.deepEqual(preconisationsPourVoie([intraveineuse, intramusculaire], " im "), [intramusculaire]);
+  assert.equal(referencePourCalcul([intraveineuse, intramusculaire], "IM"), null);
+  assert.equal(referencePourCalcul([intraveineuse, intramusculaire], "IV").id, "iv");
+  assert.equal(formatBaseKg("100KG"), "par 100 kg");
+  assert.equal(formatBaseKg("10 KG"), "par 10 kg");
+  assert.equal(formatBaseKg("KG"), "par kg");
+  assert.ok(form.indexOf('Voie d&apos;administration') < form.indexOf('<PosologiePharmacie medicament='));
+  assert.ok(form.indexOf('<PosologiePharmacie medicament=') < form.indexOf('>Dose administrée</label>'));
 });
