@@ -1,3 +1,4 @@
+import { buildEchoRecap } from "@/lib/echo-recap";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { addDays, differenceInDays } from "date-fns";
@@ -124,6 +125,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Saillie non trouvée" }, { status: 404 });
     }
 
+    if (animalId && animalId !== saillie.animalId) return NextResponse.json({error:"Saillie incompatible avec cet animal"},{status:409});
+    if (updateTaureau === true && taureauId !== null && (typeof taureauId !== "string" || !await prisma.taureau.findUnique({where:{id:taureauId},select:{id:true}}))) return NextResponse.json({error:"Taureau introuvable"},{status:400});
+
     // Capture previous states for undo
     const prevGestation = saillie.gestation ? { ...saillie.gestation } : null;
     const prevAnimal = await prisma.animal.findUnique({ where: { id: saillie.animalId }, select: { aEchographier: true } });
@@ -164,36 +168,21 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    const [gestation] = await prisma.$transaction([
-      saillie.gestation
-        ? prisma.gestation.update({ where: { id: saillie.gestation.id }, data: gestationData })
-        : prisma.gestation.create({ data: { saillieId, ...gestationData } }),
-      // Clear the "à échographier" flag automatically
-      prisma.animal.update({
-        where: { id: saillie.animalId },
-        data: { aEchographier: false },
-      }),
-      prisma.demandeEchographie.updateMany({
-        where: { animalId: saillie.animalId, etat: "A_FAIRE", origine: "AUTOMATIQUE", OR: [{ saillieId }, { saillieId: null }] },
-        data: { etat: "REALISEE", clotureeAt: new Date(date) },
-      }),
-      prisma.demandeEchographie.updateMany({
-        where: { animalId: saillie.animalId, etat: "A_FAIRE", origine: "MANUELLE", OR: [{ saillieId }, { saillieId: null }] },
-        data: { etat: "REALISEE", clotureeAt: new Date(date), requestKey: null },
-      }),
-    ]);
-    const remainingEchoRequests = await prisma.demandeEchographie.count({
-      where: { animalId: saillie.animalId, etat: "A_FAIRE" },
-    });
-    if (remainingEchoRequests > 0) {
-      await prisma.animal.update({ where: { id: saillie.animalId }, data: { aEchographier: true } });
-    }
-    if (updateTaureau === true) {
-      await prisma.saillie.update({
-        where: { id: saillieId },
-        data: { taureauId: typeof taureauId === "string" && taureauId ? taureauId : null },
+    const gestation = await prisma.$transaction(async tx => {
+      const saved = await tx.gestation.upsert({where:{saillieId},create:{saillieId,...gestationData},update:gestationData});
+      await tx.demandeEchographie.updateMany({
+        where:{animalId:saillie.animalId,etat:"A_FAIRE",origine:"AUTOMATIQUE",OR:[{saillieId},{saillieId:null}]},
+        data:{etat:"REALISEE",clotureeAt:new Date(date)}
       });
-    }
+      await tx.demandeEchographie.updateMany({
+        where:{animalId:saillie.animalId,etat:"A_FAIRE",origine:"MANUELLE",OR:[{saillieId},{saillieId:null}]},
+        data:{etat:"REALISEE",clotureeAt:new Date(date),requestKey:null}
+      });
+      const remaining=await tx.demandeEchographie.count({where:{animalId:saillie.animalId,etat:"A_FAIRE"}});
+      await tx.animal.update({where:{id:saillie.animalId},data:{aEchographier:remaining>0}});
+      if(updateTaureau===true) await tx.saillie.update({where:{id:saillieId},data:{taureauId:typeof taureauId==="string"&&taureauId?taureauId:null}});
+      return saved;
+    });
 
     const desc = `Échographie ${resultat === "PLEINE" ? "positive" : "négative"} enregistrée`;
     let undoId = "";
@@ -245,4 +234,59 @@ export async function POST(request: NextRequest) {
     console.error("POST /api/echographies error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const day = request.nextUrl.searchParams.get("date");
+    if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return NextResponse.json({error:"Date requise"}, {status:400});
+    const start = new Date(day+"T00:00:00.000Z");
+    if (!Number.isFinite(start.getTime()) || start.toISOString().slice(0,10)!==day) return NextResponse.json({error:"Date invalide"}, {status:400});
+    const end = addDays(start,1);
+    const range = {gte:start,lt:end};
+    const animal = {select:{id:true,nutrav:true,nobovi:true,reproductionEtatManuel:true,reproductionEtatModifieAt:true}};
+    const [gestations, requests] = await Promise.all([
+      prisma.gestation.findMany({where:{dateEcho:range,resultatEcho:{in:["PLEINE","VIDE"]}},select:{id:true,dateEcho:true,resultatEcho:true,joursGestation:true,observationEcho:true,saillie:{select:{id:true,animal,taureau:{select:{id:true,nopere:true,nupere:true}}}}}}),
+      prisma.demandeEchographie.findMany({where:{etat:"REALISEE",clotureeAt:range},select:{id:true,clotureeAt:true,saillieId:true,observation:true,animal}})
+    ]);
+    const rows = buildEchoRecap(gestations, requests.filter(r=>r.saillieId===null || (r.animal.reproductionEtatManuel==="ROUGE" && r.animal.reproductionEtatModifieAt && r.animal.reproductionEtatModifieAt>=start && r.animal.reproductionEtatModifieAt<end)));
+    const actions = await prisma.evenementSanitaire.findMany({where:{animalId:{in:rows.map(r=>r.animalId)},description:"Action à prévoir — séance du "+day},select:{animalId:true,type:true,date:true,resolu:true}});
+    return NextResponse.json(rows.map(r=>({...r,actions:actions.filter(a=>a.animalId===r.animalId).map(a=>a.type+" ("+a.date.toISOString().slice(0,10)+(a.resolu?", réalisée":"")+")").join(" · ")})));
+  } catch(err) {
+    console.error("GET /api/echographies",err);
+    return NextResponse.json({error:"Impossible de charger le récapitulatif"}, {status:500});
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+ try {
+  const {id,animalId,date,remarque,resultat,joursGestation,taureauId}=await request.json();
+  if(resultat!==undefined && !["PLEINE","VIDE"].includes(resultat))return NextResponse.json({error:"Résultat invalide"},{status:400});
+  if(resultat==="PLEINE" && (!Number.isInteger(joursGestation)||joursGestation<1||joursGestation>285))return NextResponse.json({error:"Durée de gestation invalide"},{status:400});
+  if(typeof id!=="string"||typeof animalId!=="string"||typeof date!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(date))return NextResponse.json({error:"Correction invalide"},{status:400});
+  const start=new Date(date+"T00:00:00.000Z");
+  if(!Number.isFinite(start.getTime())||start.toISOString().slice(0,10)!==date)return NextResponse.json({error:"Date invalide"},{status:400});
+  const range={gte:start,lt:addDays(start,1)};
+  const result=await prisma.$transaction(async tx=>{
+   const row=await tx.demandeEchographie.findFirst({where:{id,animalId,etat:"REALISEE",clotureeAt:range},include:{animal:true}});
+   if(!row|| (row.saillieId!==null && !(row.animal.reproductionEtatManuel==="ROUGE"&&row.animal.reproductionEtatModifieAt&&row.animal.reproductionEtatModifieAt>=start&&row.animal.reproductionEtatModifieAt<range.lt)))return false;
+   if(await tx.gestation.findFirst({where:{saillie:{animalId},dateEcho:range}}))return false;
+   const observation=typeof remarque==="string"?remarque.trim()||null:null;
+   if(resultat==="PLEINE") {
+    if(row.saillieId!==null || row.animal.sexbov!=="F")return false;
+    if(taureauId!=null && (typeof taureauId!=="string" || !await tx.taureau.findUnique({where:{id:taureauId},select:{id:true}})))return false;
+    if(await tx.gestation.findFirst({where:{saillie:{animalId},etat:"VERT",velage:null}}))return false;
+    const saillie=await tx.saillie.create({data:{animalId,date:addDays(start,-joursGestation),type:"NATURELLE",estimation:true,taureauId:taureauId??null}});
+    const gestation=await tx.gestation.create({data:{saillieId:saillie.id,etat:"VERT",dateEcho:start,resultatEcho:"PLEINE",joursGestation,dateVelagePrevue:addDays(start,DUREE_GESTATION-joursGestation),observationEcho:observation}});
+    await tx.demandeEchographie.update({where:{id},data:{observation,saillieId:saillie.id}});
+    await tx.animal.update({where:{id:animalId},data:{reproductionEtatManuel:null,reproductionEtatPrecedent:null,reproductionEtatModifieAt:null}});
+    await tx.actionLog.create({data:{type:"CORRECT_ECHOGRAPHIE",description:"Correction échographie positive sans saillie connue",revertData:JSON.stringify([{op:"update",model:"demandeEchographie",where:{id},data:{observation:row.observation,saillieId:null}},{op:"delete",model:"gestation",id:gestation.id},{op:"delete",model:"saillie",id:saillie.id},{op:"update",model:"animal",where:{id:animalId},data:{reproductionEtatManuel:row.animal.reproductionEtatManuel,reproductionEtatPrecedent:row.animal.reproductionEtatPrecedent,reproductionEtatModifieAt:row.animal.reproductionEtatModifieAt}}])}});
+    return true;
+   }
+   await tx.demandeEchographie.update({where:{id},data:{observation}});
+   await tx.actionLog.create({data:{type:"CORRECT_ECHOGRAPHIE",description:"Correction observation échographie négative",revertData:JSON.stringify([{op:"update",model:"demandeEchographie",where:{id},data:{observation:row.observation}}])}});
+   return true;
+  });
+  return result?NextResponse.json({ok:true}):NextResponse.json({error:"Échographie non modifiable ou résultat déjà associé"}, {status:409});
+ }catch{return NextResponse.json({error:"Correction impossible"},{status:500});}
 }
