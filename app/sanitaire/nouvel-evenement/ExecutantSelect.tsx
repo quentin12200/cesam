@@ -10,19 +10,20 @@ export interface Intervenant {
 
 interface Props {
   intervenants: Intervenant[];
+  simulation?: boolean;
   value: string;
   onChange: (nom: string) => void;
   onAdded: (intervenant: Intervenant) => void;
 }
 
-export default function ExecutantSelect({ intervenants, value, onChange, onAdded }: Props) {
+export default function ExecutantSelect({ intervenants, value, onChange, onAdded, simulation = false }: Props) {
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
   const [nouveauNom, setNouveauNom] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function ajouter() {
     const nom = nouveauNom.trim();
-    if (!nom) return;
+    if (!nom || simulation) return;
     setSaving(true);
     try {
       const res = await fetch("/api/intervenants", {
@@ -69,7 +70,7 @@ export default function ExecutantSelect({ intervenants, value, onChange, onAdded
     >
       <option value="">Sélectionner…</option>
       {intervenants.map((i) => <option key={i.id} value={i.nom}>{i.nom}</option>)}
-      <option value="__nouveau__">+ Ajouter une personne…</option>
+      {!simulation && <option value="__nouveau__">+ Ajouter une personne…</option>}
     </select>
   );
 }
