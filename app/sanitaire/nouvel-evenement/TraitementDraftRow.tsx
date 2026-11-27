@@ -1,15 +1,17 @@
 "use client";
 
 import { X } from "lucide-react";
-import { VOIES_ADMINISTRATION } from "@/lib/medicament-categories";
+import { useState } from "react";
+import { formatDoseBase, VOIES_ADMINISTRATION } from "@/lib/medicament-categories";
 import MedicamentPicker, { type MedicamentOption } from "./MedicamentPicker";
 import ExecutantSelect, { type Intervenant } from "./ExecutantSelect";
+import { calculerDose, referencePourCalcul, type ReferenceDose } from "./saisie-traitement";
 
 export interface TraitementDraft {
   key: string;
   medicament: MedicamentOption | null;
   voie: string;
-  executant: string;
+  executant?: string;
   dose: string;
   uniteDosage: string;
   motif: string;
@@ -22,13 +24,34 @@ interface Props {
   draft: TraitementDraft;
   medicaments: MedicamentOption[];
   intervenants: Intervenant[];
+  executantParDefaut: string;
+  animalPourCalcul: string | null;
   onChange: (draft: TraitementDraft) => void;
   onRemove: () => void;
   onIntervenantAdded: (i: Intervenant) => void;
   removable: boolean;
 }
 
-export default function TraitementDraftRow({ draft, medicaments, intervenants, onChange, onRemove, onIntervenantAdded, removable }: Props) {
+function CalculDose({ reference }: { reference: ReferenceDose }) {
+  const [poids, setPoids] = useState("");
+  const dose = calculerDose(reference, poids);
+  return (
+    <div className="space-y-2 rounded-md border border-amber-300 bg-white p-2">
+      <label className="block">
+        <span className="block font-medium">Poids estimé (kg)</span>
+        <input type="number" inputMode="decimal" min="0" step="any" value={poids}
+          onChange={(event) => setPoids(event.target.value)}
+          className="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Facultatif" />
+      </label>
+      <p aria-live="polite">
+        {dose !== null && <><strong>Quantité calculée : {dose} {reference.unite}</strong>. Vérifie le résultat, puis renseigne la dose réellement administrée.</>}
+      </p>
+    </div>
+  );
+}
+
+export default function TraitementDraftRow({ draft, medicaments, intervenants, executantParDefaut, animalPourCalcul, onChange, onRemove, onIntervenantAdded, removable }: Props) {
+  const reference = referencePourCalcul(draft.medicament?.preconisations ?? [], draft.voie);
   function set<K extends keyof TraitementDraft>(field: K, value: TraitementDraft[K]) {
     onChange({ ...draft, [field]: value });
   }
@@ -77,7 +100,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
       {draft.medicament && (
         <section aria-label="Informations de posologie de la pharmacie" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm space-y-2">
           <p className="font-semibold text-amber-950">Posologie de référence — à vérifier avant administration</p>
-          <p className="text-xs text-amber-900">Ces informations proviennent de la pharmacie CESAM. Elles ne constituent pas une dose calculée ou une prescription. La dose administrée reste à renseigner manuellement.</p>
+          <p className="text-xs text-amber-900">Ces informations proviennent de la pharmacie CESAM. La dose administrée reste à renseigner manuellement.</p>
           <p>Fiche pharmacie : {draft.medicament.dosagePourKg != null ? `${draft.medicament.dosagePourKg} ${draft.medicament.uniteDosage ?? "unité non renseignée"} / kg (valeur enregistrée, à vérifier)` : "Aucune posologie par kg renseignée"}</p>
           <p>Voie de la fiche : {draft.medicament.voie || "Non renseignée"}</p>
           <p>Attente viande : {draft.medicament.delaiAttenteViandeJ != null ? `${draft.medicament.delaiAttenteViandeJ} jour(s)` : "Non renseignée"} · Attente lait : {draft.medicament.delaiAttenteLaitJ != null ? `${draft.medicament.delaiAttenteLaitJ} jour(s)` : "Non renseignée"}</p>
@@ -86,7 +109,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
               {draft.medicament.preconisations.map((p) => (
                 <div key={p.id} className="rounded-md border border-amber-200 bg-white p-2">
                   <p className="font-medium">{p.indicationMotif || "Préconisation sans indication"} · {p.statut === "VALIDE" ? "Validée" : p.statut === "A_VERIFIER" ? "À vérifier" : "Importée / non validée"}</p>
-                  <p>Dose de référence : {p.dose != null ? `${p.dose} ${p.unite ?? "unité non renseignée"} ${p.doseBase ?? "(base non renseignée)"}` : "Non renseignée"}</p>
+                  <p>Dose de référence : {p.dose != null ? `${p.dose} ${p.unite ?? "unité non renseignée"} ${formatDoseBase(p.doseBase) ?? "(base non renseignée)"}` : "Non renseignée"}</p>
                   <p>Voie : {p.voie || "Non renseignée"} · Fréquence : {p.frequence || "Non renseignée"}</p>
                   <p>Durée : {p.dureeValeur != null ? `${p.dureeValeur} ${p.dureeUnite || "unité non renseignée"}` : "Non renseignée"}</p>
                   <p>Attente viande : {p.delaiAttenteViandeJ != null ? `${p.delaiAttenteViandeJ} j` : "Non renseignée"} · Lait : {p.delaiAttenteLaitTraites != null ? `${p.delaiAttenteLaitTraites} traites` : "Non renseignée"}</p>
@@ -94,6 +117,9 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
               ))}
             </div>
           ) : <p>Aucune préconisation enregistrée pour ce médicament.</p>}
+          {animalPourCalcul && reference && (
+            <CalculDose key={JSON.stringify([animalPourCalcul, draft.medicament.id, reference.id])} reference={reference} />
+          )}
           <a className="font-semibold text-blue-800 underline" href={`/pharmacie/${draft.medicament.id}`} target="_blank" rel="noopener noreferrer">Voir la fiche pharmacie</a>
         </section>
       )}
@@ -110,14 +136,14 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Exécutant(e) *</label>
-          <ExecutantSelect intervenants={intervenants} value={draft.executant} onChange={(v) => set("executant", v)} onAdded={onIntervenantAdded} />
+          <ExecutantSelect intervenants={intervenants} value={draft.executant ?? executantParDefaut} onChange={(v) => set("executant", v)} onAdded={onIntervenantAdded} />
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2.5">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Dose</label>
-          <input type="number" min={0} step="0.1" value={draft.dose} onChange={(e) => set("dose", e.target.value)}
+          <label className="text-xs text-gray-500 block mb-1">Dose administrée</label>
+          <input type="number" min={0} step="any" value={draft.dose} onChange={(e) => set("dose", e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0" />
         </div>
         <div>
