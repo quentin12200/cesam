@@ -50,4 +50,6 @@ jobs:
       - run: node --test --experimental-strip-types lib/echo-session-extras.test.ts
       - run: node --test tests/animal-card-followup.test.mjs
       - run: node --test --experimental-strip-types lib/echo-recap.test.ts
+      - run: node --test tests/animal-card-navigation.test.mjs
+      - run: node --test --experimental-strip-types lib/animal-tab-navigation.test.ts
       - run: node --test --experimental-strip-types lib/performance-gmq.test.ts

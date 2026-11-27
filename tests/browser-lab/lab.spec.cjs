@@ -166,3 +166,16 @@ test("écho compacte : largeur 320, 375 et 390 et conservation des saisies",asyn
  await dialog.getByRole("button",{name:"Fermer",exact:true}).click();
  }
 });
+
+test("actions rapides : ouverture, fermeture extérieure et clavier",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Actions rapides fictives"});
+ const button=zone.getByRole("button",{name:"Actions",exact:true});
+ const menu=zone.getByRole("group",{name:"Actions rapides"});
+ await button.click(); await expect(menu).toBeVisible();
+ await expect(menu.getByRole("button",{name:"Pesée"})).toBeVisible();
+ await expect(menu.getByRole("button",{name:"Saillie / IA"})).toBeVisible();
+ await page.keyboard.press("Escape"); await expect(menu).toHaveCount(0);
+ await button.click(); await zone.getByRole("heading").click(); await expect(menu).toHaveCount(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+});
