@@ -1,101 +1,37 @@
+import LabBouclage from "./LabBouclage";
+import EchoShortcut from "@/app/components/EchoShortcut";
+import LabEchoSession from "./LabEchoSession";
+import LabFatherAudit from "./LabFatherAudit";
+import LabCalvingPanel from "./LabCalvingPanel";
 import Link from "next/link";
-import { GENEA_DATA } from "@/app/api/genealogie-import/data";
-import { prisma } from "@/lib/prisma";
-import { getGestationCalendar } from "@/lib/gestation-calendar";
 import LabExplorer from "./LabExplorer";
-import { normalizeGenealogyNational } from "@/lib/animal-genealogy-data";
-import { getEtatGestation } from "@/lib/utils";
-import { getCurrentCycleBreeding } from "@/lib/current-reproduction-cycle";
+import { DEMO_WORKSPACE_ANIMALS } from "@/app/prototype-espace-travail/demo-data";
 
-export const dynamic = "force-dynamic";
-
-export default async function CesamLabPage() {
-  const [animaux, echeances, reproConfig, bulls, children] = await Promise.all([
-    prisma.animal.findMany({
-      where: { statut: "ACTIF" },
-      select: {
-        id: true, nutrav: true, nobovi: true, sexbov: true, danais: true,
-        estGenisse: true, categorie: true, aEchographier: true,
-        reproductionEtatManuel: true,
-        saillies: {
-          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-          select: { id: true, date: true, gestation: { select: { etat: true, dateVelagePrevue: true } } },
-        },
-        velagesVache: { orderBy: { date: "desc" }, take: 1, select: { date: true } },
-      },
-      orderBy: { nutrav: "asc" },
-    }),
-    getGestationCalendar(),
-    prisma.exploitationConfig.findUnique({ where: { id: "singleton" }, select: { reproReposObjectifJours: true } }).catch(() => null),
-    prisma.taureau.findMany({ select: { id: true, nupere: true, nopere: true, copaip: true, present: true } }),
-    prisma.animal.findMany({ select: { nunati: true, nutrav: true, nobovi: true, sexbov: true, danais: true, statut: true, taureauId: true, pereNationalManuel: true, pereNomManuel: true, pereTravailManuel: true, mereTravailManuel: true, mereNomManuel: true, mere: { select: { nutrav: true, nobovi: true } }, velageVeau: { select: { pereNunati: true, pereNom: true, gestation: { select: { saillie: { select: { taureauId: true } } } } } } } }),
-  ]);
-
-  return (
-    <main className="mx-auto max-w-3xl space-y-4 px-3 py-4 pb-28">
-      <header className="rounded-2xl bg-green-800 p-4 text-white">
-        <div className="flex items-center justify-between gap-3">
-          <div><span className="rounded-full bg-white/20 px-2 py-1 text-xs font-bold">PROTOTYPE · LECTURE SEULE</span><h1 className="mt-3 text-2xl font-black">CESAM LAB</h1><p className="mt-1 text-sm text-green-50">Essayons une autre façon de travailler.</p></div>
-          <Link href="/config" className="rounded-xl border border-white/50 px-3 py-2 text-sm font-bold text-white">← Retour à CESAM</Link>
-        </div>
-      </header>
-      <LabExplorer
-        fathers={bulls.map(bull => {
-          const number = normalizeGenealogyNational(bull.nupere);
-          const bullName = bull.nopere?.trim().toLocaleUpperCase("fr") ?? "";
-          const uniqueName = bullName.length >= 3 && bulls.filter(b => b.nopere?.trim().toLocaleUpperCase("fr") === bullName).length === 1;
-          const linked = children.filter(a => {
-            if (a.taureauId === bull.id || a.velageVeau?.gestation?.saillie?.taureauId === bull.id) return true;
-            if (number.length >= 8 && [a.pereNationalManuel, a.velageVeau?.pereNunati].some(n => normalizeGenealogyNational(n) === number)) return true;
-            // Historical names are used only when they identify exactly one bull, and no conflicting national ID is recorded.
-            if (!uniqueName || a.taureauId) return false;
-            const namesMatch = [a.pereNomManuel, a.velageVeau?.pereNom].some(n => n?.trim().toLocaleUpperCase("fr") === bullName);
-            if (!namesMatch) return false;
-            // A distinct full national number takes precedence over a manually entered name.
-            const recordedNationals = [a.pereNationalManuel, a.velageVeau?.pereNunati]
-              .map(normalizeGenealogyNational).filter(Boolean);
-            return recordedNationals.every(n => n.length < 8 || n === number);
-          });
-          // Historical genealogy is read-only; match on full national numbers, never on a name or last four digits.
-          const historical = GENEA_DATA.filter(entry =>
-            (number.length >= 8 && normalizeGenealogyNational(entry.pereNat) === number) ||
-            (uniqueName && entry.pereNom.trim().toLocaleUpperCase("fr") === bullName &&
-              (number.length < 8 || normalizeGenealogyNational(entry.pereNat) === number))
-          );
-          const byNational = new Map(children.map(a => [normalizeGenealogyNational(a.nunati), a]));
-          const linkedNationals = new Set(linked.map(a => normalizeGenealogyNational(a.nunati)));
-          const historicalOnly = historical.filter(entry => {
-            const nat = normalizeGenealogyNational(entry.veauNat);
-            if (linkedNationals.has(nat)) return false;
-            // A conflicting father in CESAM must be reviewed, not silently overwritten.
-            const existing = byNational.get(nat);
-            if (existing && (existing.taureauId || existing.pereNationalManuel || existing.velageVeau?.pereNunati)) return false;
-            return true;
-          });
-          return { id: bull.id, number: bull.nupere, country: bull.copaip, name: bull.nopere, present: bull.present, offspring: linked.length + historicalOnly.length, presentOffspring: linked.filter(a => a.statut === "ACTIF").length, children: [...linked.map(a => ({ number: a.nutrav, name: a.nobovi, sex: a.sexbov, birth: a.danais?.toISOString() ?? null, mother: a.mere?.nobovi ?? a.mere?.nutrav ?? a.mereNomManuel ?? a.mereTravailManuel ?? null, status: a.statut, source: "CESAM" as const })), ...historicalOnly.map(entry => ({ number: entry.veauNat.slice(-4), name: entry.nom, sex: entry.sexe, birth: entry.danais, mother: entry.mereNat, status: "HISTORIQUE", source: "HISTORIQUE" as const }))] };
-        })}
-        animaux={animaux.map((animal) => {
-          const dernierVelage = animal.velagesVache[0]?.date ?? null;
-          const saillie = getCurrentCycleBreeding(animal.saillies, dernierVelage);
-          const reproduction = animal.sexbov === "F" && (animal.categorie === "VACHE" || animal.estGenisse)
-            ? getEtatGestation(
-                saillie?.date ?? null,
-                animal.reproductionEtatManuel ?? saillie?.gestation?.etat ?? null,
-                saillie?.gestation?.dateVelagePrevue ?? null,
-                dernierVelage,
-                false,
-                reproConfig?.reproReposObjectifJours ?? 60,
-              )
-            : null;
-          return {
-            id: animal.id, nutrav: animal.nutrav, nobovi: animal.nobovi,
-            sexbov: animal.sexbov, danais: animal.danais.toISOString(),
-            aEchographier: animal.aEchographier, reproduction,
-          };
-        })}
-        echeances={echeances.map((row) => ({ id: row.id, nutrav: row.nutrav, nom: row.nobovi, date: row.dateVelagePrevue.toISOString() }))}
-      />
-      <p className="text-xs text-gray-500">Cet espace n’enregistre aucun acte et n’altère aucun animal. Les actions de terrain sont présentées ici uniquement pour tester la navigation.</p>
-    </main>
-  );
+export default function CesamLabPage() {
+  const animaux = DEMO_WORKSPACE_ANIMALS.map(a => ({
+    id: a.id, nutrav: a.nutrav, nobovi: a.name, sexbov: a.sex,
+    danais: a.birthDate, aEchographier: a.echoDue,
+    reproduction: a.reproductionStatus === "PREGNANT" ? "VERT" as const : a.reproductionStatus === "EMPTY" ? "ROUGE" as const : a.reproductionStatus === "TO_CHECK" ? "JAUNE" as const : null,
+  }));
+  const echeances = DEMO_WORKSPACE_ANIMALS.filter(a => a.reproductionStatus === "PREGNANT").map((a, i) => ({
+    id: a.id, nutrav: a.nutrav, nom: a.name, date: new Date(Date.UTC(2026, 11, 1 + i * 3)).toISOString(),
+  }));
+  return <div className="mx-auto max-w-3xl space-y-4 px-3 py-4 pb-28">
+    <header className="rounded-2xl bg-blue-800 p-4 text-white">
+      <span className="text-xs font-bold">PROTOTYPES · DONNÉES FICTIVES</span>
+      <h1 className="mt-2 text-2xl font-black">CESAM LAB</h1>
+      <p className="mt-1 text-sm">Les simulations de cette page utilisent uniquement des exemples fictifs.</p>
+    </header>
+    <nav className="grid gap-2 sm:grid-cols-2" aria-label="Autres prototypes">
+      <Link href="/prototype-espace-travail" prefetch={false} className="min-h-11 rounded-xl border bg-white p-3 text-sm font-bold">Prototype espace de travail</Link>
+      <Link href="/prototype-accueil-v3" prefetch={false} className="min-h-11 rounded-xl border bg-white p-3 text-sm font-bold">Prototype accueil V3</Link>
+    </nav>
+    <LabExplorer animaux={animaux} echeances={echeances} />
+    <LabCalvingPanel />
+    <LabFatherAudit />
+    <div aria-label="Raccourci échographie fictif" role="region" className="grid grid-cols-3 gap-1.5"><EchoShortcut echoCount={animaux.filter(a => a.aEchographier).length} /></div>
+    <LabEchoSession />
+    <LabBouclage />
+    <Link href="/config" prefetch={false} className="inline-flex min-h-11 items-center font-bold underline">Quitter le Lab — paramètres réels</Link>
+  </div>;
 }

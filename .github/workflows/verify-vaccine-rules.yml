@@ -6,6 +6,9 @@ on:
       - "app/config/protocoles/**"
       - "app/sanitaire/vaccins/**"
       - "lib/vaccine-*.ts"
+      - "app/api/ordonnances/rattacher-acte/**"
+      - "app/api/ordonnances/for-medicament/**"
+      - "app/api/evenements/batch/**"
       - "lib/vaccination-session*.ts"
       - "prisma/**"
       - "package.json"
@@ -44,4 +47,6 @@ jobs:
             lib/vaccine-planner.test.ts \
             lib/vaccine-protocol-extraction.test.ts \
             lib/vaccine-acts.test.ts \
+            lib/vaccine-prescription-attachment.test.ts \
+            lib/vaccine-prescription-date.test.ts \
             lib/vaccine-protocol-save.test.ts

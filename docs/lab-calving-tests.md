@@ -1,0 +1,2 @@
+# Phase 7 — Vêlage fictif
+Simulation locale réutilisant les fonctions métier consumesLoopNumber, conflictingFatherIdentity et shouldResetReproductionAtCalving. Les scénarios navigateur testent la simulation, pas le formulaire réel ni ses routes API. Les tests transactionnels existants velage-edit.test.ts restent actifs. Aucune écriture, aucune migration, aucun accès base. Les statuts affichés représentent la réinitialisation manuelle, non le calcul exhaustif du cycle réel.

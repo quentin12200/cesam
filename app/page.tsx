@@ -1,3 +1,5 @@
+import { ECHO_ACTION_CATEGORY } from "@/lib/echo-session-extras";
+import { effectiveManualReproduction } from "@/lib/calving-reproduction-reset";
 import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
@@ -97,6 +99,8 @@ async function getDashboardData() {
       select: {
         id: true,
         type: true,
+        categorie: true,
+        date: true,
         animal: { select: { nutrav: true } },
       },
     }),
@@ -181,6 +185,7 @@ async function getDashboardData() {
         nutrav: true,
         nobovi: true,
         reproductionEtatManuel: true,
+        reproductionEtatModifieAt: true,
         chaleurs: {
           orderBy: { date: "desc" },
           take: 1,
@@ -231,7 +236,7 @@ async function getDashboardData() {
           animal.velagesVache[0]?.date ?? null,
           reproductionRules.heatReturnMonitoring,
           now,
-          animal.reproductionEtatManuel === "VERT" || animal.reproductionEtatManuel === "ROSE"
+          ["VERT", "ROSE"].includes(effectiveManualReproduction(animal.reproductionEtatManuel, animal.reproductionEtatModifieAt, animal.velagesVache[0]?.date ?? null) ?? "")
         ),
       }))
       .filter((item): item is typeof item & { reminder: NonNullable<typeof item.reminder> } => item.reminder !== null)
@@ -258,12 +263,12 @@ async function getDashboardData() {
       false,
       reproductionConfig?.reproReposObjectifJours ?? 60
     );
-    motherReproductionStatuses[vache.id] =
-      (vache.reproductionEtatManuel as EtatGestation | null) ?? etat;
+    const effective = effectiveManualReproduction(vache.reproductionEtatManuel as EtatGestation | null, vache.reproductionEtatModifieAt, dernierVelage) ?? etat;
+    motherReproductionStatuses[vache.id] = effective;
 
-    if (etat === "VERT" || etat === "ROSE") vachesPleine++;
+    if (effective === "VERT" || effective === "ROSE") vachesPleine++;
     if (vache.aEchographier) aEchographier++;
-    if (etat === "ROUGE") vachesVidesEnRetard++;
+    if (effective === "ROUGE") vachesVidesEnRetard++;
   }
 
   let veauxAVacciner = 0;
@@ -761,11 +766,11 @@ export default async function Dashboard({ searchParams }: PageProps) {
     data.bolusPreVelage;
   if (santeTotal > 0) {
     const suivisEcho = data.interventionsSanitairesUrgentes.filter((intervention) =>
-      ["Métrite", "Metrabol à prévoir", "Bolus à prévoir"].includes(intervention.type)
+      intervention.categorie===ECHO_ACTION_CATEGORY || ["Métrite", "Metrabol à prévoir", "Métrabole à prévoir", "Estrumate à prévoir", "À revérifier", "Bolus à prévoir"].includes(intervention.type)
     );
-    const resumeSuivisEcho = ["Métrite", "Metrabol à prévoir", "Bolus à prévoir"]
+    const resumeSuivisEcho = [...new Set(suivisEcho.map(i=>i.type))]
       .map((type) => {
-        const numeros = suivisEcho.filter((intervention) => intervention.type === type).map((intervention) => intervention.animal.nutrav);
+        const numeros = suivisEcho.filter((intervention) => intervention.type === type).map((intervention) => intervention.categorie===ECHO_ACTION_CATEGORY?`${intervention.animal.nutrav} (${intervention.date.toLocaleDateString("fr-FR",{day:"numeric",month:"numeric",timeZone:"Europe/Paris"})})`:intervention.animal.nutrav);
         return numeros.length > 0 ? `${type} : ${numeros.join(", ")}` : null;
       })
       .filter(Boolean)
@@ -925,15 +930,15 @@ export default async function Dashboard({ searchParams }: PageProps) {
               }} />
             )}
             {data.neverWeighedCount > 0 && (
-              <div className="flex min-h-14 items-center gap-3 rounded-lg border-l-4 border-l-amber-600 bg-amber-50 px-3 py-2">
+              <div className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border-l-4 border-l-amber-600 bg-amber-50 px-3 py-2">
                 <Scale size={20} className="shrink-0 text-amber-800" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-amber-950">Veaux jamais pesés</p>
                   <p className="text-xs text-amber-800">{data.neverWeighedCount} animaux de 10 mois ou plus</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto sm:shrink-0">
                   <Link href="/troupeau/pesee/jamais-peses" className="flex min-h-11 items-center px-2 text-sm font-bold text-amber-950 underline">Voir</Link>
-                  <Link href="/troupeau/pesee" className="hidden min-h-11 items-center px-2 text-xs font-semibold text-amber-900 underline sm:flex">Démarrer une pesée</Link>
+                  <Link href="/troupeau/pesee" className="flex min-h-11 items-center px-2 text-xs font-semibold text-amber-900 underline">Démarrer une pesée</Link>
                 </div>
               </div>
             )}

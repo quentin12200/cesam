@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCarnetSanitaireRows, groupRowsByAnimal, type CarnetSanitaireRow } from "@/lib/carnet-sanitaire";
+import { rechercherActes } from "@/lib/carnet-actes";
+import { getCarnetSanitaireRows, getActesSanitairesReels, groupRowsByAnimal, type CarnetSanitaireRow } from "@/lib/carnet-sanitaire";
 
 function fmt(d: Date | null): string {
   if (!d) return "";
@@ -32,9 +33,13 @@ export async function GET(request: NextRequest) {
   const order = searchParams.get("order") === "animal" ? "animal" : "chrono";
 
   const rows = await getCarnetSanitaireRows();
+  const selection = searchParams.get("selection") === "1";
+  const actes = selection ? await getActesSanitairesReels() : [];
+  const ids = new Set(rechercherActes(actes, { q: searchParams.get("q") ?? "" }).map((a) => a.id.split(":")[1]));
+  const selectedRows = selection ? rows.filter((r) => ids.has(r.id)) : rows;
   const orderedRows = order === "animal"
-    ? groupRowsByAnimal(rows).flatMap((g) => g.rows)
-    : rows;
+    ? groupRowsByAnimal(selectedRows).flatMap((g) => g.rows)
+    : selectedRows;
 
   const header = [
     "Date", "N° National", "N° Travail", "Nom", "N° ordonnance", "Prescripteur",

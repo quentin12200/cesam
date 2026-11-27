@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { ChevronLeft, ChevronRight, Check, ClipboardList, Search, Users, Zap } from "lucide-react";
 
 type Animal = { id: string; nutrav: string; nobovi: string | null; sexbov: string; aEchographier?: boolean; reproduction?: string | null };
@@ -11,13 +10,6 @@ type Scope = "tous" | "echo" | "selection";
 type Rule = { id: string; etape: Etape; cible: Scope; animaux: string[]; produit: string };
 type Acte = { rule: string; valeur: string; result: "fait" | "nonfait" };
 const TYPES: Etape[] = ["Pesée", "Vaccination", "Échographie", "Antiparasitaire", "Traitement", "Parage"];
-const destinations: Record<string,string> = {
-  "Vêlage": "/velage?nouveau=1", "Pesée": "/troupeau/pesee",
-  "Événement sanitaire": "/sanitaire/nouvel-evenement", "Saillie / IA": "/reproduction",
-  "Échographie": "/reproduction", "Chaleur": "/reproduction",
-  "Vaccination": "/sanitaire/vaccins", "Antiparasitaire": "/sanitaire/nouvel-evenement",
-  "Traitement": "/sanitaire/nouvel-evenement", "Parage": "/parage",
-};
 const defaultRules: Rule[] = [
   {id:"poids",etape:"Pesée",cible:"tous",animaux:[],produit:""},
   {id:"echo",etape:"Échographie",cible:"echo",animaux:[],produit:""},
@@ -72,7 +64,7 @@ export default function LabCreatePanel({ animaux }: { animaux: Animal[] }) {
     {(mode==="rapide"||mode==="collectif")&&<>
       <h2 className="text-lg font-black">{mode==="rapide"?"Action immédiate":"Travail collectif"}</h2>
       <div className="grid grid-cols-2 gap-2">{(mode==="rapide"?["Vêlage","Pesée","Événement sanitaire","Saillie / IA","Échographie","Chaleur"]:["Vaccination","Échographie","Traitement","Antiparasitaire","Pesée","Parage"]).map(label=><button type="button" key={label} onClick={()=>setAction(label)} className="min-h-16 rounded-xl border bg-white p-3 text-sm font-semibold">{label}</button>)}</div>
-      {action&&<div className="space-y-2 rounded-xl border border-green-300 bg-green-50 p-4"><b>{action}</b><p className="text-sm">Ce raccourci ouvre le parcours existant de CESAM, en dehors du LAB. Tu pourras y enregistrer de vrais actes.</p><Link href={destinations[action]} className="block rounded-lg bg-green-700 p-3 text-center text-sm font-bold text-white">Ouvrir dans CESAM</Link></div>}
+      {action&&<div className="space-y-2 rounded-xl border border-green-300 bg-green-50 p-4"><b>{action}</b><p className="text-sm">Action sélectionnée pour la démonstration. Pour un acte réel, quitte le Lab et ouvre le module correspondant dans CESAM.</p></div>}
     </>}
     {mode==="combinee"&&<>
       <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900"><b>Prototype sans enregistrement.</b> Les poids, résultats et validations ci-dessous ne sont jamais transmis à CESAM. Ils disparaissent en quittant ou rechargeant cette page.</div>
@@ -86,7 +78,7 @@ export default function LabCreatePanel({ animaux }: { animaux: Animal[] }) {
           <label className="block text-xs font-semibold">Animaux concernés
             <select value={rule.cible} onChange={e=>updateRule(rule.id,{cible:e.target.value as Scope})} className="mt-1 w-full rounded-lg border bg-white p-3 text-sm">
               <option value="tous">Tous les bovins qui passent</option>
-              <option value="echo">Liste à échographier dans CESAM ({echoIds.length})</option>
+              <option value="echo">Liste fictive à échographier ({echoIds.length})</option>
               <option value="selection">Sélection personnalisée ({rule.animaux.length})</option>
             </select>
           </label>

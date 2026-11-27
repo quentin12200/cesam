@@ -141,6 +141,19 @@ export function selectedAverage(
   return averageWeight(selected);
 }
 
+export function weighingShareRows(entries: FieldSessionEntry[], referenceDate: Date) {
+  return entries.map((entry) => {
+    const age = fieldAgeInfo(entry.birthDate, referenceDate);
+    return {
+      selected: entry.selected,
+      weight: `${entry.nutrav} — ${formatWeightKg(entry.poids)}`,
+      details: `${motherNumberLabel(entry)} · ${age.label}`,
+      progress: weightProgressLabel(entry),
+      alert: ageAlertLabel(age.alert),
+    };
+  });
+}
+
 export function selectedWeightSummary(
   count: number,
   average: number | null,
