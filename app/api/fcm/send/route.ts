@@ -38,7 +38,7 @@ export async function POST() {
           where: { etat: { in: ["VERT", "ROSE"] }, dateVelagePrevue: { gte: now, lte: addDays(now, 7) } },
         }),
         prisma.animal.count({
-          where: { statut: "ACTIF", boucleFaite: false, velageVeau: { isNot: null } },
+          where: { statut: "ACTIF", boucleFaite: false, danais: { gt: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) }, velageVeau: { isNot: null } },
         }),
         prisma.gestation.count({
           where: {

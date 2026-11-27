@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { ECHO_ACTION_CATEGORY, ACTION_PREFIX, normEcho, actionLabel } from "@/lib/echo-session-extras";
 import { normalizeSearch } from "@/lib/fuzzy-search";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const actions=request.nextUrl.searchParams.get("kind")==="actions";
   const types = await prisma.typeEvenement.findMany({
-    where: { actif: true },
+    where: { actif: true, categorie: actions?ECHO_ACTION_CATEGORY:{not:ECHO_ACTION_CATEGORY} },
     orderBy: { nom: "asc" },
     select: { id: true, nom: true, synonymes: true, categorie: true },
   });
-  return NextResponse.json(types);
+  return NextResponse.json(actions?types.map(t=>({...t,nom:actionLabel(t.nom)})):types);
 }
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const nom = (body.nom as string | undefined)?.trim();
-  if (!nom) {
+  if (!nom || normEcho(nom).startsWith(normEcho(ACTION_PREFIX))) {
     return NextResponse.json({ error: "nom requis" }, { status: 400 });
   }
 

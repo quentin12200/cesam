@@ -18,6 +18,8 @@ jobs:
       - run: npx prisma generate
       - run: npx tsc --noEmit
       - run: node --test tests/traitements-posologie.test.mjs
+      - run: node --test tests/gmq-period-rankings.test.mjs tests/gmq-father-genealogy.test.mjs
+      - run: node --test tests/pharmacie-category-picker.test.mjs
       - run: node --test tests/taureaux-identity-edit.test.mjs
       - run: node --test --experimental-strip-types lib/medicament-custom-categories.test.ts
       - run: node --test --experimental-strip-types lib/validate-breeding.test.ts lib/grouped-sale.test.ts
@@ -30,4 +32,21 @@ jobs:
       # Évite les erreurs JSX qu'un simple contrôle TypeScript ne détecte pas.
       - name: Lint carnet sanitaire
         run: ESLINT_USE_FLAT_CONFIG=false npx eslint app/sanitaire/carnet/page.tsx app/sanitaire/carnet/ChoixImpression.tsx
+      - run: node --test --experimental-strip-types lib/gmq-father-conflict.test.ts
 
+      - run: node --test --experimental-strip-types lib/gmq-rankings-functional.test.ts
+      - run: npm run test:field-weighing
+      - run: node --test tests/ergonomie-phase1.test.mjs
+      - run: node --test tests/coulisses-phase1.test.mjs
+      - run: node --test tests/coulisses-phase2.test.mjs
+      - run: node --test --experimental-strip-types lib/calving-reproduction-reset.test.ts lib/velage-edit.test.ts
+      - run: node --test tests/coulisses-history.test.mjs
+      - run: node --test --experimental-strip-types lib/coulisses-diagnostics.test.ts
+      - run: node --test tests/lab-isolation.test.mjs
+      - run: node --test --experimental-strip-types lib/lab-route.test.ts
+      - run: node --test --experimental-strip-types lib/lab-calving.test.ts
+      - run: node --test --experimental-strip-types lib/father-audit-navigation.test.ts lib/velage-navigation.test.ts tests/origin-navigation.test.mjs
+      - run: node --test tests/velage-father-selection.test.mjs
+      - run: node --test --experimental-strip-types lib/echo-session-extras.test.ts
+      - run: node --test tests/animal-card-followup.test.mjs
+      - run: node --test --experimental-strip-types lib/echo-recap.test.ts

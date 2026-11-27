@@ -4,6 +4,9 @@ import { BarChart2 } from "lucide-react";
 import PerformancesClient from "./PerformancesClient";
 
 import BackButton from "@/app/components/BackButton";
+
+export const dynamic = "force-dynamic";
+
 export interface VachePerf {
   vacheId: string;
   nutrav: string;

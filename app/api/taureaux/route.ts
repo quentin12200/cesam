@@ -16,13 +16,16 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { nupere, nopere, traper, present } = body;
+    const { nupere, nopere, traper, present, numeroACompleter } = body;
+    const pending = numeroACompleter === true && !nupere?.trim();
+    if (pending && (!nopere?.trim() || nopere.trim().length > 120)) return NextResponse.json({ error: "Nom requis pour créer une fiche à compléter" }, { status: 400 });
+    const identity = pending ? `A_COMPLETER_${crypto.randomUUID()}` : nupere?.trim();
 
-    if (!nupere?.trim()) {
+    if (!identity) {
       return NextResponse.json({ error: "Le numéro du taureau est requis" }, { status: 400 });
     }
 
-    const normalized = normalizeGenealogyNational(nupere.trim());
+    const normalized = normalizeGenealogyNational(identity);
     const candidates = await prisma.taureau.findMany({
       where: {
         OR: [
@@ -45,8 +48,8 @@ export async function POST(request: NextRequest) {
     // deuxième fiche si le même nom existe sous un numéro national complet.
     // L'utilisateur doit sélectionner la fiche existante, sans rapprochement
     // automatique sur un nom qui peut être partagé par plusieurs taureaux.
-    if (!fullNational(nupere.trim())) {
-      const enteredName = canonicalName(nopere?.trim() || nupere.trim());
+    if (pending || !fullNational(identity)) {
+      const enteredName = canonicalName(nopere?.trim() || identity);
       if (enteredName) {
         const all = await prisma.taureau.findMany({
           select: { id: true, nupere: true, nopere: true },
@@ -65,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     const taureau = await prisma.taureau.create({
       data: {
-        nupere: nationalWithCountry(nupere.trim()),
+        nupere: pending ? identity : nationalWithCountry(identity),
         nopere: nopere?.trim() || null,
         traper: traper?.trim() || null,
         present: present !== false,

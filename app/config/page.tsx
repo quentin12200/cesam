@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   Bell,
   FlaskConical,
+  Wrench,
   Building2,
   ChevronRight,
   HeartPulse,
@@ -99,10 +100,16 @@ export default function ConfigPage() {
         })}
       </div>
 
-      <Link href="/lab" className="mt-5 flex items-center gap-3 rounded-xl border-2 border-green-200 bg-green-50 p-4 text-green-900">
-        <FlaskConical size={26} />
-        <span className="flex-1"><span className="block font-black">CESAM LAB · Tester la nouvelle interface</span><span className="mt-1 block text-xs">Prototype en lecture seule, retour à CESAM à tout moment</span></span>
-        <ChevronRight size={20} />
+      <Link href="/config/coulisses" className="mt-5 flex min-h-11 min-w-0 items-center gap-3 rounded-xl border-2 border-amber-200 bg-amber-50 p-4 text-slate-900 focus-visible:ring-2 focus-visible:ring-green-700">
+        <Wrench size={26} className="shrink-0 text-amber-800" aria-hidden="true" />
+        <span className="min-w-0 flex-1"><span className="block font-black">Les Coulisses</span><span className="mt-1 block text-sm text-slate-700">Diagnostics et corrections manuelles des données réelles</span></span>
+        <ChevronRight size={20} className="shrink-0" aria-hidden="true" />
+      </Link>
+
+      <Link href="/lab" className="mt-3 flex min-h-11 min-w-0 items-center gap-3 rounded-xl border-2 border-green-200 bg-green-50 p-4 text-green-900">
+        <FlaskConical size={26} className="shrink-0" aria-hidden="true" />
+        <span className="min-w-0 flex-1"><span className="block font-black">CESAM LAB · Tester la nouvelle interface</span><span className="mt-1 block text-xs">Prototypes sur données fictives ; environnement complet à venir</span></span>
+        <ChevronRight size={20} className="shrink-0" aria-hidden="true" />
       </Link>
 
       <aside className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">

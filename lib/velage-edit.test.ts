@@ -31,6 +31,7 @@ type AnimalRow = {
   danais: Date;
   sexbov: string;
   mereId: string | null;
+  taureauId?: string | null;
   categorie: string | null;
   histories: RemovalBlockage[];
 };
@@ -56,6 +57,7 @@ type VelageRow = {
   sousType: string | null;
   capteur: number | null;
   pereNom: string | null;
+  pereNunati?: string | null;
   notes: string | null;
   nombreVeaux: number;
   jumeaux: boolean;
@@ -66,7 +68,7 @@ type State = {
   animals: AnimalRow[];
   details: DetailRow[];
   declarations: DeclarationRow[];
-  gestation: { id: string; etat: string } | null;
+  gestation: { id: string; etat: string; saillie?: { taureauId: string | null } } | null;
   lot: { id: string; premierNunati: string; quantite: number; prochainIndex: number; actif: boolean; createdAt: Date } | null;
   animalCreates: number;
   velageCreates: number;
@@ -227,9 +229,15 @@ function createDatabase(seed = initialState()) {
           },
         },
         gestation: {
+          findUnique: async () => draft.gestation && { ...draft.gestation, saillie: draft.gestation.saillie ?? { taureauId: null } },
           updateMany: async ({ where, data }: { where: { id: string; etat: string }; data: { etat: string } }) => {
             if (draft.gestation?.id === where.id && draft.gestation.etat === where.etat) draft.gestation.etat = data.etat;
           },
+        },
+        taureau: {
+          findUnique: async ({ where }: { where: { id: string } }) => where.id === "pere1"
+            ? { id: "pere1", nopere: "Père sélectionné", nupere: "FR1234567890" }
+            : null,
         },
         exploitationConfig: { findUnique: async () => ({ serviceDeclaration: "AUCUN" }) },
         lotBoucles: {
@@ -272,6 +280,24 @@ function editInput(overrides: Partial<EditVelageInput> = {}): EditVelageInput {
     ...overrides,
   };
 }
+
+test("rattache le père sélectionné à un vêlage existant et à son veau", async () => {
+  const db = createDatabase();
+  await editVelage("v1", editInput({ pereTaureauId: "pere1" }), db as never, fakeInspect as never);
+  assert.equal(db.state.animals[0].taureauId, "pere1");
+  assert.equal(db.state.velage?.pereNunati, "FR1234567890");
+});
+
+test("laisse le vêlage intact si le veau a déjà un autre père", async () => {
+  const seed = initialState();
+  seed.animals[0].taureauId = "autre-pere";
+  const db = createDatabase(seed);
+  await assert.rejects(
+    editVelage("v1", editInput({ pereTaureauId: "pere1" }), db as never, fakeInspect as never),
+    { code: "CONFLICT" },
+  );
+  assert.deepEqual(db.state, seed);
+});
 
 test("modifie la date sur le même vêlage et les mêmes fiches vivantes", async () => {
   const seed = initialState();
@@ -594,4 +620,25 @@ test("le formulaire propose les prochaines vaches à vêler sans remplacer la sa
   assert.match(form, /suggestion\.nobovi/);
   assert.match(form, /suggestion\.dateVelagePrevue/);
   assert.match(form, /setSuggestionsOpen\(false\)/);
+});
+
+ test("jumeau mort-né sans aucun numéro : identité historique stable et aucun animal supplémentaire", async () => {
+ const seed = initialState();
+ seed.lot = { id: "lot1", premierNunati: "FR2001", quantite: 10, prochainIndex: 1, actif: true, createdAt: new Date() };
+ const db = createDatabase(seed);
+ await editVelage("v1", editInput({ veaux: [...editInput().veaux, { nutrav: "", nunati: "", nom: "Historique", sexe: "M", statut: "MORT_NE" }] }), db as never, fakeInspect as never);
+ const detail = db.state.details.find(d => d.statut === "MORT_NE")!;
+ assert.ok(detail.id);
+ assert.equal(detail.animalId, null);
+ assert.equal(detail.nutrav, null);
+ assert.equal(detail.nunati, null);
+ assert.equal(db.state.animals.length, 1);
+ assert.equal(db.state.velage?.veauId, "a1");
+ assert.equal(db.state.velage?.nombreVeaux, 2);
+ assert.equal(db.state.velage?.jumeaux, true);
+ assert.equal(db.state.lot?.prochainIndex, 1);
+ await editVelage("v1", editInput({ veaux: [...editInput().veaux, { detailId: detail.id, animalId: null, nutrav: "", nunati: "", nom: "Historique", sexe: "M", statut: "MORT_NE" }] }), db as never, fakeInspect as never);
+ assert.equal(db.state.details.length, 2);
+ assert.equal(db.state.details.find(d => d.statut === "MORT_NE")?.id, detail.id);
+ assert.equal(db.state.animals.length, 1);
 });

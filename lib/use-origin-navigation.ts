@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { auditSuccessTarget } from "@/lib/father-audit-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ORIGIN_CONFIRMATION_KEY,
@@ -18,7 +19,7 @@ export function useOriginNavigation() {
   useEffect(() => {
     setCurrentUrl(`${window.location.pathname}${window.location.search}${window.location.hash}`);
     setReturnTo(safeReturnTo(new URLSearchParams(window.location.search).get("returnTo")));
-  }, [pathname]);
+  });
 
   function markScrollRestoration() {
     window.sessionStorage.setItem(SCROLL_RESTORE_KEY, "1");
@@ -29,7 +30,7 @@ export function useOriginNavigation() {
   }
 
   function closeToOrigin(fallback?: string) {
-    const target = returnTo ?? fallback ?? null;
+    const target = safeReturnTo(new URLSearchParams(window.location.search).get("returnTo")) ?? fallback ?? null;
     if (!target) return false;
     markScrollRestoration();
     router.push(target);
@@ -37,7 +38,9 @@ export function useOriginNavigation() {
   }
 
   function completeToOrigin(message: string, fallback?: string) {
-    const target = returnTo ?? fallback ?? null;
+    const params = new URLSearchParams(window.location.search);
+    const origin = safeReturnTo(params.get("returnTo"));
+    const target = auditSuccessTarget(origin, params.get("successReturnTo")) ?? origin ?? fallback ?? null;
     if (!target) return false;
     window.sessionStorage.setItem(ORIGIN_CONFIRMATION_KEY, message);
     markScrollRestoration();

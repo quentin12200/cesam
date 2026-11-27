@@ -81,6 +81,7 @@ export default async function FatherControlPage() {
   return (
     <main className="mx-auto max-w-7xl space-y-4 p-3 pb-24 sm:p-5">
       <Link href="/taureaux" className="text-sm font-semibold text-green-700 underline">Retour aux taureaux</Link>
+      <Link href="/taureaux/controle/anciens-velages" className="block text-sm font-semibold text-green-700 underline">Diagnostiquer les anciens pères saisis en texte libre (lecture seule)</Link>
       <div>
         <h1 className="text-xl font-black text-gray-900">Coulisses CESAM · Tableau des pères</h1>
         <p className="mt-1 text-sm text-gray-600">

@@ -27,6 +27,7 @@ export type EditVelageInput = {
   sousType?: string | null;
   capteur?: number | null;
   pereNom?: string | null;
+  pereTaureauId?: string | null;
   notes?: string | null;
   veaux: EditableCalfInput[];
 };
@@ -64,6 +65,7 @@ const calfAnimalSelect = {
   numeroNational: true,
   nobovi: true,
   sexbov: true,
+  taureauId: true,
   danais: true,
 } satisfies Prisma.AnimalSelect;
 
@@ -163,6 +165,7 @@ function editableView(velage: LoadedVelage) {
     sousType: velage.sousType,
     capteur: velage.capteur,
     pereNom: velage.pereNom,
+    pereTaureauId: velage.veau?.taureauId ?? velage.veauxDetails.find(d => d.animal?.taureauId)?.animal?.taureauId ?? null,
     notes: velage.notes,
     veaux: normalizeVelageCalves(velage).map(({ animal: _animal, ...calf }) => calf),
   };
@@ -367,6 +370,10 @@ export async function editVelage(
       throw new VelageEditError("La mère ne peut pas être modifiée sur un vêlage déjà enregistré", "UNSAFE");
     }
 
+    const pereSelectionne = input.pereTaureauId ? await tx.taureau.findUnique({ where: { id: input.pereTaureauId } }) : null;
+    if (input.pereTaureauId && !pereSelectionne) throw new VelageEditError("Père sélectionné introuvable", "INVALID");
+    const gestationLiee = pereSelectionne && current.gestationId ? await tx.gestation.findUnique({ where: { id: current.gestationId }, include: { saillie: true } }) : null;
+    if (pereSelectionne && gestationLiee?.saillie.taureauId && gestationLiee.saillie.taureauId !== pereSelectionne.id) throw new VelageEditError("Filiation de gestation différente : correction manuelle nécessaire", "CONFLICT");
     const existingDetails = new Map(current.veauxDetails.map((detail) => [detail.id, detail]));
     for (const calf of input.veaux) {
       if (calf.detailId && !existingDetails.has(calf.detailId)) {
@@ -579,6 +586,11 @@ export async function editVelage(
       else await tx.veauVelage.create({ data: { velageId: id, ...detailData } });
     }
 
+    if (pereSelectionne) for (const animalId of linkedAnimalIds) {
+      const existing = await tx.animal.findUnique({ where: { id: animalId }, select: { taureauId: true } });
+      if (existing?.taureauId && existing.taureauId !== pereSelectionne.id) throw new VelageEditError("Filiation existante différente : correction manuelle nécessaire", "CONFLICT");
+      await tx.animal.update({ where: { id: animalId }, data: { taureauId: pereSelectionne.id } });
+    }
     const primaryAnimalId = current.veauId && linkedAnimalIds.includes(current.veauId)
       ? current.veauId
       : linkedAnimalIds[0] ?? null;
@@ -590,7 +602,8 @@ export async function editVelage(
         qualificatif: input.qualificatif,
         sousType: input.sousType,
         capteur: input.capteur,
-        pereNom: input.pereNom,
+        pereNom: pereSelectionne?.nopere ?? input.pereNom,
+        ...(pereSelectionne ? { pereNunati: pereSelectionne.nupere } : {}),
         notes: input.notes,
         veauId: primaryAnimalId,
         nombreVeaux: input.veaux.length,

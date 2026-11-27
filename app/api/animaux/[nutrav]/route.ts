@@ -95,7 +95,7 @@ export async function PATCH(
   if ("danais"       in body) data.danais       = new Date(body.danais);
   if ("boucleFaite"  in body) {
     data.boucleFaite = body.boucleFaite;
-    data.dateBouclage = body.boucleFaite ? new Date() : null;
+    data.dateBouclage = body.boucleFaite ? (animal.boucleFaite ? animal.dateBouclage : new Date()) : null;
   }
   if ("tarieFaite"   in body) {
     data.tarieFaite = body.tarieFaite;

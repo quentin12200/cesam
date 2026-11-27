@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Search, CalendarDays, ChevronDown, ChevronUp, Plus, House, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import LabCreatePanel from "./LabCreatePanel";
-import LabFathers, { type LabFather } from "./LabFathers";
 import AccueilRadialMenu from "@/app/components/AccueilRadialMenu";
 
 type Animal = {
@@ -17,7 +15,7 @@ type Animal = {
   reproduction: "VERT" | "ROSE" | "JAUNE" | "ROUGE" | "REPOS" | "GRIS" | null;
 };
 type Echeance = { id: string; nutrav: string; nom: string | null; date: string };
-type Vue = "accueil" | "animaux" | "creer" | "peres";
+type Vue = "accueil" | "animaux" | "creer";
 type Tri = "numero" | "sexe" | "age" | "repro";
 
 const reproLabels: Record<string, string> = { VERT: "Gestante", ROSE: "Vêlage imminent", JAUNE: "À écho", ROUGE: "Vide", REPOS: "Repos", GRIS: "En attente" };
@@ -37,11 +35,9 @@ const seances = ["Échographies", "Vaccinations", "Antiparasitaires", "Soins / t
 export default function LabExplorer({
   animaux,
   echeances,
-  fathers,
 }: {
   animaux: Animal[];
   echeances: Echeance[];
-  fathers: LabFather[];
 }) {
   const [vue, setVue] = useState<Vue>("accueil");
   const [demoAction, setDemoAction] = useState<string | null>(null);
@@ -58,35 +54,34 @@ export default function LabExplorer({
 
   return (
     <div className="space-y-4 pb-[calc(env(safe-area-inset-bottom)+10rem)]">
-      <nav className="grid grid-cols-4 gap-2" aria-label="Sections du CESAM LAB">
+      <nav className="grid grid-cols-3 gap-2" aria-label="Sections du CESAM LAB">
         <button type="button" onClick={() => setVue("accueil")} className={vue==="accueil"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><House className="mx-auto mb-1" size={20}/>Accueil</button>
         <button type="button" onClick={() => setVue("animaux")} className={vue==="animaux"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-white p-3 text-sm font-bold text-gray-700"}><Search className="mx-auto mb-1" size={20}/>Troupeau</button>
-        <button type="button" onClick={() => setVue("peres")} className={vue==="peres"?"rounded-xl bg-green-700 p-2 text-xs font-bold text-white":"rounded-xl bg-white p-2 text-xs font-bold text-gray-700"}>Pères</button>
         <button type="button" onClick={() => setVue("creer")} className={vue==="creer"?"rounded-xl bg-green-700 p-3 text-sm font-bold text-white":"rounded-xl bg-green-50 p-3 text-sm font-bold text-green-800"}><Plus className="mx-auto mb-1" size={20}/>Créer</button>
       </nav>
       <AccueilRadialMenu animalNumero={animalContexte} onAction={setDemoAction} onSaveNote={async (content) => { setDemoNotes(prev => [content, ...prev]); }} />
       {vue === "accueil" && (
         <section className="space-y-3">
           <h2 className="text-xl font-black">À faire et à prévoir</h2>
-          <p className="text-sm text-gray-600">Les échéances déjà connues de CESAM, sans nouvelle saisie.</p>
+          <p className="text-sm text-gray-600">Échéances fictives pour tester la présentation.</p>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setVue("animaux")} className="rounded-xl border bg-white p-4 text-left"><b className="block">{animaux.length} animaux actifs</b><span className="text-xs text-gray-500">Voir le troupeau</span></button>
             <button type="button" onClick={() => setVue("creer")} className="rounded-xl border bg-white p-4 text-left"><b className="block">Intervenir</b><span className="text-xs text-gray-500">Individuel ou collectif</span></button>
           </div>
           <div className="rounded-xl border bg-white p-3">
             <h3 className="flex items-center gap-2 font-bold"><CalendarDays size={18}/> Vêlages prévus</h3>
-            <div className="mt-3 space-y-2">{prochaines.slice(0,6).map(item=><Link href={"/troupeau/"+item.nutrav} key={item.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 p-3"><span className="font-semibold">{item.nutrav} · {item.nom||"Sans nom"}</span><span className="text-sm font-semibold text-green-800">{new Date(item.date).toLocaleDateString("fr-FR")}</span></Link>)}</div>
+            <div className="mt-3 space-y-2">{prochaines.slice(0,6).map(item=><div key={item.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 p-3"><span className="font-semibold">{item.nutrav} · {item.nom||"Sans nom"}</span><span className="text-sm font-semibold text-green-800">{new Date(item.date).toLocaleDateString("fr-FR")}</span></div>)}</div>
             {prochaines.length===0&&<p className="mt-2 text-sm text-gray-500">Aucun vêlage prévu dans le calendrier.</p>}
-            <Link href="/velage" className="mt-3 block text-sm font-bold text-green-800">Voir le calendrier complet dans CESAM →</Link>
+            <p className="mt-3 text-sm text-gray-600">Calendrier complet disponible dans CESAM réel, hors simulation.</p>
           </div>
           <div className="rounded-xl border bg-white p-3">
             <h3 className="font-bold">Autres travaux à consulter</h3>
-            <p className="mt-1 text-xs text-gray-500">Ces raccourcis ouvrent les suivis existants ; ils ne constituent pas encore un agenda collectif unique.</p>
+            <p className="mt-1 text-xs text-gray-500">Aperçu des raccourcis ; les parcours réels restent hors simulation.</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <Link href="/reproduction" className="rounded-lg bg-amber-50 p-3 text-sm font-semibold">Échographies →</Link>
-              <Link href="/sanitaire/vaccins" className="rounded-lg bg-blue-50 p-3 text-sm font-semibold">Vaccins et rappels →</Link>
-              <Link href="/parage" className="rounded-lg bg-green-50 p-3 text-sm font-semibold">Parage →</Link>
-              <Link href="/troupeau/pesee" className="rounded-lg bg-gray-50 p-3 text-sm font-semibold">Pesées →</Link>
+              <span className="rounded-lg bg-amber-50 p-3 text-sm font-semibold">Échographies →</span>
+              <span className="rounded-lg bg-blue-50 p-3 text-sm font-semibold">Vaccins et rappels →</span>
+              <span className="rounded-lg bg-green-50 p-3 text-sm font-semibold">Parage →</span>
+              <span className="rounded-lg bg-gray-50 p-3 text-sm font-semibold">Pesées →</span>
             </div>
           </div>
         </section>
@@ -101,7 +96,6 @@ export default function LabExplorer({
         </section>
       )}
       {vue === "creer" && <LabCreatePanel animaux={animaux}/>}
-      {vue === "peres" && <LabFathers fathers={fathers}/> }
 
       {vue === "animaux" && (
         <section className="space-y-3">
@@ -123,7 +117,7 @@ export default function LabExplorer({
             {visibles.map((animal) => (
               <div key={animal.id} className="rounded-xl border bg-white">
                 <div className="flex min-h-14 items-center gap-2 p-3">
-                  <Link href={`/troupeau/${animal.nutrav}`} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
                   <span className="rounded-lg bg-green-700 px-2 py-1 font-bold text-white">{animal.nutrav}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{animal.nobovi || "Sans nom"}</span>
@@ -133,7 +127,7 @@ export default function LabExplorer({
                       {animal.reproduction && <span className={`rounded-full px-2 py-0.5 font-semibold ${reproColors[animal.aEchographier ? "JAUNE" : animal.reproduction]}`}>{reproLabels[animal.aEchographier ? "JAUNE" : animal.reproduction]}</span>}
                     </span>
                   </span>
-                  </Link>
+                  </div>
                   <button type="button" onClick={() => setOuvert(ouvert === animal.id ? null : animal.id)} aria-label={`Actions de ${animal.nutrav}`} aria-expanded={ouvert === animal.id} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-800">{ouvert === animal.id ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}</button>
                 </div>
                 {ouvert === animal.id && (
