@@ -22,6 +22,7 @@ import {
 } from "@/lib/utils";
 import Link from "next/link";
 import BackButton from "./BackButton";
+import { animalTabHref } from "@/lib/origin-navigation";
 import { notFound } from "next/navigation";
 import {
   Scale,
@@ -75,7 +76,7 @@ import { construireHistoriqueVaccinalSante } from "@/lib/vaccine-health-history"
 
 interface PageProps {
   params: Promise<{ nutrav: string }>;
-  searchParams: Promise<{ onglet?: string; pesee?: string; poids?: string; testRepro?: string }>;
+  searchParams: Promise<{ onglet?: string; pesee?: string; poids?: string; testRepro?: string; returnTo?: string }>;
 }
 
 async function getGroupes() {
@@ -204,7 +205,7 @@ async function getAnimal(nutrav: string, onglet: string) {
 
 export default async function FicheAnimal({ params, searchParams }: PageProps) {
   const { nutrav } = await params;
-  const { onglet = "identite", pesee, poids, testRepro } = await searchParams;
+  const { onglet = "identite", pesee, poids, testRepro, returnTo } = await searchParams;
   const [animal, groupes, protocoles, configAffichage] = await Promise.all([
     getAnimal(nutrav, onglet), getGroupes(), getProtocoles(), getExploitationDisplayConfig(),
   ]);
@@ -424,8 +425,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
   ];
 
   function tabHref(id: string) {
-    const testParam = testReproEnabled ? "&testRepro=1" : "";
-    return `/troupeau/${animal!.nutrav}?onglet=${id}${testParam}`;
+    return animalTabHref(animal!.nutrav, id, testReproEnabled, returnTo ?? null);
   }
 
   return (
@@ -464,7 +464,7 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               N° national : {animal.numeroNational ?? "à compléter"}
             </p>
           </div>
-          <div className="col-span-2 flex shrink-0 items-center justify-between gap-2 border-t border-gray-100 pt-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:justify-end sm:border-0 sm:pt-0">
+          <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:justify-end sm:border-0 sm:pt-0">
             <QuickActionsBar
               animalId={animal.id}
               nutrav={animal.nutrav}
@@ -489,15 +489,15 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
               />
               <Link
                 href={`/troupeau/${animal.nutrav}/arbre`}
-                className="rounded-lg p-2 text-gray-500 hover:bg-white"
-                title="Arbre généalogique"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-gray-500 hover:bg-white"
+                aria-label="Arbre généalogique" title="Arbre généalogique"
               >
                 <GitBranch size={18} />
               </Link>
               <Link
                 href={`/troupeau/${animal.nutrav}/impression`}
-                className="rounded-lg p-2 text-gray-500 hover:bg-white"
-                title="Imprimer la fiche"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-gray-500 hover:bg-white"
+                aria-label="Imprimer la fiche" title="Imprimer la fiche"
               >
                 <Printer size={18} />
               </Link>
@@ -548,7 +548,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
             <a
               key={tab.id}
               href={tabHref(tab.id)}
-              className={`flex-1 text-center py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+              aria-current={onglet === tab.id ? "page" : undefined}
+              className={`flex-1 min-h-11 text-center py-2.5 text-sm font-semibold border-b-2 transition-colors ${
                 onglet === tab.id
                   ? "border-green-600 text-green-700"
                   : "border-transparent text-gray-500 hover:text-gray-700"
