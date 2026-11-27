@@ -179,3 +179,20 @@ test("actions rapides : ouverture, fermeture extérieure et clavier",async({page
  await button.click(); await zone.getByRole("heading").click(); await expect(menu).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
 });
+
+ test("posologies compactes : simulation ordinateur et iPhone",async({page})=>{
+ for(const width of [1280,320,375,390]){
+ await page.setViewportSize({width,height:844}); await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Traitement fictif"});
+ const ref=zone.getByRole("region",{name:"Informations de posologie de la pharmacie"});
+ await expect(ref.getByRole("table")).toBeVisible(); await expect(ref.getByRole("alert")).toBeVisible();
+ expect((await ref.boundingBox()).height).toBeLessThan(330);
+ expect(await ref.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ const dose=zone.getByLabel("Dose administrée"); await expect(dose).toHaveValue(""); await dose.fill("7");
+ await expect(ref.getByText(/Fréquence/).first()).toBeHidden();
+ await ref.locator("summary").click(); await expect(ref.getByText(/Fréquence/).first()).toBeVisible();
+ await ref.locator("summary").click(); await expect(dose).toHaveValue("7");
+ await zone.getByTitle("Changer de médicament").click(); await zone.getByRole("combobox").filter({has:page.locator("option")}).count();
+ await zone.getByPlaceholder("Tapez le nom ou la substance active…").fill("TOLFINE"); await zone.getByRole("option",{name:/TOLFINE/}).click(); await expect(dose).toHaveValue("");
+ }
+ });
