@@ -26,9 +26,10 @@ interface Props {
   onRemove: () => void;
   onIntervenantAdded: (i: Intervenant) => void;
   removable: boolean;
+  simulation?: boolean;
 }
 
-export default function TraitementDraftRow({ draft, medicaments, intervenants, onChange, onRemove, onIntervenantAdded, removable }: Props) {
+export default function TraitementDraftRow({ draft, medicaments, intervenants, onChange, onRemove, onIntervenantAdded, removable, simulation = false }: Props) {
   function set<K extends keyof TraitementDraft>(field: K, value: TraitementDraft[K]) {
     onChange({ ...draft, [field]: value });
   }
@@ -94,7 +95,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
             <div className="space-y-2">
               <p>Fiche : {draft.medicament.voie || "Voie non renseignée"} · Viande : {draft.medicament.delaiAttenteViandeJ ?? "?"} j · Lait : {draft.medicament.delaiAttenteLaitJ ?? "?"} j</p>
               {draft.medicament.preconisations.map(p => <p key={p.id}>{p.voie || "—"} · {p.indicationMotif || "Indication non renseignée"} · Fréquence : {p.frequence || "Non renseignée"} · Viande : {p.delaiAttenteViandeJ ?? "?"} j · Lait : {p.delaiAttenteLaitTraites ?? "?"} traites</p>)}
-              <a className="font-semibold text-blue-800 underline" href={`/pharmacie/${draft.medicament.id}`} target="_blank" rel="noopener noreferrer">Voir la fiche pharmacie</a>
+              {!simulation && <a className="font-semibold text-blue-800 underline" href={`/pharmacie/${draft.medicament.id}`} target="_blank" rel="noopener noreferrer">Voir la fiche pharmacie</a>}
             </div>
           </details>
         </section>
@@ -112,7 +113,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Exécutant(e) *</label>
-          <ExecutantSelect intervenants={intervenants} value={draft.executant} onChange={(v) => set("executant", v)} onAdded={onIntervenantAdded} />
+          <ExecutantSelect simulation={simulation} intervenants={intervenants} value={draft.executant} onChange={(v) => set("executant", v)} onAdded={onIntervenantAdded} />
         </div>
       </div>
 
@@ -120,7 +121,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
         <div>
           <label className="text-xs text-gray-500 block mb-1">Dose</label>
           <input type="number" min={0} step="0.1" value={draft.dose} onChange={(e) => set("dose", e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0" />
+            className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Dose administrée" placeholder="0" />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Unité</label>
