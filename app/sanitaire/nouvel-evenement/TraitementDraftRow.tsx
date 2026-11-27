@@ -1,15 +1,17 @@
 "use client";
 
 import { X } from "lucide-react";
-import { VOIES_ADMINISTRATION } from "@/lib/medicament-categories";
-import MedicamentPicker, { type MedicamentOption } from "./MedicamentPicker";
+import { useState } from "react";
+import { formatDoseBase, VOIES_ADMINISTRATION } from "@/lib/medicament-categories";
+import MedicamentPicker, { type MedicamentOption, type PreconisationOption } from "./MedicamentPicker";
 import ExecutantSelect, { type Intervenant } from "./ExecutantSelect";
+import { calculerDose, formatBaseKg, preconisationsPourVoie, referencePourCalcul, type ReferenceDose } from "./saisie-traitement";
 
 export interface TraitementDraft {
   key: string;
   medicament: MedicamentOption | null;
   voie: string;
-  executant: string;
+  executant?: string;
   dose: string;
   uniteDosage: string;
   motif: string;
@@ -22,13 +24,105 @@ interface Props {
   draft: TraitementDraft;
   medicaments: MedicamentOption[];
   intervenants: Intervenant[];
+  executantParDefaut: string;
+  animalPourCalcul: string | null;
   onChange: (draft: TraitementDraft) => void;
   onRemove: () => void;
   onIntervenantAdded: (i: Intervenant) => void;
   removable: boolean;
 }
 
-export default function TraitementDraftRow({ draft, medicaments, intervenants, onChange, onRemove, onIntervenantAdded, removable }: Props) {
+function libelleDose(p: PreconisationOption): string | null {
+  if (p.dose == null || !p.unite?.trim() || !p.doseBase?.trim()) return null;
+  return `${p.dose} ${p.unite} ${formatBaseKg(p.doseBase) ?? formatDoseBase(p.doseBase)}`;
+}
+
+function statutPosologie(statut: string): string {
+  if (statut === "VALIDE") return "Validée";
+  return statut === "A_VERIFIER" ? "À vérifier" : "Importée, à vérifier";
+}
+
+function PosologiePharmacie({ medicament, voie, animalId }: {
+  medicament: MedicamentOption;
+  voie: string;
+  animalId: string | null;
+}) {
+  const preconisations = medicament.preconisations ?? [];
+  const pourVoie = preconisationsPourVoie(preconisations, voie);
+  const principale = pourVoie.length === 1 ? pourVoie[0] : null;
+  const affichage = principale && libelleDose(principale);
+  const reference = referencePourCalcul(preconisations, voie);
+  const ancienneDose = pourVoie.length === 0 && preconisations.length === 0 &&
+    voie && medicament.voie?.trim().toUpperCase() === voie.trim().toUpperCase() &&
+    medicament.dosagePourKg != null && medicament.uniteDosage?.trim()
+    ? `${medicament.dosagePourKg} ${medicament.uniteDosage} par kg`
+    : null;
+  const message = !voie ? "Choisis la voie d’administration"
+    : pourVoie.length > 1 ? "Plusieurs références pour cette voie"
+      : "Pas de posologie complète pour cette voie";
+
+  return (
+    <section aria-label="Posologie de la pharmacie" className="rounded-lg border border-gray-200 bg-white px-3 text-sm">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-2">
+        <span className="text-gray-600">Posologie pharmacie</span>
+        <strong>{affichage || ancienneDose || message}</strong>
+        {affichage && principale && principale.statut !== "VALIDE" && (
+          <span className="font-medium text-amber-900">{statutPosologie(principale.statut)}</span>
+        )}
+        {ancienneDose && <span className="font-medium text-amber-900">À vérifier</span>}
+      </div>
+      <details>
+        <summary className="min-h-11 cursor-pointer py-3 font-medium text-blue-800">Détails de la posologie</summary>
+        <div className="space-y-2 pb-3">
+          {preconisations.map((p) => {
+            const duree = p.dureeValeur != null && p.dureeUnite
+              ? `${p.dureeValeur} ${p.dureeUnite === "JOUR" ? (p.dureeValeur === 1 ? "jour" : "jours") : p.dureeUnite.toLowerCase()}`
+              : null;
+            const consignes = [p.frequence, duree,
+              p.delaiAttenteViandeJ != null ? `Attente viande : ${p.delaiAttenteViandeJ} j` : null,
+              p.delaiAttenteLaitTraites != null ? `Attente lait : ${p.delaiAttenteLaitTraites} traite(s)` : null,
+            ].filter(Boolean);
+            return (
+              <div key={p.id} className="rounded-md border border-gray-200 p-2">
+                <p className="font-medium">{[p.voie, p.indicationMotif, statutPosologie(p.statut)].filter(Boolean).join(" · ")}</p>
+                <p>{libelleDose(p) ?? "Posologie incomplète"}</p>
+                {consignes.length > 0 && <p className="text-gray-600">{consignes.join(" · ")}</p>}
+              </div>
+            );
+          })}
+          <p className="text-gray-600">Attente sur la fiche pharmacie · viande : {medicament.delaiAttenteViandeJ != null ? `${medicament.delaiAttenteViandeJ} j` : "non renseignée"} · lait : {medicament.delaiAttenteLaitJ != null ? `${medicament.delaiAttenteLaitJ} j` : "non renseignée"}</p>
+          <a className="inline-flex min-h-11 items-center font-medium text-blue-800 underline" href={`/pharmacie/${medicament.id}`} target="_blank" rel="noopener noreferrer">Voir la fiche pharmacie</a>
+        </div>
+      </details>
+      {animalId && reference && (
+        <details className="border-t border-gray-200">
+          <summary className="min-h-11 cursor-pointer py-3 font-medium text-blue-800">Calculer avec un poids estimé</summary>
+          <CalculDose key={JSON.stringify([animalId, medicament.id, reference.id])} reference={reference} />
+        </details>
+      )}
+    </section>
+  );
+}
+
+function CalculDose({ reference }: { reference: ReferenceDose }) {
+  const [poids, setPoids] = useState("");
+  const dose = calculerDose(reference, poids);
+  return (
+    <div className="space-y-2 pb-3">
+      <label className="block">
+        <span className="block font-medium">Poids estimé (kg)</span>
+        <input type="number" inputMode="decimal" min="0" step="any" value={poids}
+          onChange={(event) => setPoids(event.target.value)}
+          className="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Facultatif" />
+      </label>
+      <p aria-live="polite">
+        {dose !== null && <><strong>Quantité calculée : {dose} {reference.unite}</strong>. Vérifie le résultat, puis renseigne la dose réellement administrée.</>}
+      </p>
+    </div>
+  );
+}
+
+export default function TraitementDraftRow({ draft, medicaments, intervenants, executantParDefaut, animalPourCalcul, onChange, onRemove, onIntervenantAdded, removable }: Props) {
   function set<K extends keyof TraitementDraft>(field: K, value: TraitementDraft[K]) {
     onChange({ ...draft, [field]: value });
   }
@@ -74,29 +168,6 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
         )}
       </div>
 
-      {draft.medicament && (
-        <section aria-label="Informations de posologie de la pharmacie" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm space-y-2">
-          <p className="font-semibold text-amber-950">Posologie de référence — à vérifier avant administration</p>
-          <p className="text-xs text-amber-900">Ces informations proviennent de la pharmacie CESAM. Elles ne constituent pas une dose calculée ou une prescription. La dose administrée reste à renseigner manuellement.</p>
-          <p>Fiche pharmacie : {draft.medicament.dosagePourKg != null ? `${draft.medicament.dosagePourKg} ${draft.medicament.uniteDosage ?? "unité non renseignée"} / kg (valeur enregistrée, à vérifier)` : "Aucune posologie par kg renseignée"}</p>
-          <p>Voie de la fiche : {draft.medicament.voie || "Non renseignée"}</p>
-          <p>Attente viande : {draft.medicament.delaiAttenteViandeJ != null ? `${draft.medicament.delaiAttenteViandeJ} jour(s)` : "Non renseignée"} · Attente lait : {draft.medicament.delaiAttenteLaitJ != null ? `${draft.medicament.delaiAttenteLaitJ} jour(s)` : "Non renseignée"}</p>
-          {(draft.medicament.preconisations ?? []).length ? (
-            <div className="space-y-2">
-              {draft.medicament.preconisations.map((p) => (
-                <div key={p.id} className="rounded-md border border-amber-200 bg-white p-2">
-                  <p className="font-medium">{p.indicationMotif || "Préconisation sans indication"} · {p.statut === "VALIDE" ? "Validée" : p.statut === "A_VERIFIER" ? "À vérifier" : "Importée / non validée"}</p>
-                  <p>Dose de référence : {p.dose != null ? `${p.dose} ${p.unite ?? "unité non renseignée"} ${p.doseBase ?? "(base non renseignée)"}` : "Non renseignée"}</p>
-                  <p>Voie : {p.voie || "Non renseignée"} · Fréquence : {p.frequence || "Non renseignée"}</p>
-                  <p>Durée : {p.dureeValeur != null ? `${p.dureeValeur} ${p.dureeUnite || "unité non renseignée"}` : "Non renseignée"}</p>
-                  <p>Attente viande : {p.delaiAttenteViandeJ != null ? `${p.delaiAttenteViandeJ} j` : "Non renseignée"} · Lait : {p.delaiAttenteLaitTraites != null ? `${p.delaiAttenteLaitTraites} traites` : "Non renseignée"}</p>
-                </div>
-              ))}
-            </div>
-          ) : <p>Aucune préconisation enregistrée pour ce médicament.</p>}
-          <a className="font-semibold text-blue-800 underline" href={`/pharmacie/${draft.medicament.id}`} target="_blank" rel="noopener noreferrer">Voir la fiche pharmacie</a>
-        </section>
-      )}
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Voie d&apos;administration *</label>
@@ -110,14 +181,18 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Exécutant(e) *</label>
-          <ExecutantSelect intervenants={intervenants} value={draft.executant} onChange={(v) => set("executant", v)} onAdded={onIntervenantAdded} />
+          <ExecutantSelect intervenants={intervenants} value={draft.executant ?? executantParDefaut} onChange={(v) => set("executant", v)} onAdded={onIntervenantAdded} />
         </div>
       </div>
 
+      {draft.medicament && (
+        <PosologiePharmacie medicament={draft.medicament} voie={draft.voie} animalId={animalPourCalcul} />
+      )}
+
       <div className="grid grid-cols-3 gap-2.5">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Dose</label>
-          <input type="number" min={0} step="0.1" value={draft.dose} onChange={(e) => set("dose", e.target.value)}
+          <label className="text-xs text-gray-500 block mb-1">Dose administrée</label>
+          <input type="number" min={0} step="any" value={draft.dose} onChange={(e) => set("dose", e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0" />
         </div>
         <div>

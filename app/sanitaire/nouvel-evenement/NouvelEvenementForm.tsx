@@ -13,6 +13,7 @@ import TraitementDraftRow, { type TraitementDraft } from "./TraitementDraftRow";
 import { type MedicamentOption } from "./MedicamentPicker";
 import type { VaccinationSessionPreset } from "@/lib/vaccination-session";
 import { type Intervenant } from "./ExecutantSelect";
+import { preparerExecutants } from "./saisie-traitement";
 import { getMomentActuel } from "@/lib/evenements-sanitaires";
 import { searchTypesEvenement, normalizeSearch, type RecherchableTypeEvenement } from "@/lib/fuzzy-search";
 import { fileToResizedDataUrl } from "@/lib/image-client";
@@ -40,7 +41,7 @@ type TargetMode = "animal" | "plusieurs";
 const today = new Date().toISOString().slice(0, 10);
 
 function nouveauDraft(): TraitementDraft {
-  return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", executant: "", dose: "", uniteDosage: "ml", motif: "", doseUnique: true, frequence: "", dureeJours: "" };
+  return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", dose: "", uniteDosage: "ml", motif: "", doseUnique: true, frequence: "", dureeJours: "" };
 }
 
 export default function NouvelEvenementForm({ presetNutrav, presetNutravs, presetMedicamentId, presetVaccination }: { presetNutrav?: string; presetNutravs?: string[]; presetMedicamentId?: string; presetVaccination?: VaccinationSessionPreset }) {
@@ -256,7 +257,12 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
     setPhotoPreview(null);
   }
 
-  const draftsValides = traitementActif ? traitementsDrafts.filter((d) => d.medicament) : [];
+  const executants = useMemo(() => preparerExecutants(intervenants), [intervenants]);
+  const animalPourCalcul = selectedAnimaux.length === 1 ? selectedAnimaux[0].id : null;
+  const draftsValides = traitementActif
+    ? traitementsDrafts.filter((draft) => draft.medicament)
+        .map((draft) => ({ ...draft, executant: draft.executant ?? executants.parDefaut }))
+    : [];
 
   async function handleSubmit() {
     setError("");
@@ -727,7 +733,9 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
                 key={d.key}
                 draft={d}
                 medicaments={medicaments}
-                intervenants={intervenants}
+                intervenants={executants.ordonnes}
+                executantParDefaut={executants.parDefaut}
+                animalPourCalcul={animalPourCalcul}
                 removable={traitementsDrafts.length > 1}
                 onChange={(next) => setTraitementsDrafts((prev) => prev.map((x) => (x.key === d.key ? next : x)))}
                 onRemove={() => setTraitementsDrafts((prev) => prev.filter((x) => x.key !== d.key))}
