@@ -14,3 +14,12 @@ test("reference guidance is displayed with status, base, route, duration and wit
   assert.match(form,/Voir la fiche pharmacie/);
   assert.match(form,/La dose administrée reste à renseigner manuellement/);
 });
+
+test("compact references retain warnings and collapsible details",()=>{
+ assert.match(form,/<table className="w-full table-fixed/);
+ assert.match(form,/<details>/);
+ assert.match(form,/Délais d’attente et détails/);
+ assert.match(form,/TOLFINE/);
+ assert.match(form,/Substance active incohérente/);
+ assert.doesNotMatch(form,/<details open/);
+});
