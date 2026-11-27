@@ -260,7 +260,9 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
  try {
-  const {id,animalId,date,remarque}=await request.json();
+  const {id,animalId,date,remarque,resultat,joursGestation,taureauId}=await request.json();
+  if(resultat!==undefined && !["PLEINE","VIDE"].includes(resultat))return NextResponse.json({error:"Résultat invalide"},{status:400});
+  if(resultat==="PLEINE" && (!Number.isInteger(joursGestation)||joursGestation<1||joursGestation>285))return NextResponse.json({error:"Durée de gestation invalide"},{status:400});
   if(typeof id!=="string"||typeof animalId!=="string"||typeof date!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(date))return NextResponse.json({error:"Correction invalide"},{status:400});
   const start=new Date(date+"T00:00:00.000Z");
   if(!Number.isFinite(start.getTime())||start.toISOString().slice(0,10)!==date)return NextResponse.json({error:"Date invalide"},{status:400});
@@ -270,6 +272,17 @@ export async function PATCH(request: NextRequest) {
    if(!row|| (row.saillieId!==null && !(row.animal.reproductionEtatManuel==="ROUGE"&&row.animal.reproductionEtatModifieAt&&row.animal.reproductionEtatModifieAt>=start&&row.animal.reproductionEtatModifieAt<range.lt)))return false;
    if(await tx.gestation.findFirst({where:{saillie:{animalId},dateEcho:range}}))return false;
    const observation=typeof remarque==="string"?remarque.trim()||null:null;
+   if(resultat==="PLEINE") {
+    if(row.saillieId!==null || row.animal.sexbov!=="F")return false;
+    if(taureauId!=null && (typeof taureauId!=="string" || !await tx.taureau.findUnique({where:{id:taureauId},select:{id:true}})))return false;
+    if(await tx.gestation.findFirst({where:{saillie:{animalId},etat:"VERT",velage:null}}))return false;
+    const saillie=await tx.saillie.create({data:{animalId,date:addDays(start,-joursGestation),type:"NATURELLE",estimation:true,taureauId:taureauId??null}});
+    const gestation=await tx.gestation.create({data:{saillieId:saillie.id,etat:"VERT",dateEcho:start,resultatEcho:"PLEINE",joursGestation,dateVelagePrevue:addDays(start,DUREE_GESTATION-joursGestation),observationEcho:observation}});
+    await tx.demandeEchographie.update({where:{id},data:{observation,saillieId:saillie.id}});
+    await tx.animal.update({where:{id:animalId},data:{reproductionEtatManuel:null,reproductionEtatPrecedent:null,reproductionEtatModifieAt:null}});
+    await tx.actionLog.create({data:{type:"CORRECT_ECHOGRAPHIE",description:"Correction échographie positive sans saillie connue",revertData:JSON.stringify([{op:"update",model:"demandeEchographie",where:{id},data:{observation:row.observation,saillieId:null}},{op:"delete",model:"gestation",id:gestation.id},{op:"delete",model:"saillie",id:saillie.id},{op:"update",model:"animal",where:{id:animalId},data:{reproductionEtatManuel:row.animal.reproductionEtatManuel,reproductionEtatPrecedent:row.animal.reproductionEtatPrecedent,reproductionEtatModifieAt:row.animal.reproductionEtatModifieAt}}])}});
+    return true;
+   }
    await tx.demandeEchographie.update({where:{id},data:{observation}});
    await tx.actionLog.create({data:{type:"CORRECT_ECHOGRAPHIE",description:"Correction observation échographie négative",revertData:JSON.stringify([{op:"update",model:"demandeEchographie",where:{id},data:{observation:row.observation}}])}});
    return true;
