@@ -60,6 +60,7 @@ export interface TraitementDelaiInput {
   dureeJours: number;
   delaiAttenteViandeJ?: number | null;
   delaiAttenteLaitJ?: number | null;
+  notes?: string | null;
   medicament?: { delaiAttenteViandeJ?: number | null; delaiAttenteLaitJ?: number | null } | null;
 }
 
@@ -69,11 +70,21 @@ export interface TraitementDelaiInput {
  */
 export function getAttenteInfoForTraitement(t: TraitementDelaiInput, now: Date = new Date()): AttenteInfo {
   const dateFin = getDateFinTraitement(new Date(t.dateDebut), t.dureeJours);
-  const delaiViande = t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
-  const delaiLait = t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null;
+  const delaiViande = delaisInconnus(t).viande ? null : t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
+  const delaiLait = delaisInconnus(t).lait ? null : t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null;
   return getAttenteInfo(dateFin, delaiViande, delaiLait, now);
 }
 
+// Un délai absent sur l'acte et sur le catalogue ne constitue pas un délai nul.
+// Les actes signalés à compléter gardent leur incertitude même après édition de la fiche.
+export function delaisInconnus(t: TraitementDelaiInput & {notes?:string|null}) {
+ const explicite = t.notes?.includes("[DELAIS_A_COMPLETER]") === true;
+ return {viande: (t.delaiAttenteViandeJ ?? (explicite ? null : t.medicament?.delaiAttenteViandeJ)) == null,
+ lait: (t.delaiAttenteLaitJ ?? (explicite ? null : t.medicament?.delaiAttenteLaitJ)) == null};
+}
+export function delaiSaisi(v:unknown): v is number {
+ return typeof v==="number" && Number.isSafeInteger(v) && v>=0;
+}
 export type AffichageDelaiAttente = "VIANDE" | "LAIT" | "LES_DEUX";
 
 export function doitAfficherViande(affichage: string | null | undefined): boolean {
