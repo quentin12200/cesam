@@ -8,7 +8,7 @@ export default function LabCalvingPanel(){
  const [result,setResult]=useState<ReturnType<typeof simulateBirth>|null>(null);
  const [error,setError]=useState("");
  const update=(patch:Partial<DemoBirth>)=>{setInput(x=>({...x,...patch}));setResult(null);setError("");};
- const calf=(i:number,patch:Partial<DemoCalf>)=>update({calves:input.calves.map((c,j)=>i===j?{...c,...patch}:c)});
+ const calf=(i:number,patch:Partial<DemoCalf>)=>{setInput(x=>({...x,calves:x.calves.map((c,j)=>i===j?{...c,...patch}:c)}));setResult(null);setError("");};
  const reset=()=>{setInput(initial());setResult(null);setError("");};
  return <section className="space-y-3 rounded-xl border bg-white p-4" aria-labelledby="demo-calving-title">
  <h2 id="demo-calving-title" className="text-lg font-black">Simulation vêlage et reproduction</h2>
