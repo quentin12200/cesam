@@ -278,7 +278,9 @@ test("exécutant : profil actif en premier et choix manuel conservé",async({pag
 });
 
 test("Mon travail : compteurs fictifs, anticipation et ordre des raccourcis",async({page})=>{
- await page.goto("/prototype-accueil-v3");
+ await page.goto("/lab");
+ await page.getByRole("link",{name:"Prototype accueil V3"}).click();
+ await page.waitForURL("**/prototype-accueil-v3");
  const zone=page.getByRole("region",{name:"Mon travail",exact:true});
  await expect(zone.getByText("Simulation · anticipation à 15 jours · données fictives")).toBeVisible();
  await zone.getByRole("button",{name:/^Vêlages/}).click();

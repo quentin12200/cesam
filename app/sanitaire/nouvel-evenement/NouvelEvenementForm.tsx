@@ -7,7 +7,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, X, Loader2, CheckCircle2, Search, Thermometer, ListChecks, Plus, Syringe, Mic } from "lucide-react";
 import AnimalPicker, { type AnimalOption } from "./AnimalPicker";
-import AnimalMultiEntry from "./AnimalMultiEntry";
 import AnimalPickerModal from "./AnimalPickerModal";
 import QuestionPanel, { type QuestionTemplateData } from "./QuestionPanel";
 import TraitementDraftRow, { type TraitementDraft } from "./TraitementDraftRow";
@@ -37,7 +36,6 @@ interface TypeSelectionne {
   nom: string;
 }
 
-type TargetMode = "animal" | "plusieurs";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -49,7 +47,6 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
   const router = useRouter();
   const { completeToOrigin } = useOriginNavigation();
 
-  const [targetMode, setTargetMode] = useState<TargetMode>("animal");
   const [selectedAnimaux, setSelectedAnimaux] = useState<AnimalOption[]>([]);
   const [groupes, setGroupes] = useState<Groupe[]>([]);
   const [showPickerModal, setShowPickerModal] = useState(false);
@@ -96,7 +93,6 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
       const draft = JSON.parse(raw) as VoiceSanitaryDraft;
       if (!draft.target?.nutravs.length) return;
       setVoiceDraft(draft);
-      setTargetMode(draft.target.nutravs.length > 1 ? "plusieurs" : "animal");
       setDate(draft.date || today);
       setMoment(draft.moment ?? getMomentActuel());
       setTemperature(draft.temperature !== null ? String(draft.temperature) : "");
@@ -456,48 +452,19 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
         />
       )}
 
-      {/* Animal(s) concerné(s) */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">Animal(x) concerné(s)</h3>
-        <div className="flex gap-2 mb-3">
-          {([["animal", "Un animal"], ["plusieurs", "Plusieurs animaux"]] as const).map(([mode, label]) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setTargetMode(mode)}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                targetMode === mode ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      <div className="bg-white rounded-xl shadow p-3 space-y-2">
+        <h3 className="font-semibold text-gray-800 text-sm">Animaux concernés</h3>
+        <AnimalPicker selected={selectedAnimaux} onChange={setSelectedAnimaux} multiple={true} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={() => setShowPickerModal(true)} className="flex min-h-9 items-center gap-1.5 text-xs text-gray-600 hover:text-blue-700">
+            <ListChecks size={14} /> Choisir dans le troupeau
+          </button>
+          {selectedAnimaux.length > 0 && <span className="text-xs text-gray-500" aria-live="polite">{selectedAnimaux.length} sélectionné{selectedAnimaux.length>1?"s":""}</span>}
         </div>
-
-        {targetMode === "animal" && (
-          <AnimalPicker selected={selectedAnimaux} onChange={setSelectedAnimaux} multiple={false} />
-        )}
-
-        {targetMode === "plusieurs" && (
-          <div className="space-y-2">
-            <AnimalMultiEntry selected={selectedAnimaux} onChange={setSelectedAnimaux} />
-            <button
-              type="button"
-              onClick={() => setShowPickerModal(true)}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100"
-            >
-              <ListChecks size={13} /> Choisir dans le troupeau (par lot, sexe, catégorie…)
-            </button>
-            {selectedAnimaux.length > 0 && (
-              <p className="text-xs text-gray-500">{selectedAnimaux.length} animal{selectedAnimaux.length > 1 ? "aux" : ""} sélectionné{selectedAnimaux.length > 1 ? "s" : ""}</p>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Date / moment */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">Date et moment</h3>
+      <div className="bg-white rounded-xl shadow p-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-gray-500 block mb-1">Date</label>
