@@ -16,7 +16,7 @@ async function getData() {
       select: {
         id: true, nom: true, dci: true, categorie: true, voie: true,
         dosagePourKg: true, uniteDosage: true, delaiAttenteViandeJ: true, delaiAttenteLaitJ: true,
-        prescriptionRequise: true, actif: true, favori: true, actions: true,
+        temporaire: true, prescriptionRequise: true, actif: true, favori: true, actions: true,
         stockActuel: true, stockUnite: true, stockSeuilAlert: true,
         conditionnements: {
           where: { actif: true },
@@ -59,6 +59,7 @@ async function getData() {
     delaiAttenteLaitJ: m.delaiAttenteLaitJ,
     prescriptionRequise: m.prescriptionRequise,
     actif: m.actif,
+    temporaire: m.temporaire,
     favori: m.favori,
     actions: m.actions,
     stockActuel: m.stockActuel,
