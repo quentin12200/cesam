@@ -35,6 +35,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
   );
 }
 
+export function useActiveExecutor() {
+  const context = useContext(PreferencesContext);
+  return context?.ready ? context.profile : "";
+}
+
 export function useUserPreferences() {
   const context = useContext(PreferencesContext);
   if (!context) throw new Error("useUserPreferences doit être utilisé dans UserPreferencesProvider");
