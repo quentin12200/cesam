@@ -1,4 +1,7 @@
 "use client";
+import DoseUnitSelect from "@/app/components/DoseUnitSelect";
+import { normaliserUniteDose } from "@/lib/dose-units";
+
 
 import { X } from "lucide-react";
 import { VOIES_ADMINISTRATION } from "@/lib/medicament-categories";
@@ -56,7 +59,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
       // Une préconisation par kg ou par 100 kg n'est pas une dose administrée.
       // Ne jamais recopier une valeur de référence dans la dose réelle.
       dose: "",
-      uniteDosage: preconisation?.unite ?? m.uniteDosage ?? draft.uniteDosage,
+      uniteDosage: normaliserUniteDose(preconisation?.unite ?? m.uniteDosage),
       motif: preconisation?.indicationMotif ?? draft.motif,
     });
   }
@@ -120,13 +123,12 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
       <div className="grid grid-cols-3 gap-2.5">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Dose</label>
-          <input type="number" min={0} step="0.1" value={draft.dose} onChange={(e) => set("dose", e.target.value)}
+          <input type="text" inputMode="decimal" value={draft.dose} onChange={(e) => set("dose", e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Dose administrée" placeholder="0" />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Unité</label>
-          <input value={draft.uniteDosage} onChange={(e) => set("uniteDosage", e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ml" />
+          <DoseUnitSelect value={draft.uniteDosage} onChange={v=>set("uniteDosage",v)}/>
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Motif</label>
