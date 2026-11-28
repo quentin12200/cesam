@@ -32,9 +32,10 @@ interface Props {
   onIntervenantAdded: (i: Intervenant) => void;
   removable: boolean;
   simulation?: boolean;
+  createSimulation?: (nom:string)=>MedicamentOption;
 }
 
-export default function TraitementDraftRow({ draft, medicaments, intervenants, onChange, onRemove, onIntervenantAdded, removable, simulation = false }: Props) {
+export default function TraitementDraftRow({ draft, medicaments, intervenants, onChange, onRemove, onIntervenantAdded, removable, simulation = false, createSimulation }: Props) {
   function set<K extends keyof TraitementDraft>(field: K, value: TraitementDraft[K]) {
     onChange({ ...draft, [field]: value });
   }
@@ -73,7 +74,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <label className="text-xs text-gray-500 block mb-1">Médicament *</label>
-          <MedicamentPicker allowQuickCreate={!simulation} medicaments={medicaments} value={draft.medicament} onChange={choisirMedicament} />
+          <MedicamentPicker allowQuickCreate={!simulation || !!createSimulation} createSimulation={simulation?createSimulation:undefined} medicaments={medicaments} value={draft.medicament} onChange={choisirMedicament} />
         </div>
         {removable && (
           <button type="button" onClick={onRemove} className="mt-5 shrink-0 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
@@ -110,7 +111,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Voie d&apos;administration *</label>
-          <select value={draft.voie} onChange={(e) => set("voie", e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          <select aria-label="Voie d’administration" value={draft.voie} onChange={(e) => set("voie", e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
             <option value="">Sélectionner…</option>
             {draft.voie && !VOIES_ADMINISTRATION.some((voie) => voie.code === draft.voie) && (
               <option value={draft.voie}>{draft.voie}</option>
