@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const {
     animalId, evenementId, medicamentId, medicamentNom, dateDebut, dureeJours, voie, frequence,
-    dose, doseRecommandee, uniteDosage, poidsUtilise, motif, veterinaire, doseUnique,
+    dose, doseRecommandee, uniteDosage, poidsUtilise, motif, veterinaire, executant, doseUnique,
     ordonnanceNumero, ordonnanceId, ordonnanceAAssocier, delaiAttenteViandeJ, delaiAttenteLaitJ, notes,
   } = body;
 
@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
       poidsUtilise: poidsUtilise ?? null,
       motif: motif?.trim() || null,
       veterinaire: veterinaire?.trim() || null,
+      executant: typeof executant === "string" ? executant.trim() || null : null,
       ordonnanceNumero: ordonnanceNumero?.trim() || null,
       ordonnanceId: ordonnanceId ?? null,
       ordonnanceAAssocier: ordonnanceAAssocier ?? false,
