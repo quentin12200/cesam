@@ -13,9 +13,10 @@ interface Props {
   selected: AnimalOption[];
   onChange: (animaux: AnimalOption[]) => void;
   multiple: boolean;
+  simulationAnimals?: AnimalOption[];
 }
 
-export default function AnimalPicker({ selected, onChange, multiple }: Props) {
+export default function AnimalPicker({ selected, onChange, multiple, simulationAnimals }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<AnimalOption[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -23,15 +24,20 @@ export default function AnimalPicker({ selected, onChange, multiple }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (query.trim().length < 1) { setResults([]); return; }
+    if (query.trim().length < 1) { setResults([]); setShowDropdown(false); return; }
+    let cancelled=false;
+    if(simulationAnimals){setResults(simulationAnimals.filter(a=>`${a.nutrav} ${a.nom??""}`.toLowerCase().includes(query.trim().toLowerCase())));setShowDropdown(true);return;}
     debounceRef.current = setTimeout(async () => {
+      try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`);
       const data = await res.json();
+      if(cancelled)return;
       setResults(data.map((a: { id: string; nutrav: string; nom: string | null }) => ({ id: a.id, nutrav: a.nutrav, nom: a.nom })));
       setShowDropdown(true);
+      } catch {if(!cancelled)setResults([]);}
     }, 250);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query]);
+    return () => { cancelled=true; if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query,simulationAnimals]);
 
   function pick(a: AnimalOption) {
     if (selected.some((s) => s.id === a.id)) { setQuery(""); setShowDropdown(false); return; }
@@ -50,10 +56,12 @@ export default function AnimalPicker({ selected, onChange, multiple }: Props) {
         <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-blue-400">
           <Search size={15} className="text-gray-400 mr-2 shrink-0" />
           <input
+            aria-label="Rechercher un animal"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => results.length > 0 && setShowDropdown(true)}
-            onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+            onBlur={(e) => {if(!e.currentTarget.parentElement?.parentElement?.contains(e.relatedTarget))setShowDropdown(false);}}
+            onKeyDown={e=>{if(e.key==="Escape")setShowDropdown(false);if(e.key==="Enter"&&showDropdown){e.preventDefault();const exact=results.find(a=>a.nutrav===query.trim());if(exact)pick(exact);else if(results.length===1)pick(results[0]);}}}
             placeholder={multiple ? "Ajouter un animal (n° travail ou nom)…" : "N° travail ou nom de l'animal…"}
             className="w-full text-sm outline-none"
           />
@@ -64,7 +72,8 @@ export default function AnimalPicker({ selected, onChange, multiple }: Props) {
               <button
                 key={a.id}
                 type="button"
-                onMouseDown={() => pick(a)}
+                onMouseDown={e=>e.preventDefault()}
+                onClick={() => pick(a)}
                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
               >
                 <span>{a.nutrav}{a.nom ? ` — ${a.nom}` : ""}</span>
@@ -80,7 +89,7 @@ export default function AnimalPicker({ selected, onChange, multiple }: Props) {
           {selected.map((a) => (
             <span key={a.id} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-full pl-2.5 pr-1 py-1 text-xs">
               {a.nutrav}{a.nom ? ` — ${a.nom}` : ""}
-              <button type="button" onClick={() => remove(a.id)} className="hover:bg-blue-100 rounded-full p-0.5">
+              <button type="button" aria-label={`Retirer ${a.nutrav}`} onClick={() => remove(a.id)} className="hover:bg-blue-100 rounded-full p-0.5">
                 <X size={11} />
               </button>
             </span>
