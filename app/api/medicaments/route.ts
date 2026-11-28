@@ -20,6 +20,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { nom, dci, categorie, voie, dosagePourKg, uniteDosage, delaiAttenteViandeJ, delaiAttenteLaitJ, prescriptionRequise, temporaire } = body;
+  if ([delaiAttenteViandeJ,delaiAttenteLaitJ].some(v=>v!=null&&!delaiRenseigne(v))) return NextResponse.json({error:"Délai invalide"},{status:400});
   if (typeof nom !== "string" || !nom.trim() || nom.trim().length > 160) {
     return NextResponse.json({ error: "nom requis" }, { status: 400 });
   }
