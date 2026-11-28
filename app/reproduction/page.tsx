@@ -1,4 +1,5 @@
 "use client";
+import {repereDernierVelage} from "@/lib/dernier-velage";
 
 import { effectiveManualReproduction } from "@/lib/calving-reproduction-reset";
 
@@ -1194,6 +1195,7 @@ function ReproductionContent() {
                 ) : (
                   <VacheSearch vaches={vaches} selectedId={chaleurAnimalId} onSelect={setChaleurAnimalId} placeholder="Numéro ou nom de la vache…" />
                 )}
+                <div className="mt-1 space-y-0.5 text-[11px] text-gray-500">{vaches.filter(v=>saillieAnimalIds.length?saillieAnimalIds.includes(v.id):v.id===saillieAnimalId).map(v=><p key={v.id}>{saillieAnimalIds.length>1?`${v.nutrav} · `:""}{repereDernierVelage(v.dernierVelage,saillieDate,v.estGenisse)}</p>)}</div>
               </div>
               <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
                 <div>
