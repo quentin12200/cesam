@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { subDays, addDays } from "date-fns";
-import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { getAttenteInfoForTraitement, delaisInconnus } from "@/lib/withdrawal";
 import { Suspense } from "react";
 import NouvelAnimalForm from "./NouvelAnimalForm";
 import TroupeauScrollRestorer from "./TroupeauScrollRestorer";
@@ -150,10 +150,11 @@ async function getAnimaux(params: TroupeauFilterParams & { tri2?: string; multi?
           select: { poids: true, date: true },
         },
         traitements: {
-          where: { dateDebut: { gte: subDays(now, 90) } },
+
           select: {
             dateDebut: true,
             dureeJours: true,
+            notes:true,
             delaiAttenteViandeJ: true,
             delaiAttenteLaitJ: true,
             medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } },
@@ -342,7 +343,7 @@ export default async function TroupeauPage({ searchParams }: PageProps) {
       activeCalves: [...activeCalves.values()],
       dernierPoids: animal.pesees[0]?.poids ?? null,
       dernierePeseeDate: animal.pesees[0]?.date.toISOString() ?? null,
-      enAttente: animal.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente),
+      enAttente: animal.traitements.some((t) => getAttenteInfoForTraitement(t).enAttente || delaisInconnus(t).viande),
     };
   });
 

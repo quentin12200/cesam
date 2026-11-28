@@ -1,4 +1,6 @@
 "use client";
+import DelaiAttenteInput from "@/app/components/DelaiAttenteInput";
+import {formatDelai} from "@/lib/withdrawal";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -151,16 +153,7 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Attente viande (j)</label>
-          <input type="number" min={0} value={delai} onChange={(e) => setDelai(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0 = aucun" />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Attente lait (j)</label>
-          <input type="number" min={0} value={delaiLait} onChange={(e) => setDelaiLait(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0 = aucun" />
-        </div>
+        <DelaiAttenteInput label="Viande" value={delai} onChange={setDelai}/><DelaiAttenteInput label="Lait" value={delaiLait} onChange={setDelaiLait}/>
       </div>
       <div>
         <label className="flex items-center gap-2 cursor-pointer">
@@ -271,13 +264,13 @@ function MedicamentRow({ med, expanded, onToggle }: { med: MedicamentItem; expan
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
             {voieTexte && <span><span className="text-gray-400">Voie :</span> {voieTexte}</span>}
             {med.delaiAttenteViandeJ != null && (
-              <span className={med.delaiAttenteViandeJ > 0 ? "text-orange-600 font-medium" : "text-green-600"}>
-                Délai viande : {med.delaiAttenteViandeJ === 0 ? "aucun" : `${med.delaiAttenteViandeJ} j`}
+              <span className={med.delaiAttenteViandeJ !== 0 ? "text-orange-600 font-medium" : "text-green-600"}>
+                Délai viande : {formatDelai(med.delaiAttenteViandeJ)}
               </span>
             )}
             {med.delaiAttenteLaitJ != null && (
-              <span className={med.delaiAttenteLaitJ > 0 ? "text-orange-600 font-medium" : "text-green-600"}>
-                Délai lait : {med.delaiAttenteLaitJ === 0 ? "aucun" : `${med.delaiAttenteLaitJ} j`}
+              <span className={med.delaiAttenteLaitJ !== 0 ? "text-orange-600 font-medium" : "text-green-600"}>
+                Délai lait : {formatDelai(med.delaiAttenteLaitJ)}
               </span>
             )}
           </div>

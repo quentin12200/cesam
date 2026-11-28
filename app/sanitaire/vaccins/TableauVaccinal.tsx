@@ -1,4 +1,5 @@
 "use client";
+import DelaiAttenteInput from "@/app/components/DelaiAttenteInput";
 import DoseUnitSelect from "@/app/components/DoseUnitSelect";
 import { normaliserUniteDose, lireDose, doseValide } from "@/lib/dose-units";
 
@@ -908,7 +909,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
 
   function enregistrerSoin() {
     if (!soinMedicament || soinAnimaux.size === 0) return;
-    if(soinMedicament.temporaire && (!lireDose(soinDose)||!soinVoie.trim()||[soinViande,soinLait].some(v=>v!==""&&(!/^\d+$/.test(v)||!Number.isSafeInteger(Number(v)))))){setErreur("Indique la dose réelle et la voie, vérifie les délais.");return;}
+    if(soinMedicament.temporaire && (!lireDose(soinDose)||!soinVoie.trim()||[soinViande,soinLait].some(v=>v!==""&&v!=="-1"&&(!/^\d+$/.test(v)||!Number.isSafeInteger(Number(v)))))){setErreur("Indique la dose réelle et la voie, vérifie les délais.");return;}
     if (!doseValide(soinDose,soinUnite)) {setErreur("Vérifie la dose et son unité."); return;}
     if (!dateSession || !executant.trim()) {
       setErreur("Indique la date et l’exécutant de la séance.");
@@ -953,7 +954,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         {soinModifierAnimaux && <div className="mt-2 grid max-h-48 gap-1 overflow-y-auto">{animauxDuLot.map((ligne) => <label key={ligne.animalId} className="flex min-h-9 cursor-pointer items-center gap-2"><input type="checkbox" checked={soinAnimaux.has(ligne.animalId)} onChange={() => basculerDansSet(setSoinAnimaux, ligne.animalId)} className="h-5 w-5 accent-green-700" />{ligne.nutrav} {ligne.nom}</label>)}</div>}
       </div>
       {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
-      {soinMedicament?.temporaire&&<div className="grid grid-cols-2 gap-2 text-xs"><label>Viande (jours)<input type="number" min={0} step={1} value={soinViande} onChange={e=>setSoinViande(e.target.value)} className="w-full border rounded p-2"/></label><label>Lait (jours)<input type="number" min={0} step={1} value={soinLait} onChange={e=>setSoinLait(e.target.value)} className="w-full border rounded p-2"/></label></div>}
+      {soinMedicament?.temporaire&&<div className="grid grid-cols-2 gap-2 text-xs"><DelaiAttenteInput label="Viande" value={soinViande} onChange={setSoinViande}/><DelaiAttenteInput label="Lait" value={soinLait} onChange={setSoinLait}/></div>}
       <button type="button" disabled={!soinMedicament || soinAnimaux.size === 0 || soinEnCours} onClick={() => void enregistrerSoin()} className="mt-3 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-40">{soinEnCours ? "Enregistrement…" : `Ajouter à la séance (${soinAnimaux.size} animaux)`}</button>
       <button type="button" disabled={soinEnCours} onClick={fermer} className="mt-2 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Annuler</button>
     </div></div>;

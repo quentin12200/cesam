@@ -279,7 +279,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
     if (traitementActif) {
       if (draftsValides.length === 0) { setError("Choisis au moins un médicament, ou désactive l'ajout de traitement"); return; }
       if (draftsValides.some(d=>!doseValide(d.dose,d.uniteDosage))) {setError("Vérifie la dose et son unité."); return;}
-      if(draftsValides.some(d=>d.medicament?.temporaire && (!lireDose(d.dose) || [d.delaiViande,d.delaiLait].some(v=>v && (!/^\d+$/.test(v) || !Number.isSafeInteger(Number(v))))))) {setError("Indique la dose réelle et vérifie les délais renseignés.");return;}
+      if(draftsValides.some(d=>d.medicament?.temporaire && (!lireDose(d.dose) || [d.delaiViande,d.delaiLait].some(v=>v && v!=="-1" && (!/^\d+$/.test(v) || !Number.isSafeInteger(Number(v))))))) {setError("Indique la dose réelle et vérifie les délais renseignés.");return;}
       const incomplet = draftsValides.find((d) => !d.voie || !d.executant);
       if (incomplet) { setError(`Pour ${incomplet.medicament?.nom}, indique la voie d'administration et l'exécutant(e)`); return; }
     }

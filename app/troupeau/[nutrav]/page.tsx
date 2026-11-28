@@ -1,3 +1,4 @@
+import { delaisInconnus } from "@/lib/withdrawal";
 import { prisma } from "@/lib/prisma";
 import { effectiveManualReproduction } from "@/lib/calving-reproduction-reset";
 import { readGridProtocols, projectGridProtocols } from "@/lib/vaccine-grid-protocols";
@@ -919,8 +920,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                     motif: t.motif,
                     veterinaire: t.veterinaire,
                     statut: t.statut,
-                    delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
-                    delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
+                    delaiAttenteViandeJ: delaisInconnus(t).viande ? null : t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
+                    delaiAttenteLaitJ: delaisInconnus(t).lait ? null : t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
                     ordonnanceNumero: t.ordonnanceNumero,
                     ordonnanceId: t.ordonnanceId,
                     ordonnanceAAssocier: t.ordonnanceAAssocier,
@@ -942,8 +943,8 @@ export default async function FicheAnimal({ params, searchParams }: PageProps) {
                   motif: t.motif,
                   veterinaire: t.veterinaire,
                   statut: t.statut,
-                  delaiAttenteViandeJ: t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
-                  delaiAttenteLaitJ: t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
+                  delaiAttenteViandeJ: delaisInconnus(t).viande ? null : t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null,
+                  delaiAttenteLaitJ: delaisInconnus(t).lait ? null : t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null,
                   ordonnanceNumero: t.ordonnanceNumero,
                   ordonnanceId: t.ordonnanceId,
                   ordonnanceAAssocier: t.ordonnanceAAssocier,

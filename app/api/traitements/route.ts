@@ -1,3 +1,4 @@
+import { delaiRenseigne } from "@/lib/withdrawal";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
     dose, doseRecommandee, uniteDosage, poidsUtilise, motif, veterinaire, executant, doseUnique,
     ordonnanceNumero, ordonnanceId, ordonnanceAAssocier, delaiAttenteViandeJ, delaiAttenteLaitJ, notes,
   } = body;
+    if ([delaiAttenteViandeJ,delaiAttenteLaitJ].some(v=>v!=null&&!delaiRenseigne(v))) return NextResponse.json({error:"Délai invalide"},{status:400});
 
   if (!animalId || !medicamentNom?.trim() || !dateDebut) {
     return NextResponse.json({ error: "animalId, medicamentNom et dateDebut requis" }, { status: 400 });

@@ -249,6 +249,17 @@ test("médicament provisoire : création, doublon, délais inconnus et zéro exp
  await expect(zone.getByLabel("Nombre de médicaments fictifs")).toHaveText("2");
 });
 
+test("restriction lait : case compacte, champ désactivé et viande indépendante",async({page})=>{
+ await page.goto("/lab");const zone=page.getByRole("region",{name:"Traitement fictif"});
+ await zone.getByTitle("Changer de médicament").click();
+ await zone.getByPlaceholder("Tapez le nom ou la substance active…").fill("Produit fictif interdit");
+ await zone.getByRole("button",{name:/Créer « Produit fictif interdit »/}).click();
+ const viande=zone.getByLabel("Délai viande en jours");const lait=zone.getByLabel("Délai lait en jours");
+ await viande.fill("0");await zone.getByLabel("Délai lait interdit").check();
+ await expect(lait).toBeDisabled();await expect(lait).toHaveValue("");await expect(viande).toHaveValue("0");
+ await zone.getByLabel("Délai lait interdit").uncheck();await expect(lait).toBeEnabled();await expect(lait).toHaveValue("");
+});
+
 test("exécutant : profil actif en premier et choix manuel conservé",async({page})=>{
  await page.goto("/lab");
  const zone=page.getByRole("region",{name:"Exécutant fictif"});

@@ -23,6 +23,7 @@ export async function PATCH(
         where: { animalId: sortie.animalId },
         include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
       });
+      if (traitementsRecents.some(t=>getAttenteInfoForTraitement(t).viandeInterdite)) return NextResponse.json({error:"Restriction viande : vérifier avec le vétérinaire avant toute sortie boucherie."},{status:409});
       if (traitementsRecents.some(t=>delaisInconnus(t).viande)) return NextResponse.json({error:"Délai viande inconnu : régularise les traitements avant la sortie boucherie."},{status:409});
       const enAttente = traitementsRecents.some((t) => getAttenteInfoForTraitement(t).enAttenteViande);
       if (enAttente && !confirmeAttente) {
