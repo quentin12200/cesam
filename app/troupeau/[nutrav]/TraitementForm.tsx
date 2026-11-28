@@ -6,6 +6,8 @@ import { normaliserUniteDose, lireDose, doseValide } from "@/lib/dose-units";
 
 
 import { useState, useEffect, useRef } from "react";
+import { useActiveExecutor } from "@/components/UserPreferencesProvider";
+import ExecutantSelect, {type Intervenant} from "@/app/sanitaire/nouvel-evenement/ExecutantSelect";
 import { useRouter } from "next/navigation";
 import { Save, X, ScanLine, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { scanAndCreateExtraction } from "@/lib/scan-ordonnance-client";
@@ -58,6 +60,11 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
   const [delaiAttenteViandeJ, setDelaiAttenteViandeJ] = useState<number | null>(null);
   const [delaiAttenteLaitJ, setDelaiAttenteLaitJ] = useState<number | null>(null);
   const [preconisationChargee, setPreconisationChargee] = useState(false);
+  const profilExecutant = useActiveExecutor();
+  const [executantChoisi, setExecutant] = useState("");
+  const executant = executantChoisi || profilExecutant;
+  const [intervenants, setIntervenants] = useState<Intervenant[]>([]);
+  useEffect(() => {fetch("/api/intervenants").then(r=>r.json()).then(v=>{if(Array.isArray(v))setIntervenants(v)}).catch(()=>{});}, []);
   const [veterinaire, setVeterinaire] = useState("");
   const [ordonnanceNumero, setOrdonnanceNumero] = useState("");
   const [ordonnanceId, setOrdonnanceId] = useState<string | null>(initialOrdonnanceId ?? null);
@@ -239,6 +246,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         uniteDosage: normaliserUniteDose(uniteDosage) || null,
         motif: motif || null,
         veterinaire: veterinaire || null,
+        executant: executant || null,
         ordonnanceNumero: ordonnanceNumero || null,
         ordonnanceId,
         ordonnanceAAssocier: !ordonnanceNumero && !ordonnanceId ? ordonnanceAAssocier : false,
@@ -253,6 +261,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
 
   return (
     <form onSubmit={submit} className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+      <label className="block text-sm">Exécutant<ExecutantSelect intervenants={intervenants} value={executant} onChange={setExecutant} onAdded={i=>setIntervenants(prev=>[...prev,i])}/></label>
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-blue-800">
           {evenementId ? "Ajouter un médicament à l’événement" : "Nouveau traitement"}

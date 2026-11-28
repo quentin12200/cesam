@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { useActiveExecutor } from "@/components/UserPreferencesProvider";
 
 export interface Intervenant {
   id: string;
@@ -11,12 +11,16 @@ export interface Intervenant {
 interface Props {
   intervenants: Intervenant[];
   simulation?: boolean;
+  simulationProfiles?: boolean;
   value: string;
   onChange: (nom: string) => void;
   onAdded: (intervenant: Intervenant) => void;
 }
 
-export default function ExecutantSelect({ intervenants, value, onChange, onAdded, simulation = false }: Props) {
+export default function ExecutantSelect({ intervenants, value, onChange, onAdded, simulation = false, simulationProfiles = false }: Props) {
+  const profile = useActiveExecutor();
+  const profils = profile === "Samuel" ? ["Samuel", "Céline"] : ["Céline", "Samuel"];
+  const noms = [...new Set([...(simulation && !simulationProfiles ? [] : profils), ...intervenants.map(i => i.nom).filter(Boolean).filter(n => simulation || !profils.includes(n)).sort((a,b)=>a.localeCompare(b,"fr")), ...(value ? [value] : [])])];
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
   const [nouveauNom, setNouveauNom] = useState("");
   const [saving, setSaving] = useState(false);
@@ -31,6 +35,7 @@ export default function ExecutantSelect({ intervenants, value, onChange, onAdded
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nom }),
       });
+      if (!res.ok) return;
       const intervenant: Intervenant = await res.json();
       onAdded(intervenant);
       onChange(intervenant.nom);
@@ -61,6 +66,7 @@ export default function ExecutantSelect({ intervenants, value, onChange, onAdded
 
   return (
     <select
+      aria-label="Exécutant"
       value={value}
       onChange={(e) => {
         if (e.target.value === "__nouveau__") setAjoutOuvert(true);
@@ -69,7 +75,7 @@ export default function ExecutantSelect({ intervenants, value, onChange, onAdded
       className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
     >
       <option value="">Sélectionner…</option>
-      {intervenants.map((i) => <option key={i.id} value={i.nom}>{i.nom}</option>)}
+      {noms.map((nom) => <option key={nom} value={nom}>{nom}</option>)}
       {!simulation && <option value="__nouveau__">+ Ajouter une personne…</option>}
     </select>
   );

@@ -209,8 +209,8 @@ test("dose réelle : décimales, unité séparée et refus du texte libre",async
  await expect(dose).toHaveValue("");
  await expect(dose).toHaveAttribute("inputmode","decimal");
  await expect(unit).toHaveValue("ml");
- await dose.fill("2,5"); await expect(output).toHaveText("2.5 ml");
- await dose.fill("2.5"); await expect(output).toHaveText("2.5 ml");
+ await dose.click(); await dose.pressSequentially("2,5"); await expect(dose).toHaveValue("2,5"); await expect(output).toHaveText("2.5 ml");
+ await dose.fill("2.5"); await expect(dose).toHaveValue("2.5"); await expect(output).toHaveText("2.5 ml");
  await unit.selectOption("bolus"); await expect(output).toHaveText("2.5 bolus");
  await dose.fill("2 ml"); await expect(output).toHaveText("Dose à renseigner ou invalide");
  await dose.fill("1"); await unit.selectOption(""); await expect(output).toHaveText("Dose à renseigner ou invalide");
@@ -258,4 +258,21 @@ test("restriction lait : case compacte, champ désactivé et viande indépendant
  await viande.fill("0");await zone.getByLabel("Délai lait interdit").check();
  await expect(lait).toBeDisabled();await expect(lait).toHaveValue("");await expect(viande).toHaveValue("0");
  await zone.getByLabel("Délai lait interdit").uncheck();await expect(lait).toBeEnabled();await expect(lait).toHaveValue("");
+});
+
+test("exécutant : profil actif en premier et choix manuel conservé",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Exécutant fictif"});
+ const select=zone.getByLabel("Exécutant");
+ await zone.getByRole("button",{name:"Profil Céline"}).click();
+ await expect(select).toHaveValue("Céline");
+ expect(await select.locator("option").allTextContents()).toEqual(["Sélectionner…","Céline","Samuel","A Démo","Z Démo"]);
+ await zone.getByRole("button",{name:"Profil Samuel"}).click();
+ await expect(select).toHaveValue("Samuel");
+ expect(await select.locator("option").allTextContents()).toEqual(["Sélectionner…","Samuel","Céline","A Démo","Z Démo"]);
+ await select.selectOption("A Démo");
+ await zone.getByRole("button",{name:"Profil Céline"}).click();
+ await expect(select).toHaveValue("A Démo");
+ await zone.getByRole("button",{name:"Nouvel acte fictif"}).click();
+ await expect(select).toHaveValue("Céline");
 });

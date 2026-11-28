@@ -13,6 +13,7 @@ import QuestionPanel, { type QuestionTemplateData } from "./QuestionPanel";
 import TraitementDraftRow, { type TraitementDraft } from "./TraitementDraftRow";
 import { type MedicamentOption } from "./MedicamentPicker";
 import type { VaccinationSessionPreset } from "@/lib/vaccination-session";
+import { useActiveExecutor } from "@/components/UserPreferencesProvider";
 import { type Intervenant } from "./ExecutantSelect";
 import { getMomentActuel } from "@/lib/evenements-sanitaires";
 import { searchTypesEvenement, normalizeSearch, type RecherchableTypeEvenement } from "@/lib/fuzzy-search";
@@ -71,7 +72,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
   const [parageNote, setParageNote] = useState("");
 
   const [description, setDescription] = useState("");
-  const [constatePar, setConstatePar] = useState("");
+  const profilExecutant = useActiveExecutor();
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -257,7 +258,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
     setPhotoPreview(null);
   }
 
-  const draftsValides = traitementActif ? traitementsDrafts.filter((d) => d.medicament) : [];
+  const draftsValides = traitementActif ? traitementsDrafts.filter((d) => d.medicament).map(d => ({...d, executant: d.executant || profilExecutant})) : [];
 
   async function handleSubmit() {
     setError("");
@@ -321,7 +322,6 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
           temperature: temperature !== "" ? Number(temperature) : null,
           description: description || null,
           photos: photoUrl,
-          constatePar: constatePar || null,
           traitements: draftsValides.map((d) => ({
             medicamentId: d.medicament!.id,
             medicamentNom: d.medicament!.nom,
@@ -697,20 +697,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
           <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoPick} />
         </div>
 
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Constaté par</label>
-          <input
-            value={constatePar}
-            onChange={(e) => setConstatePar(e.target.value)}
-            placeholder="Nom de la personne"
-            list="constate-par-suggestions"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          <datalist id="constate-par-suggestions">
-            <option value="Samuel" />
-            <option value="Céline" />
-          </datalist>
-        </div>
+
       </div>
 
       {/* Traitement (optionnel) */}
@@ -728,7 +715,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
             {traitementsDrafts.map((d) => (
               <TraitementDraftRow
                 key={d.key}
-                draft={d}
+                draft={{...d, executant: d.executant || profilExecutant}}
                 medicaments={medicaments}
                 intervenants={intervenants}
                 removable={traitementsDrafts.length > 1}

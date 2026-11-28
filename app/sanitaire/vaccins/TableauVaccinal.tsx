@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Settings } from "lucide-react";
+import { useActiveExecutor } from "@/components/UserPreferencesProvider";
 import ExecutantSelect, { type Intervenant } from "@/app/sanitaire/nouvel-evenement/ExecutantSelect";
 import { formatAgeTerrain } from "@/lib/animal-age";
 import { regrouperActesVaccinaux } from "@/lib/vaccination-session";
@@ -180,7 +181,9 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const menuColonneRef = useRef<HTMLDivElement>(null);
   const [colonnesMenuOuvert, setColonnesMenuOuvert] = useState(false);
   const [dateSession, setDateSession] = useState(dateLocaleIso);
-  const [executant, setExecutant] = useState("");
+  const [executantChoisi, setExecutant] = useState("");
+  const profilExecutant = useActiveExecutor();
+  const executant = executantChoisi || profilExecutant;
   const [ordonnanceNumeroSession, setOrdonnanceNumeroSession] = useState("");
   const [ordonnanceIdSession, setOrdonnanceIdSession] = useState("");
   const [ordonnanceEnAttente, setOrdonnanceEnAttente] = useState(false);
@@ -240,7 +243,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
 
   const { message: messageBrouillon, vider: viderBrouillon } = useVaccinWorkspace({
     vue, recherche, vaccinModes, statuts, tri, directionTri, colonnesMasquees, anneesAffichees, toutHistorique, uniquementSelection,
-    animauxSelectionnes, actesSelectionnes, dateSession, executant, ajustements,
+    animauxSelectionnes, actesSelectionnes, dateSession, executant: executantChoisi, ajustements,
   }, { setVue, setRecherche, setVaccinModes, setStatuts, setTri, setDirectionTri, setColonnesMasquees, setAnneesAffichees, setToutHistorique, setUniquementSelection, setAnimauxSelectionnes, setActesSelectionnes, setDateSession, setExecutant, setAjustements }, lignes, blocs);
 
   useEffect(() => {
@@ -502,7 +505,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
             date: dateSession,
             type: "Vaccination",
             symptomes: [{ libelle: "Vaccination", typeEvenementId: null }],
-            constatePar: executant.trim(),
+
             description: groupe.etape.label || null,
             traitements: [{
               medicamentId,
