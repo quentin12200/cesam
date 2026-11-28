@@ -1,4 +1,5 @@
 "use client";
+import {repereDernierVelage} from "@/lib/dernier-velage";
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import { addDays, differenceInDays, format } from "date-fns";
@@ -14,6 +15,8 @@ export interface EchoSessionCow {
   nobovi: string | null;
   saillieId: string | null;
   derniereSaillie: string | null;
+  dernierVelage?: string | null;
+  estGenisse?: boolean;
   saillieType: string | null;
   taureauNom?: string | null;
 }
@@ -200,6 +203,7 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
                   {vache.derniereSaillie && ` · Père : ${vache.taureauNom ?? "non renseigné"}`}
                 </p>
 
+                <p className="mb-1 text-[11px] text-gray-500">{repereDernierVelage(vache.dernierVelage,date,vache.estGenisse)}</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => chooseResult(vache, "PLEINE")} className={`min-h-12 rounded-xl border-2 text-sm font-black ${draft.resultat === "PLEINE" ? "border-green-600 bg-green-600 text-white" : "border-gray-200 bg-white text-gray-700"}`}>
                     Pleine
