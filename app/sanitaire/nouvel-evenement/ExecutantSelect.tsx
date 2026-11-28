@@ -11,15 +11,16 @@ export interface Intervenant {
 interface Props {
   intervenants: Intervenant[];
   simulation?: boolean;
+  simulationProfiles?: boolean;
   value: string;
   onChange: (nom: string) => void;
   onAdded: (intervenant: Intervenant) => void;
 }
 
-export default function ExecutantSelect({ intervenants, value, onChange, onAdded, simulation = false }: Props) {
+export default function ExecutantSelect({ intervenants, value, onChange, onAdded, simulation = false, simulationProfiles = false }: Props) {
   const profile = useActiveExecutor();
   const profils = profile === "Samuel" ? ["Samuel", "Céline"] : ["Céline", "Samuel"];
-  const noms = [...new Set([...(simulation ? [] : profils), ...intervenants.map(i => i.nom).filter(Boolean).filter(n => simulation || !profils.includes(n)).sort((a,b)=>a.localeCompare(b,"fr")), ...(value ? [value] : [])])];
+  const noms = [...new Set([...(simulation && !simulationProfiles ? [] : profils), ...intervenants.map(i => i.nom).filter(Boolean).filter(n => simulation || !profils.includes(n)).sort((a,b)=>a.localeCompare(b,"fr")), ...(value ? [value] : [])])];
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
   const [nouveauNom, setNouveauNom] = useState("");
   const [saving, setSaving] = useState(false);
@@ -65,6 +66,7 @@ export default function ExecutantSelect({ intervenants, value, onChange, onAdded
 
   return (
     <select
+      aria-label="Exécutant"
       value={value}
       onChange={(e) => {
         if (e.target.value === "__nouveau__") setAjoutOuvert(true);
