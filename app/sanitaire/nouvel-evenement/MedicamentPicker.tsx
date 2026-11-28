@@ -40,6 +40,7 @@ interface Props {
   onChange: (m: MedicamentOption | null) => void;
   allowFreeText?: boolean;
   allowQuickCreate?: boolean;
+  createSimulation?: (nom:string)=>MedicamentOption;
   freeText?: string;
   onFreeTextChange?: (value: string) => void;
 }
@@ -50,6 +51,7 @@ export default function MedicamentPicker({
   onChange,
   allowFreeText = false,
   allowQuickCreate = false,
+  createSimulation,
   freeText = "",
   onFreeTextChange,
 }: Props) {
@@ -61,7 +63,8 @@ export default function MedicamentPicker({
   async function creer(){
     if(creating || !query.trim())return;
     setCreating(true);setCreationError("");
-    try{const res=await fetch("/api/medicaments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nom:query.trim(),temporaire:true})});
+    try{if(createSimulation){onChange(createSimulation(query.trim()));setQuery("");setOuvert(false);return;}
+    const res=await fetch("/api/medicaments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nom:query.trim(),temporaire:true})});
     const med=await res.json();if(!res.ok || !med?.id)throw Error(med?.error || "Création impossible");
     onChange({...med,preconisations:med.preconisations??[]});onFreeTextChange?.("");setQuery("");setOuvert(false);
     }catch(e){setCreationError(e instanceof Error?e.message:"Création impossible");}finally{setCreating(false);}
