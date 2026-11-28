@@ -27,15 +27,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const viandeInterdite = traitements.some(t=>getAttenteInfoForTraitement(t).viandeInterdite);
+  const laitInterdit = traitements.some(t=>getAttenteInfoForTraitement(t).laitInterdit);
   const viandeInconnue = traitements.some(t=>delaisInconnus(t).viande);
   const laitInconnu = traitements.some(t=>delaisInconnus(t).lait);
   return NextResponse.json({
-    viandeInconnue, laitInconnu,
-    enAttente: viandeInconnue || laitInconnu || (pire?.enAttente ?? false),
-    enAttenteViande: viandeInconnue || (pire?.enAttenteViande ?? false),
-    enAttenteLait: laitInconnu || (pire?.enAttenteLait ?? false),
-    dateFinAttenteViande: pire?.dateFinAttenteViande ?? null,
-    dateFinAttenteLait: pire?.dateFinAttenteLait ?? null,
+    viandeInconnue, laitInconnu, viandeInterdite, laitInterdit,
+    enAttente: viandeInterdite || laitInterdit || viandeInconnue || laitInconnu || (pire?.enAttente ?? false),
+    enAttenteViande: viandeInterdite || viandeInconnue || (pire?.enAttenteViande ?? false),
+    enAttenteLait: laitInterdit || laitInconnu || (pire?.enAttenteLait ?? false),
+    dateFinAttenteViande: viandeInterdite || viandeInconnue ? null : pire?.dateFinAttenteViande ?? null,
+    dateFinAttenteLait: laitInterdit || laitInconnu ? null : pire?.dateFinAttenteLait ?? null,
     medicamentNom,
   });
 }
