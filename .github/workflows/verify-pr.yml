@@ -21,6 +21,7 @@ jobs:
       - run: node --test --experimental-strip-types lib/withdrawal-interdit.test.ts
       - run: node --test --experimental-strip-types lib/withdrawal-unknown.test.ts
       - run: node --test tests/medicament-rapide.test.mjs
+      - run: node --test tests/sanitaire-selection-compacte.test.mjs
       - run: node --test tests/executants-profil.test.mjs
       - run: node --test tests/traitements-posologie.test.mjs
       - run: node --test tests/gmq-period-rankings.test.mjs tests/gmq-father-genealogy.test.mjs
