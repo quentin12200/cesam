@@ -1,4 +1,5 @@
 "use client";
+import DelaiAttenteInput from "@/app/components/DelaiAttenteInput";
 import DoseUnitSelect from "@/app/components/DoseUnitSelect";
 import { normaliserUniteDose } from "@/lib/dose-units";
 
@@ -101,7 +102,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
           <details>
             <summary className="min-h-11 cursor-pointer py-3 font-medium text-blue-800">Délais d’attente et détails</summary>
             <div className="space-y-2">
-              <p>Fiche : {draft.medicament.voie || "Voie non renseignée"} · Viande : {draft.medicament.delaiAttenteViandeJ ?? "?"} j · Lait : {draft.medicament.delaiAttenteLaitJ ?? "?"} j</p>
+              <p>Fiche : {draft.medicament.voie || "Voie non renseignée"} · Viande : {draft.medicament.delaiAttenteViandeJ===-1?"Interdit":draft.medicament.delaiAttenteViandeJ ?? "?"} j · Lait : {draft.medicament.delaiAttenteLaitJ===-1?"Interdit":draft.medicament.delaiAttenteLaitJ ?? "?"} j</p>
               {draft.medicament.preconisations.map(p => <p key={p.id}>{p.voie || "—"} · {p.indicationMotif || "Indication non renseignée"} · Fréquence : {p.frequence || "Non renseignée"} · Viande : {p.delaiAttenteViandeJ ?? "?"} j · Lait : {p.delaiAttenteLaitTraites ?? "?"} traites</p>)}
               {!simulation && <a className="font-semibold text-blue-800 underline" href={`/pharmacie/${draft.medicament.id}`} target="_blank" rel="noopener noreferrer">Voir la fiche pharmacie</a>}
             </div>
@@ -141,7 +142,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ex: Mammite" />
         </div>
       </div>
-      {draft.medicament?.temporaire && <div className="rounded border p-2 text-xs"><p className="font-semibold">Délais d’attente (à compléter plus tard)</p><div className="grid grid-cols-2 gap-2"><label>Viande (jours)<input aria-label="Délai viande en jours" type="number" min={0} step={1} value={draft.delaiViande ?? ""} onChange={e=>set("delaiViande",e.target.value)} className="w-full border rounded p-2" /></label><label>Lait (jours)<input aria-label="Délai lait en jours" type="number" min={0} step={1} value={draft.delaiLait ?? ""} onChange={e=>set("delaiLait",e.target.value)} className="w-full border rounded p-2"/></label></div><p className="text-amber-800">Vide = inconnu, jamais zéro.</p></div>}
+      {draft.medicament?.temporaire && <div className="rounded border p-2 text-xs"><p className="font-semibold">Délais d’attente (à compléter plus tard)</p><div className="grid grid-cols-2 gap-2"><DelaiAttenteInput label="Délai viande" value={draft.delaiViande??""} onChange={v=>set("delaiViande",v)}/><DelaiAttenteInput label="Délai lait" value={draft.delaiLait??""} onChange={v=>set("delaiLait",v)}/></div><p className="text-amber-800">Vide = inconnu, jamais zéro.</p></div>}
       <label className="flex min-h-11 items-center gap-2 rounded-lg border bg-white px-3 text-sm">
         <input type="checkbox" checked={draft.doseUnique} onChange={(e) => set("doseUnique", e.target.checked)} className="h-4 w-4 accent-green-700" />
         Dose unique
