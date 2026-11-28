@@ -83,6 +83,7 @@ interface OrdonnanceAssociee {
 }
 
 interface HistoriqueItem {
+  delaisInconnus?: {viande:boolean;lait:boolean};
   id: string;
   animalNutrav: string;
   animalNom: string | null;
@@ -172,6 +173,12 @@ function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicame
   );
 }
 
+function RegulariserActe({h}:{h:HistoriqueItem}) {
+ const router=useRouter();const [v,setV]=useState("");const [l,setL]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [confirmed,setConfirmed]=useState(false);
+ const valid=confirmed && (!h.delaisInconnus?.viande || /^\d+$/.test(v)) && (!h.delaisInconnus?.lait || /^\d+$/.test(l));
+ async function save(){setBusy(true);setError("");try{const res=await fetch(`/api/traitements/${h.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmeDelais:true,...(h.delaisInconnus?.viande?{delaiAttenteViandeJ:Number(v)}:{}),...(h.delaisInconnus?.lait?{delaiAttenteLaitJ:Number(l)}:{})})});if(!res.ok)throw Error("Enregistrement impossible");router.refresh();}catch(e){setError(e instanceof Error?e.message:"Erreur");}finally{setBusy(false);}}
+ return <div className="border rounded p-2 space-y-2"><p className="font-semibold">{h.animalNutrav} · {new Date(h.dateDebut).toLocaleDateString("fr-FR")}</p>{h.delaisInconnus?.viande&&<label className="block text-sm">Viande (jours)<input type="number" min={0} step={1} value={v} onChange={e=>{setV(e.target.value);setConfirmed(false)}} className="w-full border rounded p-2"/></label>}{h.delaisInconnus?.lait&&<label className="block text-sm">Lait (jours)<input type="number" min={0} step={1} value={l} onChange={e=>{setL(e.target.value);setConfirmed(false)}} className="w-full border rounded p-2"/></label>}<label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>Délais vérifiés pour cet acte</label><button type="button" disabled={!valid||busy} onClick={()=>void save()} className="rounded bg-green-800 text-white px-3 py-2 disabled:opacity-50">Régulariser cet acte</button>{error&&<p role="alert">{error}</p>}</div>;
+}
 export default function MedicamentFicheClient({ medicament, preconisations, termes, conditionnements, ordonnances, historique }: Props) {
   const { hrefWithOrigin } = useOriginNavigation();
   const router = useRouter();
@@ -216,6 +223,7 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
   return (
     <div className="space-y-4">
       {medicament.temporaire && <section className="rounded-xl border border-amber-300 p-3 space-y-2"><h2 className="font-bold">Fiche provisoire à compléter</h2><label className="block text-sm">Substance active<input value={dci} onChange={e=>{setDci(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label><label className="block text-sm">Voie vérifiée<input value={voie} onChange={e=>{setVoie(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label><div className="grid grid-cols-2 gap-2"><label className="text-sm">Viande (jours)<input type="number" min={0} step={1} value={viande} onChange={e=>{setViande(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label><label className="text-sm">Lait (jours)<input type="number" min={0} step={1} value={lait} onChange={e=>{setLait(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label></div><p className="text-xs">Vérifie les délais prescrits. Les actes déjà saisis sans délai ne sont pas automatiquement régularisés.</p><label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmation} onChange={e=>setConfirmation(e.target.checked)}/>J’ai vérifié ces informations.</label><button type="button" disabled={completing||!confirmation||!dci.trim()||!voie.trim()||!/^\d+$/.test(viande)||!/^\d+$/.test(lait)} onClick={()=>void completer()} className="rounded bg-green-800 text-white px-3 py-2 disabled:opacity-50">Valider la fiche</button>{erreurCompletion&&<p role="alert">{erreurCompletion}</p>}</section>}
+      {historique.some(h=>h.delaisInconnus?.viande||h.delaisInconnus?.lait)&&<section className="rounded-xl border border-amber-300 p-3 space-y-2"><h2 className="font-bold">Actes avec délais à compléter</h2>{historique.filter(h=>h.delaisInconnus?.viande||h.delaisInconnus?.lait).map(h=><RegulariserActe key={h.id} h={h}/>)}</section>}
       {/* Header */}
       <div className="space-y-2 rounded-xl bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-1.5">
