@@ -193,7 +193,7 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
   const [confirmation,setConfirmation]=useState(false);
   const [erreurCompletion,setErreurCompletion]=useState("");
   const [completing,setCompleting]=useState(false);
-  async function completer(){setCompleting(true);setErreurCompletion("");try{const res=await fetch(`/api/medicaments/${medicament.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({dci,voie,categorie:categorieRef,delaiAttenteViandeJ:Number(viande),delaiAttenteLaitJ:Number(lait),temporaire:false})});if(!res.ok){const j=await res.json();throw Error(j.error||"Enregistrement impossible");}router.refresh();}catch(e){setErreurCompletion(e instanceof Error?e.message:"Erreur");}finally{setCompleting(false);}}
+  async function completer(){setCompleting(true);setErreurCompletion("");try{const res=await fetch(`/api/medicaments/${medicament.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({referencesControlees:true,dci,voie,categorie:categorieRef,delaiAttenteViandeJ:Number(viande),delaiAttenteLaitJ:Number(lait),temporaire:false})});if(!res.ok){const j=await res.json();throw Error(j.error||"Enregistrement impossible");}router.refresh();}catch(e){setErreurCompletion(e instanceof Error?e.message:"Erreur");}finally{setCompleting(false);}}
   const [savingFavori, setSavingFavori] = useState(false);
   const [showSavoir, setShowSavoir] = useState(false);
 

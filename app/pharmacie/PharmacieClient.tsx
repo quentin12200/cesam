@@ -84,6 +84,7 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         nom,
+        referencesControlees:true,
         dci: dci || null,
         categorie,
         voie: voie || null,
@@ -93,7 +94,7 @@ function AddMedicamentForm({ onDone }: { onDone: () => void }) {
       }),
     });
     setSaving(false);
-    if (!response.ok) { setError("Impossible d’ajouter ce médicament."); return; }
+    if (!response.ok) { setError((await response.json()).error || "Impossible d’ajouter ce médicament."); return; }
     onDone();
     router.refresh();
   }

@@ -8,7 +8,7 @@ export const VOIES_COMMUNES:OptionPharmacie[]=[
  {value:"PO",label:"Orale"},{value:"SC",label:"Sous-cutanée"},{value:"IM",label:"Intramusculaire"},{value:"IV",label:"Intraveineuse"},{value:"NASALE",label:"Intranasale"},{value:"POUR_ON",label:"Pour-on"},{value:"IMM",label:"Intramammaire"},{value:"IU",label:"Intra-utérine"},{value:"CUTANEE",label:"Cutanée / externe"},{value:"OCULAIRE",label:"Oculaire"}
 ];
 const aliases:Record<string,string>={"vo":"PO","orale":"PO","po":"PO","intranasale":"NASALE","nasale":"NASALE","in":"NASALE","intramammaire":"IMM","intra_uterine":"IU","intra uterine":"IU","intra-uterine":"IU","pour-on":"POUR_ON","pour on":"POUR_ON","sous cutanee":"SC","sous-cutanee":"SC","intramusculaire":"IM","intraveineuse":"IV","cutanee":"CUTANEE","oculaire":"OCULAIRE"};
-export const cleOption=(type:TypePharmacie,v:string)=>type==="VOIE"?cleReference(aliases[cleReference(v)]??v):type==="CATEGORIE"?normaliserLibelleCategorie(v):cleReference(v);
+export const cleOption=(type:TypePharmacie,v:string)=>type==="VOIE"?cleReference((Object.hasOwn(aliases,cleReference(v))?aliases[cleReference(v)]:v)):type==="CATEGORIE"?normaliserLibelleCategorie(v):cleReference(v);
 export function optionsPharmacie(type:TypePharmacie,meds:MedReference[],refs:RefReference[]):OptionPharmacie[]{
  const standards=type==="VOIE"?VOIES_COMMUNES:type==="CATEGORIE"?CATEGORIES_MEDICAMENT.map(c=>({value:c.code,label:c.label})):[];
  const custom=refs.filter(r=>r.type===type&&r.actif).map(r=>({value:type==="VOIE"?r.code:r.libelle,label:r.libelle}));

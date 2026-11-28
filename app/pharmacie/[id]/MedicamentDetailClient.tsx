@@ -113,6 +113,7 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         nom: form.nom,
+        referencesControlees:true,
         dci: form.dci || null,
         forme: form.forme || null,
         categorie: selected,
