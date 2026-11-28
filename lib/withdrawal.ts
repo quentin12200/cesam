@@ -1,4 +1,8 @@
 import { addDays } from "date-fns";
+export const DELAI_INTERDIT = -1;
+export const delaiInterdit = (v:unknown)=>v===DELAI_INTERDIT;
+export const delaiRenseigne = (v:unknown)=>delaiInterdit(v)||delaiSaisi(v);
+export const formatDelai = (v:number|null|undefined)=>delaiInterdit(v)?"Interdit":v==null?"Inconnu":`${v} j`;
 
 /**
  * Fin de traitement = date de début + durée en jours (convention utilisée dans
@@ -14,18 +18,20 @@ export function getDateFinTraitement(dateDebut: Date, dureeJours: number): Date 
  * sans +1 pour le lait.
  */
 export function getDateFinAttenteViande(dateFin: Date, delaiAttenteViandeJ: number | null | undefined): Date | null {
-  if (delaiAttenteViandeJ == null) return null;
+  if (!delaiSaisi(delaiAttenteViandeJ)) return null;
   return addDays(dateFin, delaiAttenteViandeJ + 1);
 }
 
 export function getDateFinAttenteLait(dateFin: Date, delaiAttenteLaitJ: number | null | undefined): Date | null {
-  if (delaiAttenteLaitJ == null) return null;
+  if (!delaiSaisi(delaiAttenteLaitJ)) return null;
   return addDays(dateFin, delaiAttenteLaitJ);
 }
 
 export interface AttenteInfo {
   dateFinAttenteViande: Date | null;
   dateFinAttenteLait: Date | null;
+  viandeInterdite: boolean;
+  laitInterdit: boolean;
   enAttenteViande: boolean;
   enAttenteLait: boolean;
   enAttente: boolean;
@@ -44,11 +50,14 @@ export function getAttenteInfo(
 ): AttenteInfo {
   const dateFinAttenteViande = getDateFinAttenteViande(dateFin, delaiAttenteViandeJ);
   const dateFinAttenteLait = getDateFinAttenteLait(dateFin, delaiAttenteLaitJ);
-  const enAttenteViande = dateFinAttenteViande ? now < dateFinAttenteViande : false;
-  const enAttenteLait = dateFinAttenteLait ? now < dateFinAttenteLait : false;
+  const viandeInterdite=delaiInterdit(delaiAttenteViandeJ);
+  const laitInterdit=delaiInterdit(delaiAttenteLaitJ);
+  const enAttenteViande = viandeInterdite || (dateFinAttenteViande ? now < dateFinAttenteViande : false);
+  const enAttenteLait = laitInterdit || (dateFinAttenteLait ? now < dateFinAttenteLait : false);
   return {
     dateFinAttenteViande,
     dateFinAttenteLait,
+    viandeInterdite,laitInterdit,
     enAttenteViande,
     enAttenteLait,
     enAttente: enAttenteViande || enAttenteLait,
@@ -60,6 +69,7 @@ export interface TraitementDelaiInput {
   dureeJours: number;
   delaiAttenteViandeJ?: number | null;
   delaiAttenteLaitJ?: number | null;
+  notes?: string | null;
   medicament?: { delaiAttenteViandeJ?: number | null; delaiAttenteLaitJ?: number | null } | null;
 }
 
@@ -69,11 +79,21 @@ export interface TraitementDelaiInput {
  */
 export function getAttenteInfoForTraitement(t: TraitementDelaiInput, now: Date = new Date()): AttenteInfo {
   const dateFin = getDateFinTraitement(new Date(t.dateDebut), t.dureeJours);
-  const delaiViande = t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
-  const delaiLait = t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null;
+  const delaiViande = delaisInconnus(t).viande ? null : t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
+  const delaiLait = delaisInconnus(t).lait ? null : t.delaiAttenteLaitJ ?? t.medicament?.delaiAttenteLaitJ ?? null;
   return getAttenteInfo(dateFin, delaiViande, delaiLait, now);
 }
 
+// Un délai absent sur l'acte et sur le catalogue ne constitue pas un délai nul.
+// Les actes signalés à compléter gardent leur incertitude même après édition de la fiche.
+export function delaisInconnus(t: TraitementDelaiInput & {notes?:string|null}) {
+ const explicite = t.notes?.includes("[DELAIS_A_COMPLETER]") === true;
+ return {viande: !delaiRenseigne(t.delaiAttenteViandeJ ?? (explicite ? null : t.medicament?.delaiAttenteViandeJ)),
+ lait: !delaiRenseigne(t.delaiAttenteLaitJ ?? (explicite ? null : t.medicament?.delaiAttenteLaitJ))};
+}
+export function delaiSaisi(v:unknown): v is number {
+ return typeof v==="number" && Number.isSafeInteger(v) && v>=0;
+}
 export type AffichageDelaiAttente = "VIANDE" | "LAIT" | "LES_DEUX";
 
 export function doitAfficherViande(affichage: string | null | undefined): boolean {

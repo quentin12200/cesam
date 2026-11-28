@@ -1,3 +1,4 @@
+import DeploymentVersion from "./DeploymentVersion";
 import Link from "next/link";
 import { ChevronRight, Wrench, ShieldCheck, FlaskConical, ArrowLeft } from "lucide-react";
 
@@ -51,6 +52,7 @@ export default function CoulissesPage() {
           <p className="mt-1 text-sm leading-5 text-slate-700">Cette page n’effectue aucune correction. Les outils ouverts peuvent modifier les données : vérifie les informations avant de valider une action.</p>
         </div>
       </aside>
+      <DeploymentVersion />
       {groups.map(group => (
         <section key={group.title} className="min-w-0 space-y-2">
           <h2 className="text-lg font-bold text-slate-900">{group.title}</h2>

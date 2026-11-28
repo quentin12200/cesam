@@ -35,8 +35,19 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
   );
 }
 
+export function useActiveExecutor() {
+  const context = useContext(PreferencesContext);
+  return context?.ready ? context.profile : "";
+}
+
 export function useUserPreferences() {
   const context = useContext(PreferencesContext);
   if (!context) throw new Error("useUserPreferences doit être utilisé dans UserPreferencesProvider");
   return context;
+}
+
+// Simulation isolée : aucune lecture ni écriture du profil réel.
+export function LabUserPreferencesProvider({children}:{children:React.ReactNode}) {
+ const [profile,setProfile]=useState<CesamProfile>("Céline");
+ return <PreferencesContext.Provider value={{profile,ready:true,setProfile}}>{children}</PreferencesContext.Provider>;
 }

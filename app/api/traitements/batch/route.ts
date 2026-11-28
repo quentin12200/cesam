@@ -1,3 +1,4 @@
+import { delaiRenseigne } from "@/lib/withdrawal";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
@@ -18,6 +19,7 @@ export async function POST(request: NextRequest) {
       uniteDosage, motif, veterinaire, ordonnanceNumero, ordonnanceId, ordonnanceAAssocier,
       delaiAttenteViandeJ, delaiAttenteLaitJ, notes,
     } = body;
+    if ([delaiAttenteViandeJ,delaiAttenteLaitJ].some(v=>v!=null&&!delaiRenseigne(v))) return NextResponse.json({error:"Délai invalide"},{status:400});
 
     const targetsList: Target[] = Array.isArray(targets) ? targets : [];
     if (targetsList.length === 0 || !medicamentNom?.trim() || !dateDebut) {
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
             ordonnanceAAssocier: ordonnanceAAssocier ?? false,
             delaiAttenteViandeJ: delaiAttenteViandeJ ?? null,
             delaiAttenteLaitJ: delaiAttenteLaitJ ?? null,
-            notes: notes?.trim() || null,
+            notes: [notes?.trim(), (delaiAttenteViandeJ == null || delaiAttenteLaitJ == null) ? "[DELAIS_A_COMPLETER]" : ""].filter(Boolean).join("\n") || null,
             statut: doseUnique ? "TERMINE" : "EN_COURS",
           },
         })

@@ -1,4 +1,5 @@
 "use client";
+import DelaiAttenteInput from "@/app/components/DelaiAttenteInput";
 
 import { useState } from "react";
 import { formatFrequence, formatDureePreconisation } from "@/lib/preconisation-schedule";
@@ -23,6 +24,7 @@ import ConservationOuvertureSection from "./ConservationOuvertureSection";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 interface MedicamentData {
+  temporaire?: boolean;
   id: string;
   nom: string;
   dci: string | null;
@@ -82,6 +84,7 @@ interface OrdonnanceAssociee {
 }
 
 interface HistoriqueItem {
+  delaisInconnus?: {viande:boolean;lait:boolean};
   id: string;
   animalNutrav: string;
   animalNom: string | null;
@@ -171,10 +174,24 @@ function PreconisationCard({ p, medicamentId }: { p: PreconisationData; medicame
   );
 }
 
+function RegulariserActe({h}:{h:HistoriqueItem}) {
+ const router=useRouter();const [v,setV]=useState("");const [l,setL]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [confirmed,setConfirmed]=useState(false);
+ const valid=confirmed && (!h.delaisInconnus?.viande || (/^(?:-1|\d+)$/.test(v))) && (!h.delaisInconnus?.lait || (/^(?:-1|\d+)$/.test(l)));
+ async function save(){setBusy(true);setError("");try{const res=await fetch(`/api/traitements/${h.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmeDelais:true,...(h.delaisInconnus?.viande?{delaiAttenteViandeJ:Number(v)}:{}),...(h.delaisInconnus?.lait?{delaiAttenteLaitJ:Number(l)}:{})})});if(!res.ok)throw Error("Enregistrement impossible");router.refresh();}catch(e){setError(e instanceof Error?e.message:"Erreur");}finally{setBusy(false);}}
+ return <div className="border rounded p-2 space-y-2"><p className="font-semibold">{h.animalNutrav} · {new Date(h.dateDebut).toLocaleDateString("fr-FR")}</p>{h.delaisInconnus?.viande&&<DelaiAttenteInput label="Viande" value={v} onChange={x=>{setV(x);setConfirmed(false)}}/>}{h.delaisInconnus?.lait&&<DelaiAttenteInput label="Lait" value={l} onChange={x=>{setL(x);setConfirmed(false)}}/>}<label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>Délais vérifiés pour cet acte</label><button type="button" disabled={!valid||busy} onClick={()=>void save()} className="rounded bg-green-800 text-white px-3 py-2 disabled:opacity-50">Régulariser cet acte</button>{error&&<p role="alert">{error}</p>}</div>;
+}
 export default function MedicamentFicheClient({ medicament, preconisations, termes, conditionnements, ordonnances, historique }: Props) {
   const { hrefWithOrigin } = useOriginNavigation();
   const router = useRouter();
   const [editMode, setEditMode] = useState(false);
+  const [viande,setViande]=useState(medicament.delaiAttenteViandeJ?.toString()??"");
+  const [lait,setLait]=useState(medicament.delaiAttenteLaitJ?.toString()??"");
+  const [dci,setDci]=useState(medicament.dci??"");
+  const [voie,setVoie]=useState(medicament.voie??"");
+  const [confirmation,setConfirmation]=useState(false);
+  const [erreurCompletion,setErreurCompletion]=useState("");
+  const [completing,setCompleting]=useState(false);
+  async function completer(){setCompleting(true);setErreurCompletion("");try{const res=await fetch(`/api/medicaments/${medicament.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({dci,voie,delaiAttenteViandeJ:Number(viande),delaiAttenteLaitJ:Number(lait),temporaire:false})});if(!res.ok){const j=await res.json();throw Error(j.error||"Enregistrement impossible");}router.refresh();}catch(e){setErreurCompletion(e instanceof Error?e.message:"Erreur");}finally{setCompleting(false);}}
   const [savingFavori, setSavingFavori] = useState(false);
   const [showSavoir, setShowSavoir] = useState(false);
 
@@ -206,6 +223,8 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
 
   return (
     <div className="space-y-4">
+      {medicament.temporaire && <section className="rounded-xl border border-amber-300 p-3 space-y-2"><h2 className="font-bold">Fiche provisoire à compléter</h2><label className="block text-sm">Substance active<input value={dci} onChange={e=>{setDci(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label><label className="block text-sm">Voie vérifiée<input value={voie} onChange={e=>{setVoie(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label><div className="grid grid-cols-2 gap-2"><DelaiAttenteInput label="Viande" value={viande} onChange={x=>{setViande(x);setConfirmation(false)}}/><DelaiAttenteInput label="Lait" value={lait} onChange={x=>{setLait(x);setConfirmation(false)}}/></div><p className="text-xs">Vérifie les délais prescrits. Les actes déjà saisis sans délai ne sont pas automatiquement régularisés.</p><label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmation} onChange={e=>setConfirmation(e.target.checked)}/>J’ai vérifié ces informations.</label><button type="button" disabled={completing||!confirmation||!dci.trim()||!voie.trim()||!(/^(?:-1|\d+)$/.test(viande))||!(/^(?:-1|\d+)$/.test(lait))} onClick={()=>void completer()} className="rounded bg-green-800 text-white px-3 py-2 disabled:opacity-50">Valider la fiche</button>{erreurCompletion&&<p role="alert">{erreurCompletion}</p>}</section>}
+      {historique.some(h=>h.delaisInconnus?.viande||h.delaisInconnus?.lait)&&<section className="rounded-xl border border-amber-300 p-3 space-y-2"><h2 className="font-bold">Actes avec délais à compléter</h2>{historique.filter(h=>h.delaisInconnus?.viande||h.delaisInconnus?.lait).map(h=><RegulariserActe key={h.id} h={h}/>)}</section>}
       {/* Header */}
       <div className="space-y-2 rounded-xl bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-1.5">

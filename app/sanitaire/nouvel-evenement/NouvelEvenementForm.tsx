@@ -1,4 +1,5 @@
 "use client";
+import { normaliserUniteDose, lireDose, doseValide } from "@/lib/dose-units";
 
 import BackButton from "@/app/components/BackButton";
 
@@ -12,6 +13,7 @@ import QuestionPanel, { type QuestionTemplateData } from "./QuestionPanel";
 import TraitementDraftRow, { type TraitementDraft } from "./TraitementDraftRow";
 import { type MedicamentOption } from "./MedicamentPicker";
 import type { VaccinationSessionPreset } from "@/lib/vaccination-session";
+import { useActiveExecutor } from "@/components/UserPreferencesProvider";
 import { type Intervenant } from "./ExecutantSelect";
 import { getMomentActuel } from "@/lib/evenements-sanitaires";
 import { searchTypesEvenement, normalizeSearch, type RecherchableTypeEvenement } from "@/lib/fuzzy-search";
@@ -40,7 +42,7 @@ type TargetMode = "animal" | "plusieurs";
 const today = new Date().toISOString().slice(0, 10);
 
 function nouveauDraft(): TraitementDraft {
-  return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", executant: "", dose: "", uniteDosage: "ml", motif: "", doseUnique: true, frequence: "", dureeJours: "" };
+  return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", executant: "", dose: "", uniteDosage: "", motif: "", doseUnique: true, frequence: "", dureeJours: "" };
 }
 
 export default function NouvelEvenementForm({ presetNutrav, presetNutravs, presetMedicamentId, presetVaccination }: { presetNutrav?: string; presetNutravs?: string[]; presetMedicamentId?: string; presetVaccination?: VaccinationSessionPreset }) {
@@ -70,7 +72,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
   const [parageNote, setParageNote] = useState("");
 
   const [description, setDescription] = useState("");
-  const [constatePar, setConstatePar] = useState("");
+  const profilExecutant = useActiveExecutor();
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -149,8 +151,8 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
         ...first,
         medicament: m,
         voie: voiceDraft?.voieAdministration ?? presetVaccination?.voie ?? m.voie ?? first.voie,
-        dose: presetVaccination?.dose != null ? String(presetVaccination.dose) : first.dose,
-        uniteDosage: presetVaccination?.uniteDosage ?? first.uniteDosage,
+        dose: "",
+        uniteDosage: normaliserUniteDose(presetVaccination?.uniteDosage ?? m.uniteDosage),
         doseUnique: presetVaccination ? true : first.doseUnique,
       }, ...rest];
     });
@@ -256,7 +258,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
     setPhotoPreview(null);
   }
 
-  const draftsValides = traitementActif ? traitementsDrafts.filter((d) => d.medicament) : [];
+  const draftsValides = traitementActif ? traitementsDrafts.filter((d) => d.medicament).map(d => ({...d, executant: d.executant || profilExecutant})) : [];
 
   async function handleSubmit() {
     setError("");
@@ -276,6 +278,8 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
 
     if (traitementActif) {
       if (draftsValides.length === 0) { setError("Choisis au moins un médicament, ou désactive l'ajout de traitement"); return; }
+      if (draftsValides.some(d=>!doseValide(d.dose,d.uniteDosage))) {setError("Vérifie la dose et son unité."); return;}
+      if(draftsValides.some(d=>d.medicament?.temporaire && (!lireDose(d.dose) || [d.delaiViande,d.delaiLait].some(v=>v && v!=="-1" && (!/^\d+$/.test(v) || !Number.isSafeInteger(Number(v))))))) {setError("Indique la dose réelle et vérifie les délais renseignés.");return;}
       const incomplet = draftsValides.find((d) => !d.voie || !d.executant);
       if (incomplet) { setError(`Pour ${incomplet.medicament?.nom}, indique la voie d'administration et l'exécutant(e)`); return; }
     }
@@ -318,27 +322,26 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
           temperature: temperature !== "" ? Number(temperature) : null,
           description: description || null,
           photos: photoUrl,
-          constatePar: constatePar || null,
           traitements: draftsValides.map((d) => ({
             medicamentId: d.medicament!.id,
             medicamentNom: d.medicament!.nom,
             voie: d.voie || null,
             executant: d.executant || null,
-            dose: d.dose !== "" ? Number(d.dose) : null,
-            uniteDosage: d.uniteDosage || null,
+            dose: lireDose(d.dose),
+            uniteDosage: normaliserUniteDose(d.uniteDosage) || null,
             motif: d.motif || null,
             doseUnique: d.doseUnique,
             frequence: d.doseUnique ? null : d.frequence || null,
             dureeJours: d.doseUnique ? null : Number(d.dureeJours || 1),
-            delaiAttenteViandeJ: d.medicament!.delaiAttenteViandeJ ?? null,
-            delaiAttenteLaitJ: d.medicament!.delaiAttenteLaitJ ?? null,
+            delaiAttenteViandeJ: d.medicament!.temporaire ? (d.delaiViande ? Number(d.delaiViande) : null) : d.medicament!.delaiAttenteViandeJ ?? null,
+            delaiAttenteLaitJ: d.medicament!.temporaire ? (d.delaiLait ? Number(d.delaiLait) : null) : d.medicament!.delaiAttenteLaitJ ?? null,
           })),
           vaccinationSession: presetVaccination ? {
             protocoleId: presetVaccination.protocoleId,
             vaccin: presetVaccination.vaccin,
             medicamentId: draftsValides[0]?.medicament?.id ?? presetVaccination.medicamentId,
             voie: draftsValides[0]?.voie || null,
-            dose: draftsValides[0]?.dose !== "" ? Number(draftsValides[0]?.dose) : null,
+            dose: lireDose(draftsValides[0]?.dose ?? ""),
             animaux: presetVaccination.animaux.filter((item) => animaux.some((animal) => animal.id === item.animalId)),
           } : null,
           parage: ajouterAuParage ? { motif: "BOITERIE", pattes: paragePattes, note: parageNote || null } : null,
@@ -694,20 +697,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
           <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoPick} />
         </div>
 
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Constaté par</label>
-          <input
-            value={constatePar}
-            onChange={(e) => setConstatePar(e.target.value)}
-            placeholder="Nom de la personne"
-            list="constate-par-suggestions"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          <datalist id="constate-par-suggestions">
-            <option value="Samuel" />
-            <option value="Céline" />
-          </datalist>
-        </div>
+
       </div>
 
       {/* Traitement (optionnel) */}
@@ -725,11 +715,11 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
             {traitementsDrafts.map((d) => (
               <TraitementDraftRow
                 key={d.key}
-                draft={d}
+                draft={{...d, executant: d.executant || profilExecutant}}
                 medicaments={medicaments}
                 intervenants={intervenants}
                 removable={traitementsDrafts.length > 1}
-                onChange={(next) => setTraitementsDrafts((prev) => prev.map((x) => (x.key === d.key ? next : x)))}
+                onChange={(next) => {if(next.medicament) setMedicaments(prev=>prev.some(m=>m.id===next.medicament!.id)?prev:[...prev,next.medicament!]);setTraitementsDrafts((prev) => prev.map((x) => (x.key === d.key ? next : x)));}}
                 onRemove={() => setTraitementsDrafts((prev) => prev.filter((x) => x.key !== d.key))}
                 onIntervenantAdded={(i) => setIntervenants((prev) => (prev.some((x) => x.id === i.id) ? prev : [...prev, i].sort((a, b) => a.nom.localeCompare(b.nom))))}
               />

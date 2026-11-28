@@ -58,6 +58,10 @@ interface InitialValues {
 }
 
 interface AttenteInfo {
+  viandeInterdite?:boolean;
+  laitInterdit?:boolean;
+  viandeInconnue?:boolean;
+  laitInconnu?:boolean;
   enAttente: boolean;
   enAttenteViande: boolean;
   dateFinAttenteViande: string | null;
@@ -161,6 +165,7 @@ export default function SortieEditorModal({ title, initial, animalLabel, animals
       setError("La cause de mortalité est obligatoire");
       return;
     }
+    if(nature==="VENTE" && modeVente==="CARCASSE" && (attenteInfo?.viandeInconnue||attenteInfo?.viandeInterdite)){setError(attenteInfo?.viandeInterdite?"Restriction viande : vérifier avec le vétérinaire.":"Délai viande inconnu : complète le traitement avant la sortie.");return;}
     if (nature === "VENTE" && modeVente === "CARCASSE" && attenteInfo?.enAttenteViande && !confirmeAttente) {
       setError("Cet animal est encore en délai d'attente viande. Coche la confirmation pour continuer.");
       return;
@@ -270,7 +275,7 @@ export default function SortieEditorModal({ title, initial, animalLabel, animals
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Sexe</label><select value={sexeSortie} onChange={(e) => setSexeSortie(e.target.value)} className={champ}><option value="F">Femelle</option><option value="M">Mâle</option></select></div>
           </div>}
 
-          {!multiSelect && nature === "VENTE" && attenteInfo?.enAttente && <div className="bg-orange-50 border border-orange-300 rounded-lg p-3 text-sm"><div className="flex items-start gap-2 text-orange-800 font-medium"><AlertTriangle size={16} className="shrink-0 mt-0.5" /><span>Délai d&apos;attente en cours{attenteInfo.dateFinAttenteViande && ` pour la viande jusqu'au ${new Date(attenteInfo.dateFinAttenteViande).toLocaleDateString("fr-FR")}`}{attenteInfo.medicamentNom && ` (${attenteInfo.medicamentNom})`}.</span></div>{nature === "VENTE" && modeVente === "CARCASSE" && attenteInfo.enAttenteViande && <label className="flex items-start gap-2 mt-2 text-orange-900"><input type="checkbox" checked={confirmeAttente} onChange={(e) => setConfirmeAttente(e.target.checked)} className="mt-0.5" /><span className="text-xs">Je confirme être informé du délai et je valide cette sortie.</span></label>}</div>}
+          {!multiSelect && nature === "VENTE" && attenteInfo?.enAttente && <div className="bg-orange-50 border border-orange-300 rounded-lg p-3 text-sm"><div className="flex items-start gap-2 text-orange-800 font-medium"><AlertTriangle size={16} className="shrink-0 mt-0.5" /><span>{attenteInfo.viandeInterdite?"Viande interdite":attenteInfo.viandeInconnue?"Délai viande inconnu : traitement à compléter":attenteInfo.laitInterdit?"Restriction lait":"Délai d’attente en cours"}{attenteInfo.dateFinAttenteViande && ` pour la viande jusqu'au ${new Date(attenteInfo.dateFinAttenteViande).toLocaleDateString("fr-FR")}`}{attenteInfo.medicamentNom && ` (${attenteInfo.medicamentNom})`}.</span></div>{nature === "VENTE" && modeVente === "CARCASSE" && attenteInfo.enAttenteViande && !attenteInfo.viandeInconnue && !attenteInfo.viandeInterdite && <label className="flex items-start gap-2 mt-2 text-orange-900"><input type="checkbox" checked={confirmeAttente} onChange={(e) => setConfirmeAttente(e.target.checked)} className="mt-0.5" /><span className="text-xs">Je confirme être informé du délai et je valide cette sortie.</span></label>}</div>}
 
           {nature === "VENTE" && <><div><label className="block text-sm font-medium text-gray-700 mb-1">Mode de vente</label><div className="grid grid-cols-2 gap-2">{([['VIF','Vif'],['CARCASSE','Carcasse']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setModeVente(value)} className={`min-h-12 rounded-lg border text-sm font-medium ${modeVente === value ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 text-gray-600"}`}>{label}</button>)}</div></div>
             <div className={multiSelect ? "grid grid-cols-1" : "grid grid-cols-2 gap-3"}>{multiSelect

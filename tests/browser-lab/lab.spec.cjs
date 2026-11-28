@@ -77,8 +77,11 @@ test("vêlage : filiation contradictoire et cycle postérieur",async({page})=>{
  await expect(page.getByText("Naissances : 1",{exact:true})).toHaveCount(0);
  await page.getByLabel("Père issu de la gestation").selectOption("DEMO-PERE-A");
  await expect(page.getByLabel("Père issu de la gestation")).toHaveValue("DEMO-PERE-A");
+ await expect(page.getByText("Filiation contradictoire : vérifier le père",{exact:true})).toHaveCount(0);
  await page.getByLabel("Cycle de reproduction postérieur au vêlage").check();
  await expect(page.getByLabel("Cycle de reproduction postérieur au vêlage")).toBeChecked();
+ await expect(page.getByLabel("Numéro du veau 1")).toHaveValue("9901");
+ await expect(page.getByLabel("Père déclaré")).toHaveValue("DEMO-PERE-A");
  await page.getByRole("button",{name:"Simuler le vêlage"}).click();
  await expect(page.getByText("Cycle ultérieur préservé",{exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
@@ -165,4 +168,111 @@ test("écho compacte : largeur 320, 375 et 390 et conservation des saisies",asyn
  await expect(cow.getByPlaceholder("Note facultative")).toHaveValue("Note fictive");
  await dialog.getByRole("button",{name:"Fermer",exact:true}).click();
  }
+});
+
+test("actions rapides : ouverture, fermeture extérieure et clavier",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Actions rapides fictives"});
+ const button=zone.getByRole("button",{name:"Actions",exact:true});
+ const menu=zone.getByRole("group",{name:"Actions rapides"});
+ await button.click(); await expect(menu).toBeVisible();
+ await expect(menu.getByRole("button",{name:"Pesée"})).toBeVisible();
+ await expect(menu.getByRole("button",{name:"Saillie / IA"})).toBeVisible();
+ await page.keyboard.press("Escape"); await expect(menu).toHaveCount(0);
+ await button.click(); await zone.getByRole("heading").click(); await expect(menu).toHaveCount(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+});
+
+ test("posologies compactes : simulation ordinateur et iPhone",async({page})=>{
+ for(const width of [1280,320,375,390]){
+ await page.setViewportSize({width,height:844}); await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Traitement fictif"});
+ const ref=zone.getByRole("region",{name:"Informations de posologie de la pharmacie"});
+ await expect(ref.getByRole("table")).toBeVisible(); await expect(ref.getByRole("alert")).toBeVisible();
+ expect((await ref.boundingBox()).height).toBeLessThan(330);
+ expect(await ref.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ const dose=zone.getByLabel("Dose administrée"); await expect(dose).toHaveValue(""); await dose.fill("7");
+ await expect(ref.getByText(/Fréquence/).first()).toBeHidden();
+ await ref.locator("summary").click(); await expect(ref.getByText(/Fréquence/).first()).toBeVisible();
+ await ref.locator("summary").click(); await expect(dose).toHaveValue("7");
+ await zone.getByTitle("Changer de médicament").click(); await zone.getByRole("combobox").filter({has:page.locator("option")}).count();
+ await zone.getByPlaceholder("Tapez le nom ou la substance active…").fill("TOLFINE"); await zone.getByRole("option",{name:/TOLFINE/}).click(); await expect(dose).toHaveValue("");
+ }
+ });
+
+test("dose réelle : décimales, unité séparée et refus du texte libre",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Traitement fictif"});
+ const dose=zone.getByLabel("Dose administrée");
+ const unit=zone.getByLabel("Unité de dose");
+ const output=zone.getByLabel("Dose fictive normalisée");
+ await expect(dose).toHaveValue("");
+ await expect(dose).toHaveAttribute("inputmode","decimal");
+ await expect(unit).toHaveValue("ml");
+ await dose.click(); await dose.pressSequentially("2,5"); await expect(dose).toHaveValue("2,5"); await expect(output).toHaveText("2.5 ml");
+ await dose.fill("2.5"); await expect(dose).toHaveValue("2.5"); await expect(output).toHaveText("2.5 ml");
+ await unit.selectOption("bolus"); await expect(output).toHaveText("2.5 bolus");
+ await dose.fill("2 ml"); await expect(output).toHaveText("Dose à renseigner ou invalide");
+ await dose.fill("1"); await unit.selectOption(""); await expect(output).toHaveText("Dose à renseigner ou invalide");
+ await expect(unit.locator('option[value="cc"]')).toHaveCount(0);
+});
+
+test("médicament provisoire : création, doublon, délais inconnus et zéro explicite",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Traitement fictif"});
+ await zone.getByTitle("Changer de médicament").click();
+ const search=zone.getByPlaceholder("Tapez le nom ou la substance active…");
+ await search.fill("Produit fictif");
+ await zone.getByRole("button",{name:/Créer « Produit fictif »/}).click();
+ await expect(zone.getByText("Fiche provisoire à compléter en pharmacie")).toBeVisible();
+ await expect(zone.getByLabel("Nombre de médicaments fictifs")).toHaveText("2");
+ await expect(zone.getByLabel("Délai viande en jours")).toHaveValue("");
+ await expect(zone.getByLabel("Délai lait en jours")).toHaveValue("");
+ await expect(zone.getByLabel("Dose administrée")).toHaveValue("");
+ await zone.getByLabel("Voie d’administration").selectOption("PO");
+ await zone.getByLabel("Dose administrée").fill("1");
+ await zone.getByLabel("Unité de dose").selectOption("bolus");
+ await zone.getByRole("button",{name:"Enregistrer le soin fictif"}).click();
+ const a=zone.getByLabel("Acte fictif 1");
+ await expect(a).toContainText("Viande inconnue · Lait inconnu");
+ await zone.getByLabel("Délai lait en jours").fill("0");
+ await zone.getByRole("button",{name:"Enregistrer le soin fictif"}).click();
+ const b=zone.getByLabel("Acte fictif 2");
+ await expect(b).toContainText("Viande inconnue · Lait renseigné");
+ await a.getByRole("button",{name:"Confirmer zéro fictif pour cet acte"}).click();
+ await expect(a).toContainText("Viande renseignée · Lait inconnu");
+ await expect(b).toContainText("Viande inconnue · Lait renseigné");
+ await zone.getByTitle("Changer de médicament").click();
+ await search.fill("produit fictif");
+ await expect(zone.getByRole("button",{name:/Créer «/})).toHaveCount(0);
+ await zone.getByRole("option",{name:/PRODUIT FICTIF/}).click();
+ await expect(zone.getByLabel("Nombre de médicaments fictifs")).toHaveText("2");
+});
+
+test("restriction lait : case compacte, champ désactivé et viande indépendante",async({page})=>{
+ await page.goto("/lab");const zone=page.getByRole("region",{name:"Traitement fictif"});
+ await zone.getByTitle("Changer de médicament").click();
+ await zone.getByPlaceholder("Tapez le nom ou la substance active…").fill("Produit fictif interdit");
+ await zone.getByRole("button",{name:/Créer « Produit fictif interdit »/}).click();
+ const viande=zone.getByLabel("Délai viande en jours");const lait=zone.getByLabel("Délai lait en jours");
+ await viande.fill("0");await zone.getByLabel("Délai lait interdit").check();
+ await expect(lait).toBeDisabled();await expect(lait).toHaveValue("");await expect(viande).toHaveValue("0");
+ await zone.getByLabel("Délai lait interdit").uncheck();await expect(lait).toBeEnabled();await expect(lait).toHaveValue("");
+});
+
+test("exécutant : profil actif en premier et choix manuel conservé",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Exécutant fictif"});
+ const select=zone.getByLabel("Exécutant");
+ await zone.getByRole("button",{name:"Profil Céline"}).click();
+ await expect(select).toHaveValue("Céline");
+ expect(await select.locator("option").allTextContents()).toEqual(["Sélectionner…","Céline","Samuel","A Démo","Z Démo"]);
+ await zone.getByRole("button",{name:"Profil Samuel"}).click();
+ await expect(select).toHaveValue("Samuel");
+ expect(await select.locator("option").allTextContents()).toEqual(["Sélectionner…","Samuel","Céline","A Démo","Z Démo"]);
+ await select.selectOption("A Démo");
+ await zone.getByRole("button",{name:"Profil Céline"}).click();
+ await expect(select).toHaveValue("A Démo");
+ await zone.getByRole("button",{name:"Nouvel acte fictif"}).click();
+ await expect(select).toHaveValue("Céline");
 });

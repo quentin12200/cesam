@@ -459,6 +459,10 @@ export function ReproductionModalProvider({ children }: { children: ReactNode })
   );
 }
 
+export function LabReproductionModalProvider({ children }: { children: ReactNode }) {
+  return <ReproductionModalContext.Provider value={{ openReproductionModal: () => {} }}>{children}</ReproductionModalContext.Provider>;
+}
+
 export function useReproductionModal() {
   const context = useContext(ReproductionModalContext);
   if (!context) throw new Error("useReproductionModal doit être utilisé dans ReproductionModalProvider");

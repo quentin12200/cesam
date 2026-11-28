@@ -1,6 +1,6 @@
 import type { CarnetSanitaireRow, EvenementCarnetRow } from "./carnet-sanitaire";
 import type { ActeSanitaireReel } from "./carnet-actes";
-export type LigneUnique = { id:string; date:Date; animalId:string; animalNutrav:string; animalNational:string; animalNom:string|null; type:"Vaccination"|"Traitement"|"Événement"; produit:string; dose:string; voie:string|null; ordonnance:string|null; prescripteur:string|null; executant:string|null; motif:string|null; commentaire:string; statut:string; remiseLait:Date|null; remiseViande:Date|null };
+export type LigneUnique = { id:string; date:Date; animalId:string; animalNutrav:string; animalNational:string; animalNom:string|null; type:"Vaccination"|"Traitement"|"Événement"; produit:string; dose:string; voie:string|null; ordonnance:string|null; prescripteur:string|null; executant:string|null; motif:string|null; commentaire:string; statut:string; restrictionLait?:string; restrictionViande?:string; remiseLait:Date|null; remiseViande:Date|null };
 const jour=(d:Date)=>d.toISOString().slice(0,10);
 const comparable=(s:string)=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLocaleLowerCase("fr");
 function commentaireEvenement(e:EvenementCarnetRow, acteDejaIdentifie:boolean):string {
@@ -32,7 +32,7 @@ export function construireCarnetUnique(rows:CarnetSanitaireRow[], evenements:Eve
  const lignes:LigneUnique[]=rows.filter(r=>!supprimerTraitements.has(r.id)).map(r=>{
   const a=actesParId.get("traitement:"+r.id)??actesParId.get("vaccination:"+r.id)??apparies.find(a=>estMeme(r,a));
   const complement=completions.get(r.id);
-  return {id:"acte:"+r.id,date:r.date,animalId:r.animalId,animalNutrav:r.animalNutrav,animalNational:r.animalNational,animalNom:r.animalNom,type:r.origine==="vaccination"||evenementVaccinal(r)||(!r.origine&&r.motif==="VACCINATION")?"Vaccination":"Traitement",produit:r.produit,dose:r.dose||complement?.dose||"",voie:r.voie??complement?.voie??null,ordonnance:r.ordonnanceNumero??complement?.ordonnanceNumero??null,prescripteur:r.prescripteur??complement?.prescripteur??null,executant:a?.executant??null,motif:r.motif,commentaire:"",statut:"Réalisé",remiseLait:r.dateRemiseLait,remiseViande:r.dateRemiseViande};
+  return {id:"acte:"+r.id,date:r.date,animalId:r.animalId,animalNutrav:r.animalNutrav,animalNational:r.animalNational,animalNom:r.animalNom,type:r.origine==="vaccination"||evenementVaccinal(r)||(!r.origine&&r.motif==="VACCINATION")?"Vaccination":"Traitement",produit:r.produit,dose:r.dose||complement?.dose||"",voie:r.voie??complement?.voie??null,ordonnance:r.ordonnanceNumero??complement?.ordonnanceNumero??null,prescripteur:r.prescripteur??complement?.prescripteur??null,executant:a?.executant??null,motif:r.motif,commentaire:"",statut:"Réalisé",restrictionLait:r.restrictionLait??complement?.restrictionLait,restrictionViande:r.restrictionViande??complement?.restrictionViande,remiseLait:r.dateRemiseLait??complement?.dateRemiseLait??null,remiseViande:r.dateRemiseViande??complement?.dateRemiseViande??null};
  });
  for(const e of evenements){
   const texte=commentaireEvenement(e,false);

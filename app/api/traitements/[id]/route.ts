@@ -1,3 +1,4 @@
+import { delaiRenseigne } from "@/lib/withdrawal";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
@@ -15,6 +16,7 @@ const EDITABLE_FIELDS = [
   "motif",
   "veterinaire",
   "ordonnanceNumero",
+  "delaiAttenteViandeJ", "delaiAttenteLaitJ",
 ] as const;
 
 const TEXT_FIELDS = new Set([
@@ -70,11 +72,15 @@ export async function PATCH(
       data.dateDebut = date;
     } else if (field === "dureeJours") {
       data.dureeJours = Number(value);
+    } else if (field === "delaiAttenteViandeJ" || field === "delaiAttenteLaitJ") {
+      if (body.confirmeDelais !== true || !delaiRenseigne(value)) return NextResponse.json({error:"Délai vérifié en jours requis"},{status:400});
+      data[field]=value;
     } else if (field === "dose") {
       data.dose = value === "" || value === null ? null : Number(value);
     } else if (TEXT_FIELDS.has(field)) {
       data[field] =
         typeof value === "string" ? value.trim() || null : value;
+      if(field === "notes" && prev.notes?.includes("[DELAIS_A_COMPLETER]")) data.notes=[data.notes,"[DELAIS_A_COMPLETER]"].filter(Boolean).join("\n");
     }
   }
 

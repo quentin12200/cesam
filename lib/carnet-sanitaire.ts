@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { getAttenteInfoForTraitement, delaisInconnus } from "@/lib/withdrawal";
 import { numeroOrdonnanceCarnet, prescripteurCarnet } from "@/lib/carnet-ordonnance";
 import { unifierActesDuCarnet, type ActeSanitaireReel } from "@/lib/carnet-actes";
 
@@ -55,6 +55,8 @@ export interface CarnetSanitaireRow {
   dose: string;
   voie: string | null;
   motif: string | null;
+  restrictionLait?: string;
+  restrictionViande?: string;
   dateRemiseLait: Date | null;
   dateRemiseViande: Date | null;
 }
@@ -100,6 +102,8 @@ export async function getCarnetSanitaireRows(): Promise<CarnetSanitaireRow[]> {
       dose: t.dose != null ? `${t.dose} ${t.uniteDosage ?? ""}`.trim() : "",
       voie: t.voie,
       motif: t.motif,
+      restrictionLait: attente.laitInterdit ? "Interdit" : delaisInconnus(t).lait ? "Inconnu" : undefined,
+      restrictionViande: attente.viandeInterdite ? "Interdit" : delaisInconnus(t).viande ? "Inconnu" : undefined,
       dateRemiseLait,
       dateRemiseViande,
     });

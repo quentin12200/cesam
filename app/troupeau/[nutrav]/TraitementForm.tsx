@@ -1,6 +1,13 @@
 "use client";
+import DelaiAttenteInput from "@/app/components/DelaiAttenteInput";
+import {formatDelai} from "@/lib/withdrawal";
+import DoseUnitSelect from "@/app/components/DoseUnitSelect";
+import { normaliserUniteDose, lireDose, doseValide } from "@/lib/dose-units";
+
 
 import { useState, useEffect, useRef } from "react";
+import { useActiveExecutor } from "@/components/UserPreferencesProvider";
+import ExecutantSelect, {type Intervenant} from "@/app/sanitaire/nouvel-evenement/ExecutantSelect";
 import { useRouter } from "next/navigation";
 import { Save, X, ScanLine, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { scanAndCreateExtraction } from "@/lib/scan-ordonnance-client";
@@ -48,11 +55,16 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
   const [dose, setDose] = useState("");
   const [doseRecommandee, setDoseRecommandee] = useState<number | null>(null);
   const [doseBase, setDoseBase] = useState("");
-  const [uniteDosage, setUniteDosage] = useState("ml");
+  const [uniteDosage, setUniteDosage] = useState("");
   const [motif, setMotif] = useState("");
   const [delaiAttenteViandeJ, setDelaiAttenteViandeJ] = useState<number | null>(null);
   const [delaiAttenteLaitJ, setDelaiAttenteLaitJ] = useState<number | null>(null);
   const [preconisationChargee, setPreconisationChargee] = useState(false);
+  const profilExecutant = useActiveExecutor();
+  const [executantChoisi, setExecutant] = useState("");
+  const executant = executantChoisi || profilExecutant;
+  const [intervenants, setIntervenants] = useState<Intervenant[]>([]);
+  useEffect(() => {fetch("/api/intervenants").then(r=>r.json()).then(v=>{if(Array.isArray(v))setIntervenants(v)}).catch(()=>{});}, []);
   const [veterinaire, setVeterinaire] = useState("");
   const [ordonnanceNumero, setOrdonnanceNumero] = useState("");
   const [ordonnanceId, setOrdonnanceId] = useState<string | null>(initialOrdonnanceId ?? null);
@@ -108,30 +120,25 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
     setMedicamentId(medicament.id);
     setVoie(preconisation?.voie ?? medicament.voie ?? "");
     setFrequence(preconisation?.frequence ?? "");
-    setDose(
-      preconisation?.dose != null
-        ? String(preconisation.dose)
-        : medicament.dosagePourKg != null
-          ? String(medicament.dosagePourKg)
-          : ""
-    );
+    setDose("");
     const doseProposee = preconisation?.dose ?? medicament.dosagePourKg ?? null;
     setDoseRecommandee(doseProposee);
     setDoseBase(preconisation?.doseBase ?? (medicament.dosagePourKg != null ? "KG" : ""));
-    setUniteDosage(preconisation?.unite ?? medicament.uniteDosage ?? "ml");
+    setUniteDosage(normaliserUniteDose(preconisation?.unite ?? medicament.uniteDosage));
     setDureeJours(preconisation ? convertirDureeEnJours(preconisation) : "3");
     setMotif(preconisation?.indicationMotif ?? "");
     setDelaiAttenteViandeJ(
-      preconisation?.delaiAttenteViandeJ ?? medicament.delaiAttenteViandeJ ?? null
+      medicament.delaiAttenteViandeJ===-1?-1:preconisation?.delaiAttenteViandeJ ?? medicament.delaiAttenteViandeJ ?? null
     );
     setDelaiAttenteLaitJ(
-      preconisation?.delaiAttenteLaitTraites ?? medicament.delaiAttenteLaitJ ?? null
+      medicament.delaiAttenteLaitJ===-1?-1:preconisation?.delaiAttenteLaitTraites ?? medicament.delaiAttenteLaitJ ?? null
     );
     setPreconisationChargee(Boolean(preconisation));
   }
 
   function choisirMedicament(medicament: Medicament | null) {
     if (medicament) {
+      setMedicaments(prev=>prev.some(m=>m.id===medicament.id)?prev:[...prev,medicament]);
       appliquerMedicament(medicament);
       return;
     }
@@ -141,7 +148,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
     setDose("");
     setDoseRecommandee(null);
     setDoseBase("");
-    setUniteDosage("ml");
+    setUniteDosage("");
     setDureeJours("3");
     setMotif("");
     setDelaiAttenteViandeJ(null);
@@ -163,8 +170,8 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
       }
     }
     if (result.voie) setVoie(result.voie);
-    if (result.dose != null) setDose(String(result.dose));
-    if (result.uniteDosage) setUniteDosage(result.uniteDosage);
+    setDose("");
+    if (result.uniteDosage) setUniteDosage(normaliserUniteDose(result.uniteDosage));
     if (result.dureeJours != null) setDureeJours(String(result.dureeJours));
     if (result.dateDebut) setDateDebut(result.dateDebut);
     if (result.veterinaire) setVeterinaire(result.veterinaire);
@@ -189,8 +196,8 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
       }
     }
     if (result.voie) setVoie(result.voie);
-    if (result.dose != null) setDose(String(result.dose));
-    if (result.uniteDosage) setUniteDosage(result.uniteDosage);
+    setDose("");
+    if (result.uniteDosage) setUniteDosage(normaliserUniteDose(result.uniteDosage));
     if (result.dureeJours != null) setDureeJours(String(result.dureeJours));
     if (result.dateDebut) setDateDebut(result.dateDebut);
     if (result.veterinaire) setVeterinaire(result.veterinaire);
@@ -220,7 +227,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!effectiveNom.trim()) return;
+    if (!effectiveNom.trim() || !doseValide(dose,uniteDosage) || (selectedMed?.temporaire && (!lireDose(dose)||!voie))) return;
     setSaving(true);
     await fetch("/api/traitements", {
       method: "POST",
@@ -234,11 +241,12 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         dureeJours: Number(dureeJours) || 1,
         voie: voie || null,
         frequence: frequence || null,
-        dose: dose !== "" ? Number(dose) : null,
+        dose: lireDose(dose),
         doseRecommandee,
-        uniteDosage: uniteDosage || null,
+        uniteDosage: normaliserUniteDose(uniteDosage) || null,
         motif: motif || null,
         veterinaire: veterinaire || null,
+        executant: executant || null,
         ordonnanceNumero: ordonnanceNumero || null,
         ordonnanceId,
         ordonnanceAAssocier: !ordonnanceNumero && !ordonnanceId ? ordonnanceAAssocier : false,
@@ -253,6 +261,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
 
   return (
     <form onSubmit={submit} className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+      <label className="block text-sm">Exécutant<ExecutantSelect intervenants={intervenants} value={executant} onChange={setExecutant} onAdded={i=>setIntervenants(prev=>[...prev,i])}/></label>
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-blue-800">
           {evenementId ? "Ajouter un médicament à l’événement" : "Nouveau traitement"}
@@ -297,6 +306,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
       <div>
         <label className="text-xs text-gray-500 block mb-1">Médicament *</label>
         <MedicamentPicker
+          allowQuickCreate
           medicaments={medicaments}
           value={selectedMed ?? null}
           onChange={choisirMedicament}
@@ -310,11 +320,12 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         </div>
       )}
 
+      {selectedMed?.temporaire && <div className="grid grid-cols-2 gap-2 text-xs"><DelaiAttenteInput label="Viande" value={delaiAttenteViandeJ?.toString()??""} onChange={v=>setDelaiAttenteViandeJ(v===""?null:Number(v))}/><DelaiAttenteInput label="Lait" value={delaiAttenteLaitJ?.toString()??""} onChange={v=>setDelaiAttenteLaitJ(v===""?null:Number(v))}/><p className="col-span-2 text-amber-800">Vide = délai inconnu, à compléter.</p></div>}
       {(delaiAttenteViandeJ != null || delaiAttenteLaitJ != null) && (
         <div className="text-xs bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-orange-700">
-          {delaiAttenteViandeJ != null && <>Attente viande : {delaiAttenteViandeJ} jour(s)</>}
+          {delaiAttenteViandeJ != null && <>Attente viande : {formatDelai(delaiAttenteViandeJ)}</>}
           {delaiAttenteViandeJ != null && delaiAttenteLaitJ != null && <span> · </span>}
-          {delaiAttenteLaitJ != null && <>Attente lait : {delaiAttenteLaitJ} traite(s)</>}
+          {delaiAttenteLaitJ != null && <>Attente lait : {formatDelai(delaiAttenteLaitJ)}</>}
         </div>
       )}
 
@@ -344,20 +355,19 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">
-            Dose
+            Dose administrée
             {doseBase && (
               <span className="ml-1 text-blue-600">
                 {doseBase === "ANIMAL" ? "par animal" : doseBase === "KG" ? "par kg" : doseBase === "100KG" ? "par 100 kg" : doseBase === "QUARTIER" ? "par quartier" : doseBase}
               </span>
             )}
           </label>
-          <input type="number" min={0} step="0.1" value={dose} onChange={(e) => setDose(e.target.value)}
+          <input type="text" inputMode="decimal" aria-label="Dose administrée" value={dose} onChange={(e) => setDose(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm" />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Unité</label>
-          <input value={uniteDosage} onChange={(e) => setUniteDosage(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ml" />
+          <DoseUnitSelect value={uniteDosage} onChange={setUniteDosage}/>
         </div>
       </div>
 
@@ -388,7 +398,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
       )}
 
       <div className="flex gap-2 pt-1">
-        <button type="submit" disabled={saving || !effectiveNom.trim()}
+        <button type="submit" disabled={saving || !effectiveNom.trim() || !doseValide(dose,uniteDosage)}
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
           <Save size={14} /> Enregistrer
         </button>

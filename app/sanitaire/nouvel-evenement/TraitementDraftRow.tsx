@@ -1,4 +1,8 @@
 "use client";
+import DelaiAttenteInput from "@/app/components/DelaiAttenteInput";
+import DoseUnitSelect from "@/app/components/DoseUnitSelect";
+import { normaliserUniteDose } from "@/lib/dose-units";
+
 
 import { X } from "lucide-react";
 import { VOIES_ADMINISTRATION } from "@/lib/medicament-categories";
@@ -14,6 +18,8 @@ export interface TraitementDraft {
   uniteDosage: string;
   motif: string;
   doseUnique: boolean;
+  delaiViande?: string;
+  delaiLait?: string;
   frequence: string;
   dureeJours: string;
 }
@@ -26,9 +32,11 @@ interface Props {
   onRemove: () => void;
   onIntervenantAdded: (i: Intervenant) => void;
   removable: boolean;
+  simulation?: boolean;
+  createSimulation?: (nom:string)=>MedicamentOption;
 }
 
-export default function TraitementDraftRow({ draft, medicaments, intervenants, onChange, onRemove, onIntervenantAdded, removable }: Props) {
+export default function TraitementDraftRow({ draft, medicaments, intervenants, onChange, onRemove, onIntervenantAdded, removable, simulation = false, createSimulation }: Props) {
   function set<K extends keyof TraitementDraft>(field: K, value: TraitementDraft[K]) {
     onChange({ ...draft, [field]: value });
   }
@@ -51,14 +59,13 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
     onChange({
       ...draft,
       medicament: m,
-      voie: voieNormalisee || draft.voie,
-      dose:
-        preconisation?.dose != null
-          ? String(preconisation.dose)
-          : m.dosagePourKg != null
-            ? String(m.dosagePourKg)
-            : draft.dose,
-      uniteDosage: preconisation?.unite ?? m.uniteDosage ?? draft.uniteDosage,
+      voie: voieNormalisee,
+      delaiViande: m.delaiAttenteViandeJ == null ? "" : String(m.delaiAttenteViandeJ),
+      delaiLait: m.delaiAttenteLaitJ == null ? "" : String(m.delaiAttenteLaitJ),
+      // Une préconisation par kg ou par 100 kg n'est pas une dose administrée.
+      // Ne jamais recopier une valeur de référence dans la dose réelle.
+      dose: "",
+      uniteDosage: normaliserUniteDose(preconisation?.unite ?? m.uniteDosage),
       motif: preconisation?.indicationMotif ?? draft.motif,
     });
   }
@@ -68,7 +75,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <label className="text-xs text-gray-500 block mb-1">Médicament *</label>
-          <MedicamentPicker medicaments={medicaments} value={draft.medicament} onChange={choisirMedicament} />
+          <MedicamentPicker allowQuickCreate={!simulation || !!createSimulation} createSimulation={simulation?createSimulation:undefined} medicaments={medicaments} value={draft.medicament} onChange={choisirMedicament} />
         </div>
         {removable && (
           <button type="button" onClick={onRemove} className="mt-5 shrink-0 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
@@ -77,10 +84,35 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
         )}
       </div>
 
+      {draft.medicament && !draft.medicament.temporaire && (
+        <section key={draft.medicament.id} aria-label="Informations de posologie de la pharmacie" className="rounded-lg border border-gray-200 bg-white p-2 text-xs space-y-1">
+          <p className="font-semibold">Posologies de référence</p>
+          <p className="text-amber-900">À vérifier avant administration. La dose administrée reste à renseigner manuellement.</p>
+          {draft.medicament.nom.trim().toUpperCase() === "TOLFINE" && !/tolf[ée]nam/i.test(draft.medicament.dci ?? "") && <p role="alert" className="font-semibold text-red-800">Substance active incohérente ou manquante : vérifier la fiche et la prescription avant utilisation.</p>}
+          {draft.medicament.preconisations.length > 0 ? (
+            <table className="w-full table-fixed text-left break-words">
+              <thead><tr className="text-gray-500"><th className="w-1/4">Voie</th><th className="w-1/2">Dose réf.</th><th>Durée</th></tr></thead>
+              <tbody>{draft.medicament.preconisations.map(p => <tr key={p.id} className="border-t align-top">
+                <td className="py-1">{p.voie || "—"}<span className="block text-gray-600">{p.statut === "VALIDE" ? "Validée" : p.statut === "A_VERIFIER" ? "À vérifier" : "Non validée"}</span></td>
+                <td className="py-1 font-medium">{p.dose != null ? `${p.dose} ${p.unite ?? "unité ?" } ${p.doseBase ?? "(base ?)"}` : "—"}</td>
+                <td className="py-1">{p.dureeValeur != null ? `${p.dureeValeur} ${p.dureeUnite || "unité ?"}` : "—"}</td>
+              </tr>)}</tbody>
+            </table>
+          ) : <p>{draft.medicament.dosagePourKg != null ? `${draft.medicament.dosagePourKg} ${draft.medicament.uniteDosage ?? "unité ?"} / kg — à vérifier` : "Aucune posologie enregistrée"}</p>}
+          <details>
+            <summary className="min-h-11 cursor-pointer py-3 font-medium text-blue-800">Délais d’attente et détails</summary>
+            <div className="space-y-2">
+              <p>Fiche : {draft.medicament.voie || "Voie non renseignée"} · Viande : {draft.medicament.delaiAttenteViandeJ===-1?"Interdit":draft.medicament.delaiAttenteViandeJ ?? "?"} j · Lait : {draft.medicament.delaiAttenteLaitJ===-1?"Interdit":draft.medicament.delaiAttenteLaitJ ?? "?"} j</p>
+              {draft.medicament.preconisations.map(p => <p key={p.id}>{p.voie || "—"} · {p.indicationMotif || "Indication non renseignée"} · Fréquence : {p.frequence || "Non renseignée"} · Viande : {p.delaiAttenteViandeJ ?? "?"} j · Lait : {p.delaiAttenteLaitTraites ?? "?"} traites</p>)}
+              {!simulation && <a className="font-semibold text-blue-800 underline" href={`/pharmacie/${draft.medicament.id}`} target="_blank" rel="noopener noreferrer">Voir la fiche pharmacie</a>}
+            </div>
+          </details>
+        </section>
+      )}
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Voie d&apos;administration *</label>
-          <select value={draft.voie} onChange={(e) => set("voie", e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          <select aria-label="Voie d’administration" value={draft.voie} onChange={(e) => set("voie", e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
             <option value="">Sélectionner…</option>
             {draft.voie && !VOIES_ADMINISTRATION.some((voie) => voie.code === draft.voie) && (
               <option value={draft.voie}>{draft.voie}</option>
@@ -90,20 +122,19 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Exécutant(e) *</label>
-          <ExecutantSelect intervenants={intervenants} value={draft.executant} onChange={(v) => set("executant", v)} onAdded={onIntervenantAdded} />
+          <ExecutantSelect simulation={simulation} intervenants={intervenants} value={draft.executant} onChange={(v) => set("executant", v)} onAdded={onIntervenantAdded} />
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2.5">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Dose</label>
-          <input type="number" min={0} step="0.1" value={draft.dose} onChange={(e) => set("dose", e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0" />
+          <input type="text" inputMode="decimal" value={draft.dose} onChange={(e) => set("dose", e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Dose administrée" placeholder="0" />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Unité</label>
-          <input value={draft.uniteDosage} onChange={(e) => set("uniteDosage", e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ml" />
+          <DoseUnitSelect value={draft.uniteDosage} onChange={v=>set("uniteDosage",v)}/>
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Motif</label>
@@ -111,6 +142,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ex: Mammite" />
         </div>
       </div>
+      {draft.medicament?.temporaire && <div className="rounded border p-2 text-xs"><p className="font-semibold">Délais d’attente (à compléter plus tard)</p><div className="grid grid-cols-2 gap-2"><DelaiAttenteInput label="Délai viande" value={draft.delaiViande??""} onChange={v=>set("delaiViande",v)}/><DelaiAttenteInput label="Délai lait" value={draft.delaiLait??""} onChange={v=>set("delaiLait",v)}/></div><p className="text-amber-800">Vide = inconnu, jamais zéro.</p></div>}
       <label className="flex min-h-11 items-center gap-2 rounded-lg border bg-white px-3 text-sm">
         <input type="checkbox" checked={draft.doseUnique} onChange={(e) => set("doseUnique", e.target.checked)} className="h-4 w-4 accent-green-700" />
         Dose unique

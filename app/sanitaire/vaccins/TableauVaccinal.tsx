@@ -1,9 +1,13 @@
 "use client";
+import DelaiAttenteInput from "@/app/components/DelaiAttenteInput";
+import DoseUnitSelect from "@/app/components/DoseUnitSelect";
+import { normaliserUniteDose, lireDose, doseValide } from "@/lib/dose-units";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Settings } from "lucide-react";
+import { useActiveExecutor } from "@/components/UserPreferencesProvider";
 import ExecutantSelect, { type Intervenant } from "@/app/sanitaire/nouvel-evenement/ExecutantSelect";
 import { formatAgeTerrain } from "@/lib/animal-age";
 import { regrouperActesVaccinaux } from "@/lib/vaccination-session";
@@ -177,7 +181,9 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const menuColonneRef = useRef<HTMLDivElement>(null);
   const [colonnesMenuOuvert, setColonnesMenuOuvert] = useState(false);
   const [dateSession, setDateSession] = useState(dateLocaleIso);
-  const [executant, setExecutant] = useState("");
+  const [executantChoisi, setExecutant] = useState("");
+  const profilExecutant = useActiveExecutor();
+  const executant = executantChoisi || profilExecutant;
   const [ordonnanceNumeroSession, setOrdonnanceNumeroSession] = useState("");
   const [ordonnanceIdSession, setOrdonnanceIdSession] = useState("");
   const [ordonnanceEnAttente, setOrdonnanceEnAttente] = useState(false);
@@ -218,7 +224,9 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [soinMedicament, setSoinMedicament] = useState<MedicamentOption | null>(null);
   const [soinVoie, setSoinVoie] = useState("");
   const [soinDose, setSoinDose] = useState("");
-  const [soinUnite, setSoinUnite] = useState("ml");
+  const [soinUnite, setSoinUnite] = useState("");
+  const [soinViande,setSoinViande]=useState("");
+  const [soinLait,setSoinLait]=useState("");
   const [soinAnimaux, setSoinAnimaux] = useState<Set<string>>(new Set());
   const [soinModifierAnimaux, setSoinModifierAnimaux] = useState(false);
   const [soinEnCours, setSoinEnCours] = useState(false);
@@ -235,7 +243,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
 
   const { message: messageBrouillon, vider: viderBrouillon } = useVaccinWorkspace({
     vue, recherche, vaccinModes, statuts, tri, directionTri, colonnesMasquees, anneesAffichees, toutHistorique, uniquementSelection,
-    animauxSelectionnes, actesSelectionnes, dateSession, executant, ajustements,
+    animauxSelectionnes, actesSelectionnes, dateSession, executant: executantChoisi, ajustements,
   }, { setVue, setRecherche, setVaccinModes, setStatuts, setTri, setDirectionTri, setColonnesMasquees, setAnneesAffichees, setToutHistorique, setUniquementSelection, setAnimauxSelectionnes, setActesSelectionnes, setDateSession, setExecutant, setAjustements }, lignes, blocs);
 
   useEffect(() => {
@@ -416,8 +424,8 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   function administrationsParDefaut() {
     return Object.fromEntries(groupesSession.map((groupe) => { const cellule = groupe.actes[0].ligne.cellules[groupe.etape.id]; return [groupe.cle, {
       voie: (cellule?.voie ?? groupe.etape.voie) === "À renseigner" ? "" : cellule?.voie ?? groupe.etape.voie ?? "",
-      dose: (cellule?.dose ?? groupe.etape.dose) == null ? "" : String(cellule?.dose ?? groupe.etape.dose),
-      uniteDosage: cellule?.uniteDosage ?? groupe.etape.uniteDosage ?? "ml",
+      dose: "",
+      uniteDosage: normaliserUniteDose(cellule?.uniteDosage ?? groupe.etape.uniteDosage),
     }]; }));
   }
 
@@ -462,7 +470,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     const administrations = { ...administrationsParDefaut(), ...ajustements };
     setAjustements(administrations);
     setErreur("");
-    if (groupesSession.some((groupe) => !administrations[groupe.cle]?.voie.trim())) {
+    if (groupesSession.length > 0) {
       setDonneesManquantes(true);
       return;
     }
@@ -471,13 +479,14 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
 
   async function validerSession(administrations = ajustements) {
     if (enregistrementVerrou.current || repriseBloquee) return;
-    enregistrementVerrou.current = true;
     setErreur("");
     const voieManquante = groupesSession.find((groupe) => !administrations[groupe.cle]?.voie.trim());
     if (voieManquante) {
       setErreur(`Indique la voie pour ${voieManquante.bloc.nom} — ${voieManquante.etape.label}.`);
       return;
     }
+    if (groupesSession.some(g=>!doseValide(administrations[g.cle]?.dose ?? "", administrations[g.cle]?.uniteDosage ?? ""))) {setErreur("Vérifie les doses et unités."); return;}
+    enregistrementVerrou.current = true;
     setEnregistrement(true);
     const enregistres = new Set<string>();
     try {
@@ -487,7 +496,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         const animalIds = groupe.actes.map((acte) => acte.ligne.animalId);
         const medicamentId = groupe.etape.medicamentId!;
         const medicamentNom = groupe.etape.medicamentNom || groupe.bloc.nom;
-        const dose = administration.dose === "" ? null : Number(administration.dose);
+        const dose = lireDose(administration.dose);
         const reponse = await fetch("/api/evenements/batch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -496,7 +505,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
             date: dateSession,
             type: "Vaccination",
             symptomes: [{ libelle: "Vaccination", typeEvenementId: null }],
-            constatePar: executant.trim(),
+
             description: groupe.etape.label || null,
             traitements: [{
               medicamentId,
@@ -504,7 +513,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
               voie: administration.voie.trim(),
               executant: executant.trim(),
               dose,
-              uniteDosage: administration.uniteDosage || null,
+              uniteDosage: normaliserUniteDose(administration.uniteDosage) || null,
               doseUnique: true,
               ordonnanceNumero: ordonnanceNumeroSession.trim() || null,
               ordonnanceId: ordonnanceIdSession || null,
@@ -883,7 +892,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     setSoinMedicament(null);
     setSoinVoie("");
     setSoinDose("");
-    setSoinUnite("ml");
+    setSoinUnite("");
     setSoinModifierAnimaux(false);
     setSoinAnimaux(new Set(animauxDuLot.map((ligne) => ligne.animalId)));
     setSoinOuvert(true);
@@ -900,6 +909,8 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
 
   function enregistrerSoin() {
     if (!soinMedicament || soinAnimaux.size === 0) return;
+    if(soinMedicament.temporaire && (!lireDose(soinDose)||!soinVoie.trim()||[soinViande,soinLait].some(v=>v!==""&&v!=="-1"&&(!/^\d+$/.test(v)||!Number.isSafeInteger(Number(v)))))){setErreur("Indique la dose réelle et la voie, vérifie les délais.");return;}
+    if (!doseValide(soinDose,soinUnite)) {setErreur("Vérifie la dose et son unité."); return;}
     if (!dateSession || !executant.trim()) {
       setErreur("Indique la date et l’exécutant de la séance.");
       return;
@@ -913,10 +924,10 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         medicamentId: soinMedicament.id,
         medicamentNom: soinMedicament.nom,
         voie: soinVoie.trim() || null,
-        dose: soinDose === "" ? null : Number(soinDose),
-        uniteDosage: soinUnite || null,
-        delaiAttenteViandeJ: soinMedicament.delaiAttenteViandeJ,
-        delaiAttenteLaitJ: soinMedicament.delaiAttenteLaitJ,
+        dose: lireDose(soinDose),
+        uniteDosage: normaliserUniteDose(soinUnite) || null,
+        delaiAttenteViandeJ: soinMedicament.temporaire ? (soinViande===""?null:Number(soinViande)) : soinMedicament.delaiAttenteViandeJ,
+        delaiAttenteLaitJ: soinMedicament.temporaire ? (soinLait===""?null:Number(soinLait)) : soinMedicament.delaiAttenteLaitJ,
       });
       setSoinsEnAttente((actuels) => [...actuels, charge]);
       setSoinMessage(`${soinMedicament.nom} ajouté à la séance pour ${soinAnimaux.size} animal(aux).`);
@@ -932,17 +943,18 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Ajouter un soin ou traitement"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
       <h2 className="text-lg font-black text-gray-900">Ajouter un soin / traitement</h2>
       <p className="text-xs text-gray-500">Date {afficherDate(dateSession)} · exécutant {executant || "à renseigner"} — enregistré comme un traitement sanitaire normal, jamais comme un vaccin.</p>
-      <div className="mt-3"><MedicamentPicker medicaments={medicamentsSoins} value={soinMedicament} onChange={(medicament) => { setSoinMedicament(medicament); setSoinVoie(medicament?.voie ?? ""); setSoinUnite(medicament?.uniteDosage ?? "ml"); }} /></div>
+      <div className="mt-3"><MedicamentPicker allowQuickCreate medicaments={medicamentsSoins} value={soinMedicament} onChange={(medicament) => { setSoinMedicament(medicament); setSoinViande(medicament?.delaiAttenteViandeJ?.toString()??"");setSoinLait(medicament?.delaiAttenteLaitJ?.toString()??""); if(medicament)setMedicamentsSoins(prev=>prev.some(m=>m.id===medicament.id)?prev:[...prev,medicament]); setSoinVoie(medicament?.voie ?? ""); setSoinDose(""); setSoinUnite(normaliserUniteDose(medicament?.uniteDosage)); }} /></div>
       {soinMedicament && <div className="mt-2 grid grid-cols-3 gap-2 text-xs font-semibold text-gray-700">
         <label>Voie<input value={soinVoie} onChange={(event) => setSoinVoie(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border px-2 text-sm font-normal" /></label>
-        <label>Dose<input type="number" min={0} step="0.1" value={soinDose} onChange={(event) => setSoinDose(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border px-2 text-sm font-normal" /></label>
-        <label>Unité<input value={soinUnite} onChange={(event) => setSoinUnite(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border px-2 text-sm font-normal" /></label>
+        <label>Dose<input type="text" inputMode="decimal" value={soinDose} onChange={(event) => setSoinDose(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border px-2 text-sm font-normal" /></label>
+        <label>Unité<DoseUnitSelect value={soinUnite} onChange={setSoinUnite} className="mt-1 min-h-10 w-full rounded-lg border px-2 text-sm font-normal"/></label>
       </div>}
       <div className="mt-3 rounded-lg bg-gray-50 p-2 text-sm">
         <div className="flex items-center gap-2"><b className="mr-auto">{soinAnimaux.size} animal(aux) du lot</b><button type="button" onClick={() => setSoinModifierAnimaux((actuel) => !actuel)} className="min-h-8 text-xs font-semibold text-green-800 underline">{soinModifierAnimaux ? "Terminé" : "Modifier les animaux"}</button></div>
         {soinModifierAnimaux && <div className="mt-2 grid max-h-48 gap-1 overflow-y-auto">{animauxDuLot.map((ligne) => <label key={ligne.animalId} className="flex min-h-9 cursor-pointer items-center gap-2"><input type="checkbox" checked={soinAnimaux.has(ligne.animalId)} onChange={() => basculerDansSet(setSoinAnimaux, ligne.animalId)} className="h-5 w-5 accent-green-700" />{ligne.nutrav} {ligne.nom}</label>)}</div>}
       </div>
       {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
+      {soinMedicament?.temporaire&&<div className="grid grid-cols-2 gap-2 text-xs"><DelaiAttenteInput label="Viande" value={soinViande} onChange={setSoinViande}/><DelaiAttenteInput label="Lait" value={soinLait} onChange={setSoinLait}/></div>}
       <button type="button" disabled={!soinMedicament || soinAnimaux.size === 0 || soinEnCours} onClick={() => void enregistrerSoin()} className="mt-3 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-40">{soinEnCours ? "Enregistrement…" : `Ajouter à la séance (${soinAnimaux.size} animaux)`}</button>
       <button type="button" disabled={soinEnCours} onClick={fermer} className="mt-2 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Annuler</button>
     </div></div>;
@@ -1105,8 +1117,8 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
       </div>
 
       {donneesManquantes && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Informations vaccinales manquantes"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
-        <h2 className="text-lg font-black text-gray-900">Information nécessaire</h2><p className="mt-1 text-sm text-gray-600">Renseignez uniquement la voie absente avant l’enregistrement.</p>
-        <div className="mt-4 space-y-3">{groupesSession.filter((groupe) => !ajustements[groupe.cle]?.voie.trim()).map((groupe) => { const administration = ajustements[groupe.cle] ?? { voie: "", dose: "", uniteDosage: "ml" }; return <label key={groupe.cle} className="block text-sm font-semibold text-gray-800">{groupe.etape.medicamentNom || groupe.bloc.nom} — {groupe.etape.label || "Injection"}<input autoFocus value={administration.voie} onChange={(event) => setAjustements((actuels) => ({ ...actuels, [groupe.cle]: { ...administration, voie: event.target.value } }))} placeholder="Voie d’administration" className="mt-1 min-h-10 w-full rounded-lg border px-3 font-normal" /></label>; })}</div>
+        <h2 className="text-lg font-black text-gray-900">Information nécessaire</h2><p className="mt-1 text-sm text-gray-600">Vérifie la voie et indique la dose réellement administrée.</p>
+        <div className="mt-4 space-y-3">{groupesSession.map((groupe) => { const administration = ajustements[groupe.cle] ?? { voie: "", dose: "", uniteDosage: "" }; return <label key={groupe.cle} className="block text-sm font-semibold text-gray-800">{groupe.etape.medicamentNom || groupe.bloc.nom} — {groupe.etape.label || "Injection"}<input autoFocus value={administration.voie} onChange={(event) => setAjustements((actuels) => ({ ...actuels, [groupe.cle]: { ...administration, voie: event.target.value } }))} placeholder="Voie d’administration" className="mt-1 min-h-10 w-full rounded-lg border px-3 font-normal" /><span className="mt-2 grid grid-cols-2 gap-2"><input aria-label="Dose administrée" inputMode="decimal" value={administration.dose} onChange={e=>setAjustements(a=>({...a,[groupe.cle]:{...administration,dose:e.target.value}}))} placeholder="Dose administrée" className="min-w-0 border rounded px-2"/><DoseUnitSelect value={administration.uniteDosage} onChange={v=>setAjustements(a=>({...a,[groupe.cle]:{...administration,uniteDosage:v}}))}/></span></label>; })}</div>
         {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
         <div className="mt-4 grid grid-cols-2 gap-2"><button type="button" disabled={enregistrement} onClick={() => { setDonneesManquantes(false); setErreur(""); }} className="min-h-11 rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Annuler</button><button type="button" disabled={enregistrement} onClick={() => void validerSession()} className="min-h-11 rounded-lg bg-green-800 font-bold text-white disabled:opacity-50">{enregistrement ? "Enregistrement…" : "Enregistrer"}</button></div>
       </div></div>}

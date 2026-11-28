@@ -26,3 +26,11 @@ export function withReturnTo(href: string, returnTo: string) {
 export function showOriginConfirmation(message: string) {
   window.dispatchEvent(new CustomEvent<string>(ORIGIN_CONFIRMATION_EVENT, { detail: message }));
 }
+
+export function animalTabHref(nutrav: string, tab: string, testRepro: boolean, returnTo: string | null) {
+  const params = new URLSearchParams({onglet: tab});
+  if (testRepro) params.set("testRepro", "1");
+  const origin = safeReturnTo(returnTo);
+  if (origin) params.set("returnTo", origin);
+  return "/troupeau/" + encodeURIComponent(nutrav) + "?" + params.toString();
+}

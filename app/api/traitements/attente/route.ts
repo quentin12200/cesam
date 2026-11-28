@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
-import { getAttenteInfoForTraitement, type AttenteInfo } from "@/lib/withdrawal";
+import { getAttenteInfoForTraitement, delaisInconnus, type AttenteInfo } from "@/lib/withdrawal";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -9,7 +8,7 @@ export async function GET(request: NextRequest) {
   if (!animalId) return NextResponse.json({ error: "animalId requis" }, { status: 400 });
 
   const traitements = await prisma.traitement.findMany({
-    where: { animalId, dateDebut: { gte: subDays(new Date(), 90) } },
+    where: { animalId },
     include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
     orderBy: { dateDebut: "desc" },
   });
@@ -28,12 +27,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const viandeInterdite = traitements.some(t=>getAttenteInfoForTraitement(t).viandeInterdite);
+  const laitInterdit = traitements.some(t=>getAttenteInfoForTraitement(t).laitInterdit);
+  const viandeInconnue = traitements.some(t=>delaisInconnus(t).viande);
+  const laitInconnu = traitements.some(t=>delaisInconnus(t).lait);
   return NextResponse.json({
-    enAttente: pire?.enAttente ?? false,
-    enAttenteViande: pire?.enAttenteViande ?? false,
-    enAttenteLait: pire?.enAttenteLait ?? false,
-    dateFinAttenteViande: pire?.dateFinAttenteViande ?? null,
-    dateFinAttenteLait: pire?.dateFinAttenteLait ?? null,
+    viandeInconnue, laitInconnu, viandeInterdite, laitInterdit,
+    enAttente: viandeInterdite || laitInterdit || viandeInconnue || laitInconnu || (pire?.enAttente ?? false),
+    enAttenteViande: viandeInterdite || viandeInconnue || (pire?.enAttenteViande ?? false),
+    enAttenteLait: laitInterdit || laitInconnu || (pire?.enAttenteLait ?? false),
+    dateFinAttenteViande: viandeInterdite || viandeInconnue ? null : pire?.dateFinAttenteViande ?? null,
+    dateFinAttenteLait: laitInterdit || laitInconnu ? null : pire?.dateFinAttenteLait ?? null,
     medicamentNom,
   });
 }
