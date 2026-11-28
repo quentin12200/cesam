@@ -1,4 +1,5 @@
 "use client";
+import { normaliserUniteDose, lireDose, doseValide } from "@/lib/dose-units";
 
 import BackButton from "@/app/components/BackButton";
 
@@ -40,7 +41,7 @@ type TargetMode = "animal" | "plusieurs";
 const today = new Date().toISOString().slice(0, 10);
 
 function nouveauDraft(): TraitementDraft {
-  return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", executant: "", dose: "", uniteDosage: "ml", motif: "", doseUnique: true, frequence: "", dureeJours: "" };
+  return { key: Math.random().toString(36).slice(2), medicament: null, voie: "", executant: "", dose: "", uniteDosage: "", motif: "", doseUnique: true, frequence: "", dureeJours: "" };
 }
 
 export default function NouvelEvenementForm({ presetNutrav, presetNutravs, presetMedicamentId, presetVaccination }: { presetNutrav?: string; presetNutravs?: string[]; presetMedicamentId?: string; presetVaccination?: VaccinationSessionPreset }) {
@@ -149,8 +150,8 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
         ...first,
         medicament: m,
         voie: voiceDraft?.voieAdministration ?? presetVaccination?.voie ?? m.voie ?? first.voie,
-        dose: presetVaccination?.dose != null ? String(presetVaccination.dose) : first.dose,
-        uniteDosage: presetVaccination?.uniteDosage ?? first.uniteDosage,
+        dose: "",
+        uniteDosage: normaliserUniteDose(presetVaccination?.uniteDosage ?? m.uniteDosage),
         doseUnique: presetVaccination ? true : first.doseUnique,
       }, ...rest];
     });
@@ -276,6 +277,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
 
     if (traitementActif) {
       if (draftsValides.length === 0) { setError("Choisis au moins un médicament, ou désactive l'ajout de traitement"); return; }
+      if (draftsValides.some(d=>!doseValide(d.dose,d.uniteDosage))) {setError("Vérifie la dose et son unité."); return;}
       const incomplet = draftsValides.find((d) => !d.voie || !d.executant);
       if (incomplet) { setError(`Pour ${incomplet.medicament?.nom}, indique la voie d'administration et l'exécutant(e)`); return; }
     }
@@ -324,8 +326,8 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
             medicamentNom: d.medicament!.nom,
             voie: d.voie || null,
             executant: d.executant || null,
-            dose: d.dose !== "" ? Number(d.dose) : null,
-            uniteDosage: d.uniteDosage || null,
+            dose: lireDose(d.dose),
+            uniteDosage: normaliserUniteDose(d.uniteDosage) || null,
             motif: d.motif || null,
             doseUnique: d.doseUnique,
             frequence: d.doseUnique ? null : d.frequence || null,
@@ -338,7 +340,7 @@ export default function NouvelEvenementForm({ presetNutrav, presetNutravs, prese
             vaccin: presetVaccination.vaccin,
             medicamentId: draftsValides[0]?.medicament?.id ?? presetVaccination.medicamentId,
             voie: draftsValides[0]?.voie || null,
-            dose: draftsValides[0]?.dose !== "" ? Number(draftsValides[0]?.dose) : null,
+            dose: lireDose(draftsValides[0]?.dose ?? ""),
             animaux: presetVaccination.animaux.filter((item) => animaux.some((animal) => animal.id === item.animalId)),
           } : null,
           parage: ajouterAuParage ? { motif: "BOITERIE", pattes: paragePattes, note: parageNote || null } : null,
