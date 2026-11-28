@@ -276,3 +276,10 @@ test("exécutant : profil actif en premier et choix manuel conservé",async({pag
  await zone.getByRole("button",{name:"Nouvel acte fictif"}).click();
  await expect(select).toHaveValue("Céline");
 });
+
+test("échographie : dernier vêlage, date de référence et génisse",async({page})=>{
+ await page.goto("/lab");
+ await page.getByRole("button",{name:"Séance écho fictive"}).click();
+ await expect(page.getByText(/Dernier vêlage : 01\/08\/2026/)).toBeVisible();
+ await expect(page.getByText("Génisse · aucun vêlage enregistré")).toBeVisible();
+});
