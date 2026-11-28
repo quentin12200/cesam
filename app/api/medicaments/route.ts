@@ -1,4 +1,5 @@
 import { valeurCategoriePersonnalisee } from "@/lib/medicament-categories";
+import { delaiRenseigne } from "@/lib/withdrawal";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
