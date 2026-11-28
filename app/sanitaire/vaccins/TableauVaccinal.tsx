@@ -221,6 +221,8 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
   const [soinVoie, setSoinVoie] = useState("");
   const [soinDose, setSoinDose] = useState("");
   const [soinUnite, setSoinUnite] = useState("");
+  const [soinViande,setSoinViande]=useState("");
+  const [soinLait,setSoinLait]=useState("");
   const [soinAnimaux, setSoinAnimaux] = useState<Set<string>>(new Set());
   const [soinModifierAnimaux, setSoinModifierAnimaux] = useState(false);
   const [soinEnCours, setSoinEnCours] = useState(false);
@@ -903,6 +905,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
 
   function enregistrerSoin() {
     if (!soinMedicament || soinAnimaux.size === 0) return;
+    if(soinMedicament.temporaire && (!lireDose(soinDose)||!soinVoie.trim()||[soinViande,soinLait].some(v=>v!==""&&(!/^\d+$/.test(v)||!Number.isSafeInteger(Number(v)))))){setErreur("Indique la dose réelle et la voie, vérifie les délais.");return;}
     if (!doseValide(soinDose,soinUnite)) {setErreur("Vérifie la dose et son unité."); return;}
     if (!dateSession || !executant.trim()) {
       setErreur("Indique la date et l’exécutant de la séance.");
@@ -919,8 +922,8 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         voie: soinVoie.trim() || null,
         dose: lireDose(soinDose),
         uniteDosage: normaliserUniteDose(soinUnite) || null,
-        delaiAttenteViandeJ: soinMedicament.delaiAttenteViandeJ,
-        delaiAttenteLaitJ: soinMedicament.delaiAttenteLaitJ,
+        delaiAttenteViandeJ: soinMedicament.temporaire ? (soinViande===""?null:Number(soinViande)) : soinMedicament.delaiAttenteViandeJ,
+        delaiAttenteLaitJ: soinMedicament.temporaire ? (soinLait===""?null:Number(soinLait)) : soinMedicament.delaiAttenteLaitJ,
       });
       setSoinsEnAttente((actuels) => [...actuels, charge]);
       setSoinMessage(`${soinMedicament.nom} ajouté à la séance pour ${soinAnimaux.size} animal(aux).`);
@@ -936,7 +939,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
     return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 sm:items-center" role="dialog" aria-modal="true" aria-label="Ajouter un soin ou traitement"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl">
       <h2 className="text-lg font-black text-gray-900">Ajouter un soin / traitement</h2>
       <p className="text-xs text-gray-500">Date {afficherDate(dateSession)} · exécutant {executant || "à renseigner"} — enregistré comme un traitement sanitaire normal, jamais comme un vaccin.</p>
-      <div className="mt-3"><MedicamentPicker medicaments={medicamentsSoins} value={soinMedicament} onChange={(medicament) => { setSoinMedicament(medicament); setSoinVoie(medicament?.voie ?? ""); setSoinDose(""); setSoinUnite(normaliserUniteDose(medicament?.uniteDosage)); }} /></div>
+      <div className="mt-3"><MedicamentPicker allowQuickCreate medicaments={medicamentsSoins} value={soinMedicament} onChange={(medicament) => { setSoinMedicament(medicament); setSoinViande(medicament?.delaiAttenteViandeJ?.toString()??"");setSoinLait(medicament?.delaiAttenteLaitJ?.toString()??""); if(medicament)setMedicamentsSoins(prev=>prev.some(m=>m.id===medicament.id)?prev:[...prev,medicament]); setSoinVoie(medicament?.voie ?? ""); setSoinDose(""); setSoinUnite(normaliserUniteDose(medicament?.uniteDosage)); }} /></div>
       {soinMedicament && <div className="mt-2 grid grid-cols-3 gap-2 text-xs font-semibold text-gray-700">
         <label>Voie<input value={soinVoie} onChange={(event) => setSoinVoie(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border px-2 text-sm font-normal" /></label>
         <label>Dose<input type="text" inputMode="decimal" value={soinDose} onChange={(event) => setSoinDose(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border px-2 text-sm font-normal" /></label>
@@ -947,6 +950,7 @@ export default function TableauVaccinal({ blocs, lignes, actionsPrevues }: { blo
         {soinModifierAnimaux && <div className="mt-2 grid max-h-48 gap-1 overflow-y-auto">{animauxDuLot.map((ligne) => <label key={ligne.animalId} className="flex min-h-9 cursor-pointer items-center gap-2"><input type="checkbox" checked={soinAnimaux.has(ligne.animalId)} onChange={() => basculerDansSet(setSoinAnimaux, ligne.animalId)} className="h-5 w-5 accent-green-700" />{ligne.nutrav} {ligne.nom}</label>)}</div>}
       </div>
       {erreur && <p className="mt-3 text-sm font-semibold text-red-700">{erreur}</p>}
+      {soinMedicament?.temporaire&&<div className="grid grid-cols-2 gap-2 text-xs"><label>Viande (jours)<input type="number" min={0} step={1} value={soinViande} onChange={e=>setSoinViande(e.target.value)} className="w-full border rounded p-2"/></label><label>Lait (jours)<input type="number" min={0} step={1} value={soinLait} onChange={e=>setSoinLait(e.target.value)} className="w-full border rounded p-2"/></label></div>}
       <button type="button" disabled={!soinMedicament || soinAnimaux.size === 0 || soinEnCours} onClick={() => void enregistrerSoin()} className="mt-3 min-h-11 w-full rounded-lg bg-green-800 font-semibold text-white disabled:opacity-40">{soinEnCours ? "Enregistrement…" : `Ajouter à la séance (${soinAnimaux.size} animaux)`}</button>
       <button type="button" disabled={soinEnCours} onClick={fermer} className="mt-2 min-h-11 w-full rounded-lg border font-semibold text-gray-700 disabled:opacity-50">Annuler</button>
     </div></div>;
