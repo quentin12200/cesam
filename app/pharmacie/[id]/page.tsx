@@ -76,6 +76,7 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
       <MedicamentFicheClient
         medicament={{
           id: medicament.id,
+          temporaire: medicament.temporaire,
           nom: medicament.nom,
           dci: medicament.dci,
           forme: medicament.forme,
