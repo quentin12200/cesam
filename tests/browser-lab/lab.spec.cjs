@@ -209,8 +209,8 @@ test("dose réelle : décimales, unité séparée et refus du texte libre",async
  await expect(dose).toHaveValue("");
  await expect(dose).toHaveAttribute("inputmode","decimal");
  await expect(unit).toHaveValue("ml");
- await dose.fill("2,5"); await expect(output).toHaveText("2.5 ml");
- await dose.fill("2.5"); await expect(output).toHaveText("2.5 ml");
+ await dose.click(); await dose.pressSequentially("2,5"); await expect(dose).toHaveValue("2,5"); await expect(output).toHaveText("2.5 ml");
+ await dose.fill("2.5"); await expect(dose).toHaveValue("2.5"); await expect(output).toHaveText("2.5 ml");
  await unit.selectOption("bolus"); await expect(output).toHaveText("2.5 bolus");
  await dose.fill("2 ml"); await expect(output).toHaveText("Dose à renseigner ou invalide");
  await dose.fill("1"); await unit.selectOption(""); await expect(output).toHaveText("Dose à renseigner ou invalide");
