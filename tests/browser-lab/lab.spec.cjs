@@ -304,3 +304,10 @@ test("référentiels pharmacie : sélection, doublon exact et ajout contrôlé",
  await zone.getByLabel("Voie fictive",{exact:true}).selectOption("SC");
  await zone.getByLabel("Catégorie fictive",{exact:true}).selectOption("Catégorie démo");
 });
+
+test("échographie : dernier vêlage, date de référence et génisse",async({page})=>{
+ await page.goto("/lab");
+ await page.getByRole("button",{name:"Séance écho fictive"}).click();
+ await expect(page.getByText(/Dernier vêlage : 01\/08\/2026/)).toBeVisible();
+ await expect(page.getByText("Génisse · aucun vêlage enregistré")).toBeVisible();
+});

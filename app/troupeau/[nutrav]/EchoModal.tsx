@@ -1,4 +1,5 @@
 "use client";
+import {repereDernierVelage} from "@/lib/dernier-velage";
 
 import { useEffect, useMemo, useState } from "react";
 import { addDays, differenceInDays, format } from "date-fns";
@@ -51,6 +52,7 @@ export default function EchoModal({
   const [observation, setObservation] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [dernierVelage,setDernierVelage]=useState<string|null|undefined>(undefined);
   const [animalId, setAnimalId] = useState("");
   const [breedings, setBreedings] = useState<BreedingChoice[]>([]);
   const [bulls, setBulls] = useState<BullChoice[]>([]);
@@ -69,6 +71,7 @@ export default function EchoModal({
     ]).then(([animal, bullData]) => {
       const lastCalvingDate = animal.velagesVache?.[0]?.date ? new Date(animal.velagesVache[0].date) : null;
       const currentBreedings = (animal.saillies ?? []).filter((breeding: BreedingChoice) => !lastCalvingDate || new Date(breeding.date) > lastCalvingDate);
+      setDernierVelage(Array.isArray(animal.velagesVache)?animal.velagesVache[0]?.date??null:undefined);
       setAnimalId(animal.id ?? "");
       setBreedings(currentBreedings);
       setBulls(bullData.taureaux ?? []);
@@ -219,6 +222,7 @@ export default function EchoModal({
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500">{mode === "PLANIFIER" ? "Date de planification" : "Date de l’échographie"}</label>
             <input type="date" value={date} max={today} onChange={(event) => setDate(event.target.value)} required className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+            <p className="mt-1 text-xs text-gray-500">{repereDernierVelage(dernierVelage,date)}</p>
             {saillieDate && <p className="mt-1 text-xs text-gray-400">Tentative associée : {format(new Date(saillieDate), "d MMM yyyy", { locale: fr })}</p>}
           </div>
 
