@@ -1,4 +1,6 @@
 "use client";
+import DelaiAttenteInput from "@/app/components/DelaiAttenteInput";
+import {formatDelai} from "@/lib/withdrawal";
 import DoseUnitSelect from "@/app/components/DoseUnitSelect";
 import { normaliserUniteDose, lireDose, doseValide } from "@/lib/dose-units";
 
@@ -119,10 +121,10 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
     setDureeJours(preconisation ? convertirDureeEnJours(preconisation) : "3");
     setMotif(preconisation?.indicationMotif ?? "");
     setDelaiAttenteViandeJ(
-      preconisation?.delaiAttenteViandeJ ?? medicament.delaiAttenteViandeJ ?? null
+      medicament.delaiAttenteViandeJ===-1?-1:preconisation?.delaiAttenteViandeJ ?? medicament.delaiAttenteViandeJ ?? null
     );
     setDelaiAttenteLaitJ(
-      preconisation?.delaiAttenteLaitTraites ?? medicament.delaiAttenteLaitJ ?? null
+      medicament.delaiAttenteLaitJ===-1?-1:preconisation?.delaiAttenteLaitTraites ?? medicament.delaiAttenteLaitJ ?? null
     );
     setPreconisationChargee(Boolean(preconisation));
   }
@@ -309,12 +311,12 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         </div>
       )}
 
-      {selectedMed?.temporaire && <div className="grid grid-cols-2 gap-2 text-xs"><label>Viande (jours)<input type="number" min={0} step={1} value={delaiAttenteViandeJ ?? ""} onChange={e=>setDelaiAttenteViandeJ(e.target.value===""?null:Number(e.target.value))} className="w-full border rounded p-2"/></label><label>Lait (jours)<input type="number" min={0} step={1} value={delaiAttenteLaitJ ?? ""} onChange={e=>setDelaiAttenteLaitJ(e.target.value===""?null:Number(e.target.value))} className="w-full border rounded p-2"/></label><p className="col-span-2 text-amber-800">Vide = délai inconnu, à compléter.</p></div>}
+      {selectedMed?.temporaire && <div className="grid grid-cols-2 gap-2 text-xs"><DelaiAttenteInput label="Viande" value={delaiAttenteViandeJ?.toString()??""} onChange={v=>setDelaiAttenteViandeJ(v===""?null:Number(v))}/><DelaiAttenteInput label="Lait" value={delaiAttenteLaitJ?.toString()??""} onChange={v=>setDelaiAttenteLaitJ(v===""?null:Number(v))}/><p className="col-span-2 text-amber-800">Vide = délai inconnu, à compléter.</p></div>}
       {(delaiAttenteViandeJ != null || delaiAttenteLaitJ != null) && (
         <div className="text-xs bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-orange-700">
-          {delaiAttenteViandeJ != null && <>Attente viande : {delaiAttenteViandeJ} jour(s)</>}
+          {delaiAttenteViandeJ != null && <>Attente viande : {formatDelai(delaiAttenteViandeJ)}</>}
           {delaiAttenteViandeJ != null && delaiAttenteLaitJ != null && <span> · </span>}
-          {delaiAttenteLaitJ != null && <>Attente lait : {delaiAttenteLaitJ} traite(s)</>}
+          {delaiAttenteLaitJ != null && <>Attente lait : {formatDelai(delaiAttenteLaitJ)}</>}
         </div>
       )}
 

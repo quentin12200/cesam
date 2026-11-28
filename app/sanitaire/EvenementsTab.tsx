@@ -35,6 +35,8 @@ export interface TraitementItem {
   statut: string;
   notes: string | null;
   delaiAttenteViandeJ: number | null;
+  viandeInterdite?:boolean;
+  laitInterdit?:boolean;
   dateFinAttente: string | null;
   enCours: boolean;
   enAttente: boolean;
@@ -101,6 +103,7 @@ function TraitementRow({ t, onTerminer }: { t: TraitementItem; onTerminer: (id: 
                 <Clock size={11} /> Traitement jusqu&apos;au {formatDate(new Date(t.dateFin))}
               </span>
             )}
+            {t.viandeInterdite && <span className="text-red-700 font-semibold">Viande : interdit</span>}{t.laitInterdit && <span className="text-red-700 font-semibold">Lait : interdit</span>}{t.delaiAttenteViandeJ==null && <span className="text-orange-700">Délai viande inconnu</span>}
             {t.enAttente && t.joursRestantsAttente != null && t.joursRestantsAttente > 0 && (
               <span className="flex items-center gap-1 bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">
                 <AlertTriangle size={11} /> Attente viande : {t.joursRestantsAttente}j restants
@@ -243,7 +246,7 @@ export default function EvenementsTab({ evenements, traitements }: { evenements:
   const [, forceRefresh] = useState(0);
 
   const enCoursCount = traitements.filter((t) => t.enCours).length;
-  const attenteCount = traitements.filter((t) => t.enAttente && t.joursRestantsAttente && t.joursRestantsAttente > 0).length;
+  const attenteCount = traitements.filter((t) => t.enAttente).length;
   const historiqueCount = evenements.length + traitements.filter((t) => !t.enCours).length;
 
   return (

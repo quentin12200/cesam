@@ -1,3 +1,4 @@
+import { delaiRenseigne } from "@/lib/withdrawal";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
@@ -72,7 +73,7 @@ export async function PATCH(
     } else if (field === "dureeJours") {
       data.dureeJours = Number(value);
     } else if (field === "delaiAttenteViandeJ" || field === "delaiAttenteLaitJ") {
-      if (body.confirmeDelais !== true || typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) return NextResponse.json({error:"Délai vérifié en jours requis"},{status:400});
+      if (body.confirmeDelais !== true || !delaiRenseigne(value)) return NextResponse.json({error:"Délai vérifié en jours requis"},{status:400});
       data[field]=value;
     } else if (field === "dose") {
       data.dose = value === "" || value === null ? null : Number(value);

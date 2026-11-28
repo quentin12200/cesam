@@ -1,4 +1,5 @@
 import { valeurCategoriePersonnalisee } from "@/lib/medicament-categories";
+import { delaiRenseigne } from "@/lib/withdrawal";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
@@ -21,7 +22,8 @@ export async function PATCH(
   const prev = await prisma.medicament.findUnique({ where: { id } });
   if (!prev) return NextResponse.json({ error: "Médicament non trouvé" }, { status: 404 });
 
-  if (temporaire === false && prev.temporaire && (!(dci ?? prev.dci)?.trim() || !(voie ?? prev.voie)?.trim() || ![delaiAttenteViandeJ === undefined ? prev.delaiAttenteViandeJ : delaiAttenteViandeJ, delaiAttenteLaitJ === undefined ? prev.delaiAttenteLaitJ : delaiAttenteLaitJ].every(v=>Number.isSafeInteger(v)&&v>=0))) return NextResponse.json({error:"Complète la substance, la voie et les deux délais vérifiés."},{status:400});
+  if (temporaire === false && prev.temporaire && (!(dci ?? prev.dci)?.trim() || !(voie ?? prev.voie)?.trim() || ![delaiAttenteViandeJ === undefined ? prev.delaiAttenteViandeJ : delaiAttenteViandeJ, delaiAttenteLaitJ === undefined ? prev.delaiAttenteLaitJ : delaiAttenteLaitJ].every(delaiRenseigne))) return NextResponse.json({error:"Complète la substance, la voie et les deux délais vérifiés."},{status:400});
+  if ([delaiAttenteViandeJ,delaiAttenteLaitJ].some(v=>v!=null&&!delaiRenseigne(v))) return NextResponse.json({error:"Délai invalide"},{status:400});
   const prevFields: Record<string, unknown> = {};
   if (temporaire !== undefined) prevFields.temporaire = prev.temporaire;
   if (nom !== undefined) prevFields.nom = prev.nom;

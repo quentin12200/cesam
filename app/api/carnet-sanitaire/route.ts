@@ -23,8 +23,8 @@ function toCsvRow(r: CarnetSanitaireRow): string {
     r.dose,
     r.voie ?? "",
     r.motif ?? "",
-    fmt(r.dateRemiseLait),
-    fmt(r.dateRemiseViande),
+    r.restrictionLait ?? fmt(r.dateRemiseLait),
+    r.restrictionViande ?? fmt(r.dateRemiseViande),
   ].map(csvEscape).join(";");
 }
 

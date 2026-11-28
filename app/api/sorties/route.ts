@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
           where: { animalId: { in: groupedAnimalIds } },
           include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
         });
-        if (traitementsRecents.some(t=>delaisInconnus(t).viande)) return NextResponse.json({error:"Délai viande inconnu : régularise les traitements avant la sortie boucherie."},{status:409});
+        if (traitementsRecents.some(t=>getAttenteInfoForTraitement(t).viandeInterdite)) return NextResponse.json({error:"Restriction viande : vérifier avec le vétérinaire avant toute sortie boucherie."},{status:409});
+      if (traitementsRecents.some(t=>delaisInconnus(t).viande)) return NextResponse.json({error:"Délai viande inconnu : régularise les traitements avant la sortie boucherie."},{status:409});
         if (!confirmeAttente && traitementsRecents.some((traitement) => getAttenteInfoForTraitement(traitement).enAttenteViande)) {
           return NextResponse.json(
             { error: "Au moins un animal est encore en délai d'attente viande." },
@@ -189,6 +190,7 @@ export async function POST(request: NextRequest) {
         where: { animalId },
         include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
       });
+      if (traitementsRecents.some(t=>getAttenteInfoForTraitement(t).viandeInterdite)) return NextResponse.json({error:"Restriction viande : vérifier avec le vétérinaire avant toute sortie boucherie."},{status:409});
       if (traitementsRecents.some(t=>delaisInconnus(t).viande)) return NextResponse.json({error:"Délai viande inconnu : régularise les traitements avant la sortie boucherie."},{status:409});
       const enAttente = traitementsRecents.some((t) => getAttenteInfoForTraitement(t).enAttenteViande);
       if (enAttente && !confirmeAttente) {

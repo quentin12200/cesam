@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { getVaccinsManquants, formatDate, formatAge, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
-import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { getAttenteInfoForTraitement, delaisInconnus } from "@/lib/withdrawal";
 import { differenceInDays, subDays, addDays } from "date-fns";
 import Link from "next/link";
 import { Settings, Printer, Building2, BookOpen, Plus } from "lucide-react";
@@ -206,7 +206,7 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
     const delaiViande = t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
     const dateFinAttente = attente.dateFinAttenteViande;
     const enCours = traitementRepete && t.statut === "EN_COURS" && dateFin !== null && now < dateFin;
-    const enAttente = attente.enAttente;
+    const enAttente = attente.enAttente || delaisInconnus(t).viande;
     const joursRestantsAttente = dateFinAttente ? differenceInDays(dateFinAttente, now) : null;
 
     return {
@@ -225,7 +225,9 @@ async function getSanitaireData(protocoles: ProtocoleVaccinConfig[]) {
       veterinaire: t.veterinaire,
       statut: t.statut,
       notes: t.notes,
-      delaiAttenteViandeJ: delaiViande,
+      delaiAttenteViandeJ: delaisInconnus(t).viande ? null : delaiViande,
+      viandeInterdite: attente.viandeInterdite,
+      laitInterdit: attente.laitInterdit,
       dateFinAttente: dateFinAttente?.toISOString() ?? null,
       enCours,
       enAttente,

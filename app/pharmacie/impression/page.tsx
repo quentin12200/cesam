@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { addDays, differenceInDays } from "date-fns";
-import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { getAttenteInfoForTraitement, delaisInconnus } from "@/lib/withdrawal";
 import PrintButton from "@/app/components/PrintButton";
 
 function fmt(d: Date | string | null | undefined) {
@@ -28,10 +28,11 @@ export default async function PharmacieImpressionPage() {
       const dateFin = addDays(new Date(t.dateDebut), t.dureeJours);
       const attente = getAttenteInfoForTraitement(t, now);
       const delaiViande = t.delaiAttenteViandeJ ?? t.medicament?.delaiAttenteViandeJ ?? null;
-      const dateFinAttente = attente.dateFinAttenteViande ?? dateFin;
+      const dateFinAttente = attente.dateFinAttenteViande;
+      const inconnu=delaisInconnus(t).viande;
       const enCours = now < dateFin;
-      const enAttente = enCours || attente.enAttenteViande;
-      return { ...t, dateFin, dateFinAttente, delaiViande, enCours, enAttente, joursRestants: differenceInDays(dateFinAttente, now) };
+      const enAttente = enCours || attente.enAttenteViande || inconnu;
+      return { ...t, dateFin, dateFinAttente, delaiViande, enCours, enAttente, interdit:attente.viandeInterdite,inconnu, joursRestants: dateFinAttente ? differenceInDays(dateFinAttente, now) : 0 };
     })
     .filter((t) => t.enCours || t.enAttente)
     .sort((a, b) => a.joursRestants - b.joursRestants);
@@ -78,13 +79,13 @@ export default async function PharmacieImpressionPage() {
                     {fmt(t.dateFin)}
                     {t.enCours && <span className="ml-1 text-xs text-blue-600">(en cours)</span>}
                   </td>
-                  <td className={`border border-gray-300 px-3 py-1.5 text-center font-bold ${t.joursRestants > 0 ? "text-orange-700" : "text-green-700"}`}>
-                    {t.delaiViande != null ? (
+                  <td className={`border border-gray-300 px-3 py-1.5 text-center font-bold ${t.interdit || t.inconnu || t.joursRestants > 0 ? "text-orange-700" : "text-green-700"}`}>
+                    {t.interdit ? "Interdit" : t.inconnu ? "Inconnu" : t.dateFinAttente ? (
                       <>
                         {fmt(t.dateFinAttente)}
                         {t.joursRestants > 0 && <span className="block text-xs">J-{t.joursRestants}</span>}
                       </>
-                    ) : "Aucune"}
+                    ) : "—"}
                   </td>
                   <td className="border border-gray-300 px-3 py-1.5 text-xs text-gray-600">{t.motif ?? "—"}</td>
                   <td className="border border-gray-300 px-3 py-1.5 text-xs text-gray-600">{t.veterinaire ?? "—"}</td>

@@ -301,13 +301,13 @@ export default function ImpressionClient({
                       <td className="border border-gray-300 px-2 py-1 text-center">{t.dureeJours}j</td>
                       <td className="border border-gray-300 px-2 py-1 text-center whitespace-nowrap">{fmt(fin)}</td>
                       <td className={`border border-gray-300 px-2 py-1 text-center whitespace-nowrap ${enAttente ? "font-bold text-orange-700" : ""}`}>
-                        {finAttente ? fmt(finAttente) : "—"}
+                        {attente.viandeInterdite ? "Interdit" : finAttente ? fmt(finAttente) : "Inconnu"}{attente.laitInterdit && <span className="block">Lait : interdit</span>}
                       </td>
                       <td className="border border-gray-300 px-2 py-1 text-gray-500">{t.motif ?? "—"}</td>
                       <td className={`border border-gray-300 px-2 py-1 text-center font-medium text-xs whitespace-nowrap ${
                         enCours ? "text-blue-700" : enAttente ? "text-orange-700" : "text-green-700"
                       }`}>
-                        {enCours ? "En cours" : enAttente ? "Attente" : "Terminé"}
+                        {enCours ? "En cours" : attente.viandeInterdite || attente.laitInterdit ? "Restriction" : t.delaiAttenteViandeJ==null ? "À vérifier" : enAttente ? "Attente" : "Terminé"}
                       </td>
                     </tr>
                   );
