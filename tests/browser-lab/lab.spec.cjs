@@ -276,3 +276,23 @@ test("exécutant : profil actif en premier et choix manuel conservé",async({pag
  await zone.getByRole("button",{name:"Nouvel acte fictif"}).click();
  await expect(select).toHaveValue("Céline");
 });
+
+test("Mon travail : compteurs fictifs, anticipation et ordre des raccourcis",async({page})=>{
+ await page.goto("/prototype-accueil-v3");
+ const zone=page.getByRole("region",{name:"Mon travail",exact:true});
+ await expect(zone.getByText("Simulation · anticipation à 15 jours · données fictives")).toBeVisible();
+ await zone.getByRole("button",{name:/^Vêlages/}).click();
+ const dialogue=zone.getByRole("dialog",{name:"Vêlages"});
+ await expect(dialogue.getByRole("checkbox")).toHaveCount(1);
+ await dialogue.getByRole("button",{name:"À anticiper"}).click();
+ await expect(dialogue.getByRole("checkbox")).toHaveCount(6);
+ await dialogue.getByRole("button",{name:"Fermer"}).click();
+ await zone.getByRole("button",{name:"Modifier l’ordre"}).click();
+ await zone.getByRole("button",{name:"Reculer Vêlages",exact:true}).click();
+ await zone.getByRole("button",{name:"Terminer",exact:true}).click();
+ await expect(zone.getByRole("button",{name:/^Vaccinations/})).toBeVisible();
+ const labels=await zone.getByRole("button").allTextContents();
+ expect(labels.findIndex(v=>v.startsWith("Vaccinations"))).toBeLessThan(labels.findIndex(v=>v.startsWith("Vêlages")));
+ await zone.getByRole("button",{name:/^Sevrages et tarissements/}).click();
+ await expect(zone.getByRole("dialog").getByRole("checkbox")).toHaveCount(3);
+});
