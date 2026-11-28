@@ -31,6 +31,7 @@ export interface MedicamentOption {
   delaiAttenteViandeJ: number | null;
   delaiAttenteLaitJ: number | null;
   preconisations: PreconisationOption[];
+  temporaire?: boolean;
 }
 
 interface Props {
@@ -38,6 +39,8 @@ interface Props {
   value: MedicamentOption | null;
   onChange: (m: MedicamentOption | null) => void;
   allowFreeText?: boolean;
+  allowQuickCreate?: boolean;
+  createSimulation?: (nom:string)=>MedicamentOption;
   freeText?: string;
   onFreeTextChange?: (value: string) => void;
 }
@@ -47,12 +50,25 @@ export default function MedicamentPicker({
   value,
   onChange,
   allowFreeText = false,
+  allowQuickCreate = false,
+  createSimulation,
   freeText = "",
   onFreeTextChange,
 }: Props) {
   const [query, setQuery] = useState("");
   const [ouvert, setOuvert] = useState(false);
   const listeId = useId();
+  const [creating,setCreating]=useState(false);
+  const [creationError,setCreationError]=useState("");
+  async function creer(){
+    if(creating || !query.trim())return;
+    setCreating(true);setCreationError("");
+    try{if(createSimulation){onChange(createSimulation(query.trim()));setQuery("");setOuvert(false);return;}
+    const res=await fetch("/api/medicaments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nom:query.trim(),temporaire:true})});
+    const med=await res.json();if(!res.ok || !med?.id)throw Error(med?.error || "Création impossible");
+    onChange({...med,preconisations:med.preconisations??[]});onFreeTextChange?.("");setQuery("");setOuvert(false);
+    }catch(e){setCreationError(e instanceof Error?e.message:"Création impossible");}finally{setCreating(false);}
+  }
 
   const resultats = useMemo(() => {
     if (!query.trim()) return [];
@@ -86,6 +102,7 @@ export default function MedicamentPicker({
               {cat.label}
             </span>
           </div>
+          {value.temporaire && <div className="text-xs text-amber-800">Fiche provisoire à compléter en pharmacie</div>}
           {value.dci && <div className="text-xs text-gray-500 mt-0.5">{value.dci}</div>}
         </div>
         <button
@@ -194,7 +211,9 @@ export default function MedicamentPicker({
             </div>
           )}
 
-          {allowFreeText && (
+          {allowQuickCreate && !medicaments.some(m=>m.nom.trim().toLocaleUpperCase("fr")===query.trim().toLocaleUpperCase("fr")) && <button type="button" disabled={creating} onClick={()=>void creer()} className="w-full text-left px-3 py-3 text-sm font-bold text-blue-800">{creating?"Création…":`+ Créer « ${query.trim()} »`}</button>}
+          {creationError && <p role="alert" className="p-2 text-red-700 text-sm">{creationError}</p>}
+          {allowFreeText && !allowQuickCreate && (
             <button
               type="button"
               role="option"

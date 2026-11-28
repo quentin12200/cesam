@@ -24,6 +24,7 @@ export interface PreconisationSummary {
 }
 
 export interface MedicamentItem {
+  temporaire?: boolean;
   id: string;
   nom: string;
   dci: string | null;
@@ -421,10 +422,12 @@ export default function PharmacieClient({ medicaments, ordonnances, initialView 
   const router = useRouter();
   const [vue, setVue] = useState<"medicaments" | "ordonnances">(initialView);
   const [saisiePrix, setSaisiePrix] = useState(false);
+  const provisoires = medicaments.filter(m=>m.temporaire);
   const ordonnancesActives = ordonnances.filter((o) => o.statut !== "ARCHIVE").length;
 
   return (
     <div>
+      {provisoires.length>0 && <section aria-label="Médicaments à compléter" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3"><h2 className="font-bold text-amber-900">{provisoires.length} médicament(s) à compléter</h2>{provisoires.map(m=><a key={m.id} href={`/pharmacie/${m.id}`} className="block min-h-11 py-2 text-sm underline">{m.nom} — compléter la fiche</a>)}</section>}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-4">
         {([
           ["medicaments", "Médicaments", medicaments.filter((m) => m.actif).length],

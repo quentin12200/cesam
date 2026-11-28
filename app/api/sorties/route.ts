@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
-import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { getAttenteInfoForTraitement, delaisInconnus } from "@/lib/withdrawal";
 import { uniqueAnimalIds, claimAnimalForExit } from "@/lib/grouped-sale";
 
 export async function GET(request: NextRequest) {
@@ -83,12 +82,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Un animal sélectionné est introuvable ou déjà sorti" }, { status: 409 });
       }
 
-      if (type === "BOUCHERIE" && !confirmeAttente) {
+      if (type === "BOUCHERIE") {
         const traitementsRecents = await prisma.traitement.findMany({
-          where: { animalId: { in: groupedAnimalIds }, dateDebut: { gte: subDays(new Date(), 90) } },
+          where: { animalId: { in: groupedAnimalIds } },
           include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
         });
-        if (traitementsRecents.some((traitement) => getAttenteInfoForTraitement(traitement).enAttenteViande)) {
+        if (traitementsRecents.some(t=>delaisInconnus(t).viande)) return NextResponse.json({error:"Délai viande inconnu : régularise les traitements avant la sortie boucherie."},{status:409});
+        if (!confirmeAttente && traitementsRecents.some((traitement) => getAttenteInfoForTraitement(traitement).enAttenteViande)) {
           return NextResponse.json(
             { error: "Au moins un animal est encore en délai d'attente viande." },
             { status: 409 },
@@ -184,13 +184,14 @@ export async function POST(request: NextRequest) {
       select: { nutrav: true, nobovi: true },
     });
 
-    if (type === "BOUCHERIE" && !confirmeAttente) {
+    if (type === "BOUCHERIE") {
       const traitementsRecents = await prisma.traitement.findMany({
-        where: { animalId, dateDebut: { gte: subDays(new Date(), 90) } },
+        where: { animalId },
         include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
       });
+      if (traitementsRecents.some(t=>delaisInconnus(t).viande)) return NextResponse.json({error:"Délai viande inconnu : régularise les traitements avant la sortie boucherie."},{status:409});
       const enAttente = traitementsRecents.some((t) => getAttenteInfoForTraitement(t).enAttenteViande);
-      if (enAttente) {
+      if (enAttente && !confirmeAttente) {
         return NextResponse.json(
           { error: "Cet animal est encore en délai d'attente viande. Confirme la sortie depuis le formulaire pour valider quand même." },
           { status: 409 }

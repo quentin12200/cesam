@@ -13,7 +13,7 @@ export async function PATCH(
   const {
     nom, dci, forme, categorie, voie, dosagePourKg, uniteDosage,
     delaiAttenteViandeJ, delaiAttenteLaitJ, prescriptionRequise, actif, commentaire,
-    stockActuel, stockUnite, stockSeuilAlert, favori, actions,
+    stockActuel, stockUnite, stockSeuilAlert, favori, actions, temporaire,
     conservationOuvertureStatut, conservationOuvertureJours,
     conservationOuvertureCondition, conservationOuvertureSource, conservationOuvertureNote,
   } = body;
@@ -21,7 +21,9 @@ export async function PATCH(
   const prev = await prisma.medicament.findUnique({ where: { id } });
   if (!prev) return NextResponse.json({ error: "Médicament non trouvé" }, { status: 404 });
 
+  if (temporaire === false && prev.temporaire && (!(dci ?? prev.dci)?.trim() || !(voie ?? prev.voie)?.trim() || ![delaiAttenteViandeJ === undefined ? prev.delaiAttenteViandeJ : delaiAttenteViandeJ, delaiAttenteLaitJ === undefined ? prev.delaiAttenteLaitJ : delaiAttenteLaitJ].every(v=>Number.isSafeInteger(v)&&v>=0))) return NextResponse.json({error:"Complète la substance, la voie et les deux délais vérifiés."},{status:400});
   const prevFields: Record<string, unknown> = {};
+  if (temporaire !== undefined) prevFields.temporaire = prev.temporaire;
   if (nom !== undefined) prevFields.nom = prev.nom;
   if (dci !== undefined) prevFields.dci = prev.dci;
   if (forme !== undefined) prevFields.forme = prev.forme;
@@ -58,6 +60,7 @@ export async function PATCH(
     const med = await prisma.medicament.update({
       where: { id },
       data: {
+        ...(typeof temporaire === "boolean" && { temporaire }),
         ...(nom !== undefined && { nom: nom.trim().toUpperCase() }),
         ...(dci !== undefined && { dci: dci?.trim() || null }),
         ...(forme !== undefined && { forme: forme?.trim() || null }),

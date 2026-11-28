@@ -17,6 +17,8 @@ export interface TraitementDraft {
   uniteDosage: string;
   motif: string;
   doseUnique: boolean;
+  delaiViande?: string;
+  delaiLait?: string;
   frequence: string;
   dureeJours: string;
 }
@@ -30,9 +32,10 @@ interface Props {
   onIntervenantAdded: (i: Intervenant) => void;
   removable: boolean;
   simulation?: boolean;
+  createSimulation?: (nom:string)=>MedicamentOption;
 }
 
-export default function TraitementDraftRow({ draft, medicaments, intervenants, onChange, onRemove, onIntervenantAdded, removable, simulation = false }: Props) {
+export default function TraitementDraftRow({ draft, medicaments, intervenants, onChange, onRemove, onIntervenantAdded, removable, simulation = false, createSimulation }: Props) {
   function set<K extends keyof TraitementDraft>(field: K, value: TraitementDraft[K]) {
     onChange({ ...draft, [field]: value });
   }
@@ -55,7 +58,9 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
     onChange({
       ...draft,
       medicament: m,
-      voie: voieNormalisee || draft.voie,
+      voie: voieNormalisee,
+      delaiViande: m.delaiAttenteViandeJ == null ? "" : String(m.delaiAttenteViandeJ),
+      delaiLait: m.delaiAttenteLaitJ == null ? "" : String(m.delaiAttenteLaitJ),
       // Une préconisation par kg ou par 100 kg n'est pas une dose administrée.
       // Ne jamais recopier une valeur de référence dans la dose réelle.
       dose: "",
@@ -69,7 +74,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <label className="text-xs text-gray-500 block mb-1">Médicament *</label>
-          <MedicamentPicker medicaments={medicaments} value={draft.medicament} onChange={choisirMedicament} />
+          <MedicamentPicker allowQuickCreate={!simulation || !!createSimulation} createSimulation={simulation?createSimulation:undefined} medicaments={medicaments} value={draft.medicament} onChange={choisirMedicament} />
         </div>
         {removable && (
           <button type="button" onClick={onRemove} className="mt-5 shrink-0 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
@@ -78,7 +83,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
         )}
       </div>
 
-      {draft.medicament && (
+      {draft.medicament && !draft.medicament.temporaire && (
         <section key={draft.medicament.id} aria-label="Informations de posologie de la pharmacie" className="rounded-lg border border-gray-200 bg-white p-2 text-xs space-y-1">
           <p className="font-semibold">Posologies de référence</p>
           <p className="text-amber-900">À vérifier avant administration. La dose administrée reste à renseigner manuellement.</p>
@@ -106,7 +111,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Voie d&apos;administration *</label>
-          <select value={draft.voie} onChange={(e) => set("voie", e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          <select aria-label="Voie d’administration" value={draft.voie} onChange={(e) => set("voie", e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
             <option value="">Sélectionner…</option>
             {draft.voie && !VOIES_ADMINISTRATION.some((voie) => voie.code === draft.voie) && (
               <option value={draft.voie}>{draft.voie}</option>
@@ -136,6 +141,7 @@ export default function TraitementDraftRow({ draft, medicaments, intervenants, o
             className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ex: Mammite" />
         </div>
       </div>
+      {draft.medicament?.temporaire && <div className="rounded border p-2 text-xs"><p className="font-semibold">Délais d’attente (à compléter plus tard)</p><div className="grid grid-cols-2 gap-2"><label>Viande (jours)<input aria-label="Délai viande en jours" type="number" min={0} step={1} value={draft.delaiViande ?? ""} onChange={e=>set("delaiViande",e.target.value)} className="w-full border rounded p-2" /></label><label>Lait (jours)<input aria-label="Délai lait en jours" type="number" min={0} step={1} value={draft.delaiLait ?? ""} onChange={e=>set("delaiLait",e.target.value)} className="w-full border rounded p-2"/></label></div><p className="text-amber-800">Vide = inconnu, jamais zéro.</p></div>}
       <label className="flex min-h-11 items-center gap-2 rounded-lg border bg-white px-3 text-sm">
         <input type="checkbox" checked={draft.doseUnique} onChange={(e) => set("doseUnique", e.target.checked)} className="h-4 w-4 accent-green-700" />
         Dose unique

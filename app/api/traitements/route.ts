@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       ordonnanceAAssocier: ordonnanceAAssocier ?? false,
       delaiAttenteViandeJ: delaiAttenteViandeJ ?? null,
       delaiAttenteLaitJ: delaiAttenteLaitJ ?? null,
-      notes: notes?.trim() || null,
+      notes: [notes?.trim(), (delaiAttenteViandeJ == null || delaiAttenteLaitJ == null) ? "[DELAIS_A_COMPLETER]" : ""].filter(Boolean).join("\n") || null,
       statut: doseUnique ? "TERMINE" : "EN_COURS",
     },
     include: {

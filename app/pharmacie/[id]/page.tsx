@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { Pill } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { delaisInconnus } from "@/lib/withdrawal";
 import MedicamentFicheClient from "./MedicamentFicheClient";
 
 import BackButton from "@/app/components/BackButton";
@@ -76,6 +77,7 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
       <MedicamentFicheClient
         medicament={{
           id: medicament.id,
+          temporaire: medicament.temporaire,
           nom: medicament.nom,
           dci: medicament.dci,
           forme: medicament.forme,
@@ -133,6 +135,7 @@ export default async function MedicamentDetailPage({ params }: PageProps) {
         ordonnances={Array.from(ordonnancesMap.values())}
         historique={traitements.map((t) => ({
           id: t.id,
+          delaisInconnus: delaisInconnus({...t,medicament}),
           animalNutrav: t.animal.nutrav,
           animalNom: t.animal.nobovi,
           dateDebut: t.dateDebut.toISOString(),
