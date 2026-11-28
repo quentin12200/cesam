@@ -1,3 +1,4 @@
+import LabPharmacieReferences from "./LabPharmacieReferences";
 import LabTraitement from "./LabTraitement";
 import { LabReproductionModalProvider } from "../components/ReproductionModalProvider";
 import QuickActionsBar from "../troupeau/[nutrav]/QuickActionsBar";
@@ -36,6 +37,7 @@ export default function CesamLabPage() {
     <LabEchoSession />
     <LabBouclage />
     <LabTraitement />
+    <LabPharmacieReferences />
     <section aria-label="Actions rapides fictives" className="rounded-xl border p-3"><h2>Actions rapides fictives</h2><LabReproductionModalProvider><QuickActionsBar animalId="DEMO-ACTIONS" nutrav="DEMO-ACTIONS" isFemelle={true} isActif={true} /></LabReproductionModalProvider></section>
     <Link href="/config" prefetch={false} className="inline-flex min-h-11 items-center font-bold underline">Quitter le Lab — paramètres réels</Link>
   </div>;

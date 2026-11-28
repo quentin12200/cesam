@@ -276,3 +276,27 @@ test("exécutant : profil actif en premier et choix manuel conservé",async({pag
  await zone.getByRole("button",{name:"Nouvel acte fictif"}).click();
  await expect(select).toHaveValue("Céline");
 });
+
+test("référentiels pharmacie : sélection, doublon exact et ajout contrôlé",async({page})=>{
+ await page.goto("/lab");const zone=page.getByRole("region",{name:"Référentiels fictifs"});
+ const dci=zone.getByLabel("Substance fictive",{exact:true});
+ await dci.selectOption("Substance démo");
+ await zone.getByRole("button",{name:"Ajouter Substance fictive"}).click();
+ await zone.getByLabel("Nouvelle valeur Substance fictive").fill("  SUBSTANCE DEMO  ");
+ await zone.getByRole("button",{name:"Ajouter et sélectionner"}).click();
+ await expect(dci).toHaveValue("Substance démo");
+ await expect(zone.getByLabel("Nouvelles valeurs fictives")).toHaveText("0");
+ await zone.getByRole("button",{name:"Ajouter Substance fictive"}).click();
+ await zone.getByLabel("Nouvelle valeur Substance fictive").fill("Substance démox");
+ await zone.getByRole("button",{name:"Ajouter et sélectionner"}).click();
+ await expect(zone.getByText("Valeur proche",{exact:true})).toBeVisible();
+ await zone.getByRole("button",{name:"Utiliser Substance démo"}).click();
+ await expect(dci).toHaveValue("Substance démo");
+ await zone.getByRole("button",{name:"Ajouter Substance fictive"}).click();
+ await zone.getByLabel("Nouvelle valeur Substance fictive").fill("Autre exemple fictif");
+ await zone.getByRole("button",{name:"Ajouter et sélectionner"}).click();
+ await expect(dci).toHaveValue("Autre exemple fictif");
+ await expect(zone.getByLabel("Nouvelles valeurs fictives")).toHaveText("1");
+ await zone.getByLabel("Voie fictive",{exact:true}).selectOption("SC");
+ await zone.getByLabel("Catégorie fictive",{exact:true}).selectOption("Catégorie démo");
+});
