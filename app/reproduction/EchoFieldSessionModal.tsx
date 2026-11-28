@@ -196,14 +196,14 @@ export default function EchoFieldSessionModal({ vaches, taureaux = [], fixture, 
                   <span className="min-w-0 flex-1 truncate text-sm font-bold text-gray-800">{vache.nobovi ?? "Sans nom"}</span>
                   {draft.resultat && <Check size={18} className={draft.resultat === "PLEINE" ? "text-green-600" : "text-red-600"} />}
                 </div>
-                <p className="mb-1 mt-0.5 text-[11px] text-gray-500">
+                <p className="mt-0.5 text-[11px] leading-3 text-gray-500">
                   {vache.derniereSaillie
                     ? `${vache.saillieType === "IA" ? "IA" : "Saillie"} du ${format(new Date(vache.derniereSaillie), "d MMM yyyy", { locale: fr })}`
                     : "Aucune saillie enregistrée"}
                   {vache.derniereSaillie && ` · Père : ${vache.taureauNom ?? "non renseigné"}`}
                 </p>
 
-                <p className="mb-1 text-[11px] text-gray-500">{repereDernierVelage(vache.dernierVelage,date,vache.estGenisse)}</p>
+                <p className="mb-1 text-[11px] leading-3 text-gray-500">{repereDernierVelage(vache.dernierVelage,date,vache.estGenisse)}</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => chooseResult(vache, "PLEINE")} className={`min-h-12 rounded-xl border-2 text-sm font-black ${draft.resultat === "PLEINE" ? "border-green-600 bg-green-600 text-white" : "border-gray-200 bg-white text-gray-700"}`}>
                     Pleine
