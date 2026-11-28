@@ -248,3 +248,20 @@ test("médicament provisoire : création, doublon, délais inconnus et zéro exp
  await zone.getByRole("option",{name:/PRODUIT FICTIF/}).click();
  await expect(zone.getByLabel("Nombre de médicaments fictifs")).toHaveText("2");
 });
+
+test("exécutant : profil actif en premier et choix manuel conservé",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Exécutant fictif"});
+ const select=zone.getByLabel("Exécutant");
+ await zone.getByRole("button",{name:"Profil Céline"}).click();
+ await expect(select).toHaveValue("Céline");
+ expect(await select.locator("option").allTextContents()).toEqual(["Sélectionner…","Céline","Samuel","A Démo","Z Démo"]);
+ await zone.getByRole("button",{name:"Profil Samuel"}).click();
+ await expect(select).toHaveValue("Samuel");
+ expect(await select.locator("option").allTextContents()).toEqual(["Sélectionner…","Samuel","Céline","A Démo","Z Démo"]);
+ await select.selectOption("A Démo");
+ await zone.getByRole("button",{name:"Profil Céline"}).click();
+ await expect(select).toHaveValue("A Démo");
+ await zone.getByRole("button",{name:"Nouvel acte fictif"}).click();
+ await expect(select).toHaveValue("Céline");
+});
