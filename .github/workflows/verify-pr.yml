@@ -18,6 +18,7 @@ jobs:
       - run: npx prisma generate
       - run: npx tsc --noEmit
       - run: node --test --experimental-strip-types lib/dose-units.test.ts
+      - run: node --test --experimental-strip-types lib/withdrawal-unknown.test.ts
       - run: node --test tests/medicament-rapide.test.mjs
       - run: node --test tests/traitements-posologie.test.mjs
       - run: node --test tests/gmq-period-rankings.test.mjs tests/gmq-father-genealogy.test.mjs
