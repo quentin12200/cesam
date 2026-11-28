@@ -52,7 +52,9 @@ test("pesée fictive, contrôle de saisie et remise à zéro",async({page})=>{
 test("vêlage jumeaux mixtes : historique, filiation et réinitialisation",async({page})=>{
  await page.goto("/lab");
  await page.getByLabel("Nombre de veaux").selectOption("2");
- await page.getByLabel("Numéro du veau 1").fill("9901");
+ await page.getByLabel("Numéro du veau 1").click();
+ await page.getByLabel("Numéro du veau 1").pressSequentially("9901");
+ await expect(page.getByLabel("Numéro du veau 1")).toHaveValue("9901");
  await page.getByLabel("État du veau 2").selectOption("MORT_NE");
  await expect(page.getByLabel("Numéro du veau 2")).toHaveCount(0);
  await page.getByLabel("Père déclaré").selectOption("DEMO-PERE-A");
@@ -69,7 +71,9 @@ test("vêlage jumeaux mixtes : historique, filiation et réinitialisation",async
 });
 test("vêlage : filiation contradictoire et cycle postérieur",async({page})=>{
  await page.goto("/lab");
- await page.getByLabel("Numéro du veau 1").fill("9901");
+ await page.getByLabel("Numéro du veau 1").click();
+ await page.getByLabel("Numéro du veau 1").pressSequentially("9901");
+ await expect(page.getByLabel("Numéro du veau 1")).toHaveValue("9901");
  await page.getByLabel("Père déclaré").selectOption("DEMO-PERE-A");
  await page.getByLabel("Père issu de la gestation").selectOption("DEMO-PERE-B");
  await page.getByRole("button",{name:"Simuler le vêlage"}).click();
