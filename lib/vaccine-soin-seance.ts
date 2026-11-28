@@ -22,7 +22,7 @@ export function construireChargeSoin(soin: SoinSeance) {
     date: soin.date,
     type: "Traitement",
     symptomes: [{ libelle: "Traitement", typeEvenementId: null }],
-    constatePar: soin.executant.trim() || null,
+    constatePar: null,
     traitements: [{
       medicamentId: soin.medicamentId,
       medicamentNom: soin.medicamentNom,

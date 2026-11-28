@@ -77,8 +77,11 @@ test("vêlage : filiation contradictoire et cycle postérieur",async({page})=>{
  await expect(page.getByText("Naissances : 1",{exact:true})).toHaveCount(0);
  await page.getByLabel("Père issu de la gestation").selectOption("DEMO-PERE-A");
  await expect(page.getByLabel("Père issu de la gestation")).toHaveValue("DEMO-PERE-A");
+ await expect(page.getByText("Filiation contradictoire : vérifier le père",{exact:true})).toHaveCount(0);
  await page.getByLabel("Cycle de reproduction postérieur au vêlage").check();
  await expect(page.getByLabel("Cycle de reproduction postérieur au vêlage")).toBeChecked();
+ await expect(page.getByLabel("Numéro du veau 1")).toHaveValue("9901");
+ await expect(page.getByLabel("Père déclaré")).toHaveValue("DEMO-PERE-A");
  await page.getByRole("button",{name:"Simuler le vêlage"}).click();
  await expect(page.getByText("Cycle ultérieur préservé",{exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
@@ -196,3 +199,52 @@ test("actions rapides : ouverture, fermeture extérieure et clavier",async({page
  await zone.getByPlaceholder("Tapez le nom ou la substance active…").fill("TOLFINE"); await zone.getByRole("option",{name:/TOLFINE/}).click(); await expect(dose).toHaveValue("");
  }
  });
+
+test("dose réelle : décimales, unité séparée et refus du texte libre",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Traitement fictif"});
+ const dose=zone.getByLabel("Dose administrée");
+ const unit=zone.getByLabel("Unité de dose");
+ const output=zone.getByLabel("Dose fictive normalisée");
+ await expect(dose).toHaveValue("");
+ await expect(dose).toHaveAttribute("inputmode","decimal");
+ await expect(unit).toHaveValue("ml");
+ await dose.fill("2,5"); await expect(output).toHaveText("2.5 ml");
+ await dose.fill("2.5"); await expect(output).toHaveText("2.5 ml");
+ await unit.selectOption("bolus"); await expect(output).toHaveText("2.5 bolus");
+ await dose.fill("2 ml"); await expect(output).toHaveText("Dose à renseigner ou invalide");
+ await dose.fill("1"); await unit.selectOption(""); await expect(output).toHaveText("Dose à renseigner ou invalide");
+ await expect(unit.locator('option[value="cc"]')).toHaveCount(0);
+});
+
+test("médicament provisoire : création, doublon, délais inconnus et zéro explicite",async({page})=>{
+ await page.goto("/lab");
+ const zone=page.getByRole("region",{name:"Traitement fictif"});
+ await zone.getByTitle("Changer de médicament").click();
+ const search=zone.getByPlaceholder("Tapez le nom ou la substance active…");
+ await search.fill("Produit fictif");
+ await zone.getByRole("button",{name:/Créer « Produit fictif »/}).click();
+ await expect(zone.getByText("Fiche provisoire à compléter en pharmacie")).toBeVisible();
+ await expect(zone.getByLabel("Nombre de médicaments fictifs")).toHaveText("2");
+ await expect(zone.getByLabel("Délai viande en jours")).toHaveValue("");
+ await expect(zone.getByLabel("Délai lait en jours")).toHaveValue("");
+ await expect(zone.getByLabel("Dose administrée")).toHaveValue("");
+ await zone.getByLabel("Voie d’administration").selectOption("PO");
+ await zone.getByLabel("Dose administrée").fill("1");
+ await zone.getByLabel("Unité de dose").selectOption("bolus");
+ await zone.getByRole("button",{name:"Enregistrer le soin fictif"}).click();
+ const a=zone.getByLabel("Acte fictif 1");
+ await expect(a).toContainText("Viande inconnue · Lait inconnu");
+ await zone.getByLabel("Délai lait en jours").fill("0");
+ await zone.getByRole("button",{name:"Enregistrer le soin fictif"}).click();
+ const b=zone.getByLabel("Acte fictif 2");
+ await expect(b).toContainText("Viande inconnue · Lait renseigné");
+ await a.getByRole("button",{name:"Confirmer zéro fictif pour cet acte"}).click();
+ await expect(a).toContainText("Viande renseignée · Lait inconnu");
+ await expect(b).toContainText("Viande inconnue · Lait renseigné");
+ await zone.getByTitle("Changer de médicament").click();
+ await search.fill("produit fictif");
+ await expect(zone.getByRole("button",{name:/Créer «/})).toHaveCount(0);
+ await zone.getByRole("option",{name:/PRODUIT FICTIF/}).click();
+ await expect(zone.getByLabel("Nombre de médicaments fictifs")).toHaveText("2");
+});

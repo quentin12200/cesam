@@ -171,6 +171,7 @@ export async function POST(request: NextRequest) {
           ordonnanceAAssocier: !traitement.ordonnanceNumero?.trim() && !traitement.ordonnanceId && traitement.ordonnanceAAssocier === true,
           executant: traitement.executant || null,
           moment: moment ?? null,
+          notes: traitement.delaiAttenteViandeJ == null || traitement.delaiAttenteLaitJ == null ? "[DELAIS_A_COMPLETER]" : null,
           delaiAttenteViandeJ: traitement.delaiAttenteViandeJ ?? null,
           delaiAttenteLaitJ: traitement.delaiAttenteLaitJ ?? null,
           statut: traitement.doseUnique ? "TERMINE" : "EN_COURS",

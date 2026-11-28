@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
-import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { getAttenteInfoForTraitement, delaisInconnus } from "@/lib/withdrawal";
 import { undoExitInTransaction, buildExitPatch } from "@/lib/grouped-sale";
 
 export async function PATCH(
@@ -19,13 +18,14 @@ export async function PATCH(
     if (!sortie) return NextResponse.json({ error: "Sortie introuvable" }, { status: 404 });
 
     const typeFinal = type ?? sortie.type;
-    if (typeFinal === "BOUCHERIE" && !confirmeAttente) {
+    if (typeFinal === "BOUCHERIE") {
       const traitementsRecents = await prisma.traitement.findMany({
-        where: { animalId: sortie.animalId, dateDebut: { gte: subDays(new Date(), 90) } },
+        where: { animalId: sortie.animalId },
         include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
       });
+      if (traitementsRecents.some(t=>delaisInconnus(t).viande)) return NextResponse.json({error:"Délai viande inconnu : régularise les traitements avant la sortie boucherie."},{status:409});
       const enAttente = traitementsRecents.some((t) => getAttenteInfoForTraitement(t).enAttenteViande);
-      if (enAttente) {
+      if (enAttente && !confirmeAttente) {
         return NextResponse.json(
           { error: "Cet animal est encore en délai d'attente viande. Confirme la sortie depuis le formulaire pour valider quand même." },
           { status: 409 }
