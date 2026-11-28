@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
-import { getAttenteInfoForTraitement, type AttenteInfo } from "@/lib/withdrawal";
+import { getAttenteInfoForTraitement, delaisInconnus, type AttenteInfo } from "@/lib/withdrawal";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -9,7 +8,7 @@ export async function GET(request: NextRequest) {
   if (!animalId) return NextResponse.json({ error: "animalId requis" }, { status: 400 });
 
   const traitements = await prisma.traitement.findMany({
-    where: { animalId, dateDebut: { gte: subDays(new Date(), 90) } },
+    where: { animalId },
     include: { medicament: { select: { delaiAttenteViandeJ: true, delaiAttenteLaitJ: true } } },
     orderBy: { dateDebut: "desc" },
   });
@@ -28,10 +27,13 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const viandeInconnue = traitements.some(t=>delaisInconnus(t).viande);
+  const laitInconnu = traitements.some(t=>delaisInconnus(t).lait);
   return NextResponse.json({
-    enAttente: pire?.enAttente ?? false,
-    enAttenteViande: pire?.enAttenteViande ?? false,
-    enAttenteLait: pire?.enAttenteLait ?? false,
+    viandeInconnue, laitInconnu,
+    enAttente: viandeInconnue || laitInconnu || (pire?.enAttente ?? false),
+    enAttenteViande: viandeInconnue || (pire?.enAttenteViande ?? false),
+    enAttenteLait: laitInconnu || (pire?.enAttenteLait ?? false),
     dateFinAttenteViande: pire?.dateFinAttenteViande ?? null,
     dateFinAttenteLait: pire?.dateFinAttenteLait ?? null,
     medicamentNom,
