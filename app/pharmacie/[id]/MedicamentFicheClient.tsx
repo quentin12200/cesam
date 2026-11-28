@@ -1,4 +1,5 @@
 "use client";
+import MedicamentReferenceSelect from "../MedicamentReferenceSelect";
 import DelaiAttenteInput from "@/app/components/DelaiAttenteInput";
 
 import { useState } from "react";
@@ -186,12 +187,13 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
   const [editMode, setEditMode] = useState(false);
   const [viande,setViande]=useState(medicament.delaiAttenteViandeJ?.toString()??"");
   const [lait,setLait]=useState(medicament.delaiAttenteLaitJ?.toString()??"");
+  const [categorieRef,setCategorieRef]=useState(medicament.categorie==="AUTRE"?"":medicament.categorie);
   const [dci,setDci]=useState(medicament.dci??"");
   const [voie,setVoie]=useState(medicament.voie??"");
   const [confirmation,setConfirmation]=useState(false);
   const [erreurCompletion,setErreurCompletion]=useState("");
   const [completing,setCompleting]=useState(false);
-  async function completer(){setCompleting(true);setErreurCompletion("");try{const res=await fetch(`/api/medicaments/${medicament.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({dci,voie,delaiAttenteViandeJ:Number(viande),delaiAttenteLaitJ:Number(lait),temporaire:false})});if(!res.ok){const j=await res.json();throw Error(j.error||"Enregistrement impossible");}router.refresh();}catch(e){setErreurCompletion(e instanceof Error?e.message:"Erreur");}finally{setCompleting(false);}}
+  async function completer(){setCompleting(true);setErreurCompletion("");try{const res=await fetch(`/api/medicaments/${medicament.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({referencesControlees:true,dci,voie,categorie:categorieRef,delaiAttenteViandeJ:Number(viande),delaiAttenteLaitJ:Number(lait),temporaire:false})});if(!res.ok){const j=await res.json();throw Error(j.error||"Enregistrement impossible");}router.refresh();}catch(e){setErreurCompletion(e instanceof Error?e.message:"Erreur");}finally{setCompleting(false);}}
   const [savingFavori, setSavingFavori] = useState(false);
   const [showSavoir, setShowSavoir] = useState(false);
 
@@ -223,7 +225,7 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
 
   return (
     <div className="space-y-4">
-      {medicament.temporaire && <section className="rounded-xl border border-amber-300 p-3 space-y-2"><h2 className="font-bold">Fiche provisoire à compléter</h2><label className="block text-sm">Substance active<input value={dci} onChange={e=>{setDci(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label><label className="block text-sm">Voie vérifiée<input value={voie} onChange={e=>{setVoie(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label><div className="grid grid-cols-2 gap-2"><DelaiAttenteInput label="Viande" value={viande} onChange={x=>{setViande(x);setConfirmation(false)}}/><DelaiAttenteInput label="Lait" value={lait} onChange={x=>{setLait(x);setConfirmation(false)}}/></div><p className="text-xs">Vérifie les délais prescrits. Les actes déjà saisis sans délai ne sont pas automatiquement régularisés.</p><label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmation} onChange={e=>setConfirmation(e.target.checked)}/>J’ai vérifié ces informations.</label><button type="button" disabled={completing||!confirmation||!dci.trim()||!voie.trim()||!(/^(?:-1|\d+)$/.test(viande))||!(/^(?:-1|\d+)$/.test(lait))} onClick={()=>void completer()} className="rounded bg-green-800 text-white px-3 py-2 disabled:opacity-50">Valider la fiche</button>{erreurCompletion&&<p role="alert">{erreurCompletion}</p>}</section>}
+      {medicament.temporaire && <section className="rounded-xl border border-amber-300 p-3 space-y-2"><h2 className="font-bold">Fiche provisoire à compléter</h2><MedicamentReferenceSelect type="DCI" label="Substance active" value={dci} onChange={v=>{setDci(v);setConfirmation(false)}}/><MedicamentReferenceSelect type="CATEGORIE" label="Catégorie" value={categorieRef} onChange={v=>{setCategorieRef(v);setConfirmation(false)}}/><MedicamentReferenceSelect type="VOIE" label="Voie vérifiée" value={voie} onChange={v=>{setVoie(v);setConfirmation(false)}}/><div className="grid grid-cols-2 gap-2"><DelaiAttenteInput label="Viande" value={viande} onChange={x=>{setViande(x);setConfirmation(false)}}/><DelaiAttenteInput label="Lait" value={lait} onChange={x=>{setLait(x);setConfirmation(false)}}/></div><p className="text-xs">Vérifie les délais prescrits. Les actes déjà saisis sans délai ne sont pas automatiquement régularisés.</p><label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmation} onChange={e=>setConfirmation(e.target.checked)}/>J’ai vérifié ces informations.</label><button type="button" disabled={completing||!confirmation||!dci.trim()||!voie.trim()||!categorieRef.trim()||!(/^(?:-1|\d+)$/.test(viande))||!(/^(?:-1|\d+)$/.test(lait))} onClick={()=>void completer()} className="rounded bg-green-800 text-white px-3 py-2 disabled:opacity-50">Valider la fiche</button>{erreurCompletion&&<p role="alert">{erreurCompletion}</p>}</section>}
       {historique.some(h=>h.delaisInconnus?.viande||h.delaisInconnus?.lait)&&<section className="rounded-xl border border-amber-300 p-3 space-y-2"><h2 className="font-bold">Actes avec délais à compléter</h2>{historique.filter(h=>h.delaisInconnus?.viande||h.delaisInconnus?.lait).map(h=><RegulariserActe key={h.id} h={h}/>)}</section>}
       {/* Header */}
       <div className="space-y-2 rounded-xl bg-white p-3 shadow">

@@ -1,3 +1,4 @@
+import { verifierReferences } from "@/lib/pharmacie-referentiels-server";
 import { valeurCategoriePersonnalisee } from "@/lib/medicament-categories";
 import { delaiRenseigne } from "@/lib/withdrawal";
 import { NextRequest, NextResponse } from "next/server";
@@ -19,7 +20,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { nom, dci, categorie, voie, dosagePourKg, uniteDosage, delaiAttenteViandeJ, delaiAttenteLaitJ, prescriptionRequise, temporaire } = body;
+  const { nom, dosagePourKg, uniteDosage, delaiAttenteViandeJ, delaiAttenteLaitJ, prescriptionRequise, temporaire } = body;
+  let {dci,categorie,voie}=body;
+  if(body.referencesControlees===true){const result=await verifierReferences({dci,categorie,voie});if(result.error)return NextResponse.json({error:result.error},{status:400});({dci,categorie,voie}={dci,categorie,voie,...result.output});}
   if ([delaiAttenteViandeJ,delaiAttenteLaitJ].some(v=>v!=null&&!delaiRenseigne(v))) return NextResponse.json({error:"Délai invalide"},{status:400});
   if (typeof nom !== "string" || !nom.trim() || nom.trim().length > 160) {
     return NextResponse.json({ error: "nom requis" }, { status: 400 });
