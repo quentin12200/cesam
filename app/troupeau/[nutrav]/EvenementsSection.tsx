@@ -144,6 +144,8 @@ function TraitementCard({ t, affichageDelaiAttente, onTerminer, nested }: {
                 <Clock size={10} /> jusqu&apos;au {formatDate(dateFin)}
               </span>
             )}
+            {attente.viandeInterdite && <span className="text-red-700 font-semibold">Viande : interdit</span>}
+            {attente.laitInterdit && doitAfficherLait(affichageDelaiAttente) && <span className="text-red-700 font-semibold">Lait : interdit</span>}
             {enAttente && dateFinAttenteViande && (
               <span className="flex items-center gap-1 text-orange-600 font-medium">
                 <AlertTriangle size={10} /> Attente viande jusqu&apos;au {formatDate(dateFinAttenteViande)}
