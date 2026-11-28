@@ -1,4 +1,5 @@
 import { ordonnanceCompatibleDate } from "@/lib/vaccine-prescription-date";
+import { delaiRenseigne } from "@/lib/withdrawal";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/action-log";
@@ -114,6 +115,7 @@ export async function POST(request: NextRequest) {
     const traitementsList: TraitementDraft[] = Array.isArray(traitements)
       ? traitements.filter((traitement: TraitementDraft) => traitement?.medicamentNom?.trim())
       : [];
+    if(traitementsList.some(t=>[t.delaiAttenteViandeJ,t.delaiAttenteLaitJ].some(v=>v!=null&&!delaiRenseigne(v)))) return NextResponse.json({error:"Délai invalide"},{status:400});
     const ordonnanceIds = [...new Set(traitementsList.map((t) => t.ordonnanceId).filter((id): id is string => Boolean(id)))];
     if (ordonnanceIds.length) {
       const existantes = await prisma.ordonnance.findMany({ where: { id: { in: ordonnanceIds } }, select: { id: true, date: true } });
