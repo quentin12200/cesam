@@ -23,6 +23,7 @@ import ConservationOuvertureSection from "./ConservationOuvertureSection";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
 
 interface MedicamentData {
+  temporaire?: boolean;
   id: string;
   nom: string;
   dci: string | null;
@@ -175,6 +176,14 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
   const { hrefWithOrigin } = useOriginNavigation();
   const router = useRouter();
   const [editMode, setEditMode] = useState(false);
+  const [viande,setViande]=useState(medicament.delaiAttenteViandeJ?.toString()??"");
+  const [lait,setLait]=useState(medicament.delaiAttenteLaitJ?.toString()??"");
+  const [dci,setDci]=useState(medicament.dci??"");
+  const [voie,setVoie]=useState(medicament.voie??"");
+  const [confirmation,setConfirmation]=useState(false);
+  const [erreurCompletion,setErreurCompletion]=useState("");
+  const [completing,setCompleting]=useState(false);
+  async function completer(){setCompleting(true);setErreurCompletion("");try{const res=await fetch(`/api/medicaments/${medicament.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({dci,voie,delaiAttenteViandeJ:Number(viande),delaiAttenteLaitJ:Number(lait),temporaire:false})});if(!res.ok){const j=await res.json();throw Error(j.error||"Enregistrement impossible");}router.refresh();}catch(e){setErreurCompletion(e instanceof Error?e.message:"Erreur");}finally{setCompleting(false);}}
   const [savingFavori, setSavingFavori] = useState(false);
   const [showSavoir, setShowSavoir] = useState(false);
 
@@ -206,6 +215,7 @@ export default function MedicamentFicheClient({ medicament, preconisations, term
 
   return (
     <div className="space-y-4">
+      {medicament.temporaire && <section className="rounded-xl border border-amber-300 p-3 space-y-2"><h2 className="font-bold">Fiche provisoire à compléter</h2><label className="block text-sm">Substance active<input value={dci} onChange={e=>{setDci(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label><label className="block text-sm">Voie vérifiée<input value={voie} onChange={e=>{setVoie(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label><div className="grid grid-cols-2 gap-2"><label className="text-sm">Viande (jours)<input type="number" min={0} step={1} value={viande} onChange={e=>{setViande(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label><label className="text-sm">Lait (jours)<input type="number" min={0} step={1} value={lait} onChange={e=>{setLait(e.target.value);setConfirmation(false)}} className="w-full border rounded p-2"/></label></div><p className="text-xs">Vérifie les délais prescrits. Les actes déjà saisis sans délai ne sont pas automatiquement régularisés.</p><label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmation} onChange={e=>setConfirmation(e.target.checked)}/>J’ai vérifié ces informations.</label><button type="button" disabled={completing||!confirmation||!dci.trim()||!voie.trim()||!/^\d+$/.test(viande)||!/^\d+$/.test(lait)} onClick={()=>void completer()} className="rounded bg-green-800 text-white px-3 py-2 disabled:opacity-50">Valider la fiche</button>{erreurCompletion&&<p role="alert">{erreurCompletion}</p>}</section>}
       {/* Header */}
       <div className="space-y-2 rounded-xl bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-1.5">
