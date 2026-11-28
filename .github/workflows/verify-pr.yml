@@ -17,6 +17,7 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx tsc --noEmit
+      - run: node --test --experimental-strip-types lib/dernier-velage.test.ts
       - run: node --test --experimental-strip-types lib/dose-units.test.ts
       - run: node --test --experimental-strip-types lib/withdrawal-interdit.test.ts
       - run: node --test --experimental-strip-types lib/withdrawal-unknown.test.ts
