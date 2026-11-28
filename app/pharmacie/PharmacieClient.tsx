@@ -1,4 +1,5 @@
 "use client";
+import MedicamentReferenceSelect from "./MedicamentReferenceSelect";
 import DelaiAttenteInput from "@/app/components/DelaiAttenteInput";
 import {formatDelai} from "@/lib/withdrawal";
 
@@ -7,7 +8,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Star, ChevronDown, Search, Plus, Save, X, Stethoscope } from "lucide-react";
 import { normalizeSearch } from "@/lib/fuzzy-search";
-import { CATEGORIES_MEDICAMENT, getCategorieMedicament, getCategoriesMedicamentUtilisees, trouverCategorieProche, normaliserLibelleCategorie, formatVoie, formatDoseBase, formatStatutConsultation } from "@/lib/medicament-categories";
+import { CATEGORIES_MEDICAMENT, getCategorieMedicament, getCategoriesMedicamentUtilisees, formatVoie, formatDoseBase, formatStatutConsultation } from "@/lib/medicament-categories";
 import OrdonnancesClient, { type OrdonnanceItem } from "@/app/ordonnances/OrdonnancesClient";
 import SaisiePrixClient from "./SaisiePrixClient";
 import { useOriginNavigation } from "@/lib/use-origin-navigation";
@@ -61,13 +62,10 @@ interface Props {
 
 // ── Add Médicament form ────────────────────────────────────────────────────────
 
-function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categories: ReturnType<typeof getCategoriesMedicamentUtilisees> }) {
+function AddMedicamentForm({ onDone }: { onDone: () => void }) {
   const [nom, setNom] = useState("");
   const [dci, setDci] = useState("");
-  const [categorie, setCategorie] = useState("ANTIBIOTIQUE");
-  const [creationCategorie, setCreationCategorie] = useState(false);
-  const [nouvelleCategorie, setNouvelleCategorie] = useState("");
-  const [erreurCategorie, setErreurCategorie] = useState("");
+  const [categorie, setCategorie] = useState("");
   const [voie, setVoie] = useState("");
   const [delai, setDelai] = useState("");
   const [delaiLait, setDelaiLait] = useState("");
@@ -78,7 +76,7 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!nom.trim() || !categorie.trim() || creationCategorie) return;
+    if (!nom.trim() || !categorie.trim()) return;
     setError("");
     setSaving(true);
     const response = await fetch("/api/medicaments", {
@@ -86,6 +84,7 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         nom,
+        referencesControlees:true,
         dci: dci || null,
         categorie,
         voie: voie || null,
@@ -95,7 +94,7 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
       }),
     });
     setSaving(false);
-    if (!response.ok) { setError("Impossible d’ajouter ce médicament."); return; }
+    if (!response.ok) { setError((await response.json()).error || "Impossible d’ajouter ce médicament."); return; }
     onDone();
     router.refresh();
   }
@@ -109,47 +108,12 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
             className="w-full border rounded-lg px-3 py-2 text-sm uppercase" placeholder="ex: METACAM" />
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Substance active (DCI)</label>
-          <input value={dci} onChange={(e) => setDci(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="ex: Méloxicam" />
+          <MedicamentReferenceSelect type="DCI" label="Substance active" value={dci} onChange={setDci}/>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Catégorie principale</label>
-          <select value={categorie} onChange={(e) => { setCategorie(e.target.value); setErreurCategorie(""); }} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" aria-label="Catégorie principale">
-            {!categories.some((c) => c.code === categorie) && <option value={categorie}>{categorie} (nouvelle)</option>}
-            {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-          </select>
-          <button type="button" onClick={() => { setCreationCategorie((v) => !v); setErreurCategorie(""); }} className="mt-2 flex items-center gap-1 text-xs font-semibold text-blue-700">
-            <Plus size={14} /> Nouvelle catégorie
-          </button>
-          {creationCategorie && (
-            <div className="mt-2 rounded-lg border border-blue-200 bg-white p-2 space-y-2">
-              <label className="block text-xs text-gray-600">Nom de la nouvelle catégorie</label>
-              <input value={nouvelleCategorie} maxLength={80} onChange={(e) => { setNouvelleCategorie(e.target.value); setErreurCategorie(""); }} placeholder="Ex. Antispasmodique" className="w-full border rounded-lg px-2 py-2 text-sm" />
-              {erreurCategorie && <p role="alert" className="text-xs text-amber-800">{erreurCategorie}</p>}
-              <div className="flex gap-2">
-                <button type="button" onClick={() => {
-                  const value = nouvelleCategorie.trim().replace(/\s+/g, " ");
-                  if (!value) { setErreurCategorie("Indique un nom de catégorie."); return; }
-                  const proche = trouverCategorieProche(value, categories);
-                  if (proche) { setErreurCategorie(`Catégorie existante ou très proche : « ${proche.label} ». Sélectionne-la dans la liste plutôt que de créer un doublon.`); return; }
-                  if (categories.some((c) => normaliserLibelleCategorie(c.label) === normaliserLibelleCategorie(value))) { setErreurCategorie("Cette catégorie existe déjà."); return; }
-                  setCategorie(value);
-                  setCreationCategorie(false);
-                  setNouvelleCategorie("");
-                }} className="rounded-lg bg-blue-600 px-3 py-2 text-xs text-white">Ajouter et sélectionner</button>
-                <button type="button" onClick={() => { setCreationCategorie(false); setNouvelleCategorie(""); }} className="rounded-lg border px-3 py-2 text-xs">Annuler</button>
-              </div>
-            </div>
-          )}
-          {!creationCategorie && !categories.some((c) => c.code === categorie) && <p className="mt-1 text-xs text-blue-700">Nouvelle catégorie « {categorie} » : elle sera conservée avec le médicament et proposée lors des prochains ajouts.</p>}
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Voie admin.</label>
-          <input value={voie} onChange={(e) => setVoie(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="IM, SC, PO..." />
+          <MedicamentReferenceSelect type="CATEGORIE" label="Catégorie principale" value={categorie} onChange={setCategorie}/></div><div><MedicamentReferenceSelect type="VOIE" label="Voie d’administration" value={voie} onChange={setVoie}/>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -163,7 +127,7 @@ function AddMedicamentForm({ onDone, categories }: { onDone: () => void; categor
       </div>
       {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
       <div className="flex gap-2 pt-1">
-        <button type="submit" disabled={saving || !nom.trim()}
+        <button type="submit" disabled={saving || !nom.trim() || !categorie.trim()}
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
           <Save size={14} /> Ajouter
         </button>
@@ -371,7 +335,7 @@ function Repertoire({ medicaments, onSaisiePrix }: { medicaments: MedicamentItem
         </div>
       </div>
 
-      {showAddMed && <AddMedicamentForm categories={categories} onDone={() => setShowAddMed(false)} />}
+      {showAddMed && <AddMedicamentForm onDone={() => setShowAddMed(false)} />}
 
       {filtered.length === 0 && (
         <div className="text-center py-12 text-gray-400 text-sm">Aucun médicament ne correspond à la recherche</div>

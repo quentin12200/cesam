@@ -26,6 +26,7 @@ jobs:
       - run: node --test tests/executants-profil.test.mjs
       - run: node --test tests/traitements-posologie.test.mjs
       - run: node --test tests/gmq-period-rankings.test.mjs tests/gmq-father-genealogy.test.mjs
+      - run: node --test tests/pharmacie-referentiels-communs.test.mjs
       - run: node --test tests/pharmacie-category-picker.test.mjs
       - run: node --test tests/taureaux-identity-edit.test.mjs
       - run: node --test --experimental-strip-types lib/medicament-custom-categories.test.ts

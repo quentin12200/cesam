@@ -1,3 +1,4 @@
+import { verifierReferences } from "@/lib/pharmacie-referentiels-server";
 import { valeurCategoriePersonnalisee } from "@/lib/medicament-categories";
 import { delaiRenseigne } from "@/lib/withdrawal";
 import { NextRequest, NextResponse } from "next/server";
@@ -12,16 +13,18 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
   const {
-    nom, dci, forme, categorie, voie, dosagePourKg, uniteDosage,
+    nom, forme, dosagePourKg, uniteDosage,
     delaiAttenteViandeJ, delaiAttenteLaitJ, prescriptionRequise, actif, commentaire,
     stockActuel, stockUnite, stockSeuilAlert, favori, actions, temporaire,
     conservationOuvertureStatut, conservationOuvertureJours,
     conservationOuvertureCondition, conservationOuvertureSource, conservationOuvertureNote,
   } = body;
 
+  let {dci,categorie,voie}=body;
   const prev = await prisma.medicament.findUnique({ where: { id } });
   if (!prev) return NextResponse.json({ error: "Médicament non trouvé" }, { status: 404 });
 
+  if(body.referencesControlees===true){const result=await verifierReferences({dci,categorie,voie},prev);if(result.error)return NextResponse.json({error:result.error},{status:400});({dci,categorie,voie}={dci,categorie,voie,...result.output});}
   if (temporaire === false && prev.temporaire && (!(dci ?? prev.dci)?.trim() || !(voie ?? prev.voie)?.trim() || ![delaiAttenteViandeJ === undefined ? prev.delaiAttenteViandeJ : delaiAttenteViandeJ, delaiAttenteLaitJ === undefined ? prev.delaiAttenteLaitJ : delaiAttenteLaitJ].every(delaiRenseigne))) return NextResponse.json({error:"Complète la substance, la voie et les deux délais vérifiés."},{status:400});
   if ([delaiAttenteViandeJ,delaiAttenteLaitJ].some(v=>v!=null&&!delaiRenseigne(v))) return NextResponse.json({error:"Délai invalide"},{status:400});
   const prevFields: Record<string, unknown> = {};
