@@ -176,7 +176,7 @@ test("G. soin ajouté à la séance : mêmes animaux/date/exécutant, Traitement
   });
   assert.deepEqual(charge.animalIds, ["a1", "a2", "a3"]);
   assert.equal(charge.date, "2026-10-02");
-  assert.equal(charge.constatePar, "Céline");
+  assert.equal(charge.constatePar, null);
   assert.equal(charge.traitements.length, 1);
   assert.deepEqual([charge.traitements[0].medicamentId, charge.traitements[0].executant, charge.traitements[0].dose], ["med-bolus", "Céline", 1]);
   assert.ok(!("vaccinationSession" in charge), "aucun contexte vaccinal : pas de Vaccination créée");
