@@ -52,7 +52,9 @@ test("pesée fictive, contrôle de saisie et remise à zéro",async({page})=>{
 test("vêlage jumeaux mixtes : historique, filiation et réinitialisation",async({page})=>{
  await page.goto("/lab");
  await page.getByLabel("Nombre de veaux").selectOption("2");
- await page.getByLabel("Numéro du veau 1").fill("9901");
+ await page.getByLabel("Numéro du veau 1").click();
+ await page.getByLabel("Numéro du veau 1").pressSequentially("9901");
+ await expect(page.getByLabel("Numéro du veau 1")).toHaveValue("9901");
  await page.getByLabel("État du veau 2").selectOption("MORT_NE");
  await expect(page.getByLabel("Numéro du veau 2")).toHaveCount(0);
  await page.getByLabel("Père déclaré").selectOption("DEMO-PERE-A");
@@ -69,7 +71,9 @@ test("vêlage jumeaux mixtes : historique, filiation et réinitialisation",async
 });
 test("vêlage : filiation contradictoire et cycle postérieur",async({page})=>{
  await page.goto("/lab");
- await page.getByLabel("Numéro du veau 1").fill("9901");
+ await page.getByLabel("Numéro du veau 1").click();
+ await page.getByLabel("Numéro du veau 1").pressSequentially("9901");
+ await expect(page.getByLabel("Numéro du veau 1")).toHaveValue("9901");
  await page.getByLabel("Père déclaré").selectOption("DEMO-PERE-A");
  await page.getByLabel("Père issu de la gestation").selectOption("DEMO-PERE-B");
  await page.getByRole("button",{name:"Simuler le vêlage"}).click();
@@ -275,4 +279,28 @@ test("exécutant : profil actif en premier et choix manuel conservé",async({pag
  await expect(select).toHaveValue("A Démo");
  await zone.getByRole("button",{name:"Nouvel acte fictif"}).click();
  await expect(select).toHaveValue("Céline");
+});
+
+test("référentiels pharmacie : sélection, doublon exact et ajout contrôlé",async({page})=>{
+ await page.goto("/lab");const zone=page.getByRole("region",{name:"Référentiels fictifs"});
+ const dci=zone.getByLabel("Substance fictive",{exact:true});
+ await dci.selectOption("Substance démo");
+ await zone.getByRole("button",{name:"Ajouter Substance fictive"}).click();
+ await zone.getByLabel("Nouvelle valeur Substance fictive").fill("  SUBSTANCE DEMO  ");
+ await zone.getByRole("button",{name:"Ajouter et sélectionner"}).click();
+ await expect(dci).toHaveValue("Substance démo");
+ await expect(zone.getByLabel("Nouvelles valeurs fictives")).toHaveText("0");
+ await zone.getByRole("button",{name:"Ajouter Substance fictive"}).click();
+ await zone.getByLabel("Nouvelle valeur Substance fictive").fill("Substance démox");
+ await zone.getByRole("button",{name:"Ajouter et sélectionner"}).click();
+ await expect(zone.getByText("Valeur proche",{exact:true})).toBeVisible();
+ await zone.getByRole("button",{name:"Utiliser Substance démo"}).click();
+ await expect(dci).toHaveValue("Substance démo");
+ await zone.getByRole("button",{name:"Ajouter Substance fictive"}).click();
+ await zone.getByLabel("Nouvelle valeur Substance fictive").fill("Autre exemple fictif");
+ await zone.getByRole("button",{name:"Ajouter et sélectionner"}).click();
+ await expect(dci).toHaveValue("Autre exemple fictif");
+ await expect(zone.getByLabel("Nouvelles valeurs fictives")).toHaveText("1");
+ await zone.getByLabel("Voie fictive",{exact:true}).selectOption("SC");
+ await zone.getByLabel("Catégorie fictive",{exact:true}).selectOption("Catégorie démo");
 });

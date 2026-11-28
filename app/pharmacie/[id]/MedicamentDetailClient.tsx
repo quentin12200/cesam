@@ -1,11 +1,12 @@
 "use client";
+import MedicamentReferenceSelect from "../MedicamentReferenceSelect";
 
 import { useState } from "react";
 import { formatFrequence, formatDureePreconisation } from "@/lib/preconisation-schedule";
 import { useRouter } from "next/navigation";
 import { Save, CheckCircle2, Plus, AlertTriangle, ShieldCheck } from "lucide-react";
-import { getCategoriesMedicamentUtilisees, getCategorieMedicament, valeurCategoriePersonnalisee } from "@/lib/medicament-categories";
-import PreconisationFields, { VoieSelect } from "./PreconisationFields";
+import { getCategorieMedicament, valeurCategoriePersonnalisee } from "@/lib/medicament-categories";
+import PreconisationFields from "./PreconisationFields";
 import RecordActionsMenu from "@/components/RecordActionsMenu";
 import { voiesPossibles } from "@/lib/vaccine-administration";
 
@@ -68,7 +69,6 @@ const emptyPreco = {
 };
 
 export default function MedicamentDetailClient({ medicament, preconisations, ficheSeulement = false }: { medicament: MedicamentData; preconisations: PreconisationData[]; ficheSeulement?: boolean }) {
-  const categories = getCategoriesMedicamentUtilisees([medicament.categorie]);
   const router = useRouter();
 
   const [form, setForm] = useState({
@@ -113,6 +113,7 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         nom: form.nom,
+        referencesControlees:true,
         dci: form.dci || null,
         forme: form.forme || null,
         categorie: selected,
@@ -201,9 +202,7 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
         <div><label className="text-xs text-gray-500 block mb-1">Nom</label><input required value={form.nom} onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm font-semibold" /></div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Substance active</label>
-            <input value={form.dci} onChange={(e) => setForm((f) => ({ ...f, dci: e.target.value }))}
-              className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="À compléter" />
+            <MedicamentReferenceSelect type="DCI" label="Substance active" value={form.dci} onChange={v=>setForm(f=>({...f,dci:v}))}/>
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Forme / présentation</label>
@@ -213,14 +212,11 @@ export default function MedicamentDetailClient({ medicament, preconisations, fic
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Catégorie</label>
-            <input list="categories-medicament-fiche" value={form.categorie} onChange={(e) => setForm((f) => ({ ...f, categorie: e.target.value }))} maxLength={80} placeholder="Ex. Antispasmodique" className="w-full border rounded-lg px-3 py-2 text-sm bg-white" />
-            <datalist id="categories-medicament-fiche">{categories.filter((c) => c.code !== "AUTRE").map((c) => <option key={c.code} value={c.code} label={c.label} />)}</datalist>
-            <p className="text-xs text-gray-500 mt-1">Choisir ou saisir une nouvelle catégorie.</p>
+            <MedicamentReferenceSelect type="CATEGORIE" label="Catégorie" value={form.categorie} onChange={v=>setForm(f=>({...f,categorie:v}))}/>
             {medicament.categorie !== "AUTRE" && <button type="button" onClick={() => { setRenaming(!renaming); setRenameLabel(getCategorieMedicament(medicament.categorie).label); }} className="mt-2 text-xs text-blue-700 underline">Renommer cette catégorie partout</button>}
             {renaming && <div className="mt-2 space-y-2"><input aria-label="Nouveau nom de catégorie" value={renameLabel} maxLength={80} onChange={(e) => setRenameLabel(e.target.value)} className="w-full border rounded px-2 py-2 text-sm" /><button type="button" className="rounded bg-blue-600 px-3 py-2 text-white text-xs" onClick={async () => { const response = await fetch("/api/medicaments/categories", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ancienCode: medicament.categorie, nouveauNom: renameLabel }) }); if (!response.ok) { setCategoryError((await response.json()).error || "Renommage impossible"); return; } setRenaming(false); router.refresh(); }}>Confirmer le renommage</button></div>}
           </div>
-          <VoieSelect
+          <MedicamentReferenceSelect type="VOIE"
             label="Voie usuelle"
             value={form.voie}
             onChange={(value) => setForm((f) => ({ ...f, voie: value }))}
