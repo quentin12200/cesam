@@ -129,6 +129,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
 
   function choisirMedicament(medicament: Medicament | null) {
     if (medicament) {
+      setMedicaments(prev=>prev.some(m=>m.id===medicament.id)?prev:[...prev,medicament]);
       appliquerMedicament(medicament);
       return;
     }
@@ -217,7 +218,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!effectiveNom.trim() || !doseValide(dose,uniteDosage)) return;
+    if (!effectiveNom.trim() || !doseValide(dose,uniteDosage) || (selectedMed?.temporaire && (!lireDose(dose)||!voie))) return;
     setSaving(true);
     await fetch("/api/traitements", {
       method: "POST",
@@ -294,6 +295,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
       <div>
         <label className="text-xs text-gray-500 block mb-1">Médicament *</label>
         <MedicamentPicker
+          allowQuickCreate
           medicaments={medicaments}
           value={selectedMed ?? null}
           onChange={choisirMedicament}
@@ -307,6 +309,7 @@ export default function TraitementForm({ animalId, evenementId, onClose, initial
         </div>
       )}
 
+      {selectedMed?.temporaire && <div className="grid grid-cols-2 gap-2 text-xs"><label>Viande (jours)<input type="number" min={0} step={1} value={delaiAttenteViandeJ ?? ""} onChange={e=>setDelaiAttenteViandeJ(e.target.value===""?null:Number(e.target.value))} className="w-full border rounded p-2"/></label><label>Lait (jours)<input type="number" min={0} step={1} value={delaiAttenteLaitJ ?? ""} onChange={e=>setDelaiAttenteLaitJ(e.target.value===""?null:Number(e.target.value))} className="w-full border rounded p-2"/></label><p className="col-span-2 text-amber-800">Vide = délai inconnu, à compléter.</p></div>}
       {(delaiAttenteViandeJ != null || delaiAttenteLaitJ != null) && (
         <div className="text-xs bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-orange-700">
           {delaiAttenteViandeJ != null && <>Attente viande : {delaiAttenteViandeJ} jour(s)</>}
