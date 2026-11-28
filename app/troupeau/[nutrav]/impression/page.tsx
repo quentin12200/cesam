@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { differenceInDays, addDays } from "date-fns";
 import { formatAge, formatDate, isMheVendable, getVaccinProtocolSteps, DEFAULT_PROTOCOLES, type ProtocoleVaccinConfig } from "@/lib/utils";
-import { getAttenteInfoForTraitement } from "@/lib/withdrawal";
+import { getAttenteInfoForTraitement, delaisInconnus } from "@/lib/withdrawal";
 import PrintButton from "@/app/components/PrintButton";
 
 interface PageProps {
@@ -76,7 +76,7 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
   const traitementsActifs = animal.traitements.filter((t) => {
     const dateFin = addDays(new Date(t.dateDebut), t.dureeJours);
     const attente = getAttenteInfoForTraitement(t, now);
-    return now < dateFin || attente.enAttente;
+    return now < dateFin || attente.enAttente || Object.values(delaisInconnus(t)).some(Boolean);
   });
 
   return (
@@ -184,10 +184,10 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
                       <Td>{t.dureeJours}j</Td>
                       <Td>{fmt(dateFin)}</Td>
                       <Td className={attente.enAttenteViande ? "font-bold text-orange-700" : ""}>
-                        {attente.dateFinAttenteViande ? fmt(attente.dateFinAttenteViande) : "Aucune"}
+                        {attente.viandeInterdite ? "Interdit" : delaisInconnus(t).viande ? "Inconnu" : attente.dateFinAttenteViande ? fmt(attente.dateFinAttenteViande) : "—"}
                       </Td>
                       <Td className={attente.enAttenteLait ? "font-bold text-orange-700" : ""}>
-                        {attente.dateFinAttenteLait ? fmt(attente.dateFinAttenteLait) : "Aucune"}
+                        {attente.laitInterdit ? "Interdit" : delaisInconnus(t).lait ? "Inconnu" : attente.dateFinAttenteLait ? fmt(attente.dateFinAttenteLait) : "—"}
                       </Td>
                       <Td>{t.ordonnanceNumero ?? "—"}</Td>
                     </tr>
@@ -212,7 +212,7 @@ export default async function ImpressionAnimalPage({ params }: PageProps) {
                   .filter((t) => {
                     const dateFin = addDays(new Date(t.dateDebut), t.dureeJours);
                     const attente = getAttenteInfoForTraitement(t, now);
-                    return now >= dateFin && !attente.enAttente;
+                    return now >= dateFin && !attente.enAttente && !Object.values(delaisInconnus(t)).some(Boolean);
                   })
                   .map((t) => (
                     <tr key={t.id} className="odd:bg-white even:bg-gray-50">
